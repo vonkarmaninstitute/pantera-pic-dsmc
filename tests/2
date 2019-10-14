@@ -1,0 +1,30 @@
+close all
+clear
+clc
+
+% Load simulation result
+dd = load('../outp');
+
+% Geometrical parameters
+Ainject = 1*0.2; % [m^2]
+vol     = 2.1*1*0.2; % [m^3]
+Fnum    = 1.0e18;    % [-]
+dt      = 1.e-5;     % [s]
+Nt      = numel(dd); % Number of timesteps
+
+tvect = [0:dt:Nt];
+
+% Compute number of real particles
+Nreal = dd*Fnum;
+
+% Compute theoretical flux of particles through surface from Maxwellian VDF
+Ndot = Ainject*MaxwellianFlux(n, T, RGAS, u);
+
+figure
+plot(Nreal)
+xlabel('Timestep')
+ylabel('Number of (real) particles in domain')
+
+
+
+ 

@@ -1,0 +1,110 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!                 Input file for PANTERA                                !!!!
+!!!!                                                                       !!!!
+!!!! The program reads is line by line, and when it finds a known line, it !!!!
+!!!! reads and saves the value in the next one.                            !!!!
+!!!! All other lines are ignored (you can comment etc).                    !!!!
+!!!! You can put trailing comments on lines, starting with "!" symbol:     !!!!
+!!!! the program will remove them before checking the content of a line.   !!!!
+!!!!                                                                       !!!!
+!!!! All units are SI [m, kg, s, ...]                                      !!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+! ========= Computational domain and grid ===========
+
+Axial_symmetry_bool:
+    .FALSE.
+Domain_limits:
+    0.  2.1      -0.5  0.5      -0.1  0.1
+Domain_periodicity:
+    .TRUE.   .TRUE.   .TRUE.
+Number_of_cells:
+    21  8  1
+
+! ========= Numerical parameters ====================
+
+Fnum:  ! Ratio of real-to-simulated particles
+    1.E18
+Timestep:
+    1.E-4
+Number_of_timesteps:
+    100
+RNG_seed:
+    12345
+
+! ========= Collisions ==============================
+
+Collision_type: ! [MCC / DSMC / NONE]
+  MCC 
+
+MCC_background_dens:
+  1.0e18
+MCC_cross_section:  
+  1.0e-18
+MCC_species: ! NOT IMPLEMENTED YET!
+
+! DSMC VHS collisions  ! NOT IMPLEMENTED YET!
+
+! ========= Initial particle seed ===================
+
+Initial_particles_bool:
+    .TRUE.
+Initial_particles_dens:
+    1.e21
+Initial_particles_vel:
+    100.   0.  0.
+Initial_particles_Ttra:
+    100.  100.  100.
+Initial_particles_Trot:
+    0. 
+Initial_particles_species_ID: ! NOT IMPLEMENTED YET!
+
+! ========== Injection from boundaries ==============
+
+Boundaries_inject_bool:
+    .FALSE.
+
+Boundaries_inject_which_bool:        ! From which boundary you want to inject particles
+    .FALSE.  .TRUE.  .TRUE.  .FALSE. 
+Boundaries_inject_dens:
+    1.e23
+Boundaries_inject_vel:
+    -300. 100. 0.
+Boundaries_inject_Ttra:
+    10.
+Boundaries_inject_Trot:
+    0.
+Boundaries_inject_species_ID: ! NOT IMPLEMENTED YET!
+
+! ========== Injection from line source =============
+
+Linesource_bool:
+    .FALSE.
+Linesource_center:
+    0.5   0.
+Linesource_length_y:
+    0.2
+Linesource_dens:
+    1.e24
+Linesource_vel:
+    200.  0. 0.
+Linesource_Ttra:
+    0.0001
+Linesource_Trot:
+    0.
+
+! ========= MPI parallelization =====================
+! == Style for MPI domain partition can be:
+! ==
+! == 0: longitudinal strips (along x)
+! == 1: blocks (equally sized)
+!
+! For "blocks" style, provide "Domain_partition_num_blocks", giving
+! the number of blocks along x and y.
+! We expect the number of processes to be N_BLOCKS_X*N_BLOCKS_Y
+
+Partition_style:
+    0
+
+Partition_num_blocks:
+    3  3

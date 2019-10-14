@@ -1,0 +1,154 @@
+
++++++++++++++ README FOR PANTERA +++++++++++++++++
+
+! Main developers: S. Boccelli  - stefano.boccelli@polimi.it   - Politecnico di Milano / VKI
+!                  F. Bariselli - federico.bariselli@polimi.it - Politecnico di Milano / VKI
+! 
+! Original code by: A. Frezzotti - Politecnico di Milano
+! See "history" section for a list of authors.
+
+##################################################
+##### Compiling, running and debugging  ##########
+##################################################
+
+PANTERA works under LINUX.
+For compiling pantera, type "make" in the main directory.
+This will read the Makefile and create the "pantera.exe" executable.
+If it doesn't run, make sure that:
+> you have a compiler installed (gcc)
+> you have MPI installed (in Debian/Ubuntu, packages "openmpi-common" and "libopenmpi-dev").
+
+After compiling, run PANTERA with:
+
+(single process)
+$ ./pantera.exe
+
+(multi-process with MPI, with NUM_PROC the number of threads)
+$ mpirun -np NUM_PROC ./pantera.exe 
+
+Pantera reads the file "input" in the current folder.
+For debugging, you can use gdb. As long as you are running on one single machine
+for debugging purposes, you can use gdb even with multiple processes:
+
+$ mpirun -np 4 xterm -e gdb pantera.exe
+
+This will run gdb ob multiple xterm instances. Type "run" in them all to start the 
+processes (they will likely wait for each other at the first MPI_BARRIER that they 
+find.
+
+##################################################
+##### Notes on the input file ####################
+##################################################
+
+The input file is read by PANTERA in sequential order.
+When the content of a line is recognized, the values in the right next line
+are saved into the proper variables. Don't put empty lines between the keyword line
+and the line with the values.
+
+All unrecognized lines are ignored, so that you can insert comments here and there,
+but not between one keyword-line and the following one.
+
+
+##################################################
+##### What is PANTERA ############################
+##################################################
+
+PANTERA is a parallel 2D hybrid PIC/DSMC code for simulating rarefied gases and plasmas,
+written in Fortran 90.
+
+~~~~~ Parallelization
+
+It is parallelized with MPI, supporting some different domain partitioning schemes.
+
+~~~~~ Geometry
+
+Simulations can be either cartesian or axisymmetric, but 2D for now.
+The z direction is treated as periodic, and only 1 cell will be attributed.
+
+~~~~~ Axisymmetric simyulations
+
+If the axisymmetric, particles are moved in the Cartesian space, and then brought back 
+to the plane by rotation. Velocity is also rotated.
+The $x$ axis is taken as symmetry axis, and specular reflection is imposed to particles
+that reach it.
+No scaling of the particles is implemented so far: near the axis, the volume of cells
+decreases, so that the number of particles in these cells is lower and the statistical
+scatter is expected to increase.
+
+ACTUALLY AXISYMMETRY IS NOT IMPLEMENTED AT ALL FOR NOW.....
+
+
+##################################################
+##### For the developer ##########################
+##################################################
+
+A couple of notes for the developer.
+You are very welcome to contribute to Pantera! Please try to keep the programming style 
+similar to the one that you find (3 spaces for indenting, uppercase for language directives,
+and maybe uppercase for other stuff as well).
+
+REMINDER:
+Remember to write real numbers with a decimal, or at least a dot, as "2.", not just "2". 
+Fortran is not Matlab and you will introduce a bug.
+Also mind divisions when integers are involved. You may get a zero where you naively 
+expected a real number. Convert integers to reals for divisions.
+
+BUT MOST OF ALL, FOLLOW THE KISS PHILOSOPHY: Keep It Simple Stupid.
+
+Keep in mind our aim:
+- We want Pantera to grow in power and allow to run (reasonably) complex and heavy 
+  simulations;
+- But it must allow average-level programmers and students to develop it and include 
+  new physics. Many of us want to do physics, not IT...
+  And mainly, an unnecessarily complex code will hinder development and lower the 
+  outcome of any programming effort.
+
+Please, comment thoroughly the code. You will forget what you did and will need to 
+refresh your memory. Others will need to understand (quickly) what you did to develop 
+further.
+
+##################################################
+##### History ####################################
+##################################################
+
+Pantera grew out from a DSMC code initially written by prof. Aldo Frezzotti, in F77.
+This code was parallelized in MPI and adapted in Fortran 90 by Federico Bariselli
+("the Gambler" code).
+Stefano Boccelli partially rewrote it to introduce hybrid PIC/DSMC capabilities.
+
+Along the way, a number of MSc students worked on it as well, bringing sometimes 
+little and sometimes huge contributions. 
+We shall thank:
+Hermes Scandelli,
+.......
+.....
+...
+.....
+.......
+
+And probably many names were lost in time and space. 
+
+Logo credits: S. Boccelli
+
+===========================================================================
+
+NOTES: 
+  - Per estendere al multispecie, (tra le varie cose) tutti i punti in cui compare "RGAS" vanno personalizzati. 
+    Magari una funzione/subroutine tipo "RGAS_SPECIES(S_ID)" che dia RGAS dato l'ID della specie.
+  - Magari le subroutines opportune si possono implementare nel modulo particle.f90
+
+  - Per le collisioni in multispecie, uno puo' dare nel file di input la specie che deve collidere.    Esempio:
+    ###################
+    # MCC_species:    # 
+    #    e-           #
+    # DSMC_species:   #
+    #    Xe           #
+    ###################
+
+QUESTIONS:
+
+
+TODO:
+  - Implement line source
+  - Implement advection with right TRES or whatever it is
+  - Implement exchange of particles (both injected particles and advected ones)

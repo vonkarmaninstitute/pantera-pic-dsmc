@@ -109,12 +109,13 @@ CONTAINS
   ! It works also for monatomic, if you give Trot = 0.                 !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  SUBROUTINE MAXWELL(UX, UY, UZ, TX, TY, TZ, TR, VX, VY, VZ, EI, RGAS)
+  SUBROUTINE MAXWELL(UX, UY, UZ, TX, TY, TZ, TR, VX, VY, VZ, EI, M)
 
   IMPLICIT NONE
 
   REAL(KIND=8), INTENT(IN)    :: UX, UY, UZ, TX, TY, TZ, TR
-  REAL(KIND=8), INTENT(IN)    :: RGAS
+  !REAL(KIND=8), INTENT(IN)    :: RGAS !RGAS = KB / M
+  REAL(KIND=8), INTENT(IN)    :: M ! Molecular mass
   REAL(KIND=8), INTENT(INOUT) :: VX, VY, VZ, EI
 
   INTEGER                     :: I
@@ -134,17 +135,21 @@ CONTAINS
   DO I = 1,3
 
      ! Step 1.
-
-     R = rand()
+      R = RAND()
+      DO WHILE (R < 1.0D-13)
+         R = RAND()
+      END DO
+      
      TETA = PI2*R
 
      ! Step 2.
 
-     BETA = 1./SQRT(2.*RGAS*TT(I))
+     BETA = 1./SQRT(2.*KB/M*TT(I))
 
      ! R goes from 0 to 1 included. Remove the extremes in a very rough way
      ! or the log() will explode
-     R = rf()*0.99999999999 + 1.0d-13 ! Please fix this!!!!! MAKE THIS ELEGANT!!!
+     !R = rf()*0.99999999999 + 1.0d-13 ! Please fix this!!!!! MAKE THIS ELEGANT!!!
+     ! Fixed at the root.
      RO = SQRT(-LOG(R))/BETA
 
      VEL(I) = RO*COS(TETA)
@@ -229,9 +234,9 @@ CONTAINS
      ! Open file for writing
      OPEN(10, FILE=filename )
 
-     WRITE(10,*) '% Timestep | X | Y | Z | proc_ID'
+     WRITE(10,*) '% Timestep | X | Y | Z | S_ID | proc_ID'
      DO IP = 1, NP_PROC
-        WRITE(10,*) TIMESTEP, particles(IP)%X, particles(IP)%Y, particles(IP)%Z, PROC_ID
+        WRITE(10,*) TIMESTEP, particles(IP)%X, particles(IP)%Y, particles(IP)%Z, particles(IP)%S_ID, PROC_ID
      END DO
 
   END SUBROUTINE DUMP_PARTICLES_FILE
@@ -328,5 +333,42 @@ CONTAINS
   str = TRIM(str_tmp)
 
   END SUBROUTINE STRIP_COMMENTS
+
+
+  SUBROUTINE SPLIT_STR(STRING, DELIMITER, STRARRAY, N_STR)
+   ! splitstring splits a string to an array of
+   ! substrings based on a selected delimiter
+   ! note any facing space/blank in substrings will be removed
+
+   IMPLICIT NONE
+
+   INTEGER :: N_STR
+   CHARACTER(LEN=80), allocatable :: STRARRAY(:)
+   CHARACTER(LEN=*) :: STRING
+   INTEGER   :: n, i, j, idx
+   CHARACTER(len=80) :: STRTMP = ''
+   CHARACTER :: DELIMITER
+
+   n=LEN(STRING)
+   ALLOCATE(STRARRAY(n))
+   j = 1
+   idx = 0
+   DO i=1, n
+      
+      IF (STRING(i:i) /= DELIMITER) THEN
+         STRTMP(j:j) = STRING(i:i)
+         j = j + 1
+         IF (i==n .OR. STRING(i+1:i+1) == DELIMITER) THEN
+            j = 1
+            idx = idx + 1
+            STRARRAY(idx) = STRTMP
+            STRTMP = ''
+         END IF
+      END IF
+   END DO
+
+   N_STR = idx
+
+end subroutine SPLIT_STR
 
 END MODULE tools

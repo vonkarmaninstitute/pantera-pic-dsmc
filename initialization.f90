@@ -25,6 +25,9 @@ MODULE initialization
       CHARACTER*512      :: line
       INTEGER            :: ReasonEOF
 
+      CHARACTER*512      :: MIXTURE_DEFINITION
+      CHARACTER*64       :: MIX_INIT_NAME
+
       ! Open input file for reading
       OPEN(UNIT=in1,FILE='input', STATUS='old',IOSTAT=ios)
 
@@ -57,6 +60,17 @@ MODULE initialization
          IF (line=='Number_of_timesteps:')     READ(in1,*) NT
          IF (line=='RNG_seed:')                READ(in1,*) RNG_SEED_GLOBAL
 
+         ! ~~~~~~~~~~~~~  Multispecies ~~~~~~~~~~~~~~~
+         IF (line=='Species_file:') THEN
+            READ(in1,*) SPECIES_FILENAME
+            CALL READ_SPECIES
+         END IF
+
+         IF (line=='Def_mixture:') THEN
+            READ(in1,'(A)') MIXTURE_DEFINITION
+            CALL DEF_MIXTURE(MIXTURE_DEFINITION)
+         END IF
+
          ! ~~~~~~~~~~~~~  Collision type  ~~~~~~~~~~~~~~~~~
          IF (line=='Collision_type:')          READ(in1,*) COLLISION_TYPE
          IF (line=='MCC_background_dens:')     READ(in1,*) MCC_BG_DENS
@@ -68,6 +82,10 @@ MODULE initialization
          IF (line=='Initial_particles_vel:')   READ(in1,*) UX_INIT, UY_INIT, UZ_INIT
          IF (line=='Initial_particles_Ttra:')  READ(in1,*) TTRAX_INIT, TTRAY_INIT, TTRAZ_INIT
          IF (line=='Initial_particles_Trot:')  READ(in1,*) TROT_INIT
+         IF (line=='Initial_particles_mixture:') THEN
+            READ(in1,*) MIX_INIT_NAME
+            MIX_INIT = MIXTURE_NAME_TO_ID(MIX_INIT_NAME)
+         END IF
 
          ! ~~~~~~~~~~~~~  Particle injection at boundaries ~~~~~~~~~~~
          IF (line=='Boundaries_inject_bool:')      READ(in1,*)BOOL_BOUNDINJECT
@@ -90,10 +108,12 @@ MODULE initialization
          IF (line=='Partition_style:')         READ(in1,*) DOMPART_TYPE
          IF (line=='Partition_num_blocks:')    READ(in1,*) N_BLOCKS_X, N_BLOCKS_Y
 
+         
       END DO ! Loop for reading input file
 
       CLOSE(in1) ! Close input file
 
+      
       CALL INPUT_DATA_SANITY_CHECK ! Check the values that were read
       CALL PRINTINPUT              ! Print values
 
@@ -106,7 +126,7 @@ MODULE initialization
    SUBROUTINE PRINTINPUT
 
       IMPLICIT NONE
-   
+      INTEGER :: j, k
       CHARACTER(LEN=512) string
 
       IF (PROC_ID == 0) THEN ! Only master prints
@@ -244,12 +264,140 @@ MODULE initialization
              WRITE(*,'(A5,A50,I9,I9)') '    ', string, N_BLOCKS_X, N_BLOCKS_Y
          END IF
 
+         ! ~~~~ Multispecies ~~~~
+         WRITE(*,*) '  =========== Species ========================='
+         WRITE(*,*) 'File read'
+         WRITE(*,'(A30,I9)') 'Number of species present: ', N_SPECIES
 
 
+         WRITE(*,*) '  =========== Mixtures ========================='
+         DO j = 1, N_MIXTURES
+            WRITE(*,*)'Contents of mixture ', MIXTURES(j)%NAME, 'with ', MIXTURES(j)%N_COMPONENTS, ' components'
+            DO k = 1, MIXTURES(j)%N_COMPONENTS
+               WRITE(*,*) 'Mix component ', MIXTURES(j)%COMPONENTS(k)%NAME, &
+                        ' with frac ', MIXTURES(j)%COMPONENTS(k)%MOLFRAC, &
+                        ' and ID ', MIXTURES(j)%COMPONENTS(k)%ID
+            END DO
+         END DO
+         
       END IF
 
    END SUBROUTINE PRINTINPUT
 
+
+   SUBROUTINE READ_SPECIES
+      
+      IMPLICIT NONE
+
+      INTEGER, PARAMETER :: in2 = 445
+      INTEGER            :: ios
+      CHARACTER*512      :: line
+      INTEGER            :: ReasonEOF
+
+      CHARACTER*10 :: NAME
+      REAL(KIND=8) :: MOLWT
+      REAL(KIND=8) :: MOLMASS
+      INTEGER      :: ROTDOF
+      REAL(KIND=8) :: ROTREL
+      INTEGER      :: VIBDOF
+      REAL(KIND=8) :: VIBREL
+      REAL(KIND=8) :: VIBTEMP
+      REAL(KIND=8) :: SPWT
+      REAL(KIND=8) :: CHARGE
+   
+      ! Open input file for reading
+      OPEN(UNIT=in2,FILE=SPECIES_FILENAME, STATUS='old',IOSTAT=ios)
+
+      IF (ios.NE.0) THEN
+         PRINT*
+         WRITE(*,*)'  Attention, species definition file not found! ABORTING.'
+         PRINT*
+         STOP
+      ENDIF
+
+      line = '' ! Init empty
+
+      ! +++++++ Read until the end of file ++++++++
+      N_SPECIES = 0
+      DO
+
+         READ(in2,'(A)', IOSTAT=ReasonEOF) line ! Read line         
+         CALL STRIP_COMMENTS(line, '!')         ! Remove comments from line
+
+         IF (ReasonEOF < 0) EXIT ! End of file reached
+
+         ! ~~~~~~~~~~~~~  Geometry and computational domain  ~~~~~~~~~~~~~~~~~
+         
+         !READ(line,'(A2, ES14.3, ES14.3, I1, ES14.3, I1, ES14.3, ES14.3, ES14.3, ES14.3)') &
+         READ(line,*) &
+         NAME, MOLWT, MOLMASS, ROTDOF, ROTREL, VIBDOF, VIBREL, VIBTEMP, SPWT, CHARGE
+      
+         ALLOCATE(TEMP_SPECIES(N_SPECIES+1)) ! Append the species to the list
+         TEMP_SPECIES(1:N_SPECIES) = SPECIES
+         CALL MOVE_ALLOC(TEMP_SPECIES, SPECIES)
+         N_SPECIES = N_SPECIES + 1
+
+         SPECIES(N_SPECIES)%NAME = NAME
+         SPECIES(N_SPECIES)%MOLWT = MOLWT
+         SPECIES(N_SPECIES)%MOLMASS = MOLMASS
+         SPECIES(N_SPECIES)%ROTDOF = ROTDOF
+         SPECIES(N_SPECIES)%ROTREL = ROTREL
+         SPECIES(N_SPECIES)%VIBDOF = VIBDOF
+         SPECIES(N_SPECIES)%VIBREL = VIBREL
+         SPECIES(N_SPECIES)%VIBTEMP = VIBTEMP
+         SPECIES(N_SPECIES)%SPWT = SPWT
+         SPECIES(N_SPECIES)%CHARGE = CHARGE
+         
+      END DO
+
+      CLOSE(in2) ! Close input file
+
+   END SUBROUTINE READ_SPECIES
+
+   SUBROUTINE DEF_MIXTURE(DEFINITION)
+      
+      IMPLICIT NONE
+
+      CHARACTER*10 :: MIX_NAME
+      CHARACTER*10 :: COMP_NAME
+      REAL(KIND=8) :: MOLFRAC
+
+      CHARACTER(LEN=*), INTENT(IN) :: DEFINITION
+      INTEGER :: N_STR
+      CHARACTER(LEN=80), allocatable :: STRARRAY(:)
+      INTEGER :: i, N_COMP
+      !TYPE(MIXTURE_COMPONENT) NEW_MIXTURE
+      TYPE(MIXTURE), DIMENSION(:), ALLOCATABLE :: TEMP_MIXTURES
+      TYPE(MIXTURE_COMPONENT), DIMENSION(:), ALLOCATABLE :: TEMP_COMPONENTS
+
+
+      call SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
+      
+      READ(STRARRAY(1),'(A10)') MIX_NAME
+      N_COMP = (N_STR-1)/2
+      ALLOCATE(TEMP_COMPONENTS(N_COMP))
+      DO i = 1, N_COMP
+         READ(STRARRAY(2*i),'(A10)') COMP_NAME
+         READ(STRARRAY(2*i+1),'(ES14.3)') MOLFRAC
+
+         TEMP_COMPONENTS(i)%NAME = COMP_NAME
+         TEMP_COMPONENTS(i)%MOLFRAC = MOLFRAC
+         TEMP_COMPONENTS(i)%ID = SPECIES_NAME_TO_ID(COMP_NAME)
+      END DO
+
+
+      ALLOCATE(TEMP_MIXTURES(N_MIXTURES+1)) ! Append the mixture to the list
+      TEMP_MIXTURES(1:N_MIXTURES) = MIXTURES
+      CALL MOVE_ALLOC(TEMP_MIXTURES, MIXTURES)
+      N_MIXTURES = N_MIXTURES + 1
+
+      MIXTURES(N_MIXTURES)%NAME = MIX_NAME
+      MIXTURES(N_MIXTURES)%N_COMPONENTS = N_COMP
+
+      CALL MOVE_ALLOC(TEMP_COMPONENTS, MIXTURES(N_MIXTURES)%COMPONENTS)
+
+
+   END SUBROUTINE DEF_MIXTURE
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE INITIAL_SEED -> seeds particles at the beginning of !!
@@ -273,9 +421,11 @@ MODULE initialization
       REAL(KIND=8)       :: Xp, Yp, Zp, VXp, VYp, VZp, EIp
       INTEGER            :: CID
 
+      REAL(KIND=8)  :: RANVAR
+      INTEGER       :: i
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
-      REAL(KIND=8)  :: RGAS ! DBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDB
-      INTEGER       :: idummy
+      REAL(KIND=8)  :: M
+      INTEGER       :: S_ID
 
       ! Print message 
       CALL ONLYMASTERPRINT1(PROC_ID, '> SEEDING INITIAL PARTICLES IN THE DOMAIN...')
@@ -295,17 +445,26 @@ MODULE initialization
          XP = XMIN + (XMAX-XMIN)*rand()
          YP = YMIN + (YMAX-YMIN)*rand()
          ZP = ZMIN + (ZMAX-ZMIN)*rand()
+         
+         ! Chose particle species based on mixture specifications
+         RANVAR = rand()
+         DO i = 1, MIXTURES(MIX_INIT)%N_COMPONENTS
+            RANVAR = RANVAR - MIXTURES(MIX_INIT)%COMPONENTS(i)%MOLFRAC
+            IF (RANVAR < 0.) THEN
+               S_ID = i
+               EXIT
+            END IF
+         END DO
 
          ! Assign velocity and energy following a Boltzmann distribution
-         RGAS = 200. ! DBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDB
+         M = SPECIES(S_ID)%MOLMASS
          CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
                       TTRAX_INIT, TTRAY_INIT, TTRAZ_INIT, TROT_INIT, &
-                      VXP, VYP, VZP, EIP, RGAS)
+                      VXP, VYP, VZP, EIP, M)
 
          CALL CELL_FROM_POSITION(XP,YP,  CID) ! Find cell containing particle
 
-         idummy = 0
-         CALL INIT_PARTICLE(XP,YP,ZP,VXP,VYP,VZP,EIP,idummy,CID,  particleNOW) ! Save in particle
+         CALL INIT_PARTICLE(XP,YP,ZP,VXP,VYP,VZP,EIP,S_ID,CID, particleNOW) ! Save in particle
          CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
       END DO
 
@@ -576,29 +735,56 @@ MODULE initialization
    
    SUBROUTINE INITCOLLISIONS
 
-   IMPLICIT NONE
+      IMPLICIT NONE
 
-   ! Set logicals
-   IF (COLLISION_TYPE == "NONE") THEN
-      BOOL_DSMC = .FALSE.
-      BOOL_MCC  = .FALSE.
+      ! Set logicals
+      IF (COLLISION_TYPE == "NONE") THEN
+         BOOL_DSMC = .FALSE.
+         BOOL_MCC  = .FALSE.
 
-   ELSE IF (COLLISION_TYPE == "DSMC") THEN
-      BOOL_DSMC = .TRUE.
-      BOOL_MCC  = .FALSE.
+      ELSE IF (COLLISION_TYPE == "DSMC") THEN
+         BOOL_DSMC = .TRUE.
+         BOOL_MCC  = .FALSE.
 
-   ELSE IF (COLLISION_TYPE == "MCC") THEN
-      BOOL_DSMC = .FALSE.
-      BOOL_MCC  = .TRUE.
+      ELSE IF (COLLISION_TYPE == "MCC") THEN
+         BOOL_DSMC = .FALSE.
+         BOOL_MCC  = .TRUE.
 
-   ELSE ! ERROR!
-      CALL ONLYMASTERPRINT1(PROC_ID, '$$$ ATTENTION! Collision type in input file not recognized! ABORTING!')
-      STOP
+      ELSE ! ERROR!
+         CALL ONLYMASTERPRINT1(PROC_ID, '$$$ ATTENTION! Collision type in input file not recognized! ABORTING!')
+         STOP
 
-   END IF 
+      END IF
 
    END SUBROUTINE INITCOLLISIONS
 
+   INTEGER FUNCTION SPECIES_NAME_TO_ID(NAME)
+
+      IMPLICIT NONE
+
+      CHARACTER(LEN=*), INTENT(IN)  :: NAME
+      INTEGER                       :: INDEX, MATCH
+      MATCH = -1
+      DO INDEX = 1, N_SPECIES
+         IF (SPECIES(INDEX)%NAME == NAME) MATCH = INDEX
+      END DO
+      SPECIES_NAME_TO_ID = MATCH
+
+   END FUNCTION SPECIES_NAME_TO_ID
+
+INTEGER FUNCTION MIXTURE_NAME_TO_ID(NAME)
+
+   IMPLICIT NONE
+
+   CHARACTER(LEN=*), INTENT(IN)  :: NAME
+   INTEGER                       :: INDEX, MATCH
+   MATCH = -1
+   DO INDEX = 1, N_MIXTURES
+      IF (MIXTURES(INDEX)%NAME == NAME) MATCH = INDEX
+   END DO
+   MIXTURE_NAME_TO_ID = MATCH
+
+END FUNCTION MIXTURE_NAME_TO_ID
 
 
 END MODULE initialization

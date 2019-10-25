@@ -35,7 +35,7 @@ MODULE timecycle
       WRITE(stringTMP, '(A13,I5,A4,I8,A9,ES14.3,A28,I10)') '   Timestep: ', tID, ' of ', NT, &
                        ' - time: ', CURRENT_TIME, ' [s] - number of particles: ', NP_TOT
 
-      CALL ONLYMASTERPRINT1(PROC_ID, stringTMP)
+      CALL ONLYMASTERPRINT1(PROC_ID, TRIM(stringTMP))
 
       ! ########### Inject particles from boundaries/injection sources ##########
 

@@ -48,6 +48,7 @@ MODULE global
    REAL(KIND=8) :: NRHO_INIT
    REAL(KIND=8) :: UX_INIT, UY_INIT, UZ_INIT
    REAL(KIND=8) :: TTRAX_INIT, TTRAY_INIT, TTRAZ_INIT, TROT_INIT
+   INTEGER      :: MIX_INIT
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Particles injection from boundaries !!!!!!!!!!!!!!!!
@@ -87,6 +88,46 @@ MODULE global
    INTEGER      :: N_BLOCKS_X, N_BLOCKS_Y ! Used for "block" partitioning
    REAL(KIND=8) :: DX_BLOCKS, DY_BLOCKS   ! Used for "block" partitioning
 
+
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!! Multispecies !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+   CHARACTER(LEN=256) :: SPECIES_FILENAME
+   INTEGER            :: N_SPECIES = 0
+   
+   TYPE SPECIES_DATA_STRUCTURE
+      CHARACTER*10 :: NAME
+      REAL(KIND=8) :: MOLWT
+      REAL(KIND=8) :: MOLMASS
+      INTEGER      :: ROTDOF
+      REAL(KIND=8) :: ROTREL
+      INTEGER      :: VIBDOF
+      REAL(KIND=8) :: VIBREL
+      REAL(KIND=8) :: VIBTEMP
+      REAL(KIND=8) :: SPWT
+      REAL(KIND=8) :: CHARGE
+   END TYPE SPECIES_DATA_STRUCTURE
+
+   TYPE(SPECIES_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: SPECIES, TEMP_SPECIES
+
+
+   INTEGER            :: N_MIXTURES = 0
+
+   TYPE MIXTURE_COMPONENT
+      INTEGER :: ID
+      CHARACTER*64 :: NAME
+      REAL(KIND=8) :: MOLFRAC
+   END TYPE MIXTURE_COMPONENT
+
+   TYPE MIXTURE
+      CHARACTER*64 :: NAME
+      INTEGER      :: N_COMPONENTS
+      TYPE(MIXTURE_COMPONENT), DIMENSION(:), ALLOCATABLE :: COMPONENTS
+   END TYPE MIXTURE
+
+   TYPE(MIXTURE), DIMENSION(:), ALLOCATABLE :: MIXTURES
+ 
    CONTAINS  ! @@@@@@@@@@@@@@@@@@@@@ SUBROUTINES @@@@@@@@@@@@@@@@@@@@@@@@
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

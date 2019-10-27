@@ -26,7 +26,7 @@ MODULE initialization
       INTEGER            :: ReasonEOF
 
       CHARACTER*512      :: MIXTURE_DEFINITION
-      CHARACTER*64       :: MIX_INIT_NAME
+      CHARACTER*64       :: MIX_INIT_NAME, MIX_BOUNDINJECT_NAME
 
       ! Open input file for reading
       OPEN(UNIT=in1,FILE='input', STATUS='old',IOSTAT=ios)
@@ -88,12 +88,16 @@ MODULE initialization
          END IF
 
          ! ~~~~~~~~~~~~~  Particle injection at boundaries ~~~~~~~~~~~
-         IF (line=='Boundaries_inject_bool:')      READ(in1,*)BOOL_BOUNDINJECT
-         IF (line=='Boundaries_inject_which_bool:')READ(in1,*)BOOL_INJ_XMIN,BOOL_INJ_XMAX,BOOL_INJ_YMIN, BOOL_INJ_YMAX
-         IF (line=='Boundaries_inject_dens:')      READ(in1,*)NRHO_BOUNDINJECT
-         IF (line=='Boundaries_inject_vel:')       READ(in1,*)UX_BOUND, UY_BOUND, UZ_BOUND
-         IF (line=='Boundaries_inject_Ttra:')      READ(in1,*)TTRA_BOUND
-         IF (line=='Boundaries_inject_Trot:')      READ(in1,*)TROT_BOUND
+         IF (line=='Boundaries_inject_bool:')       READ(in1,*)BOOL_BOUNDINJECT
+         IF (line=='Boundaries_inject_which_bool:') READ(in1,*)BOOL_INJ_XMIN,BOOL_INJ_XMAX,BOOL_INJ_YMIN, BOOL_INJ_YMAX
+         IF (line=='Boundaries_inject_dens:')       READ(in1,*)NRHO_BOUNDINJECT
+         IF (line=='Boundaries_inject_vel:')        READ(in1,*)UX_BOUND, UY_BOUND, UZ_BOUND
+         IF (line=='Boundaries_inject_Ttra:')       READ(in1,*)TTRA_BOUND
+         IF (line=='Boundaries_inject_Trot:')       READ(in1,*)TROT_BOUND
+         IF (line=='Boundaries_inject_mixture:') THEN
+            READ(in1,*) MIX_BOUNDINJECT_NAME
+            MIX_BOUNDINJECT = MIXTURE_NAME_TO_ID(MIX_BOUNDINJECT_NAME)
+         END IF
 
          ! ~~~~~~~~~~~~~  Particle injection at line source ~~~~~~~~~~~
          IF (line=='Linesource_bool:')      READ(in1,*)BOOL_LINESOURCE
@@ -421,12 +425,11 @@ MODULE initialization
       REAL(KIND=8)       :: Xp, Yp, Zp, VXp, VYp, VZp, EIp
       INTEGER            :: CID
 
-      REAL(KIND=8)  :: RANVAR
-      INTEGER       :: i
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
       REAL(KIND=8)  :: M
-      INTEGER       :: S_ID
-
+      INTEGER       :: S_ID, i
+      REAL(KIND=8) :: RANVAR
+            
       ! Print message 
       CALL ONLYMASTERPRINT1(PROC_ID, '> SEEDING INITIAL PARTICLES IN THE DOMAIN...')
      
@@ -445,7 +448,7 @@ MODULE initialization
          XP = XMIN + (XMAX-XMIN)*rand()
          YP = YMIN + (YMAX-YMIN)*rand()
          ZP = ZMIN + (ZMAX-ZMIN)*rand()
-         
+
          ! Chose particle species based on mixture specifications
          RANVAR = rand()
          DO i = 1, MIXTURES(MIX_INIT)%N_COMPONENTS
@@ -455,7 +458,7 @@ MODULE initialization
                EXIT
             END IF
          END DO
-
+      
          ! Assign velocity and energy following a Boltzmann distribution
          M = SPECIES(S_ID)%MOLMASS
          CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
@@ -464,7 +467,7 @@ MODULE initialization
 
          CALL CELL_FROM_POSITION(XP,YP,  CID) ! Find cell containing particle
 
-         CALL INIT_PARTICLE(XP,YP,ZP,VXP,VYP,VZP,EIP,S_ID,CID, particleNOW) ! Save in particle
+         CALL INIT_PARTICLE(XP,YP,ZP,VXP,VYP,VZP,EIP,S_ID,CID,DT, particleNOW) ! Save in particle
          CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
       END DO
 
@@ -616,104 +619,125 @@ MODULE initialization
       REAL(KIND=8) :: BETA, FLUXBOUND, FLUXLINESOURCE, NtotINJECT, ACCA, Snow
       REAL(KIND=8) :: PI, PI2  
  
-      REAL(KIND=8)  :: RGAS = 200. ! DBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDB
+      REAL(KIND=8)  :: M, FRAC, KB
+      INTEGER :: N_COMP, IS, S_ID
     
       PI   = 3.141593
       PI2  = 2.*PI
 
+      KB = 1.38064852E-23
+
       ! Injection from boundaries
       IF (BOOL_BOUNDINJECT) THEN 
+         N_COMP = MIXTURES(MIX_BOUNDINJECT)%N_COMPONENTS
 
-         BETA = 1./SQRT(2.*RGAS*TTRA_BOUND) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
+         ALLOCATE(nfs_XMIN(N_COMP))
+         ALLOCATE(nfs_XMAX(N_COMP))
+         ALLOCATE(nfs_YMIN(N_COMP))
+         ALLOCATE(nfs_YMAX(N_COMP))
 
-         ! +++++++++++ Lower x ++++++++++++
-         IF (BOOL_INJ_XMIN) THEN
+         DO IS = 1, N_COMP ! Loop on mixture components
+            S_ID = MIXTURES(MIX_BOUNDINJECT)%COMPONENTS(IS)%ID
+            M = SPECIES(S_ID)%MOLMASS
+            FRAC = MIXTURES(MIX_BOUNDINJECT)%COMPONENTS(IS)%MOLFRAC
+            BETA = 1./SQRT(2.*KB/M*TTRA_BOUND) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
 
-            S_NORM_XMIN = UX_BOUND*BETA ! Molecular speed ratio normal to boundary
-            Snow        = S_NORM_XMIN   ! temp variable
+            ! +++++++++++ Lower x ++++++++++++
+            IF (BOOL_INJ_XMIN) THEN
 
-            FLUXBOUND = NRHO_BOUNDINJECT/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) & 
-                                      + SQRT(PI)*Snow*(1.+ERF1(Snow)))    ! Tot number flux emitted [1/(s m^2)]
-            NtotINJECT = FLUXBOUND*(YMAX-YMIN)*(ZMAX-ZMIN)*DT/FNUM        ! Tot num of particles to be injected
-            nfs_XMIN = FLOOR(NtotINJECT/REAL(N_MPI_THREADS,KIND=8)+rf())  ! Particles injected by each proc
-            ACCA = SQRT(Snow**2+2.)                                       ! Tmp variable
-            KAPPA_XMIN = 2./(Snow+ACCA) * EXP(0.5 + 0.5*Snow*(Snow-ACCA)) ! global variable
+               S_NORM_XMIN = UX_BOUND*BETA ! Molecular speed ratio normal to boundary
+               Snow        = S_NORM_XMIN   ! temp variable
 
-            ! Check: if we are hypersonic and stuff exits domain print a warning
-            IF (UX_BOUND+3./BETA .LE. 0.) THEN 
-               CALL ONLYMASTERPRINT1(PROC_ID, '$$$ Warning! Hypersonic boundary! Almost no &
-                                                   &particles will be emitted at XMIN.')
+               FLUXBOUND = NRHO_BOUNDINJECT*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) & 
+                                       + SQRT(PI)*Snow*(1.+ERF1(Snow)))    ! Tot number flux emitted [1/(s m^2)]
+               NtotINJECT = FLUXBOUND*(YMAX-YMIN)*(ZMAX-ZMIN)*DT/FNUM        ! Tot num of particles to be injected
+               nfs_XMIN(IS) = NtotINJECT/REAL(N_MPI_THREADS,KIND=8)  ! Particles injected by each proc
+               WRITE(*,*)'ON XLO ', nfs_XMIN(1)
+               !ACCA = SQRT(Snow**2+2.)                                       ! Tmp variable
+               !KAPPA_XMIN = 2./(Snow+ACCA) * EXP(0.5 + 0.5*Snow*(Snow-ACCA)) ! global variable
+
+               ! Check: if we are hypersonic and stuff exits domain print a warning
+               IF (UX_BOUND+3./BETA .LE. 0.) THEN 
+                  CALL ONLYMASTERPRINT1(PROC_ID, '$$$ Warning! Hypersonic boundary! Almost no &
+                                                      &particles will be emitted at XMIN.')
+               END IF
+
+            END IF 
+
+            ! +++++++++++ Higher x +++++++++++
+            IF (BOOL_INJ_XMAX) THEN
+
+               S_NORM_XMAX = - UX_BOUND*BETA ! Molecular speed ratio normal to boundary (inside)
+               Snow        = S_NORM_XMAX     ! temp variable
+
+               FLUXBOUND   = NRHO_BOUNDINJECT*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) &
+                                       + SQRT(PI)*Snow*(1.+ERF1(Snow)))      ! Tot number flux emitted 
+               NtotINJECT  = FLUXBOUND*(YMAX-YMIN)*(ZMAX-ZMIN)*DT/FNUM         ! Tot num of particles to be injected
+               nfs_XMAX(IS)    = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
+               WRITE(*,*)'ON XHI ', nfs_XMAX(1)
+               !ACCA        = SQRT(Snow**2+2.)                                  ! Tmp variable
+               !KAPPA_XMAX  = 2./(Snow+ACCA) * EXP(0.5 + 0.5*Snow*(Snow-ACCA))  ! global variable
+
+               ! Check: if we are hypersonic and stuff exits domain print a warning
+               IF (UX_BOUND-3./BETA .GE. 0.) THEN 
+                  CALL ONLYMASTERPRINT1(PROC_ID, '$$$ Warning! Hypersonic boundary! Almost no &
+                                                      &particles will be emitted at XMAX.')
+               END IF
+
             END IF
+            
 
-         END IF 
+            ! +++++++++++ Lower y ++++++++++++
+            IF (BOOL_INJ_YMIN) THEN
 
-         ! +++++++++++ Higher x +++++++++++
-         IF (BOOL_INJ_XMAX) THEN
+               S_NORM_YMIN = UY_BOUND*BETA ! Molecular speed ratio normal to boundary
+               Snow        = S_NORM_YMIN   ! temp variable
 
-            S_NORM_XMAX = - UX_BOUND*BETA ! Molecular speed ratio normal to boundary (inside)
-            Snow        = S_NORM_XMAX     ! temp variable
-            FLUXBOUND   = NRHO_BOUNDINJECT/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) &
-                                      + SQRT(PI)*Snow*(1.+ERF1(Snow)))      ! Tot number flux emitted 
-            NtotINJECT  = FLUXBOUND*(YMAX-YMIN)*(ZMAX-ZMIN)*DT/FNUM         ! Tot num of particles to be injected
-            nfs_XMAX    = FLOOR(NtotINJECT/REAL(N_MPI_THREADS,KIND=8)+rf()) ! Particles injected by each proc
-            ACCA        = SQRT(Snow**2+2.)                                  ! Tmp variable
-            KAPPA_XMAX  = 2./(Snow+ACCA) * EXP(0.5 + 0.5*Snow*(Snow-ACCA))  ! global variable
+               FLUXBOUND   = NRHO_BOUNDINJECT*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) &
+                                       + SQRT(PI)*Snow*(1.+ERF1(Snow)))      ! Tot number flux emitted
+               NtotINJECT  = FLUXBOUND*(XMAX-XMIN)*(ZMAX-ZMIN)*DT/FNUM         ! Tot num of particles to be injected
+               nfs_YMIN(IS)    = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
+               WRITE(*,*)'ON YLO ', nfs_YMIN(1)
+               !ACCA        = SQRT(Snow**2+2.)                                  ! Tmp variable
+               !KAPPA_YMIN  = 2./(Snow+ACCA) * EXP(0.5 + 0.5*Snow*(Snow-ACCA))  ! global variable
 
-            ! Check: if we are hypersonic and stuff exits domain print a warning
-            IF (UX_BOUND-3./BETA .GE. 0.) THEN 
-               CALL ONLYMASTERPRINT1(PROC_ID, '$$$ Warning! Hypersonic boundary! Almost no &
-                                                   &particles will be emitted at XMAX.')
+               ! Check: if we are hypersonic and stuff exits domain print a warning
+               IF (UY_BOUND+3./BETA .LE. 0.) THEN 
+                  CALL ONLYMASTERPRINT1(PROC_ID, '$$$ Warning! Hypersonic boundary! Almost no &
+                                                      &particles will be emitted at YMIN.')
+               END IF
+
+            END IF 
+
+            ! +++++++++++ Higher y +++++++++++
+            IF (BOOL_INJ_YMAX) THEN
+
+               S_NORM_YMAX = - UY_BOUND*BETA ! Molecular speed ratio normal to boundary (inside)
+               Snow        = S_NORM_YMAX     ! temp variable
+
+               FLUXBOUND   = NRHO_BOUNDINJECT*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) &
+                                       + SQRT(PI)*Snow*(1.+ERF1(Snow)))      ! Tot number flux emitted 
+               NtotINJECT  = FLUXBOUND*(XMAX-XMIN)*(ZMAX-ZMIN)*DT/FNUM         ! Tot num of particles to be injected
+               nfs_YMAX(IS)    = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
+               WRITE(*,*)'ON YHI ', nfs_YMAX(1)
+               !ACCA        = SQRT(Snow**2+2.)                                  ! Tmp variable
+               !KAPPA_YMAX  = 2./(Snow+ACCA) * EXP(0.5 + 0.5*Snow*(Snow-ACCA))  ! global variable
+
+               ! Check: if we are hypersonic and stuff exits domain print a warning
+               IF (UY_BOUND-3./BETA .GE. 0.) THEN 
+                  CALL ONLYMASTERPRINT1(PROC_ID, '$$$ Warning! Hypersonic boundary! Almost no &
+                                                      &particles will be emitted at YMAX.')
+               END IF
+
             END IF
-
-         END IF 
-
-         ! +++++++++++ Lower y ++++++++++++
-         IF (BOOL_INJ_YMIN) THEN
-
-            S_NORM_YMIN = UY_BOUND*BETA ! Molecular speed ratio normal to boundary
-            Snow        = S_NORM_YMIN   ! temp variable
-            FLUXBOUND   = NRHO_BOUNDINJECT/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) &
-                                      + SQRT(PI)*Snow*(1.+ERF1(Snow)))      ! Tot number flux emitted
-            NtotINJECT  = FLUXBOUND*(XMAX-XMIN)*(ZMAX-ZMIN)*DT/FNUM         ! Tot num of particles to be injected
-            nfs_YMIN    = FLOOR(NtotINJECT/REAL(N_MPI_THREADS,KIND=8)+rf()) ! Particles injected by each proc
-            ACCA        = SQRT(Snow**2+2.)                                  ! Tmp variable
-            KAPPA_YMIN  = 2./(Snow+ACCA) * EXP(0.5 + 0.5*Snow*(Snow-ACCA))  ! global variable
-
-            ! Check: if we are hypersonic and stuff exits domain print a warning
-            IF (UY_BOUND+3./BETA .LE. 0.) THEN 
-               CALL ONLYMASTERPRINT1(PROC_ID, '$$$ Warning! Hypersonic boundary! Almost no &
-                                                   &particles will be emitted at YMIN.')
-            END IF
-
-         END IF 
-
-         ! +++++++++++ Higher y +++++++++++
-         IF (BOOL_INJ_YMAX) THEN
-
-            S_NORM_YMAX = - UY_BOUND*BETA ! Molecular speed ratio normal to boundary (inside)
-            Snow        = S_NORM_YMAX     ! temp variable
-            FLUXBOUND   = NRHO_BOUNDINJECT/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) &
-                                      + SQRT(PI)*Snow*(1.+ERF1(Snow)))      ! Tot number flux emitted 
-            NtotINJECT  = FLUXBOUND*(XMAX-XMIN)*(ZMAX-ZMIN)*DT/FNUM         ! Tot num of particles to be injected
-            nfs_YMAX    = FLOOR(NtotINJECT/REAL(N_MPI_THREADS,KIND=8)+rf()) ! Particles injected by each proc
-            ACCA        = SQRT(Snow**2+2.)                                  ! Tmp variable
-            KAPPA_YMAX  = 2./(Snow+ACCA) * EXP(0.5 + 0.5*Snow*(Snow-ACCA))  ! global variable
-
-            ! Check: if we are hypersonic and stuff exits domain print a warning
-            IF (UY_BOUND-3./BETA .GE. 0.) THEN 
-               CALL ONLYMASTERPRINT1(PROC_ID, '$$$ Warning! Hypersonic boundary! Almost no &
-                                                   &particles will be emitted at YMAX.')
-            END IF
-
-         END IF
-
+         END DO
       END IF
 
       ! =====================================================
-      ! Injection from line source
+      ! Injection from line source !!!!!!!!!TO IMPLEMENT FOR MULTISPECIES
       IF (BOOL_LINESOURCE) THEN 
 
-         BETA = 1./SQRT(2.*RGAS*TTRA_LINESOURCE) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
+         BETA = 1./SQRT(2.*KB/M*TTRA_LINESOURCE) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
 
          S_NORM_LINESOURCE = UX_LINESOURCE*BETA ! Molecular speed ratio normal to line source (which is y-aligned)
          Snow              = S_NORM_LINESOURCE  ! temp variable

@@ -17,7 +17,7 @@ Axial_symmetry_bool:
 Domain_limits:
     -0.1  0.1      -0.1  0.1      -0.5  0.5
 Domain_periodicity:
-    .TRUE.   .TRUE.   .TRUE.
+    .FALSE.   .FALSE.   .TRUE.
 Number_of_cells:
     10  10  1
 
@@ -28,7 +28,7 @@ Fnum:  ! Ratio of real-to-simulated particles
 Timestep:
     1.E-5
 Number_of_timesteps:
-    100
+    1000
 RNG_seed:
     12346
     
@@ -41,12 +41,15 @@ Def_mixture:
     air N2 0.78 O2 0.22
     
 Def_mixture:
+    air1 N2 1.0
+
+Def_mixture:
     ions O+ 0.1 N+ 0.2 NO+ 0.3 O2+ 0.4 N2+ 0.5 e 0.6
 
 ! ========= Collisions ==============================
 
 Collision_type: ! [MCC / DSMC / NONE]
-  MCC 
+  NONE 
 
 MCC_background_dens:
   1.0e20
@@ -59,34 +62,34 @@ MCC_species: ! NOT IMPLEMENTED YET!
 ! ========= Initial particle seed ===================
 
 Initial_particles_bool:
-    .TRUE.
+    .FALSE.
 Initial_particles_dens:
     1.e20
 Initial_particles_vel:
-    100.   0.  0.
+    1000.   0.  0.
 Initial_particles_Ttra:
     100.  100.  100.
 Initial_particles_Trot:
     0. 
-Initial_particles_mixture: ! NOT IMPLEMENTED YET!
+Initial_particles_mixture:
     air
 ! ========== Injection from boundaries ==============
 
 Boundaries_inject_bool:
-    .FALSE.
+    .TRUE.
 
 Boundaries_inject_which_bool:        ! From which boundary you want to inject particles
-    .FALSE.  .TRUE.  .TRUE.  .FALSE. 
+    .TRUE.  .TRUE.  .TRUE.  .TRUE. 
 Boundaries_inject_dens:
-    1.e23
+    1.e19
 Boundaries_inject_vel:
-    -300. 100. 0.
+    -800. 500. 0.
 Boundaries_inject_Ttra:
-    10.
+    2000.0
 Boundaries_inject_Trot:
     0.
-Boundaries_inject_species_ID: ! NOT IMPLEMENTED YET!
-
+Boundaries_inject_mixture:
+    air1
 ! ========== Injection from line source =============
 
 Linesource_bool:

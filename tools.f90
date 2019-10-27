@@ -120,7 +120,7 @@ CONTAINS
 
   INTEGER                     :: I
   REAL(KIND=8)                :: PI, PI2, KB
-  REAL(KIND=8)                :: R, RO, TETA, BETA
+  REAL(KIND=8)                :: R, R1, RO, TETA, BETA
   REAL(KIND=8), DIMENSION(3)  :: VEL, TT
 
   PI   = 3.141593
@@ -150,9 +150,14 @@ CONTAINS
      ! or the log() will explode
      !R = rf()*0.99999999999 + 1.0d-13 ! Please fix this!!!!! MAKE THIS ELEGANT!!!
      ! Fixed at the root.
-     RO = SQRT(-LOG(R))/BETA
+     R1 = RAND()
+      DO WHILE (R1 < 1.0D-13)
+         R1 = RAND()
+      END DO
 
-     VEL(I) = RO*COS(TETA)
+     RO = SQRT(-LOG(R1))/BETA ! The random number here shouldn't be correlated to the one for teta!!
+
+     VEL(I) = RO*SIN(TETA)
 
   END DO
 
@@ -164,7 +169,11 @@ CONTAINS
 
   ! Step 4. 
 
-  R = rand()
+  R = RAND()
+  DO WHILE (R < 1.0D-13)
+    R = RAND()
+  END DO
+
   EI = -LOG(R)*KB*TR
 
   RETURN
@@ -270,16 +279,20 @@ CONTAINS
   ! to a surface !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  FUNCTION FLX(SN, KAPPA, TINF, RGAS) RESULT(OUT)
+  FUNCTION FLX(SN, TINF, M) RESULT(OUT)
 
   IMPLICIT NONE
 
-  REAL(KIND=8), INTENT(IN) :: SN,TINF,KAPPA,RGAS
+  REAL(KIND=8), INTENT(IN) :: SN,TINF,M
   REAL(KIND=8) :: OUT
   REAL(KIND=8) :: R1,R2
-  REAL(KIND=8) :: y,fM,BETA
+  REAL(KIND=8) :: y,fM,BETA,KB, KAPPA, ACCA
 
-  BETA = 1./SQRT(2.*RGAS*TINF)
+  KB = 1.38064852E-23
+  BETA = 1./SQRT(2.*KB/M*TINF)
+
+  ACCA = SQRT(SN**2+2.)                              ! Tmp variable
+  KAPPA = 2./(SN+ACCA) * EXP(0.5 + 0.5*SN*(SN-ACCA)) ! variable
 
    ! Step 1.
 
@@ -369,6 +382,6 @@ CONTAINS
 
    N_STR = idx
 
-end subroutine SPLIT_STR
+END SUBROUTINE SPLIT_STR
 
 END MODULE tools

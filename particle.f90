@@ -10,6 +10,7 @@ MODULE particle
       REAL(KIND=8) :: VX, VY, VZ, EI ! velocities and internal energy
       INTEGER      :: IC             ! Cell index 
       INTEGER      :: S_ID           ! Species ID
+      REAL(KIND=8) :: DTRIM          ! Remaining time for advection
    END TYPE PARTICLE_DATA_STRUCTURE
  
    CONTAINS
@@ -20,11 +21,11 @@ MODULE particle
    ! field is added/removed to/from the particle type.                         !!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-   SUBROUTINE INIT_PARTICLE(X, Y, Z, VX, VY, VZ, EI, S_ID, IC, particlept)
+   SUBROUTINE INIT_PARTICLE(X, Y, Z, VX, VY, VZ, EI, S_ID, IC, DTRIM, particlept)
 
       IMPLICIT NONE
       
-      REAL(KIND=8), INTENT(IN) :: X, Y, Z, VX, VY, VZ, EI
+      REAL(KIND=8), INTENT(IN) :: X, Y, Z, VX, VY, VZ, EI, DTRIM
       INTEGER, INTENT(IN)      :: S_ID, IC
 
       TYPE(PARTICLE_DATA_STRUCTURE), INTENT(INOUT) :: particlept
@@ -41,6 +42,8 @@ MODULE particle
  
       particlept%S_ID = S_ID 
       particlept%IC   = IC  
+
+      particlept%DTRIM = DTRIM
 
    END SUBROUTINE INIT_PARTICLE
 
@@ -114,10 +117,10 @@ MODULE particle
       CALL INIT_PARTICLE(particlesARRAY(NP_ARRAY)%X,  particlesARRAY(NP_ARRAY)%Y,    particlesARRAY(NP_ARRAY)%Z,  &
                          particlesARRAY(NP_ARRAY)%VX, particlesARRAY(NP_ARRAY)%VY,   particlesARRAY(NP_ARRAY)%VZ, &
                          particlesARRAY(NP_ARRAY)%EI, particlesARRAY(NP_ARRAY)%S_ID, particlesARRAY(NP_ARRAY)%IC, &
-                         particlesARRAY(ID_REMOVE))
+                         particlesARRAY(NP_ARRAY)%DTRIM, particlesARRAY(ID_REMOVE))
 
       ! Then put the last place to zeros and decrement counter
-      CALL INIT_PARTICLE(0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,-1,-1, particlesARRAY(NP_ARRAY)) ! Zero
+      CALL INIT_PARTICLE(0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,-1,-1, 0.d0, particlesARRAY(NP_ARRAY)) ! Zero
 
       NP_ARRAY = NP_ARRAY - 1
 

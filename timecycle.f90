@@ -94,7 +94,7 @@ MODULE timecycle
                       TTRA_LINESOURCE, TTRA_LINESOURCE, TTRA_LINESOURCE, TROT_LINESOURCE, &
                       Vdummy,VY,VZ,EI,RGAS)
 
-         VX = UX_LINESOURCE + FLX(S_NORM_LINESOURCE,KAPPA_LINESOURCE,TTRA_LINESOURCE,RGAS)
+         VX = UX_LINESOURCE + FLX(S_NORM_LINESOURCE,TTRA_LINESOURCE,RGAS)
  
          DTFRAC = rf()*DT
    
@@ -105,7 +105,7 @@ MODULE timecycle
          CALL CELL_FROM_POSITION(X,Y,  IC)
 
          ! Create particle
-         CALL INIT_PARTICLE(X, Y, Z, VX, VY, VZ, EI, S_ID_DUMMY, IC, particleNOW)
+         CALL INIT_PARTICLE(X, Y, Z, VX, VY, VZ, EI, S_ID_DUMMY, IC, DTFRAC, particleNOW)
 
          ! Assign particle to particles array
          CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles)
@@ -124,40 +124,46 @@ MODULE timecycle
   
    IMPLICIT NONE
 
-   INTEGER      :: IP, IC
+   INTEGER      :: IP, IC, IS, NFS
    REAL(KIND=8) :: DTFRAC, Vdummy 
    REAL(KIND=8) :: X, Y, Z, VX, VY, VZ, EI 
    TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
 
-   ! Temporary (debugging) variablaes
-   INTEGER :: S_ID_DUMMY = -1 ! DBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBD
-   REAL(KIND=8) :: RGAS ! DBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBBDB
+   INTEGER :: S_ID
+   REAL(KIND=8) :: M
 
-   RGAS = 200. ! DBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDDBDBDBDBDBDBDBDBDBDBBDBDBDBDBDBDBDBDB
 
    ! Low X boundary (left)
    IF (BOOL_INJ_XMIN) THEN
 
-      DO IP = 1, nfs_XMIN ! Loop on particles to be injected
+      DO IS = 1, MIXTURES(MIX_BOUNDINJECT)%N_COMPONENTS ! Loop on mixture components
+         S_ID = MIXTURES(MIX_BOUNDINJECT)%COMPONENTS(IS)%ID
+         M = SPECIES(S_ID)%MOLMASS
+         NFS = FLOOR(nfs_XMIN(IS))
+         IF (nfs_XMIN(IS)-REAL(NFS, KIND=8) .GE. rf()) THEN ! Same as SPARTA's perspeciess
+            NFS = NFS + 1
+         END IF
 
-         ! Create a particle
-         CALL MAXWELL(UX_BOUND,UY_BOUND,UZ_BOUND, &
-                      TTRA_BOUND,TTRA_BOUND,TTRA_BOUND,TROT_BOUND, &
-                      Vdummy,VY,VZ,EI,RGAS)
+         DO IP = 1, NFS ! Loop on particles to be injected
 
-         VX = UX_BOUND + FLX(S_NORM_XMIN,KAPPA_XMIN,TTRA_BOUND,RGAS) !!AAAAAAAAAAA
+            CALL MAXWELL(UX_BOUND,UY_BOUND,UZ_BOUND, &
+                        TTRA_BOUND,TTRA_BOUND,TTRA_BOUND,TROT_BOUND, &
+                        Vdummy,VY,VZ,EI,M)
+            
+            VX = UX_BOUND + FLX(S_NORM_XMIN,TTRA_BOUND,M) !!AAAAAAAAAAA
 
-         DTFRAC = rf()*DT
-         X = XMIN                    - VX*DTFRAC
-         Y = YMIN + (YMAX-YMIN)*rf() - VY*DTFRAC
-         Z = ZMIN + (ZMAX-ZMIN)*rf() - VZ*DTFRAC
+            DTFRAC = rf()*DT
+            X = XMIN
+            Y = YMIN + (YMAX-YMIN)*rf()
+            Z = ZMIN + (ZMAX-ZMIN)*rf()
 
-         CALL CELL_FROM_POSITION(X,Y,  IC)
+            CALL CELL_FROM_POSITION(X,Y,  IC)
 
-         ! Init a particle object and assign it to the local vector of particles
-         CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EI,S_ID_DUMMY,IC,  particleNOW)
-         CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles)
+            ! Init a particle object and assign it to the local vector of particles
+            CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EI,S_ID,IC,DTFRAC,  particleNOW)
+            CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles)
 
+         END DO
       END DO
 
    END IF
@@ -165,26 +171,35 @@ MODULE timecycle
    ! High X boundary (right)
    IF (BOOL_INJ_XMAX) THEN
 
-      DO IP = 1, nfs_XMAX ! Loop on particles to be injected
 
-         ! Create a particle
-         CALL MAXWELL(UX_BOUND,UY_BOUND,UZ_BOUND, &
-                      TTRA_BOUND,TTRA_BOUND,TTRA_BOUND,TROT_BOUND, &
-                      Vdummy,VY,VZ,EI,RGAS)
+      DO IS = 1, MIXTURES(MIX_BOUNDINJECT)%N_COMPONENTS ! Loop on mixture components
+         S_ID = MIXTURES(MIX_BOUNDINJECT)%COMPONENTS(IS)%ID
+         M = SPECIES(S_ID)%MOLMASS
+         NFS = FLOOR(nfs_XMAX(IS))
+         IF (nfs_XMAX(IS)-REAL(NFS, KIND=8) .GE. rf()) THEN
+            NFS = NFS + 1
+         END IF
 
-         VX = UX_BOUND + FLX(S_NORM_XMAX,KAPPA_XMAX,TTRA_BOUND,RGAS) !!AAAAAAAAAAA
+         DO IP = 1, NFS ! Loop on particles to be injected
 
-         DTFRAC = rf()*DT
-         X = XMAX                    - VX*DTFRAC
-         Y = YMIN + (YMAX-YMIN)*rf() - VY*DTFRAC
-         Z = ZMIN + (ZMAX-ZMIN)*rf() - VZ*DTFRAC
+            CALL MAXWELL(UX_BOUND,UY_BOUND,UZ_BOUND, &
+                        TTRA_BOUND,TTRA_BOUND,TTRA_BOUND,TROT_BOUND, &
+                        Vdummy,VY,VZ,EI,M)
 
-         CALL CELL_FROM_POSITION(X,Y,  IC)
+            VX = UX_BOUND - FLX(S_NORM_XMAX,TTRA_BOUND,M) !! I think something was wrong here with the sign
 
-         ! Init a particle object and assign it to vector of particles
-         CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EI,S_ID_DUMMY,IC,  particleNOW)
-         CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles)
+            DTFRAC = rf()*DT
+            X = XMAX
+            Y = YMIN + (YMAX-YMIN)*rf()
+            Z = ZMIN + (ZMAX-ZMIN)*rf()
+            
+            CALL CELL_FROM_POSITION(X,Y,  IC)
 
+            ! Init a particle object and assign it to vector of particles
+            CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EI,S_ID,IC,DTFRAC,  particleNOW)
+            CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles)
+            
+         END DO
       END DO
 
    END IF
@@ -192,26 +207,33 @@ MODULE timecycle
    ! Low Y boundary (bottom)
    IF (BOOL_INJ_YMIN) THEN
 
-      DO IP = 1, nfs_YMIN ! Loop on particles to be injected
+      DO IS = 1, MIXTURES(MIX_BOUNDINJECT)%N_COMPONENTS ! Loop on mixture components
+         S_ID = MIXTURES(MIX_BOUNDINJECT)%COMPONENTS(IS)%ID
+         M = SPECIES(S_ID)%MOLMASS
+         NFS = FLOOR(nfs_YMIN(IS))
+         IF (nfs_YMIN(IS)-REAL(NFS, KIND=8) .GE. rf()) THEN
+            NFS = NFS + 1
+         END IF
 
-         ! Create a particle
-         CALL MAXWELL(UX_BOUND,UY_BOUND,UZ_BOUND, &
-                      TTRA_BOUND,TTRA_BOUND,TTRA_BOUND,TROT_BOUND, &
-                      VX,Vdummy,VZ,EI,RGAS)
+         DO IP = 1, NFS ! Loop on particles to be injected
 
-         VY = UY_BOUND + FLX(S_NORM_YMIN,KAPPA_YMIN,TTRA_BOUND,RGAS) !!AAAAAAAAAAA
+            CALL MAXWELL(UX_BOUND,UY_BOUND,UZ_BOUND, &
+                        TTRA_BOUND,TTRA_BOUND,TTRA_BOUND,TROT_BOUND, &
+                        VX,Vdummy,VZ,EI,M)
 
-         DTFRAC = rf()*DT
-         X = XMIN + (XMAX-XMIN)*rf() - VX*DTFRAC
-         Y = YMIN                    - VY*DTFRAC
-         Z = ZMIN + (ZMAX-ZMIN)*rf() - VZ*DTFRAC
+            VY = UY_BOUND + FLX(S_NORM_YMIN,TTRA_BOUND,M) !!AAAAAAAAAAA
 
-         CALL CELL_FROM_POSITION(X,Y,  IC)
+            DTFRAC = rf()*DT
+            X = XMIN + (XMAX-XMIN)*rf()
+            Y = YMIN
+            Z = ZMIN + (ZMAX-ZMIN)*rf()
 
-         ! Init a particle object and assign it to the local vector of particles
-         CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EI,S_ID_DUMMY,IC,  particleNOW)
-         CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles)
+            CALL CELL_FROM_POSITION(X,Y,  IC)
 
+            ! Init a particle object and assign it to the local vector of particles
+            CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EI,S_ID,IC,DTFRAC,  particleNOW)
+            CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles)
+         END DO
       END DO
 
    END IF
@@ -219,26 +241,33 @@ MODULE timecycle
    ! High Y boundary (top)
    IF (BOOL_INJ_YMAX) THEN
 
-      DO IP = 1, nfs_YMAX ! Loop on particles to be injected
+      DO IS = 1, MIXTURES(MIX_BOUNDINJECT)%N_COMPONENTS ! Loop on mixture components
+         S_ID = MIXTURES(MIX_BOUNDINJECT)%COMPONENTS(IS)%ID
+         M = SPECIES(S_ID)%MOLMASS
+         NFS = FLOOR(nfs_YMAX(IS))
+         IF (nfs_YMAX(IS)-REAL(NFS, KIND=8) .GE. rf()) THEN
+            NFS = NFS + 1
+         END IF
 
-         ! Create a particle
-         CALL MAXWELL(UX_BOUND,UY_BOUND,UZ_BOUND, &
-                      TTRA_BOUND,TTRA_BOUND,TTRA_BOUND,TROT_BOUND, &
-                      VX,Vdummy,VZ,EI,RGAS)
+         DO IP = 1, NFS ! Loop on particles to be injected
 
-         VY = UY_BOUND + FLX(S_NORM_YMAX,KAPPA_YMAX,TTRA_BOUND,RGAS) !!AAAAAAAAAAA
+            CALL MAXWELL(UX_BOUND,UY_BOUND,UZ_BOUND, &
+                        TTRA_BOUND,TTRA_BOUND,TTRA_BOUND,TROT_BOUND, &
+                        VX,Vdummy,VZ,EI,M)
 
-         DTFRAC = rf()*DT
-         X = XMAX + (XMAX-XMIN)*rf() - VX*DTFRAC
-         Y = YMAX                    - VY*DTFRAC
-         Z = ZMIN + (ZMAX-ZMIN)*rf() - VZ*DTFRAC
+            VY = UY_BOUND - FLX(S_NORM_YMAX,TTRA_BOUND,M) !!AAAAAAAAAAA
 
-         CALL CELL_FROM_POSITION(X,Y,  IC)
+            DTFRAC = rf()*DT
+            X = XMIN + (XMAX-XMIN)*rf() ! There was a bug here!
+            Y = YMAX
+            Z = ZMIN + (ZMAX-ZMIN)*rf()
 
-         ! Init a particle object and assign it to vector of particles
-         CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EI,S_ID_DUMMY,IC,  particleNOW)
-         CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles)
+            CALL CELL_FROM_POSITION(X,Y,  IC)
 
+            ! Init a particle object and assign it to vector of particles
+            CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EI,S_ID,IC,DTFRAC,  particleNOW)
+            CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles)
+         END DO
       END DO
 
    END IF
@@ -270,7 +299,7 @@ MODULE timecycle
 
    DO IP = 1, NP_PROC
 
-      DTRIM = DT ! Remaining DT
+      DTRIM = particles(IP)%DTRIM
 
       DO WHILE (DTRIM .GT. 0.) ! Repeat the procedure until step is done
 
@@ -343,6 +372,8 @@ MODULE timecycle
          END IF
 
       END DO
+
+      particles(IP)%DTRIM = DT ! For the next timestep.
 
    END DO ! End loop: DO IP = 1,NP_PROC
 

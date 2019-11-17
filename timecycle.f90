@@ -4,6 +4,7 @@ MODULE timecycle
    USE mpi_common
    USE screen
    USE tools
+   USE collisions
 
    CONTAINS
 
@@ -23,7 +24,9 @@ MODULE timecycle
 
    ! Init variables
    NP_TOT = 0
-
+   
+   ! Dump particles before the first time step, but after the initial seeding
+   CALL DUMP_PARTICLES_FILE(0)
    DO tID = 1, NT
 
       ! ########### Print simulation info #######################################
@@ -58,64 +61,75 @@ MODULE timecycle
 
       ! ########### Dump particles ##############################################
 
-      CALL DUMP_PARTICLES_FILE(tID)
+      IF (MOD(tID, DUMP_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
 
       ! ~~~~~ Hmm that's it! ~~~~~
 
    END DO
 
    END SUBROUTINE TIME_LOOP
+ 
 
-
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   ! SUBROUTINE LINE_SOURCE_INJECT -> Injects particles from line source !!!!!!!!!
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    SUBROUTINE LINE_SOURCE_INJECT
-
-   IMPLICIT NONE
-
-   INTEGER      :: IP, IC
-   REAL(KIND=8) :: DTFRAC
-   REAL(KIND=8) :: X, Y, Z, VX, VY, VZ, EI, Vdummy
-   TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
-
-   ! DDBDBDBDBDBDDBDBDBDBDBDDBDBDBDBDBDDBDBDBDBDBDDBDBDBDBDBDDBDBDBDBDBDDBDBDBDBDBDDBDBDBDB
-   REAL(KIND=8) :: RGAS = 200.0d0 ! DBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBD
-   INTEGER :: S_ID_DUMMY = -1 ! DBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDDBDBDB
-   ! DDBDBDBDBDBDDBDBDBDBDBDDBDBDBDBDBDDBDBDBDBDBDDBDBDBDBDBDDBDBDBDBDBDDBDBDBDBDBDDBDBDBDB
-
-   IF (BOOL_LINESOURCE) THEN
-
-      DO IP = 1,nfs_LINESOURCE 
-
-         ! Create particle velocity, internal energy, position
-         CALL MAXWELL(UX_LINESOURCE, UY_LINESOURCE, UZ_LINESOURCE,                        &
-                      TTRA_LINESOURCE, TTRA_LINESOURCE, TTRA_LINESOURCE, TROT_LINESOURCE, &
-                      Vdummy,VY,VZ,EI,RGAS)
-
-         VX = UX_LINESOURCE + FLX(S_NORM_LINESOURCE,TTRA_LINESOURCE,RGAS)
- 
-         DTFRAC = rf()*DT
+  
+      IMPLICIT NONE
    
-         X = X_LINESOURCE                     - VX*DTFRAC
-         Y = Y_LINESOURCE + L_LINESOURCE*rf() - VY*DTFRAC
-         Z = ZMIN         + (ZMAX-ZMIN)*rf()  - VZ*DTFRAC
-         
-         CALL CELL_FROM_POSITION(X,Y,  IC)
+      INTEGER      :: IP, IC, IS, NFS, ILINE
+      REAL(KIND=8) :: DTFRAC, Vdummy, V_NORM, V_PERP, U_NORM, POS
+      REAL(KIND=8) :: X, Y, Z, VX, VY, VZ, EI 
+      TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
+   
+      INTEGER :: S_ID
+      REAL(KIND=8) :: M
+      REAL(KIND=8) :: ZERO = 0.0
+   
+   
+      ! Linesource
+      DO ILINE = 1, N_LINESOURCES
+   
+         DO IS = 1, MIXTURES(LINESOURCES(ILINE)%MIX_ID)%N_COMPONENTS ! Loop on mixture components
 
-         ! Create particle
-         CALL INIT_PARTICLE(X, Y, Z, VX, VY, VZ, EI, S_ID_DUMMY, IC, DTFRAC, particleNOW)
+            S_ID = MIXTURES(LINESOURCES(ILINE)%MIX_ID)%COMPONENTS(IS)%ID
+            M = SPECIES(S_ID)%MOLMASS
+            NFS = FLOOR(LINESOURCES(ILINE)%nfs(IS))
+            IF (LINESOURCES(ILINE)%nfs(IS)-REAL(NFS, KIND=8) .GE. rf()) THEN ! Same as SPARTA's perspeciess
+               NFS = NFS + 1
+            END IF
+   
+            DO IP = 1, NFS ! Loop on particles to be injected
+   
+               CALL MAXWELL(ZERO, ZERO, ZERO, &
+                            LINESOURCES(ILINE)%TTRA, LINESOURCES(ILINE)%TTRA, LINESOURCES(ILINE)%TTRA, &
+                            LINESOURCES(ILINE)%TROT, &
+                            Vdummy, V_PERP, VZ, EI, M)
+                            
+               V_NORM = FLX(U_NORM, TTRA_BOUND, M) !!AAAAAAAAAAA
 
-         ! Assign particle to particles array
-         CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles)
+               VX = V_NORM*LINESOURCES(ILINE)%NORMX - V_PERP*LINESOURCES(ILINE)%NORMY + LINESOURCES(ILINE)%UX
+               VY = V_PERP*LINESOURCES(ILINE)%NORMX + V_NORM*LINESOURCES(ILINE)%NORMY + LINESOURCES(ILINE)%UY
+               VZ = VZ + LINESOURCES(ILINE)%UZ
 
+               DTFRAC = rf()*DT
+               POS = rf()
+               X = LINESOURCES(ILINE)%CX + (0.5-POS)*LINESOURCES(ILINE)%DX
+               Y = LINESOURCES(ILINE)%CY + (0.5-POS)*LINESOURCES(ILINE)%DY
+               Z = ZMIN + (ZMAX-ZMIN)*rf()
+   
+               CALL CELL_FROM_POSITION(X,Y,  IC)
+   
+               ! Init a particle object and assign it to the local vector of particles
+               CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EI,S_ID,IC,DTFRAC,  particleNOW)
+               CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles)
+   
+            END DO
+         END DO
+   
       END DO
-
-   END IF
-
+         
    END SUBROUTINE LINE_SOURCE_INJECT
- 
+
+
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE BOUNDARIES_INJECT -> Injects particles from domain borders !!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -294,23 +308,147 @@ MODULE timecycle
 
    IMPLICIT NONE
 
-   INTEGER      :: IP, IC
-   REAL(KIND=8) :: DTRIM
+   INTEGER      :: IP, IC, i
+   INTEGER      :: BOUNDCOLL
+   REAL(KIND=8) :: DTCOLL
+   REAL(KIND=8), DIMENSION(4) :: NX, NY, NZ, XW, YW, ZW
+   REAL(KIND=8) :: XCOLL, YCOLL, ZCOLL
+   REAL(KIND=8) :: VN, DX
+   LOGICAL, DIMENSION(:), ALLOCATABLE :: REMOVE_PART
+
+   NX = (/ 1., -1., 0., 0. /)
+   NY = (/ 0., 0., 1., -1. /)
+   NZ = (/ 0., 0., 0., 0. /)
+
+   XW = (/ XMIN, XMAX, XMIN, XMAX /)
+   YW = (/ YMAX, YMIN, YMIN, YMAX /)
+   ZW = (/ 0., 0., 0., 0. /)
+
+   ALLOCATE(REMOVE_PART(NP_PROC))
 
    DO IP = 1, NP_PROC
+      REMOVE_PART(IP) = .FALSE.
 
-      DTRIM = particles(IP)%DTRIM
+      
+      DO WHILE (particles(IP)%DTRIM .GT. 0.) ! Repeat the procedure until step is done
 
-      DO WHILE (DTRIM .GT. 0.) ! Repeat the procedure until step is done
+         DTCOLL = particles(IP)%DTRIM ! Start by looking for collisions within the remaining time
 
          ! ______ ADVECTION ______
 
-         ! Advect particle in space (forward Euler integration)
-         particles(IP)%X = particles(IP)%X + DTRIM*particles(IP)%VX
-         particles(IP)%Y = particles(IP)%Y + DTRIM*particles(IP)%VY
-         particles(IP)%Z = particles(IP)%Z + DTRIM*particles(IP)%VZ
-   
-         ! Advect particle in velocity
+         BOUNDCOLL = -1
+         DO i = 1, 4 ! Check collisions with boundaries
+            VN = particles(IP)%VX * NX(i) + particles(IP)%VY * NY(i) + particles(IP)%VZ * NZ(i) ! The velocity normal to the boundary
+            DX = (XW(i) - particles(IP)%X) * NX(i) + (YW(i) - particles(IP)%Y) * NY(i) + (ZW(i) - particles(IP)%Z) * NZ(i) ! The distance from the boundary
+            IF (VN * DTCOLL .LE. DX) THEN
+               
+               XCOLL = particles(IP)%X + particles(IP)%VX * DTCOLL ! Find candidate collision point
+               YCOLL = particles(IP)%Y + particles(IP)%VY * DTCOLL
+               ZCOLL = particles(IP)%Z + particles(IP)%VZ * DTCOLL
+
+               DTCOLL = DX/VN
+               BOUNDCOLL = i                                 
+
+            END IF
+         END DO
+
+         ! Check collisions with surfaces
+         ! If earlier than dtcoll remember to set BOUNDCOLL to -1 and the new dtcoll
+
+
+         IF (BOUNDCOLL == 1) THEN ! Collision with XMIN
+            ! Tally boundary properties
+            IF (BOOL_X_PERIODIC) THEN
+               particles(IP)%X = particles(IP)%X + particles(IP)%VX * DTCOLL + XMAX - XMIN
+               particles(IP)%Y = particles(IP)%Y + particles(IP)%VY * DTCOLL
+               particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ * DTCOLL
+
+               particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
+            ELSE IF (BOOL_XMIN_SPECULAR) THEN
+               particles(IP)%X = particles(IP)%X + particles(IP)%VX * DTCOLL
+               particles(IP)%Y = particles(IP)%Y + particles(IP)%VY * DTCOLL
+               particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ * DTCOLL
+
+               particles(IP)%VX = - particles(IP)%VX
+
+               particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
+            ELSE
+               REMOVE_PART(IP) = .TRUE.
+
+               particles(IP)%DTRIM = 0.
+            END IF
+         ELSE IF (BOUNDCOLL == 2) THEN ! Collision with XMAX
+            ! Tally boundary properties
+            IF (BOOL_X_PERIODIC) THEN
+               particles(IP)%X = particles(IP)%X + particles(IP)%VX * DTCOLL - XMAX + XMIN
+               particles(IP)%Y = particles(IP)%Y + particles(IP)%VY * DTCOLL
+               particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ * DTCOLL
+
+               particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
+            ELSE IF (BOOL_XMAX_SPECULAR) THEN
+               particles(IP)%X = particles(IP)%X + particles(IP)%VX * DTCOLL
+               particles(IP)%Y = particles(IP)%Y + particles(IP)%VY * DTCOLL
+               particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ * DTCOLL
+
+               particles(IP)%VX = - particles(IP)%VX
+
+               particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
+            ELSE
+               REMOVE_PART(IP) = .TRUE.
+
+               particles(IP)%DTRIM = 0.
+            END IF
+         ELSE IF (BOUNDCOLL == 3) THEN ! Collision with YMIN
+            ! Tally boundary properties
+            IF (BOOL_Y_PERIODIC) THEN
+               particles(IP)%X = particles(IP)%X + particles(IP)%VX * DTCOLL
+               particles(IP)%Y = particles(IP)%Y + particles(IP)%VY * DTCOLL + YMAX - YMIN
+               particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ * DTCOLL
+
+               particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
+            ELSE IF (BOOL_YMIN_SPECULAR) THEN
+               particles(IP)%X = particles(IP)%X + particles(IP)%VX * DTCOLL
+               particles(IP)%Y = particles(IP)%Y + particles(IP)%VY * DTCOLL
+               particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ * DTCOLL
+
+               particles(IP)%VY = - particles(IP)%VY
+
+               particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
+            ELSE
+               REMOVE_PART(IP) = .TRUE.
+
+               particles(IP)%DTRIM = 0.
+            END IF
+         ELSE IF (BOUNDCOLL == 4) THEN ! Collision with YMIN
+            ! Tally boundary properties
+            IF (BOOL_Y_PERIODIC) THEN
+               particles(IP)%X = particles(IP)%X + particles(IP)%VX * DTCOLL
+               particles(IP)%Y = particles(IP)%Y + particles(IP)%VY * DTCOLL - YMAX + YMIN
+               particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ * DTCOLL
+
+               particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
+            ELSE IF (BOOL_YMAX_SPECULAR) THEN
+               particles(IP)%X = particles(IP)%X + particles(IP)%VX * DTCOLL
+               particles(IP)%Y = particles(IP)%Y + particles(IP)%VY * DTCOLL
+               particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ * DTCOLL
+
+               particles(IP)%VY = - particles(IP)%VY
+
+               particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
+            ELSE
+               REMOVE_PART(IP) = .TRUE.
+
+               particles(IP)%DTRIM = 0.
+            END IF
+         ELSE
+            particles(IP)%X = particles(IP)%X + particles(IP)%VX * particles(IP)%DTRIM
+            particles(IP)%Y = particles(IP)%Y + particles(IP)%VY * particles(IP)%DTRIM
+            particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ * particles(IP)%DTRIM
+            particles(IP)%DTRIM = 0.
+         END IF
+         
+            
+         ! Advect particle in velocity - leapfrog method?
          ! particles(IP)%VX = ...
          ! particles(IP)%VY = ...
          ! particles(IP)%VZ = ...
@@ -322,56 +460,44 @@ MODULE timecycle
    
          END IF
 
-         ! _______ APPLY PERIODIC BCs IF REQUESTED ________
-
-         ! If the periodic BC is active, check if the particle exits one border or the other,
-         ! and if so, bring it back in the domain.
-       
-         ! -------
-         IF (BOOL_X_PERIODIC) THEN
-      
-            IF (particles(IP)%X .GT. XMAX) particles(IP)%X = XMIN + (particles(IP)%X - XMAX)
-            IF (particles(IP)%X .LT. XMIN) particles(IP)%X = XMAX + (particles(IP)%X - XMIN)
-      
-         END IF
-      
-         ! -------
-         IF (BOOL_Y_PERIODIC) THEN
-      
-            IF (particles(IP)%Y .GT. YMAX) particles(IP)%Y = YMIN + (particles(IP)%Y - YMAX)
-            IF (particles(IP)%Y .LT. YMIN) particles(IP)%Y = YMAX + (particles(IP)%Y - YMIN)
-      
-         END IF 
-      
-         ! -------
-         IF (BOOL_Z_PERIODIC) THEN
-      
-            IF (particles(IP)%Z .GT. ZMAX) particles(IP)%Z = ZMIN + (particles(IP)%Z - ZMAX)
-            IF (particles(IP)%Z .LT. ZMIN) particles(IP)%Z = ZMAX + (particles(IP)%Z - ZMIN)
-      
-         END IF 
    
          ! _______ CHECK WHERE PARTICLE ENDED UP _______
 
          ! ++++++++ Check if particle is still in the domain ++++++++++++
-         IF (particles(IP)%X .GE. XMIN .AND. particles(IP)%X .LE. XMAX .AND. & 
-             particles(IP)%Y .GE. YMIN .AND. particles(IP)%Y .LE. YMAX .AND. &
-             particles(IP)%Z .GE. ZMIN .AND. particles(IP)%Z .LE. ZMAX) THEN   ! Check that the particle is still in the domain
+         !IF (particles(IP)%X .GE. XMIN .AND. particles(IP)%X .LE. XMAX .AND. & 
+         !    particles(IP)%Y .GE. YMIN .AND. particles(IP)%Y .LE. YMAX .AND. &
+         !    particles(IP)%Z .GE. ZMIN .AND. particles(IP)%Z .LE. ZMAX) THEN   ! Check that the particle is still in the domain
    
             ! Compute the index of the cell in which the particle ended up
-            CALL CELL_FROM_POSITION(particles(IP)%X, particles(IP)%Y, IC)
-            particles(IP)%IC = IC
+            !CALL CELL_FROM_POSITION(particles(IP)%X, particles(IP)%Y, IC)
+            !particles(IP)%IC = IC
    
-            DTRIM = 0.E0 ! Timestep is over.
+            !DTRIM = 0.E0 ! Timestep is over.
  
          ! +++++++++ Particle crossed domain boundaries ++++++++
-         ELSE
+         !ELSE
 
-            ! CALL IMPACT_BOUNDARY(particles(IP)%X, DTRIM) 
-            DTRIM = 0.E0 ! TMP TMP TMP TMP TMP TMP TMP TMP TMP
-         END IF
+            ! CALL IMPACT_BOUNDARY(IP, DTRIM) 
+         !   DTRIM = 0.E0 ! TMP TMP TMP TMP TMP TMP TMP TMP TMP
+         !END IF
 
-      END DO
+         
+
+      END DO ! WHILE (DTRIM .GT. 0.)
+
+         ! _______ APPLY Z PERIODIC BCs ________
+
+         ! Z we should be able to do this a posteriori (remember it could be more than one depth length out!)
+      IF (BOOL_Z_PERIODIC) THEN
+      
+         DO WHILE (particles(IP)%Z .GT. ZMAX)
+            particles(IP)%Z = ZMIN + (particles(IP)%Z - ZMAX)
+         END DO
+         DO WHILE (particles(IP)%Z .LT. ZMIN) 
+            particles(IP)%Z = ZMAX + (particles(IP)%Z - ZMIN)
+         END DO
+   
+      END IF 
 
       particles(IP)%DTRIM = DT ! For the next timestep.
 
@@ -387,12 +513,11 @@ MODULE timecycle
    DO WHILE (IP .GE. 1)
 
       ! Is particle IP out of the domain? Then remove it!
-      IF (particles(IP)%X .LT. XMIN .OR. particles(IP)%X .GT. XMAX .OR. & 
-          particles(IP)%Y .LT. YMIN .OR. particles(IP)%Y .GT. YMAX .OR. &
-          particles(IP)%Z .LT. ZMIN .OR. particles(IP)%Z .GT. ZMAX) THEN
-   
+      IF (REMOVE_PART(IP)) THEN
          CALL REMOVE_PARTICLE_ARRAY(IP, particles, NP_PROC)
-
+      ELSE
+         CALL CELL_FROM_POSITION(particles(IP)%X, particles(IP)%Y, IC)
+         particles(IP)%IC = IC
       END IF
 
       IP = IP - 1
@@ -400,18 +525,6 @@ MODULE timecycle
    END DO
 
    END SUBROUTINE ADVECT
-
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   ! SUBROUTINE DSMC_COLLISIONS -> perform DSMC collisions !!!!!!!!!!!!!!!!!!!!
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-   SUBROUTINE DSMC_COLLISIONS
-
-   IMPLICIT NONE
-
-   CALL ONLYMASTERPRINT1(PROC_ID, "DSMC COLLISIONS NOT IMPLEMENTED YET! IGNORING THIS!")
-
-   END SUBROUTINE DSMC_COLLISIONS
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE MCC_COLLISIONS -> perform MCC collisions !!!!!!!!!!!!!!!!!!!!!!

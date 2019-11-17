@@ -8,9 +8,9 @@ MODULE particle
    TYPE PARTICLE_DATA_STRUCTURE
       REAL(KIND=8) :: X, Y, Z        ! position
       REAL(KIND=8) :: VX, VY, VZ, EI ! velocities and internal energy
+      REAL(KIND=8) :: DTRIM          ! Remaining time for advection
       INTEGER      :: IC             ! Cell index 
       INTEGER      :: S_ID           ! Species ID
-      REAL(KIND=8) :: DTRIM          ! Remaining time for advection
    END TYPE PARTICLE_DATA_STRUCTURE
  
    CONTAINS

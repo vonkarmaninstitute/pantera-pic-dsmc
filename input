@@ -15,41 +15,47 @@
 Axial_symmetry_bool:
     .FALSE.
 Domain_limits:
-    -0.1  0.1      -0.1  0.1      -0.5  0.5
+    -0.5  0.5      -0.5  0.5      -0.5  0.5
 Domain_periodicity:
     .FALSE.   .FALSE.   .TRUE.
+Domain_specular:
+    .FALSE.    .FALSE.    .TRUE.    .TRUE.
 Number_of_cells:
-    10  10  1
+    10  1  1
 
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.E14
+    5.0E18
 Timestep:
-    1.E-5
+    2.E-6
 Number_of_timesteps:
-    1000
+    10000
 RNG_seed:
-    12346
+    12343
+Dump_every:
+    10000
     
 ! ========= Multispecies ==============================
 
 Species_file:
-    air.species
+    ar.species
     
 Def_mixture:
-    air N2 0.78 O2 0.22
+    Argon1 Ar1 1.0
     
-Def_mixture:
-    air1 N2 1.0
 
 Def_mixture:
-    ions O+ 0.1 N+ 0.2 NO+ 0.3 O2+ 0.4 N2+ 0.5 e 0.6
+    Argon2 Ar2 1.0
 
+Def_mixture:
+    collmix Ar1 0.5 Ar2 0.5
+    
+    
 ! ========= Collisions ==============================
 
 Collision_type: ! [MCC / DSMC / NONE]
-  NONE 
+  DSMC 
 
 MCC_background_dens:
   1.0e20
@@ -59,16 +65,21 @@ MCC_species: ! NOT IMPLEMENTED YET!
 
 ! DSMC VHS collisions  ! NOT IMPLEMENTED YET!
 
+DSMC_collisions_mixture:
+    collmix
+VSS_parameters_file:
+    ar.vss
+
 ! ========= Initial particle seed ===================
 
 Initial_particles_bool:
     .FALSE.
 Initial_particles_dens:
-    1.e20
+    1.4e20
 Initial_particles_vel:
-    1000.   0.  0.
+    0.  0.  0.
 Initial_particles_Ttra:
-    100.  100.  100.
+    273.  273.  273.
 Initial_particles_Trot:
     0. 
 Initial_particles_mixture:
@@ -76,20 +87,20 @@ Initial_particles_mixture:
 ! ========== Injection from boundaries ==============
 
 Boundaries_inject_bool:
-    .TRUE.
+    .FALSE.
 
 Boundaries_inject_which_bool:        ! From which boundary you want to inject particles
-    .TRUE.  .TRUE.  .TRUE.  .TRUE. 
+    .FALSE.  .FALSE.  .FALSE.  .FALSE. 
 Boundaries_inject_dens:
-    1.e19
+    1.e20
 Boundaries_inject_vel:
-    -800. 500. 0.
+    500. 0. 0.
 Boundaries_inject_Ttra:
-    2000.0
+    300.0
 Boundaries_inject_Trot:
     0.
 Boundaries_inject_mixture:
-    air1
+    air
 ! ========== Injection from line source =============
 
 Linesource_bool:
@@ -106,6 +117,13 @@ Linesource_Ttra:
     0.0001
 Linesource_Trot:
     0.
+
+   center       length        density  velocity xyz         Ttr      Trot   mix
+Linesource:
+    -0.5    0.0    0.0    1.0    5.0e23    0.0    0.0    0.0    273.0    0.0    Argon1
+Linesource:
+    0.5    0.0    0.0    -1.0    5.0e23    0.0    0.0    0.0    273.0    0.0    Argon2
+
 
 ! ========= MPI parallelization =====================
 ! == Style for MPI domain partition can be:

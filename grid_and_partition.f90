@@ -13,7 +13,7 @@ MODULE grid_and_partition
  
    SUBROUTINE CELL_FROM_POSITION(XP,YP,  IDCELL)
 
-      ! Note: first cell is denoted as zero
+      ! Note: first cell is denoted as 1. changed from before, think it's easier
 
       IMPLICIT NONE
 
@@ -26,7 +26,7 @@ MODULE grid_and_partition
       DX = (XMAX - XMIN)/NX
       DY = (YMAX - YMIN)/NY
 
-      IDCELL = INT((XP-XMIN)/DX) + NX*INT((YP-YMIN)/DY)
+      IDCELL = INT((XP-XMIN)/DX) + NX*INT((YP-YMIN)/DY)+1
   
    END SUBROUTINE CELL_FROM_POSITION
 

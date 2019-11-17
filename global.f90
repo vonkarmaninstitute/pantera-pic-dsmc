@@ -20,9 +20,14 @@ MODULE global
    LOGICAL      :: BOOL_AXI = .FALSE. ! Assign default value!
    INTEGER      :: NX, NY, NZ
    REAL(KIND=8) :: XMIN, XMAX, YMIN, YMAX, ZMIN, ZMAX
+   REAL(KIND=8) :: CELL_VOL
    LOGICAL      :: BOOL_X_PERIODIC = .FALSE. ! Assign default value!
    LOGICAL      :: BOOL_Y_PERIODIC = .FALSE.
    LOGICAL      :: BOOL_Z_PERIODIC = .FALSE.
+   LOGICAL      :: BOOL_XMIN_SPECULAR = .FALSE.
+   LOGICAL      :: BOOL_XMAX_SPECULAR = .FALSE.
+   LOGICAL      :: BOOL_YMIN_SPECULAR = .FALSE.
+   LOGICAL      :: BOOL_YMAX_SPECULAR = .FALSE.
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Numerical settings !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -31,6 +36,7 @@ MODULE global
    INTEGER      :: NT
    REAL(KIND=8) :: FNUM, DT
    INTEGER      :: RNG_SEED_GLOBAL, RNG_SEED_LOCAL
+   INTEGER      :: DUMP_EVERY
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Collisions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -39,6 +45,7 @@ MODULE global
    CHARACTER(LEN=64) :: COLLISION_TYPE
    LOGICAL           :: BOOL_MCC = .FALSE., BOOL_DSMC = .FALSE.
    REAL(KIND=8)      :: MCC_BG_DENS, MCC_SIGMA
+   INTEGER           :: DSMC_COLL_MIX
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Initial particles seed !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -70,7 +77,7 @@ MODULE global
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Particles injection from line source !!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+   ! Not used anymore
    LOGICAL      :: BOOL_LINESOURCE = .FALSE. ! Assign default value!
   
    REAL(KIND=8) :: X_LINESOURCE, Y_LINESOURCE, L_LINESOURCE
@@ -81,6 +88,25 @@ MODULE global
    INTEGER      :: nfs_LINESOURCE
    REAL(KIND=8) :: KAPPA_LINESOURCE
    REAL(KIND=8) :: S_NORM_LINESOURCE
+
+   ! This is used instead.
+   INTEGER         :: N_LINESOURCES = 0
+
+   TYPE LINESOURCE
+      REAL(KIND=8) :: CX, CY, DX, DY
+      REAL(KIND=8) :: NRHO
+      REAL(KIND=8) :: UX, UY, UZ
+      REAL(KIND=8) :: TTRA, TROT ! No TTRAX_ TTRAY_ TTRAZ_ for now! IMPLEMENT IT!
+      INTEGER      :: MIX_ID
+
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: nfs
+      REAL(KIND=8) :: KAPPA
+      REAL(KIND=8) :: U_NORM
+      REAL(KIND=8) :: NORMX, NORMY
+   END TYPE LINESOURCE
+
+   TYPE(LINESOURCE), DIMENSION(:), ALLOCATABLE :: LINESOURCES
+
    
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! MPI parallelization !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -109,6 +135,14 @@ MODULE global
       REAL(KIND=8) :: VIBTEMP
       REAL(KIND=8) :: SPWT
       REAL(KIND=8) :: CHARGE
+      REAL(KIND=8) :: DIAM
+      REAL(KIND=8) :: OMEGA
+      REAL(KIND=8) :: TREF
+      REAL(KIND=8) :: ALPHA
+      REAL(KIND=8) :: SIGMA
+      REAL(KIND=8) :: NU
+      REAL(KIND=8) :: CREF
+      
    END TYPE SPECIES_DATA_STRUCTURE
 
    TYPE(SPECIES_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: SPECIES, TEMP_SPECIES
@@ -140,23 +174,23 @@ MODULE global
    SUBROUTINE NEWTYPE
    
       INTEGER :: ii, extent_dpr, extent_int
-      INTEGER, DIMENSION(9) :: blocklengths, oldtypes, offsets
+      INTEGER, DIMENSION(10) :: blocklengths, oldtypes, offsets
      
       CALL MPI_TYPE_EXTENT(MPI_DOUBLE_PRECISION, extent_dpr, ierr)  
       CALL MPI_TYPE_EXTENT(MPI_INTEGER,          extent_int, ierr)
            
       blocklengths = 1
      
-      oldtypes(1:7) = MPI_DOUBLE_PRECISION  
-      oldtypes(8:9) = MPI_INTEGER
+      oldtypes(1:8) = MPI_DOUBLE_PRECISION  
+      oldtypes(9:10) = MPI_INTEGER
           
       offsets(1) = 0  
-      DO ii = 2, 8
+      DO ii = 2, 9
          offsets(ii) = offsets(ii - 1) + extent_dpr * blocklengths(ii - 1)
       END DO
-      offsets(9) = offsets(8) + extent_int * blocklengths(8)
+      offsets(10) = offsets(9) + extent_int * blocklengths(9)
       
-      CALL MPI_TYPE_STRUCT(9, blocklengths, offsets, oldtypes, MPI_PARTICLE_DATA_STRUCTURE, ierr)  
+      CALL MPI_TYPE_STRUCT(10, blocklengths, offsets, oldtypes, MPI_PARTICLE_DATA_STRUCTURE, ierr)  
       CALL MPI_TYPE_COMMIT(MPI_PARTICLE_DATA_STRUCTURE, ierr)   
    
    END SUBROUTINE NEWTYPE

@@ -10,7 +10,7 @@ OPTF = -O3 -Wall -Wextra -fimplicit-none -fbacktrace -ffpe-trap=invalid,zero,ove
 #OPTF = -Ofast -march=native -Wall -Wextra -fimplicit-none -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow -mcmodel=medium # Aggressive optimization options 
 
 # Objects: list of all objects *.o
-OBJS = mpi_common.o  global.o  screen.o  tools.o  initialization.o  timecycle.o  grid_and_partition.o  particle.o
+OBJS = mpi_common.o  global.o  screen.o  tools.o  initialization.o  timecycle.o  grid_and_partition.o  particle.o  collisions.o
 #OBJDSMC = mpi_common.o tools.o screen.o global.o postprocess.o initialization.o timecycle.o
 
 # Executable generation by the linker
@@ -22,7 +22,7 @@ pantera.exe: pantera.o $(OBJS)
 pantera.o: pantera.f90 $(OBJS) 
 	$(CMPF) $(OPTF) pantera.f90
 
-timecycle.o: timecycle.f90  global.o  particle.o  screen.o
+timecycle.o: timecycle.f90  global.o  particle.o  screen.o  collisions.o
 	$(CMPF) $(OPTF) timecycle.f90
 
 initialization.o: initialization.f90  global.o  tools.o  grid_and_partition.o
@@ -46,6 +46,8 @@ mpi_common.o: mpi_common.f90
 particle.o: particle.f90
 	$(CMPF) $(OPTF) particle.f90
 
+collisions.o: collisions.f90
+	$(CMPF) $(OPTF) collisions.f90
 
 # Cleaning command
 clean: 

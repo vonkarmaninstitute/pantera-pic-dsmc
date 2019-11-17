@@ -135,15 +135,12 @@ CONTAINS
   DO I = 1,3
 
      ! Step 1.
-      R = RAND()
-      DO WHILE (R < 1.0D-13)
-         R = RAND()
-      END DO
+     R = RAND()
       
      TETA = PI2*R
 
      ! Step 2.
-
+     
      BETA = 1./SQRT(2.*KB/M*TT(I))
 
      ! R goes from 0 to 1 included. Remove the extremes in a very rough way
@@ -243,9 +240,10 @@ CONTAINS
      ! Open file for writing
      OPEN(10, FILE=filename )
 
-     WRITE(10,*) '% Timestep | X | Y | Z | S_ID | proc_ID'
+     WRITE(10,*) '% Timestep | X | Y | Z | VX | VY | VZ | S_ID | proc_ID'
      DO IP = 1, NP_PROC
-        WRITE(10,*) TIMESTEP, particles(IP)%X, particles(IP)%Y, particles(IP)%Z, particles(IP)%S_ID, PROC_ID
+        WRITE(10,*) TIMESTEP, particles(IP)%X, particles(IP)%Y, particles(IP)%Z, &
+        particles(IP)%VX, particles(IP)%VY, particles(IP)%VZ, particles(IP)%S_ID, PROC_ID
      END DO
 
   END SUBROUTINE DUMP_PARTICLES_FILE

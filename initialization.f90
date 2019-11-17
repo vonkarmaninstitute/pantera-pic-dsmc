@@ -25,8 +25,8 @@ MODULE initialization
       CHARACTER*512      :: line
       INTEGER            :: ReasonEOF
 
-      CHARACTER*512      :: MIXTURE_DEFINITION
-      CHARACTER*64       :: MIX_INIT_NAME, MIX_BOUNDINJECT_NAME
+      CHARACTER*512      :: MIXTURE_DEFINITION, VSS_PARAMS_FILENAME, LINESOURCE_DEFINITION
+      CHARACTER*64       :: MIX_INIT_NAME, MIX_BOUNDINJECT_NAME, DSMC_COLL_MIX_NAME
 
       ! Open input file for reading
       OPEN(UNIT=in1,FILE='input', STATUS='old',IOSTAT=ios)
@@ -51,7 +51,9 @@ MODULE initialization
          ! ~~~~~~~~~~~~~  Geometry and computational domain  ~~~~~~~~~~~~~~~~~
          IF (line=='Axial_symmetry_bool:')     READ(in1,'(L6)') BOOL_AXI
          IF (line=='Domain_limits:')           READ(in1,*) XMIN, XMAX, YMIN, YMAX, ZMIN, ZMAX
-         IF (line=='Domain_periodicity:')      READ(in1,*) BOOL_X_PERIODIC, BOOL_Y_PERIODIC, BOOL_Z_PERIODIC 
+         IF (line=='Domain_periodicity:')      READ(in1,*) BOOL_X_PERIODIC, BOOL_Y_PERIODIC, BOOL_Z_PERIODIC
+         IF (line=='Domain_specular:')         READ(in1,*) BOOL_XMIN_SPECULAR, BOOL_XMAX_SPECULAR, &
+                                                           BOOL_YMIN_SPECULAR, BOOL_YMAX_SPECULAR
          IF (line=='Number_of_cells:')         READ(in1,*) NX, NY, NZ
 
          ! ~~~~~~~~~~~~~  Numerical settings  ~~~~~~~~~~~~~~~~~
@@ -59,6 +61,7 @@ MODULE initialization
          IF (line=='Timestep:')                READ(in1,*) DT
          IF (line=='Number_of_timesteps:')     READ(in1,*) NT
          IF (line=='RNG_seed:')                READ(in1,*) RNG_SEED_GLOBAL
+         IF (line=='Dump_every:')              READ(in1,*) DUMP_EVERY
 
          ! ~~~~~~~~~~~~~  Multispecies ~~~~~~~~~~~~~~~
          IF (line=='Species_file:') THEN
@@ -75,6 +78,15 @@ MODULE initialization
          IF (line=='Collision_type:')          READ(in1,*) COLLISION_TYPE
          IF (line=='MCC_background_dens:')     READ(in1,*) MCC_BG_DENS
          IF (line=='MCC_cross_section:')       READ(in1,*) MCC_SIGMA
+         IF (line=='VSS_parameters_file:')     THEN
+            READ(in1,*) VSS_PARAMS_FILENAME
+            CALL READ_VSS(VSS_PARAMS_FILENAME)
+         END IF
+         IF (line=='DSMC_collisions_mixture:') THEN
+            READ(in1,*) DSMC_COLL_MIX_NAME
+            DSMC_COLL_MIX = MIXTURE_NAME_TO_ID(DSMC_COLL_MIX_NAME)
+         END IF
+         
 
          ! ~~~~~~~~~~~~~  Initial particles seeding  ~~~~~~~~~~~~~~~~~
          IF (line=='Initial_particles_bool:')  READ(in1,*) BOOL_INITIAL_SEED
@@ -107,6 +119,11 @@ MODULE initialization
          IF (line=='Linesource_vel:')       READ(in1,*)UX_LINESOURCE, UY_LINESOURCE, UZ_LINESOURCE
          IF (line=='Linesource_Ttra:')      READ(in1,*)TTRA_LINESOURCE
          IF (line=='Linesource_Trot:')      READ(in1,*)TROT_LINESOURCE 
+
+         IF (line=='Linesource:') THEN
+            READ(in1,'(A)') LINESOURCE_DEFINITION
+            CALL DEF_LINESOURCE(LINESOURCE_DEFINITION)
+         END IF
 
          ! ~~~~~~~~~~~~~  MPI parallelization settings ~~~~~~~~~~~~~~~
          IF (line=='Partition_style:')         READ(in1,*) DOMPART_TYPE
@@ -358,6 +375,73 @@ MODULE initialization
 
    END SUBROUTINE READ_SPECIES
 
+   SUBROUTINE READ_VSS(FILENAME)
+
+      IMPLICIT NONE
+
+      CHARACTER*64, INTENT(IN) :: FILENAME
+      
+      INTEGER, PARAMETER :: in2 = 456
+      INTEGER            :: ios
+      CHARACTER*512      :: line
+      INTEGER            :: ReasonEOF
+
+      CHARACTER*64 :: SP_NAME
+      INTEGER      :: SP_ID
+      REAL(KIND=8) :: DIAM
+      REAL(KIND=8) :: OMEGA
+      REAL(KIND=8) :: TREF
+      REAL(KIND=8) :: ALPHA
+      REAL(KIND=8) :: PI, KB
+
+      PI   = 3.141593
+      KB = 1.38064852E-23
+
+      ! Open input file for reading
+      OPEN(UNIT=in2,FILE=FILENAME, STATUS='old',IOSTAT=ios)
+
+      IF (ios.NE.0) THEN
+         PRINT*
+         WRITE(*,*)'  Attention, VSS parameters definition file not found! ABORTING.'
+         PRINT*
+         STOP
+      ENDIF
+
+      line = '' ! Init empty
+
+      ! +++++++ Read until the end of file ++++++++
+      DO
+
+         READ(in2,'(A)', IOSTAT=ReasonEOF) line ! Read line         
+         CALL STRIP_COMMENTS(line, '!')         ! Remove comments from line
+
+         IF (ReasonEOF < 0) EXIT ! End of file reached
+
+         ! ~~~~~~~~~~~~~  Geometry and computational domain  ~~~~~~~~~~~~~~~~~
+         
+         !READ(line,'(A2, ES14.3, ES14.3, I1, ES14.3, I1, ES14.3, ES14.3, ES14.3, ES14.3)') &
+         READ(line,*) SP_NAME, DIAM, OMEGA, TREF, ALPHA
+      
+         SP_ID = SPECIES_NAME_TO_ID(SP_NAME)
+
+         SPECIES(SP_ID)%DIAM  = DIAM
+         SPECIES(SP_ID)%OMEGA = OMEGA
+         SPECIES(SP_ID)%TREF  = TREF
+         SPECIES(SP_ID)%ALPHA = ALPHA
+
+         SPECIES(SP_ID)%SIGMA = PI*DIAM**2
+         SPECIES(SP_ID)%NU    = OMEGA - 0.5
+         SPECIES(SP_ID)%CREF  = SQRT(3.*KB*TREF / SPECIES(SP_ID)%MOLMASS)
+         
+         
+      END DO
+
+      CLOSE(in2) ! Close input file
+
+
+   END SUBROUTINE READ_VSS
+
+
    SUBROUTINE DEF_MIXTURE(DEFINITION)
       
       IMPLICIT NONE
@@ -375,7 +459,7 @@ MODULE initialization
       TYPE(MIXTURE_COMPONENT), DIMENSION(:), ALLOCATABLE :: TEMP_COMPONENTS
 
 
-      call SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
+      CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
       
       READ(STRARRAY(1),'(A10)') MIX_NAME
       N_COMP = (N_STR-1)/2
@@ -402,6 +486,48 @@ MODULE initialization
 
 
    END SUBROUTINE DEF_MIXTURE
+
+
+   
+   SUBROUTINE DEF_LINESOURCE(DEFINITION)
+
+      IMPLICIT NONE
+
+      CHARACTER(LEN=*), INTENT(IN) :: DEFINITION
+
+      INTEGER :: N_STR
+      CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
+
+      CHARACTER*64 :: MIX_NAME
+      INTEGER      :: MIX_ID
+      TYPE(LINESOURCE), DIMENSION(:), ALLOCATABLE :: TEMP_LINESOURCES
+
+      
+      ALLOCATE(TEMP_LINESOURCES(N_LINESOURCES+1)) ! Append the mixture to the list
+      TEMP_LINESOURCES(1:N_LINESOURCES) = LINESOURCES
+      CALL MOVE_ALLOC(TEMP_LINESOURCES, LINESOURCES)
+      N_LINESOURCES = N_LINESOURCES + 1
+
+
+
+      CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
+
+      READ(STRARRAY(1), '(ES14.3)') LINESOURCES(N_LINESOURCES)%CX
+      READ(STRARRAY(2), '(ES14.3)') LINESOURCES(N_LINESOURCES)%CY
+      READ(STRARRAY(3), '(ES14.3)') LINESOURCES(N_LINESOURCES)%DX
+      READ(STRARRAY(4), '(ES14.3)') LINESOURCES(N_LINESOURCES)%DY
+      READ(STRARRAY(5), '(ES14.3)') LINESOURCES(N_LINESOURCES)%NRHO
+      READ(STRARRAY(6), '(ES14.3)') LINESOURCES(N_LINESOURCES)%UX
+      READ(STRARRAY(7), '(ES14.3)') LINESOURCES(N_LINESOURCES)%UY
+      READ(STRARRAY(8), '(ES14.3)') LINESOURCES(N_LINESOURCES)%UZ
+      READ(STRARRAY(9), '(ES14.3)') LINESOURCES(N_LINESOURCES)%TTRA
+      READ(STRARRAY(10),'(ES14.3)') LINESOURCES(N_LINESOURCES)%TROT
+      READ(STRARRAY(11),'(A10)') MIX_NAME
+
+      MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
+      LINESOURCES(N_LINESOURCES)%MIX_ID = MIX_ID
+
+   END SUBROUTINE
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE INITIAL_SEED -> seeds particles at the beginning of !!
@@ -454,7 +580,7 @@ MODULE initialization
          DO i = 1, MIXTURES(MIX_INIT)%N_COMPONENTS
             RANVAR = RANVAR - MIXTURES(MIX_INIT)%COMPONENTS(i)%MOLFRAC
             IF (RANVAR < 0.) THEN
-               S_ID = i
+               S_ID = MIXTURES(MIX_INIT)%COMPONENTS(i)%ID
                EXIT
             END IF
          END DO
@@ -582,6 +708,8 @@ MODULE initialization
          DY_BLOCKS = (YMAX - YMIN)/N_BLOCKS_Y
       END IF
 
+      CELL_VOL = (XMAX-XMIN)*(YMAX-YMIN)/(NX*NY)
+
    END SUBROUTINE INITVARIOUS
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -616,11 +744,14 @@ MODULE initialization
 
       IMPLICIT NONE
 
-      REAL(KIND=8) :: BETA, FLUXBOUND, FLUXLINESOURCE, NtotINJECT, ACCA, Snow
+      REAL(KIND=8) :: BETA, FLUXBOUND, NtotINJECT, Snow
+      REAL(KIND=8) :: U_NORM, S_NORM, FLUXLINESOURCE, LINELENGTH, NORMX, NORMY
       REAL(KIND=8) :: PI, PI2  
+
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: nfs_LINE
  
       REAL(KIND=8)  :: M, FRAC, KB
-      INTEGER :: N_COMP, IS, S_ID
+      INTEGER :: N_COMP, IS, S_ID, ILINE
     
       PI   = 3.141593
       PI2  = 2.*PI
@@ -735,21 +866,73 @@ MODULE initialization
 
       ! =====================================================
       ! Injection from line source !!!!!!!!!TO IMPLEMENT FOR MULTISPECIES
-      IF (BOOL_LINESOURCE) THEN 
+      ! IF (BOOL_LINESOURCE) THEN 
 
-         BETA = 1./SQRT(2.*KB/M*TTRA_LINESOURCE) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
+      !    BETA = 1./SQRT(2.*KB/M*TTRA_LINESOURCE) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
 
-         S_NORM_LINESOURCE = UX_LINESOURCE*BETA ! Molecular speed ratio normal to line source (which is y-aligned)
-         Snow              = S_NORM_LINESOURCE  ! temp variable
+      !    S_NORM_LINESOURCE = UX_LINESOURCE*BETA ! Molecular speed ratio normal to line source (which is y-aligned)
+      !    Snow              = S_NORM_LINESOURCE  ! temp variable
 
-         FLUXLINESOURCE = NRHO_LINESOURCE/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) & 
-                                   + SQRT(PI)*Snow*(1.+ERF1(Snow)))          ! Tot number flux emitted [1/(s m^2)]
-         NtotINJECT = FLUXLINESOURCE*L_LINESOURCE*(ZMAX-ZMIN)*DT/FNUM        ! Tot num of particles to be injected
-         nfs_LINESOURCE = FLOOR(NtotINJECT/REAL(N_MPI_THREADS,KIND=8)+rf())  ! Particles injected by each proc
-         ACCA = SQRT(Snow**2+2.)                                             ! Tmp variable
-         KAPPA_LINESOURCE = 2./(Snow+ACCA) * EXP(0.5 + 0.5*Snow*(Snow-ACCA)) ! global variable
+      !    FLUXLINESOURCE = NRHO_LINESOURCE/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) & 
+      !                              + SQRT(PI)*Snow*(1.+ERF1(Snow)))          ! Tot number flux emitted [1/(s m^2)]
+      !    NtotINJECT = FLUXLINESOURCE*L_LINESOURCE*(ZMAX-ZMIN)*DT/FNUM        ! Tot num of particles to be injected
+      !    nfs_LINESOURCE = FLOOR(NtotINJECT/REAL(N_MPI_THREADS,KIND=8)+rf())  ! Particles injected by each proc
+      !    ACCA = SQRT(Snow**2+2.)                                             ! Tmp variable
+      !    KAPPA_LINESOURCE = 2./(Snow+ACCA) * EXP(0.5 + 0.5*Snow*(Snow-ACCA)) ! global variable
 
-      END IF 
+      ! END IF 
+
+      ! Injection from linesource new way
+
+      DO ILINE = 1, N_LINESOURCES ! Loop on line sources
+         WRITE(*,*) 'Mixture id is:', LINESOURCES(ILINE)%MIX_ID
+         N_COMP = MIXTURES(LINESOURCES(ILINE)%MIX_ID)%N_COMPONENTS
+         WRITE(*,*) 'NCOMP is:', N_COMP
+
+         ALLOCATE(nfs_LINE(N_COMP))
+
+         DO IS = 1, N_COMP ! Loop on mixture components
+            S_ID = MIXTURES(LINESOURCES(ILINE)%MIX_ID)%COMPONENTS(IS)%ID
+            WRITE(*,*) 'Species id is:', S_ID
+            M = SPECIES(S_ID)%MOLMASS
+            WRITE(*,*) 'Mixture id is:', LINESOURCES(ILINE)%MIX_ID
+            FRAC = MIXTURES(LINESOURCES(ILINE)%MIX_ID)%COMPONENTS(IS)%MOLFRAC
+            BETA = 1./SQRT(2.*KB/M*LINESOURCES(ILINE)%TTRA) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
+         
+            LINELENGTH = SQRT(LINESOURCES(ILINE)%DX**2 + LINESOURCES(ILINE)%DY**2)
+
+            NORMX = LINESOURCES(ILINE)%DY/LINELENGTH
+            LINESOURCES(ILINE)%NORMX = NORMX
+            NORMY = - LINESOURCES(ILINE)%DX/LINELENGTH
+            LINESOURCES(ILINE)%NORMY = NORMY
+
+            U_NORM = LINESOURCES(ILINE)%UX*NORMX + LINESOURCES(ILINE)%UY*NORMY ! Molecular speed ratio normal to boundary
+            LINESOURCES(ILINE)%U_NORM = U_NORM
+            S_NORM = U_NORM*BETA
+            Snow   = S_NORM     ! temp variable
+
+            FLUXLINESOURCE   = LINESOURCES(ILINE)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) &
+                                    + SQRT(PI)*Snow*(1.+ERF1(Snow)))      ! Tot number flux emitted 
+            NtotINJECT  = FLUXLINESOURCE*LINELENGTH*(ZMAX-ZMIN)*DT/FNUM         ! Tot num of particles to be injected
+
+            
+
+            nfs_LINE(IS)    = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
+            WRITE(*,*)'ON LINESOURCE ', nfs_LINE(IS)
+            !ACCA        = SQRT(Snow**2+2.)                                  ! Tmp variable
+            !KAPPA_YMAX  = 2./(Snow+ACCA) * EXP(0.5 + 0.5*Snow*(Snow-ACCA))  ! global variable
+
+            ! Check: if we are hypersonic and stuff exits domain print a warning
+            IF (S_NORM .LE. -3.) THEN 
+               CALL ONLYMASTERPRINT1(PROC_ID, '$$$ Warning! Hypersonic boundary! Almost no &
+                                                   &particles will be emitted at line source.')
+            END IF
+         END DO
+
+         CALL MOVE_ALLOC(nfs_LINE, LINESOURCES(ILINE)%nfs)
+      
+      END DO
+
 
    END SUBROUTINE INITINJECTION
 
@@ -806,6 +989,11 @@ INTEGER FUNCTION MIXTURE_NAME_TO_ID(NAME)
    DO INDEX = 1, N_MIXTURES
       IF (MIXTURES(INDEX)%NAME == NAME) MATCH = INDEX
    END DO
+
+   IF (MATCH .EQ. -1) THEN
+      WRITE(*,*) 'Error! Mixture name not found.'
+   END IF
+
    MIXTURE_NAME_TO_ID = MATCH
 
 END FUNCTION MIXTURE_NAME_TO_ID

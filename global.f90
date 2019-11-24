@@ -33,10 +33,13 @@ MODULE global
    !!!!!!!!! Numerical settings !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-   INTEGER      :: NT
+   INTEGER      :: NT, tID
    REAL(KIND=8) :: FNUM, DT
    INTEGER      :: RNG_SEED_GLOBAL, RNG_SEED_LOCAL
    INTEGER      :: DUMP_EVERY
+   INTEGER      :: DUMP_GRID_AVG_EVERY
+   INTEGER      :: DUMP_GRID_START
+   INTEGER      :: DUMP_GRID_N_AVG
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Collisions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -46,6 +49,7 @@ MODULE global
    LOGICAL           :: BOOL_MCC = .FALSE., BOOL_DSMC = .FALSE.
    REAL(KIND=8)      :: MCC_BG_DENS, MCC_SIGMA
    INTEGER           :: DSMC_COLL_MIX
+   INTEGER           :: TIMESTEP_COLL
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Initial particles seed !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -164,6 +168,27 @@ MODULE global
 
    TYPE(MIXTURE), DIMENSION(:), ALLOCATABLE :: MIXTURES
  
+
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!! Average flowfield !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+   INTEGER, DIMENSION(:), ALLOCATABLE      :: AVG_NP
+
+   INTEGER, DIMENSION(:), ALLOCATABLE      :: AVG_N
+
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_VX
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_VY
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_VZ
+
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_TTRX
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_TTRY
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_TTRZ
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_TTR
+
+   INTEGER                                 :: AVG_CUMULATED
+
+
    CONTAINS  ! @@@@@@@@@@@@@@@@@@@@@ SUBROUTINES @@@@@@@@@@@@@@@@@@@@@@@@
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

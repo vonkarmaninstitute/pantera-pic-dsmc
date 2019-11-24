@@ -30,7 +30,7 @@
    INTEGER, DIMENSION(NX*NY)          :: NPC, IOF
    INTEGER, DIMENSION(:), ALLOCATABLE :: IND
    INTEGER                            :: JP, JC, NCELLS, IDX
-   INTEGER                            :: TIMESTEP_COLL, NCOLLREAL
+   INTEGER                            :: NCOLLREAL
 
    NPC = 0
    DO JP = 1, NP_PROC
@@ -68,7 +68,7 @@
       END IF
    END DO
  
-   WRITE(*,*) 'Number of real collisions: ', TIMESTEP_COLL
+   !WRITE(*,*) 'Number of real collisions: ', TIMESTEP_COLL
 
    DEALLOCATE(IND)
  
@@ -92,7 +92,7 @@
   INTEGER      :: SP_ID1, SP_ID2
   INTEGER      :: NCOLL,NCOLLMAX_INT
   REAL(KIND=8) :: SIGMA, ALPHA, SIGMAMAX, NCOLLMAX,FCORR,VR,VR2,rfp
-  REAL(KIND=8) :: NU, OMEGA, CREF, ZETA, MASS
+  REAL(KIND=8) :: OMEGA, CREF, ZETA, MASS
   REAL(KIND=8) :: PPMAX
   REAL(KIND=8) :: B,C,EINT,ETOT,ETR,PHI,SITETA,VRX,VRY,VRZ
   REAL(KIND=8) :: VXMAX,VXMIN,VYMAX,VYMIN,VZMAX,VZMIN,VRMAX
@@ -100,7 +100,7 @@
   REAL(KIND=8), DIMENSION(3) :: C1, C2, GREL, W
   REAL(KIND=8) :: GX, GY, GZ, G
   REAL(KIND=8) :: COSCHI, SINCHI, THETA, COSTHETA, SINTHETA
-  REAL(KIND=8) :: M1, M2, MTOT, MR
+  REAL(KIND=8) :: M1, M2, MTOT, MR, COSA, SINA, BB
   
   PI   = 3.141593
   PI2  = 2.*PI
@@ -192,8 +192,7 @@
      SP_ID2 = particles(JP2)%S_ID
 
      SIGMA = PI * (0.5 * (SPECIES(SP_ID1)%DIAM + SPECIES(SP_ID2)%DIAM))**2
-     NU    = 0.5 * (SPECIES(SP_ID1)%NU + SPECIES(SP_ID2)%NU)
-     OMEGA = NU + 0.5
+     OMEGA    = 0.5 * (SPECIES(SP_ID1)%OMEGA + SPECIES(SP_ID2)%OMEGA)
      CREF  = 0.5 * (SPECIES(SP_ID1)%CREF + SPECIES(SP_ID2)%CREF) ! Not correct DBDBDBDBDBDBDDBDBDB
      
      ALPHA = 0.5 * (SPECIES(SP_ID1)%ALPHA + SPECIES(SP_ID2)%ALPHA)
@@ -206,19 +205,21 @@
      C1(2) = particles(JP1)%VY
      C1(3) = particles(JP1)%VZ
 
-     C2(1) = particles(JP1)%VX
-     C2(2) = particles(JP1)%VY
-     C2(3) = particles(JP1)%VZ
+     C2(1) = particles(JP2)%VX
+     C2(2) = particles(JP2)%VY
+     C2(3) = particles(JP2)%VZ
 
      ! Check if collision happens
      rfp = rf()
      ZETA = 0.
 
+
+     !WRITE(*,*) SIGMA*(VR/CREF)**(1.-2.*OMEGA)/5.3e-19
      !WRITE(*,*) 'Collision probability:', (FCORR/(SIGMAMAX*VRMAX)*SIGMA*(VR/CREF)**(1.-2.*NU))
-     IF ( rfp .LT. (FCORR/(SIGMAMAX*VRMAX)*SIGMA*(VR/CREF)**(1.-2.*NU)) ) THEN
+     IF ( rfp .LT. (FCORR/(SIGMAMAX*VRMAX)*VR*SIGMA*(VR/CREF)**(1.-2.*OMEGA)) ) THEN
 
         ! Rimuovere commento per avere avviso
-        IF ((FCORR/(SIGMAMAX*VRMAX)*SIGMA*(VR/CREF)**(1.-2.*NU)) .GT. 1.) THEN
+        IF ((FCORR/(SIGMAMAX*VRMAX)*VR*SIGMA*(VR/CREF)**(1.-2.*OMEGA)) .GT. 1.) THEN
            WRITE(*,*) 'Attention => this was a bad collision!!!'
         END IF
 
@@ -280,10 +281,10 @@
 
         ELSE
 
-           ! Elastic collision => Compute post-collision velocities
-         !   HS Collisions
-         !   B = 1. - 2.*rf()
-         !   SITETA = SQRT(1.-B*B)
+         ! Elastic collision => Compute post-collision velocities
+         ! HS Collisions
+         !   B = 1. - 2.*rf() ! COSTHETA
+         !   SITETA = SQRT(1.-B*B) ! SINTHETA
 
          !   PHI = PI2*rf()
 
@@ -305,8 +306,9 @@
          ! End of HS collisions
 
          ! VSS Collisions
-         COSCHI = 2.*rf()**(1/ALPHA) - 1.
-         SINCHI = SQRT(1-COSCHI*COSCHI)
+         !ALPHA = 1.0 ! DBDBDBDBDBDBDBDBDBDBBDBDBDBBDBDBDBBDBDBBDBDBDBBDDBBDBDBDBDBBDBDBBDBD
+         COSCHI = 2.*rf()**(1./ALPHA) - 1.
+         SINCHI = SQRT(1.-COSCHI*COSCHI)
          THETA = PI2*rf()
          COSTHETA = COS(THETA)
          SINTHETA = SIN(THETA)
@@ -315,22 +317,51 @@
          ETR = 0.5*MR*VR**2 ! Will be different for inelastic collisions.
          G = SQRT(2.*ETR/MR)
 
-         GX = G*SINCHI*COSTHETA
-         GY = G*SINCHI*SINTHETA
-         GZ = G*COSCHI
+         ! Randomize relative velocity vector
+         COSA = 2.*rf()-1.0
+         SINA = SQRT(1-COSA*COSA)
+         BB = PI2 * rf()
+
+
+         GX = G*SINA*COS(BB)
+         GY = G*SINA*SIN(BB)
+         GZ = G*COSA
+
+
+         !GX = G*SINCHI*COSTHETA
+         !GY = G*SINCHI*SINTHETA
+         !GZ = G*COSCHI
+         
+         !GX = particles(JP1)%VX - particles(JP2)%VX
+         !GY = particles(JP1)%VY - particles(JP2)%VY
+         !GZ = particles(JP1)%VZ - particles(JP2)%VZ
 
          GREL(1) = GX*COSCHI + SQRT(GY*GY+GZ*GZ)*SINTHETA*SINCHI
          GREL(2) = GY*COSCHI + (G*GZ*COSTHETA - GX*GY*SINTHETA)/SQRT(GY*GY+GZ*GZ)*SINCHI
          GREL(3) = GZ*COSCHI - (G*GY*COSTHETA + GX*GZ*SINTHETA)/SQRT(GY*GY+GZ*GZ)*SINCHI
 
+         !GREL(1) = GX
+         !GREL(2) = GY
+         !GREL(3) = GZ
+
+         ! Compute center of mass velocity vector
          DO I = 1, 3
             W(I) = M1/(M1+M2)*C1(I) + M2/(M1+M2)*C2(I)
          END DO
 
+         ! Compute absolute velocity vector of the two particles
          DO I = 1, 3
             C1(I) = W(I) + M2/(M1+M2)*GREL(I)
             C2(I) = W(I) - M1/(M1+M2)*GREL(I)
          END DO
+
+         particles(JP1)%VX = C1(1)
+         particles(JP1)%VY = C1(2)
+         particles(JP1)%VZ = C1(3)
+
+         particles(JP2)%VX = C2(1)
+         particles(JP2)%VY = C2(2)
+         particles(JP2)%VZ = C2(3)
 
         END IF
 

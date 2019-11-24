@@ -5,6 +5,7 @@ MODULE timecycle
    USE screen
    USE tools
    USE collisions
+   USE postprocess
 
    CONTAINS
 
@@ -15,28 +16,31 @@ MODULE timecycle
    SUBROUTINE TIME_LOOP
 
    IMPLICIT NONE
-
-   INTEGER :: tID 
-   INTEGER :: NP_TOT
+ 
+   INTEGER :: NP_TOT, NCOLL_TOT
    REAL(KIND=8) :: CURRENT_TIME
 
    CHARACTER(len=512) :: stringTMP
 
    ! Init variables
    NP_TOT = 0
+   CALL INIT_POSTPROCESS
    
    ! Dump particles before the first time step, but after the initial seeding
    CALL DUMP_PARTICLES_FILE(0)
-   DO tID = 1, NT
+   tID = 1
+   DO WHILE (tID .LE. NT)
 
       ! ########### Print simulation info #######################################
 
       CURRENT_TIME = tID*DT
 
       CALL MPI_REDUCE(NP_PROC, NP_TOT, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(TIMESTEP_COLL, NCOLL_TOT, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
 
-      WRITE(stringTMP, '(A13,I5,A4,I8,A9,ES14.3,A28,I10)') '   Timestep: ', tID, ' of ', NT, &
-                       ' - time: ', CURRENT_TIME, ' [s] - number of particles: ', NP_TOT
+      WRITE(stringTMP, '(A13,I5,A4,I8,A9,ES14.3,A28,I10,A25,I10)') '   Timestep: ', tID, ' of ', NT, &
+                       ' - time: ', CURRENT_TIME, ' [s] - number of particles: ', NP_TOT, &
+                       ' - number of collisions: ', NCOLL_TOT
 
       CALL ONLYMASTERPRINT1(PROC_ID, TRIM(stringTMP))
 
@@ -63,8 +67,19 @@ MODULE timecycle
 
       IF (MOD(tID, DUMP_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
 
+      ! ########### Dump flowfield ##############################################
+
+      IF (tID .GE. DUMP_GRID_START) THEN
+         IF (MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY) .EQ. 0) CALL GRID_AVG
+         IF (MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY*DUMP_GRID_N_AVG) .EQ. 0) THEN
+            CALL GRID_AVG
+            CALL GRID_SAVE
+            CALL GRID_RESET
+         END IF
+      END IF
       ! ~~~~~ Hmm that's it! ~~~~~
 
+      tID = tID + 1
    END DO
 
    END SUBROUTINE TIME_LOOP

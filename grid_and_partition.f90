@@ -70,7 +70,7 @@ MODULE grid_and_partition
          NCELLSPP = CEILING(REAL(NX*NY)/REAL(N_MPI_THREADS))
 
          ! 3) Here is the process ID 
-         IDPROC   = INT(IDCELL/NCELLSPP)
+         IDPROC   = INT((IDCELL-1)/NCELLSPP) ! Before was giving wrong result for peculiar combinations of NCELLS and NCELLSPP
 
       ELSE IF (DOMPART_TYPE == 1) THEN ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ B L O C K S
       !
@@ -111,7 +111,7 @@ MODULE grid_and_partition
    ALLOCATE(disp1(0:SIZE(PARTICLES_COUNT)-1))
  
    disp1 = PARTICLES_COUNT
- 
+
    DO i1 = 1, N_MPI_THREADS - 1
       disp1(i1) = disp1(i1) + disp1(i1-1)
    END DO

@@ -21,21 +21,27 @@ Domain_periodicity:
 Domain_specular:
     .FALSE.    .FALSE.    .TRUE.    .TRUE.
 Number_of_cells:
-    10  1  1
+    200  1  1
 
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    5.0E18
+    1.0E15
 Timestep:
-    2.E-6
+    1.E-5
 Number_of_timesteps:
-    10000
+    100000
 RNG_seed:
     12343
-Dump_every:
-    10000
-    
+Dump_part_every:
+    100000
+
+Dump_grid_start:
+    80000
+Dump_grid_avgevery:
+    10
+Dump_grid_numavgs:
+    2000
 ! ========= Multispecies ==============================
 
 Species_file:
@@ -83,7 +89,7 @@ Initial_particles_Ttra:
 Initial_particles_Trot:
     0. 
 Initial_particles_mixture:
-    air
+    Argon1
 ! ========== Injection from boundaries ==============
 
 Boundaries_inject_bool:
@@ -92,15 +98,15 @@ Boundaries_inject_bool:
 Boundaries_inject_which_bool:        ! From which boundary you want to inject particles
     .FALSE.  .FALSE.  .FALSE.  .FALSE. 
 Boundaries_inject_dens:
-    1.e20
+    1.4e20
 Boundaries_inject_vel:
-    500. 0. 0.
+    0. 0. 0.
 Boundaries_inject_Ttra:
-    300.0
+    273.0
 Boundaries_inject_Trot:
     0.
 Boundaries_inject_mixture:
-    air
+    Argon1
 ! ========== Injection from line source =============
 
 Linesource_bool:
@@ -118,11 +124,11 @@ Linesource_Ttra:
 Linesource_Trot:
     0.
 
-   center       length        density  velocity xyz         Ttr      Trot   mix
+!   center       length        density  velocity xyz         Ttr      Trot   mix
 Linesource:
-    -0.5    0.0    0.0    1.0    5.0e23    0.0    0.0    0.0    273.0    0.0    Argon1
+    -0.5    0.0    0.0    1.0    1.4e20    0.0    0.0    0.0    273.0    0.0    Argon1
 Linesource:
-    0.5    0.0    0.0    -1.0    5.0e23    0.0    0.0    0.0    273.0    0.0    Argon2
+    0.5    0.0    0.0    -1.0    1.4e20    0.0    0.0    0.0    273.0    0.0    Argon2
 
 
 ! ========= MPI parallelization =====================

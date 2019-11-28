@@ -20,13 +20,29 @@ MODULE grid_and_partition
       REAL(KIND=8), INTENT(IN) :: XP, YP ! Location of particle
       INTEGER, INTENT(OUT)     :: IDCELL ! ID of cell to which the particle belongs
 
+      INTEGER      :: XCELL, YCELL
       REAL(KIND=8) :: DX, DY
 
       ! Cartesian grid with equally spaced cells
       DX = (XMAX - XMIN)/NX
       DY = (YMAX - YMIN)/NY
 
-      IDCELL = INT((XP-XMIN)/DX) + NX*INT((YP-YMIN)/DY)+1
+      XCELL = INT((XP-XMIN)/DX)
+      YCELL = INT((YP-YMIN)/DY)
+
+      IF (XCELL .GT. (NX-1)) THEN 
+         XCELL = NX-1
+      ELSE IF (XCELL .LT. 0) THEN
+         XCELL = 0
+      END IF
+
+      IF (YCELL .GT. (NY-1)) THEN 
+         YCELL = NY-1
+      ELSE IF (YCELL .LT. 0) THEN
+         YCELL = 0
+      END IF
+
+      IDCELL = XCELL + NX*YCELL + 1
   
    END SUBROUTINE CELL_FROM_POSITION
 
@@ -63,6 +79,9 @@ MODULE grid_and_partition
  
          ! 1) Find ID of cell where the particle is
          CALL CELL_FROM_POSITION(XP, YP, IDCELL)
+         IF (IDCELL .GT. NX*NY .OR. IDCELL .LT. 1) THEN
+            WRITE(*,*) 'Error! CELL_FROM_POSITION returned cell:', IDCELL, 'Particle position: ', XP, ', ', YP 
+         END IF
 
          ! 2) Find number of cells for each process (NX*NY*NZ = number of cells)
          !    Exceed a bit, so the last processor has slightly less cells, if number
@@ -71,6 +90,10 @@ MODULE grid_and_partition
 
          ! 3) Here is the process ID 
          IDPROC   = INT((IDCELL-1)/NCELLSPP) ! Before was giving wrong result for peculiar combinations of NCELLS and NCELLSPP
+         IF (IDPROC .GT. N_MPI_THREADS-1 .OR. IDPROC .LT. 0) THEN
+            WRITE(*,*) 'Error! PROC_FROM_POSITION returned proc:', IDPROC
+         END IF
+
 
       ELSE IF (DOMPART_TYPE == 1) THEN ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ B L O C K S
       !

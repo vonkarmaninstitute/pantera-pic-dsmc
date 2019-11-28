@@ -28,20 +28,20 @@ Number_of_cells:
 Fnum:  ! Ratio of real-to-simulated particles
     1.0E15
 Timestep:
-    1.E-5
+    5.E-6
 Number_of_timesteps:
-    100000
+    200000
 RNG_seed:
     12343
 Dump_part_every:
-    100000
+    200000
 
 Dump_grid_start:
-    80000
+    40000
 Dump_grid_avgevery:
-    10
+    20
 Dump_grid_numavgs:
-    2000
+    5000
 ! ========= Multispecies ==============================
 
 Species_file:

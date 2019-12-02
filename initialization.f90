@@ -641,6 +641,28 @@ MODULE initialization
          END IF
       END IF
 
+      ! Check that periodic faces were not also set as specular
+      IF (BOOL_X_PERIODIC) THEN
+        IF (BOOL_XMIN_SPECULAR .OR. BOOL_XMAX_SPECULAR) THEN
+            WRITE(*,*)
+            WRITE(*,*) 'ERROR! X faces were specified as periodic, but "specular reflection" was also imposed.' 
+            WRITE(*,*) 'Pick only one of the two! Check the input file. ABORTING!'
+            WRITE(*,*)
+            STOP
+        END IF
+      END IF
+
+      ! Same thing for Y
+      IF (BOOL_Y_PERIODIC) THEN
+        IF (BOOL_YMIN_SPECULAR .OR. BOOL_YMAX_SPECULAR) THEN
+            WRITE(*,*)
+            WRITE(*,*) 'ERROR! Y faces were specified as periodic, but "specular reflection" was also imposed.' 
+            WRITE(*,*) 'Pick only one of the two! Check the input file. ABORTING!'
+            WRITE(*,*)
+            STOP
+        END IF
+      END IF
+
       ! ------------ MPI settings --------------------------------
       IF (DOMPART_TYPE == -1) THEN ! It's the initialization value. It was not recognized.
 

@@ -17,20 +17,20 @@ Axial_symmetry_bool:
 Domain_limits:
     -0.5  0.5      -0.5  0.5      -0.5  0.5
 Domain_periodicity:
-    .FALSE.   .FALSE.   .TRUE.
+    .FALSE.   .TRUE.   .FALSE.
 Domain_specular:
-    .FALSE.    .FALSE.    .TRUE.    .TRUE.
+    .FALSE.    .FALSE.    .FALSE.    .FALSE.
 Number_of_cells:
-    200  1  1
+    20  1  1
 
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0E15
+    1.0E16
 Timestep:
     5.E-6
 Number_of_timesteps:
-    200000
+    300
 RNG_seed:
     12343
 Dump_part_every:
@@ -42,6 +42,7 @@ Dump_grid_avgevery:
     20
 Dump_grid_numavgs:
     5000
+
 ! ========= Multispecies ==============================
 
 Species_file:
@@ -49,7 +50,6 @@ Species_file:
     
 Def_mixture:
     Argon1 Ar1 1.0
-    
 
 Def_mixture:
     Argon2 Ar2 1.0
@@ -60,17 +60,20 @@ Def_mixture:
     
 ! ========= Collisions ==============================
 
-Collision_type: ! [MCC / DSMC / NONE]
-  DSMC 
+Collision_type: ! [MCC / DSMC / NONE / BGK]
+  DSMC
 
-MCC_background_dens:
-  1.0e20
-MCC_cross_section:  
-  1.0e-18
-MCC_species: ! NOT IMPLEMENTED YET!
+!BGK_cross_section:
+!  1.0e-18
 
-! DSMC VHS collisions  ! NOT IMPLEMENTED YET!
-
+! MCC_background_dens:
+!   1.0e20
+! MCC_cross_section:  
+!   1.0e-18
+! MCC_species: ! NOT IMPLEMENTED YET!
+! 
+! ! DSMC VHS collisions  ! NOT IMPLEMENTED YET!
+! 
 DSMC_collisions_mixture:
     collmix
 VSS_parameters_file:
@@ -79,7 +82,7 @@ VSS_parameters_file:
 ! ========= Initial particle seed ===================
 
 Initial_particles_bool:
-    .FALSE.
+    .TRUE.
 Initial_particles_dens:
     1.4e20
 Initial_particles_vel:
@@ -90,6 +93,7 @@ Initial_particles_Trot:
     0. 
 Initial_particles_mixture:
     Argon1
+
 ! ========== Injection from boundaries ==============
 
 Boundaries_inject_bool:

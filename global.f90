@@ -46,8 +46,9 @@ MODULE global
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    CHARACTER(LEN=64) :: COLLISION_TYPE
-   LOGICAL           :: BOOL_MCC = .FALSE., BOOL_DSMC = .FALSE.
+   LOGICAL           :: BOOL_MCC = .FALSE., BOOL_DSMC = .FALSE., BOOL_BGK = .FALSE.
    REAL(KIND=8)      :: MCC_BG_DENS, MCC_SIGMA
+   REAL(KIND=8)      :: BGK_SIGMA
    INTEGER           :: DSMC_COLL_MIX
    INTEGER           :: TIMESTEP_COLL
 

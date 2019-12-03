@@ -82,6 +82,7 @@ MODULE initialization
          IF (line=='Collision_type:')          READ(in1,*) COLLISION_TYPE
          IF (line=='MCC_background_dens:')     READ(in1,*) MCC_BG_DENS
          IF (line=='MCC_cross_section:')       READ(in1,*) MCC_SIGMA
+         IF (line=='BGK_cross_section:')       READ(in1,*) BGK_SIGMA
          IF (line=='VSS_parameters_file:')     THEN
             READ(in1,*) VSS_PARAMS_FILENAME
             CALL READ_VSS(VSS_PARAMS_FILENAME)
@@ -200,6 +201,11 @@ MODULE initialization
 
             string = 'Collision cross-section [m^2]:'
             WRITE(*,'(A5,A50,ES14.3)') '     ', string, MCC_SIGMA 
+
+         ELSE IF (COLLISION_TYPE == 'BGK') THEN ! Only print this if BGK collisions are ON
+
+            string = 'Collision cross-section [m^2]:'
+            WRITE(*,'(A5,A50,ES14.3)') '     ', string, BGK_SIGMA 
 
          END IF
 
@@ -346,33 +352,35 @@ MODULE initialization
       N_SPECIES = 0
       DO
 
-         READ(in2,'(A)', IOSTAT=ReasonEOF) line ! Read line         
+         READ(in2,'(A)', IOSTAT=ReasonEOF) line ! Read line until EoF
          CALL STRIP_COMMENTS(line, '!')         ! Remove comments from line
 
          IF (ReasonEOF < 0) EXIT ! End of file reached
 
-         ! ~~~~~~~~~~~~~  Geometry and computational domain  ~~~~~~~~~~~~~~~~~
-         
-         !READ(line,'(A2, ES14.3, ES14.3, I1, ES14.3, I1, ES14.3, ES14.3, ES14.3, ES14.3)') &
-         READ(line,*) &
-         NAME, MOLWT, MOLMASS, ROTDOF, ROTREL, VIBDOF, VIBREL, VIBTEMP, SPWT, CHARGE
-      
-         ALLOCATE(TEMP_SPECIES(N_SPECIES+1)) ! Append the species to the list
-         TEMP_SPECIES(1:N_SPECIES) = SPECIES
-         CALL MOVE_ALLOC(TEMP_SPECIES, SPECIES)
-         N_SPECIES = N_SPECIES + 1
+         IF (LEN_TRIM(line) .NE. 0) THEN ! Skip empty lines (commented ones for example, that became empty)
 
-         SPECIES(N_SPECIES)%NAME = NAME
-         SPECIES(N_SPECIES)%MOLWT = MOLWT
-         SPECIES(N_SPECIES)%MOLMASS = MOLMASS
-         SPECIES(N_SPECIES)%ROTDOF = ROTDOF
-         SPECIES(N_SPECIES)%ROTREL = ROTREL
-         SPECIES(N_SPECIES)%VIBDOF = VIBDOF
-         SPECIES(N_SPECIES)%VIBREL = VIBREL
-         SPECIES(N_SPECIES)%VIBTEMP = VIBTEMP
-         SPECIES(N_SPECIES)%SPWT = SPWT
-         SPECIES(N_SPECIES)%CHARGE = CHARGE
+            !READ(line,'(A2, ES14.3, ES14.3, I1, ES14.3, I1, ES14.3, ES14.3, ES14.3, ES14.3)') &
+            READ(line,*) &
+            NAME, MOLWT, MOLMASS, ROTDOF, ROTREL, VIBDOF, VIBREL, VIBTEMP, SPWT, CHARGE
          
+            ALLOCATE(TEMP_SPECIES(N_SPECIES+1)) ! Append the species to the list
+            TEMP_SPECIES(1:N_SPECIES) = SPECIES
+            CALL MOVE_ALLOC(TEMP_SPECIES, SPECIES)
+            N_SPECIES = N_SPECIES + 1
+   
+            SPECIES(N_SPECIES)%NAME = NAME
+            SPECIES(N_SPECIES)%MOLWT = MOLWT
+            SPECIES(N_SPECIES)%MOLMASS = MOLMASS
+            SPECIES(N_SPECIES)%ROTDOF = ROTDOF
+            SPECIES(N_SPECIES)%ROTREL = ROTREL
+            SPECIES(N_SPECIES)%VIBDOF = VIBDOF
+            SPECIES(N_SPECIES)%VIBREL = VIBREL
+            SPECIES(N_SPECIES)%VIBTEMP = VIBTEMP
+            SPECIES(N_SPECIES)%SPWT = SPWT
+            SPECIES(N_SPECIES)%CHARGE = CHARGE
+         
+         END IF
+
       END DO
 
       CLOSE(in2) ! Close input file
@@ -594,6 +602,8 @@ MODULE initialization
          CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
                       TTRAX_INIT, TTRAY_INIT, TTRAZ_INIT, TROT_INIT, &
                       VXP, VYP, VZP, EIP, M)
+
+!          PRINT*, "DBDBDB PART: ", VXP, VYP, VZP
 
          CALL CELL_FROM_POSITION(XP,YP,  CID) ! Find cell containing particle
 
@@ -974,14 +984,22 @@ MODULE initialization
       IF (COLLISION_TYPE == "NONE") THEN
          BOOL_DSMC = .FALSE.
          BOOL_MCC  = .FALSE.
+         BOOL_BGK  = .FALSE.
 
       ELSE IF (COLLISION_TYPE == "DSMC") THEN
          BOOL_DSMC = .TRUE.
          BOOL_MCC  = .FALSE.
+         BOOL_BGK  = .FALSE.
 
       ELSE IF (COLLISION_TYPE == "MCC") THEN
          BOOL_DSMC = .FALSE.
          BOOL_MCC  = .TRUE.
+         BOOL_BGK  = .FALSE.
+
+      ELSE IF (COLLISION_TYPE == "BGK") THEN
+         BOOL_DSMC = .FALSE.
+         BOOL_MCC  = .FALSE.
+         BOOL_BGK  = .TRUE.
 
       ELSE ! ERROR!
          CALL ONLYMASTERPRINT1(PROC_ID, '$$$ ATTENTION! Collision type in input file not recognized! ABORTING!')

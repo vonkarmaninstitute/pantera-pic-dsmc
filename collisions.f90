@@ -12,7 +12,7 @@
   CONTAINS
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! SUBROUTINE DSMC_COLLISIONS -> Calcola collisioni !!!!!!!!!!!!!!!!!!!!!!!!!
+  ! SUBROUTINE DSMC_COLLISIONS -> Calcola collisioni !!!!!!!!!!!!!!!!!!!
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   SUBROUTINE DSMC_COLLISIONS 
@@ -375,6 +375,213 @@
   RETURN
       
   END SUBROUTINE COLLIS
+   
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+  ! SUBROUTINE BGK_COLLISIONS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+  ! Implements BGK model for the collision operator.           !!
+  ! Performs relaxation towards a local Maxwellian.            !!
+  !                                                            !!
+  ! ATTENTION! WORKS ONLY FOR SINGLE SPECIES GAS MIXTURE!!!    !!
+  ! The temperature of the local Maxwellian is found from the  !!
+  ! internal energy (translational PLUS rotational). The local !!
+  ! Maxwellian has a rotational temperature equal to the       !!
+  ! translational one.                                         !!
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+
+  SUBROUTINE BGK_COLLISIONS
+
+  ! First, create vectors holding the position of particles in the "particles" array,
+  ! so that it's practical to extract them.
+  ! Particles in the "particles" array are not actually moved aroud, in order to save computational
+  ! time. Instead, the particle array is scanned so that:
+  ! 1) the number of particles in each cell is computed
+  ! 2) the ID of each particle is copied in the array IND, ordered by cell: first the particles
+  !    belonging to the first cell, then these belonging to the second one etc.
+  ! The IDs in the IND array allow to pick the particle quickly from the "particles" array.
+  !
+  !
+  ! NPC => number of particles in each cell. Array of size NX*NY (total cells of the simulation)
+  !        In the cells belonging to the current processor, there will be some particle, in other
+  !        cells it will be zero.
+  !
+  ! IND => array of length NP_PROC, containing the ID of particles, ordered per cell.
+  ! 
+  ! IOF => index of first particle in a cell (it indicates the offset in IND). 
+  !        Conceptually: IOF = cumsum(NPC).
+
+!!!!!!! 
+!!!!!!! ! index of the particle in the "particle" array, indexed by particles I own and sorted by cells
+!!!!!!!   ! NPC => number of particles in each cell, indexed by cell index (a block length for IND) 
+!!!!!!! 
+!!!!!!!    ! Reorder particles
+!!!!!!!    ! IND => index of particle in particle array, indexed by particles I own and sorted by cells
+!!!!!!!    ! NPC => number of particles in cell, indexed by cell index (a block length for IND) 
+!!!!!!!    ! could this be indexed by all cells? for those that I don't own, NPC will turn out to be 0.
+!!!!!!!    ! + would simplify significantly,
+!!!!!!!    ! - could be up to about 50 times bigger
+!!!!!!!    ! + it's just a list of integers
+!!!!!!!    ! --->  I am gonna try and in case revert back.
+!!!!!!!    ! IOF => index (for IND) of first particle in a cell (an offset in IND)
+   
+   INTEGER, DIMENSION(NX*NY)          :: NPC, IOF
+   INTEGER, DIMENSION(:), ALLOCATABLE :: IND
+   INTEGER                            :: JP, JC, NCELLS, IDX
+   INTEGER                            :: NCOLLREAL
+
+   ! For actual collisions
+   INTEGER :: IDp 
+   REAL(KIND=8) :: VX_CELL, VY_CELL, VZ_CELL, P_CELL, T_CELL, n_CELL, CX, CY, CZ, C2, MASS
+   REAL(KIND=8) :: nu, V_TH
+   REAL(KIND=8) :: VX_NEW, VY_NEW, VZ_NEW, EI_NEW
+
+
+   INTEGER :: JP_START, JP_END
+   REAL(KIND=8) :: kB = 1.38064852E-23
+   REAL(KIND=8) :: pi = 2.0*ASIN(1.0d0)
+
+   ! Check that the gas is composed by only one species
+   IF (SIZE(SPECIES) .NE. 1) THEN
+      PRINT*
+      PRINT*, "  ATTENTION! BGK collisions work for single species gas only. Sorry about that."
+      PRINT*, "  You may have one only species in your actual particle vector, but I see the SPECIES "
+      PRINT*, "  structure has more entries, so I will stop here just to be sure. Use one only species!"
+      PRINT*
+      PRINT*, "  ABORTING!"
+      PRINT*
+      STOP
+   END IF
+
+   PRINT*, "DBDBDB ", SIZE(SPECIES)
+
+   NPC = 0
+   DO JP = 1, NP_PROC
+      JC = particles(JP)%IC
+      NPC(JC) = NPC(JC) + 1
+   END DO
+
+   NCELLS = NX*NY
+
+   IOF = -1
+   IDX = 1
+   DO JC = 1, NCELLS
+      IF (NPC(JC) .NE. 0) THEN
+         IOF(JC) = IDX
+         IDX = IDX + NPC(JC)
+      END IF
+   END DO
+
+   ALLOCATE(IND(NP_PROC))
+ 
+   NPC = 0
+   DO JP = 1, NP_PROC
+      JC = particles(JP)%IC
+      IND(IOF(JC) + NPC(JC)) = JP
+      NPC(JC) = NPC(JC) + 1
+   END DO
+ 
+   ! Calcola collisioni fra particelle
+ 
+   TIMESTEP_COLL = 0 ! Init number of collisions that happened
+
+   DO JC = 1, NCELLS
+
+      JP_START = IOF(JC)                ! First particle in the cell 
+      JP_END   = IOF(JC) + NPC(JC) - 1  ! Last particle in the cell
+
+      ! ++++++++ Compute average quantities in cell +++++++++++
+      ! First, put internal quantities to zero
+      VX_CELL = 0
+      VY_CELL = 0
+      VZ_CELL = 0
+
+      V_TH   = 0
+      P_CELL = 0
+
+      ! Compute average velocities
+      DO JP = JP_START, JP_END ! Loop on particles in cell
+        
+         IDp = IND(JP) ! ID of current particle
+         VX_CELL = VX_CELL + particles(IDp)%VX/NPC(JC)
+         VY_CELL = VY_CELL + particles(IDp)%VY/NPC(JC)
+         VZ_CELL = VZ_CELL + particles(IDp)%VZ/NPC(JC)
+
+      END DO
+
+      ! Pressure, temperature (and internal temperature?)
+      DO JP = JP_START, JP_END ! Loop on particles in cell
+
+         IDp = IND(JP) ! ID of current particle
+         CX  = particles(IDp)%VX - VX_CELL
+         CY  = particles(IDp)%VY - VY_CELL
+         CZ  = particles(IDp)%VZ - VZ_CELL
+
+         C2  = CX**2 + CY**2 + CZ**2
+
+         V_TH = V_TH + SQRT(C2)/NPC(JC) ! Compute thermal velocity (based on translational energy)
+
+         MASS = SPECIES(particles(IDp)%S_ID)%MOLMASS 
+
+         P_CELL = P_CELL + FNUM*MASS*(C2)/3/CELL_VOL ! Pressure in the cell
+
+         PRINT*, "THIS IS A WORK IN PROGRESS!!!!!! INTRODUCE ROTATIONAL ENERGY!!!!!!"
+         PRINT*, "THIS IS A WORK IN PROGRESS!!!!!! INTRODUCE ROTATIONAL ENERGY!!!!!!"
+         PRINT*, "THIS IS A WORK IN PROGRESS!!!!!! INTRODUCE ROTATIONAL ENERGY!!!!!!"
+         PRINT*, "THIS IS A WORK IN PROGRESS!!!!!! INTRODUCE ROTATIONAL ENERGY!!!!!!"
+         PRINT*, "THIS IS A WORK IN PROGRESS!!!!!! INTRODUCE ROTATIONAL ENERGY!!!!!!"
+         PRINT*, "THIS IS A WORK IN PROGRESS!!!!!! INTRODUCE ROTATIONAL ENERGY!!!!!!"
+         PRINT*, "THIS IS A WORK IN PROGRESS!!!!!! INTRODUCE ROTATIONAL ENERGY!!!!!!"
+         PRINT*, "THIS IS A WORK IN PROGRESS!!!!!! INTRODUCE ROTATIONAL ENERGY!!!!!!"
+         PRINT*, "THIS IS A WORK IN PROGRESS!!!!!! INTRODUCE ROTATIONAL ENERGY!!!!!!"
+         PRINT*, "THIS IS A WORK IN PROGRESS!!!!!! INTRODUCE ROTATIONAL ENERGY!!!!!!"
+         PRINT*, "THIS IS A WORK IN PROGRESS!!!!!! INTRODUCE ROTATIONAL ENERGY!!!!!!"
+         PRINT*, "THIS IS A WORK IN PROGRESS!!!!!! INTRODUCE ROTATIONAL ENERGY!!!!!!"
+         PRINT*, "THIS IS A WORK IN PROGRESS!!!!!! INTRODUCE ROTATIONAL ENERGY!!!!!!"
+
+         STOP
+
+      END DO
+
+      n_CELL = FNUM*NPC(JC)/CELL_VOL
+      T_CELL = P_CELL/(n_CELL*kB)
+
+      nu = n_CELL*BGK_SIGMA*V_TH ! Compute collision frequency (CONSTANT SIGMA FOR NOW)
+
+      ! ++++++++++ Test particles for collisions +++++++++++
+      DO JP = JP_START, JP_END
+
+         IDp = IND(JP) ! ID of current particle
+
+         ! Try collision - note that in this BGK model I use a collision frequency function of T:
+         !                 collisions may or may not happen according to \nu, independently to 
+         !                 the actual particle velocity.
+
+         IF (rf() .LT. (1 - EXP(-nu*DT))) THEN ! Pcoll = 1 - exp(-nu*dt)
+
+            ! Sample from Maxwellian (isotropic) at local velocity and temperature 
+            CALL MAXWELL(VX_CELL, VY_CELL, VZ_CELL, T_CELL, T_CELL, T_CELL, T_CELL, &
+                         VX_NEW, VY_NEW, VZ_NEW, EI_NEW, MASS)
+
+            ! Assign new velocities and internal energy to particle
+            particles(IDp)%VX = VX_NEW
+            particles(IDp)%VY = VY_NEW
+            particles(IDp)%VZ = VZ_NEW
+
+            particles(IDp)%EI = EI_NEW
+
+            ! Update number of collisions happened
+            TIMESTEP_COLL = TIMESTEP_COLL + 1
+
+         END IF
+      END DO
+
+   END DO
+
+   DEALLOCATE(IND)
+
+  END SUBROUTINE BGK_COLLISIONS
+
   
+ 
   END MODULE collisions
 

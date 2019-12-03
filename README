@@ -152,3 +152,14 @@ TODO:
   - Implement line source
   - Implement advection with right TRES or whatever it is
   - Implement exchange of particles (both injected particles and advected ones)
+
+Other TODOs: ############################################################################
+  - Update INPUT_DATA_SANITY_CHECK with the new features
+  - Update PRINTINPUT with the new features
+
+  - Rename COLLIS into VSS_COLLIS
+  - Rename MOLMASS into MASS o MOLEC_MASS (or one thinks "molar mass")
+
+CHANGES:
+  - In initialization.f90, mixture file did not accept commented lines (it would read it as a blank line
+    and crash). Now it's ok

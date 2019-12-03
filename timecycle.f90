@@ -27,7 +27,7 @@ MODULE timecycle
    CALL INIT_POSTPROCESS
    
    ! Dump particles before the first time step, but after the initial seeding
-   CALL DUMP_PARTICLES_FILE(0)
+   ! CALL DUMP_PARTICLES_FILE(0)
    tID = 1
    DO WHILE (tID .LE. NT)
 
@@ -63,6 +63,8 @@ MODULE timecycle
 
       IF (BOOL_DSMC) CALL DSMC_COLLISIONS
 
+      IF (BOOL_BGK)  CALL BGK_COLLISIONS
+
       ! ########### Dump particles ##############################################
 
       IF (MOD(tID, DUMP_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
@@ -84,7 +86,9 @@ MODULE timecycle
 
    END SUBROUTINE TIME_LOOP
  
-
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE LINE_SOURCE_INJECT -> Injects particles from lines in the domain !!!!!!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    SUBROUTINE LINE_SOURCE_INJECT
   
@@ -564,6 +568,8 @@ MODULE timecycle
    PI  = 3.141593
    PI2 = 2*PI
 
+   TIMESTEP_COLL = 0 ! Initialize number of collisions done during the timestep.
+
    DO IP = 1,NP_PROC
 
       ! particle velocity
@@ -585,6 +591,8 @@ MODULE timecycle
          particles(IP)%VY = V_NOW*SIN_TH*SIN(CHI)
          particles(IP)%VZ = V_NOW*COS_TH
 
+         ! Update number of collisions performed
+         TIMESTEP_COLL = TIMESTEP_COLL + 1
       END IF
 
    END DO

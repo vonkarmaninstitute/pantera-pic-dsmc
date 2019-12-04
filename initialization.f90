@@ -61,11 +61,10 @@ MODULE initialization
          IF (line=='Timestep:')                READ(in1,*) DT
          IF (line=='Number_of_timesteps:')     READ(in1,*) NT
          IF (line=='RNG_seed:')                READ(in1,*) RNG_SEED_GLOBAL
-         IF (line=='Dump_part_every:')              READ(in1,*) DUMP_EVERY
-         IF (line=='Dump_grid_avgevery:')              READ(in1,*) DUMP_GRID_AVG_EVERY
-         IF (line=='Dump_grid_start:')              READ(in1,*) DUMP_GRID_START
-         IF (line=='Dump_grid_numavgs:')              READ(in1,*) DUMP_GRID_N_AVG
-
+         IF (line=='Dump_part_every:')         READ(in1,*) DUMP_EVERY
+         IF (line=='Dump_grid_avgevery:')      READ(in1,*) DUMP_GRID_AVG_EVERY
+         IF (line=='Dump_grid_start:')         READ(in1,*) DUMP_GRID_START
+         IF (line=='Dump_grid_numavgs:')       READ(in1,*) DUMP_GRID_N_AVG
 
          ! ~~~~~~~~~~~~~  Multispecies ~~~~~~~~~~~~~~~
          IF (line=='Species_file:') THEN
@@ -429,8 +428,6 @@ MODULE initialization
 
          IF (ReasonEOF < 0) EXIT ! End of file reached
 
-         ! ~~~~~~~~~~~~~  Geometry and computational domain  ~~~~~~~~~~~~~~~~~
-         
          !READ(line,'(A2, ES14.3, ES14.3, I1, ES14.3, I1, ES14.3, ES14.3, ES14.3, ES14.3)') &
          READ(line,*) SP_NAME, DIAM, OMEGA, TREF, ALPHA
       
@@ -444,7 +441,6 @@ MODULE initialization
          SPECIES(SP_ID)%SIGMA = PI*DIAM**2
          SPECIES(SP_ID)%NU    = OMEGA - 0.5
          SPECIES(SP_ID)%CREF  = SQRT(3.*KB*TREF / SPECIES(SP_ID)%MOLMASS)
-         
          
       END DO
 
@@ -1009,6 +1005,10 @@ MODULE initialization
 
    END SUBROUTINE INITCOLLISIONS
 
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! FUNCTION SPECIES_NAME_TO_ID -> Maps a species name (string) to its ID !!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   
    INTEGER FUNCTION SPECIES_NAME_TO_ID(NAME)
 
       IMPLICIT NONE
@@ -1023,24 +1023,28 @@ MODULE initialization
 
    END FUNCTION SPECIES_NAME_TO_ID
 
-INTEGER FUNCTION MIXTURE_NAME_TO_ID(NAME)
-
-   IMPLICIT NONE
-
-   CHARACTER(LEN=*), INTENT(IN)  :: NAME
-   INTEGER                       :: INDEX, MATCH
-   MATCH = -1
-   DO INDEX = 1, N_MIXTURES
-      IF (MIXTURES(INDEX)%NAME == NAME) MATCH = INDEX
-   END DO
-
-   IF (MATCH .EQ. -1) THEN
-      WRITE(*,*) 'Error! Mixture name not found.'
-   END IF
-
-   MIXTURE_NAME_TO_ID = MATCH
-
-END FUNCTION MIXTURE_NAME_TO_ID
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! FUNCTION MIXTURE_NAME_TO_ID -> Maps a mixture name (string) to its ID !!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   
+   INTEGER FUNCTION MIXTURE_NAME_TO_ID(NAME)
+   
+      IMPLICIT NONE
+   
+      CHARACTER(LEN=*), INTENT(IN)  :: NAME
+      INTEGER                       :: INDEX, MATCH
+      MATCH = -1
+      DO INDEX = 1, N_MIXTURES
+         IF (MIXTURES(INDEX)%NAME == NAME) MATCH = INDEX
+      END DO
+   
+      IF (MATCH .EQ. -1) THEN
+         WRITE(*,*) 'Error! Mixture name not found.'
+      END IF
+   
+      MIXTURE_NAME_TO_ID = MATCH
+   
+   END FUNCTION MIXTURE_NAME_TO_ID
 
 
 END MODULE initialization

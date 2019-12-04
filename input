@@ -21,27 +21,27 @@ Domain_periodicity:
 Domain_specular:
     .FALSE.    .FALSE.    .FALSE.    .FALSE.
 Number_of_cells:
-    20  1  1
+    2  1  1
 
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0E16
+    1.0E14
 Timestep:
     5.E-6
 Number_of_timesteps:
-    3
+    3000
 RNG_seed:
     12343
 Dump_part_every:
-    200000
+    300
 
 Dump_grid_start:
-    40000
+    0
 Dump_grid_avgevery:
-    20
+    200000
 Dump_grid_numavgs:
-    5000
+    1
 
 ! ========= Multispecies ==============================
 
@@ -51,11 +51,11 @@ Species_file:
 Def_mixture:
     Argon1 Ar1 1.0
 
-! Def_mixture:
-!     Argon2 Ar2 1.0
-! 
-! Def_mixture:
-!     collmix Ar1 0.5 Ar2 0.5
+Def_mixture:
+    Argon2 Ar2 1.0
+
+Def_mixture:
+    collmix Ar1 0.5 Ar2 0.5
     
     
 ! ========= Collisions ==============================
@@ -64,21 +64,20 @@ Collision_type: ! [MCC / DSMC / BGK / NONE]
   BGK
 
 BGK_cross_section:
-  1.0e-18
+  5.0e-19 ! [m2] argon-argon
 
-MCC_background_dens:
-  1.0e20
-MCC_cross_section:  
-  1.0e-18
-MCC_species: ! NOT IMPLEMENTED YET!
+! MCC_background_dens:
+!   1.0e20
+! MCC_cross_section:  
+!   1.0e-18
+! MCC_species: ! NOT IMPLEMENTED YET!
 
 ! DSMC VHS collisions  ! NOT IMPLEMENTED YET!
 
-
-!DSMC_collisions_mixture:
-!    collmix
-!VSS_parameters_file:
-!    ar.vss
+! DSMC_collisions_mixture:
+!     collmix
+! VSS_parameters_file:
+!     ar.vss
 
 ! ========= Initial particle seed ===================
 
@@ -89,7 +88,7 @@ Initial_particles_dens:
 Initial_particles_vel:
     0.  0.  0.
 Initial_particles_Ttra:
-    273.  273.  273.
+    2000.  500.  100.
 Initial_particles_Trot:
     0. 
 Initial_particles_mixture:

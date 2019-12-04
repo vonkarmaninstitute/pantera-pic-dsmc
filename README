@@ -154,8 +154,11 @@ TODO:
   - Implement exchange of particles (both injected particles and advected ones)
 
 Other TODOs: ############################################################################
-  - Update INPUT_DATA_SANITY_CHECK with the new features
+  - Update INPUT_DATA_SANITY_CHECK with the new features.
+    > DSMC for example throws a segmentation fault if the proper data is not defined
+    > If I leave some DSMC settings in the input file, it tries to read, but fails and crashes
   - Update PRINTINPUT with the new features
+  - In boundary inject, 3 temperatures, as did for the initial injection
 
   - Rename COLLIS into VSS_COLLIS
   - Rename MOLMASS into MASS o MOLEC_MASS (or one thinks "molar mass")
@@ -163,3 +166,4 @@ Other TODOs: ###################################################################
 CHANGES:
   - In initialization.f90, mixture file did not accept commented lines (it would read it as a blank line
     and crash). Now it's ok
+    TODO: do the same in VSS collisions reader

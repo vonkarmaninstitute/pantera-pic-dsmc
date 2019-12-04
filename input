@@ -21,7 +21,7 @@ Domain_periodicity:
 Domain_specular:
     .FALSE.    .FALSE.    .FALSE.    .FALSE.
 Number_of_cells:
-    2  1  1
+    7  2  1
 
 ! ========= Numerical parameters ====================
 

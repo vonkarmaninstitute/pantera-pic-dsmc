@@ -380,6 +380,206 @@ CONTAINS
 
    N_STR = idx
 
-END SUBROUTINE SPLIT_STR
+  END SUBROUTINE SPLIT_STR
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! SUBROUTINE DUMP_GLOBAL_MOMENTS_FILE                                 !!!!!!!!!!!
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  SUBROUTINE DUMP_GLOBAL_MOMENTS_FILE(TIMESTEP)
+
+     ! This subroutine computes and dumps global moments (computed from all particles in the domain) 
+     ! to a file, appending a line for every timestep.
+     ! The moments to be computed are 33, corresponding to the 14 moments equations and their closing
+     ! moments. This should be enough for now. For this reason, LOCAL_MOMENTS and MOMENTS arrays have
+     ! length 33.
+     ! 
+     ! TIMESTEP: current timestep of the simulation
+
+     IMPLICIT NONE
+
+     INTEGER, INTENT(IN) :: TIMESTEP
+
+     REAL(KIND=8), DIMENSION(33) :: LOCAL_MOMENTS, MOMENTS ! See description of the function
+     INTEGER :: i
+
+     MOMENTS = 0
+     LOCAL_MOMENTS = 0
+
+     ! Compute moments at current time. Every process does it.
+     ! Moments are all extensive: rho, rho u_i, Pij, etc, so they can be then
+     ! added by a reduce command, to get the whole moments.
+     CALL COMPUTE_GLOBAL_MOMENTS(LOCAL_MOMENTS)
+
+     ! Now, processors should communicate with each others. All moments are computed as 
+     ! extensive quantities, so I can add them. Then I will extract the velocities (intensive).
+     !
+     ! Note that I used the total volume for the computation, that's why I have to add 
+     ! the moments. It's like considering all particles.
+     CALL MPI_REDUCE(LOCAL_MOMENTS,  MOMENTS, 33, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+
+     ! Master writes moments to file
+     IF (PROC_ID .EQ. 0) THEN 
+
+        ! First, redefine moments 2, 3 and 4 as velocities, by dividing by the density
+        MOMENTS(2) = MOMENTS(2)/MOMENTS(1)
+        MOMENTS(3) = MOMENTS(3)/MOMENTS(1)
+        MOMENTS(4) = MOMENTS(4)/MOMENTS(1)
+
+        ! Then, write
+        OPEN(12, FILE=DUMP_GLOB_MOM_FILENAME, STATUS="old", POSITION="append", ACTION="write") 
+        WRITE(12, *) TIMESTEP*DT, (MOMENTS(i), i = 1, SIZE(MOMENTS))
+        CLOSE(12)
+     END IF
+
+  END SUBROUTINE DUMP_GLOBAL_MOMENTS_FILE
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! SUBROUTINE COMPUTE_GLOBAL_MOMENTS => Computes moments, from all particles in the domain !!
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  SUBROUTINE COMPUTE_GLOBAL_MOMENTS(MOM_VECT)
+
+     REAL(KIND=8), DIMENSION(:), INTENT(INOUT) :: MOM_VECT
+     INTEGER :: JP
+     REAL(KIND=8) :: RHO, Ux, Uy, Uz, Pxx, Pxy, Pxz, Pyy, Pyz, Pzz
+     REAL(KIND=8) :: qx, qy, qz, Qxxx, Qxxy, Qxyy, Qyyy, Qyyz, Qyzz, Qzzz, Qxxz, Qxzz, Qxyz
+     REAL(KIND=8) :: Riijj, Rxxjj, Rxyjj, Rxzjj, Ryyjj, Ryzjj, Rzzjj, Sxiijj, Syiijj, Sziijj
+     REAL(KIND=8) :: MASS, CX_NOW, CY_NOW, CZ_NOW, C2_NOW, VOL
+
+     ! Check size of MOM_VECT
+     IF (SIZE(MOM_VECT) .NE. 33) THEN
+        WRITE(*,*) "ERROR! Only 33 moments can be computed for now:"
+        WRITE(*,*) "Rho, rho*ui, Pij, qi, Qijk, Riijj, Rijkk, Siijjx (for i,j,k = x,y,z)."
+        WRITE(*,*) "Check how this function is called!"
+        WRITE(*,*) "In: COMPUTE_GLOBAL_MOMENTS."
+        STOP
+     END IF
+
+     ! Every processor should perform the operation on its own particles
+
+     VOL = (XMAX - XMIN)*(YMAX - YMIN)*(ZMAX - ZMIN) ! Domain volume
+
+     ! Init moments to zero (I'm sure there is a smarter way.....)
+     RHO  = 0
+
+     Ux  = 0; Uy  = 0; Uz  = 0
+     Pxx = 0; Pxy = 0; Pxz = 0; Pyy = 0; Pyz = 0; Pzz = 0
+     qx  = 0; qy  = 0; qz  = 0
+
+     Qxxx = 0; Qxxy = 0; Qxyy = 0; Qyyy = 0; Qyyz = 0; 
+     Qyzz = 0; Qzzz = 0; Qxxz = 0; Qxzz = 0; Qxyz = 0; 
+
+     Riijj = 0
+     Rxxjj = 0; Rxyjj = 0; Rxzjj = 0; 
+     Ryyjj = 0; Ryzjj = 0; Rzzjj = 0;
+
+     Sxiijj = 0; Syiijj = 0; Sziijj = 0
+
+     ! Compute average velocities and density
+     DO JP = 1, NP_PROC ! Loop on the particles that the processor owns
+
+        MASS = SPECIES(particles(JP)%S_ID)%MOLMASS ! [kg]
+
+        RHO = RHO + MASS/VOL*Fnum
+
+        Ux = Ux + particles(JP)%VX/NP_PROC
+        Uy = Uy + particles(JP)%VY/NP_PROC
+        Uz = Uz + particles(JP)%VZ/NP_PROC
+
+     END DO
+
+     ! Now proceed with central moments
+     DO JP = 1, NP_PROC
+
+        MASS = SPECIES(particles(JP)%S_ID)%MOLMASS ! [kg]
+
+        CX_NOW = particles(JP)%VX - Ux
+        CY_NOW = particles(JP)%VY - Uy
+        CZ_NOW = particles(JP)%VZ - Uz
+
+        C2_NOW = CX_NOW**2 + CY_NOW**2 + CZ_NOW**2
+
+        ! Compute pressure terms
+        Pxx = Pxx + MASS*CX_NOW*CX_NOW*Fnum/VOL
+        Pxy = Pxy + MASS*CX_NOW*CY_NOW*Fnum/VOL
+        Pxz = Pxz + MASS*CX_NOW*CZ_NOW*Fnum/VOL
+        Pyy = Pyy + MASS*CY_NOW*CY_NOW*Fnum/VOL
+        Pyz = Pyz + MASS*CY_NOW*CZ_NOW*Fnum/VOL
+        Pzz = Pzz + MASS*CZ_NOW*CZ_NOW*Fnum/VOL
+
+        ! Heat flux vector components
+        qx = qx + MASS*CX_NOW*C2_NOW*Fnum/VOL
+        qy = qy + MASS*CY_NOW*C2_NOW*Fnum/VOL
+        qz = qz + MASS*CZ_NOW*C2_NOW*Fnum/VOL
+ 
+        ! Heat flux tensor components
+        Qxxx = Qxxx + MASS*CX_NOW*CX_NOW*CX_NOW*Fnum/VOL
+        Qxxy = Qxxy + MASS*CX_NOW*CX_NOW*CY_NOW*Fnum/VOL
+        Qxyy = Qxyy + MASS*CX_NOW*CY_NOW*CY_NOW*Fnum/VOL
+        Qyyy = Qyyy + MASS*CY_NOW*CY_NOW*CY_NOW*Fnum/VOL
+        Qyyz = Qyyz + MASS*CY_NOW*CY_NOW*CZ_NOW*Fnum/VOL
+        Qyzz = Qyzz + MASS*CY_NOW*CZ_NOW*CZ_NOW*Fnum/VOL
+        Qzzz = Qzzz + MASS*CZ_NOW*CZ_NOW*CZ_NOW*Fnum/VOL
+        Qxxz = Qxxz + MASS*CX_NOW*CX_NOW*CZ_NOW*Fnum/VOL
+        Qxzz = Qxzz + MASS*CX_NOW*CZ_NOW*CZ_NOW*Fnum/VOL
+        Qxyz = Qxyz + MASS*CX_NOW*CY_NOW*CZ_NOW*Fnum/VOL
+
+        ! Riijj
+        Riijj = Riijj + MASS*C2_NOW*C2_NOW*Fnum/VOL
+
+        ! Rijkk
+        Rxxjj = Rxxjj + MASS*CX_NOW*CX_NOW*C2_NOW*Fnum/VOL
+        Rxyjj = Rxyjj + MASS*CX_NOW*CY_NOW*C2_NOW*Fnum/VOL
+        Rxzjj = Rxzjj + MASS*CX_NOW*CZ_NOW*C2_NOW*Fnum/VOL
+        Ryyjj = Ryyjj + MASS*CY_NOW*CY_NOW*C2_NOW*Fnum/VOL
+        Ryzjj = Ryzjj + MASS*CY_NOW*CZ_NOW*C2_NOW*Fnum/VOL
+        Rzzjj = Rzzjj + MASS*CZ_NOW*CZ_NOW*C2_NOW*Fnum/VOL
+
+        ! Sxiijj
+        Sxiijj = Sxiijj + MASS*CX_NOW*C2_NOW*C2_NOW*Fnum/VOL
+        Syiijj = Syiijj + MASS*CY_NOW*C2_NOW*C2_NOW*Fnum/VOL
+        Sziijj = Sziijj + MASS*CZ_NOW*C2_NOW*C2_NOW*Fnum/VOL
+
+     END DO
+
+     ! Assemble moments vector
+     MOM_VECT(1)  = RHO
+     MOM_VECT(2)  = RHO*Ux ! NOTE HERE, rho Ux, not Ux
+     MOM_VECT(3)  = RHO*Uy ! NOTE HERE, rho Uy, not Uy
+     MOM_VECT(4)  = RHO*Uz ! NOTE HERE, rho Uz, not Uz
+     MOM_VECT(5)  = Pxx
+     MOM_VECT(6)  = Pxy
+     MOM_VECT(7)  = Pxz
+     MOM_VECT(8)  = Pyy
+     MOM_VECT(9)  = Pyz
+     MOM_VECT(10) = Pzz
+     MOM_VECT(11) = qx
+     MOM_VECT(12) = qy
+     MOM_VECT(13) = qz
+     MOM_VECT(13) = qz
+     MOM_VECT(14) = Qxxx
+     MOM_VECT(15) = Qxxy
+     MOM_VECT(16) = Qxyy
+     MOM_VECT(17) = Qyyy
+     MOM_VECT(18) = Qyyz
+     MOM_VECT(19) = Qyzz
+     MOM_VECT(20) = Qzzz
+     MOM_VECT(21) = Qxxz
+     MOM_VECT(22) = Qxzz
+     MOM_VECT(23) = Qxyz
+     MOM_VECT(24) = Riijj
+     MOM_VECT(25) = Rxxjj
+     MOM_VECT(26) = Rxyjj
+     MOM_VECT(27) = Rxzjj
+     MOM_VECT(28) = Ryyjj
+     MOM_VECT(29) = Ryzjj
+     MOM_VECT(30) = Rzzjj
+     MOM_VECT(31) = Sxiijj
+     MOM_VECT(32) = Syiijj
+     MOM_VECT(33) = Sziijj
+
+  END SUBROUTINE COMPUTE_GLOBAL_MOMENTS
+
 
 END MODULE tools

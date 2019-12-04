@@ -474,83 +474,89 @@
 
    DO JC = 1, NCELLS
 
-      JP_START = IOF(JC)                ! First particle in the cell 
-      JP_END   = IOF(JC) + NPC(JC) - 1  ! Last particle in the cell
+      ! Note that in the current formulation, some cells may be not owned by me. 
+      ! These will have zero particles inside, so I will skip them.
+      IF (NPC(JC) .GT. 0) THEN
 
-      ! ++++++++ Compute average quantities in cell +++++++++++
-      ! First, put internal quantities to zero
-      VX_CELL = 0
-      VY_CELL = 0
-      VZ_CELL = 0
+         JP_START = IOF(JC)                ! First particle in the cell 
+         JP_END   = IOF(JC) + NPC(JC) - 1  ! Last particle in the cell
+   
+         ! ++++++++ Compute average quantities in cell +++++++++++
+         ! First, put internal quantities to zero
+         VX_CELL = 0
+         VY_CELL = 0
+         VZ_CELL = 0
+   
+         E_SUM   = 0
+   
+         V_TH   = 0
+         P_CELL = 0
+   
+         MASS = SPECIES(1)%MOLMASS  ! ONLY 1 SPECIES FOR BGK!
+   
+         ! Compute average velocities and total energy
+         DO JP = JP_START, JP_END ! Loop on particles in cell
+           
+            IDp = IND(JP) ! ID of current particle
+   
+            ! Extract velocities and internal energy
+            VX_NOW   = particles(IDp)%VX
+            VY_NOW   = particles(IDp)%VY
+            VZ_NOW   = particles(IDp)%VZ
+            EI_NOW   = particles(IDp)%EI
+   
+            ! Average velocity in the cell
+            VX_CELL = VX_CELL + VX_NOW/NPC(JC)
+            VY_CELL = VY_CELL + VY_NOW/NPC(JC)
+            VZ_CELL = VZ_CELL + VZ_NOW/NPC(JC)
+   
+            ! Total energy, sum over the particles
+            E_SUM   = E_SUM + MASS*(VX_NOW**2 + VY_NOW**2 + VZ_NOW**2)/2 + MASS*EI_NOW ! [J] Total energy
+   
+         END DO
+   
+         n_CELL   = FNUM*NPC(JC)/CELL_VOL ! Number density in the cell
+   
+         Etot_cell = n_CELL*E_SUM/NPC(JC)                                 ! [J/m3]
+         Ekin_cell = MASS*n_CELL*(VX_CELL**2 + VY_CELL**2 + VZ_CELL**2)/2 ! [J/m3]
+    
+         N_DOF_TOT = 3 + SPECIES(1)%ROTDOF + SPECIES(1)%VIBDOF ! Total number of DOFs. BGK works only for 1 species!!!
+         T_CELL = 2/(N_DOF_TOT*kB*n_CELL)*(Etot_cell - Ekin_cell) ! [K] Compute temperature from internal energy
+   
+         V_TH = sqrt(8*kB*T_CELL/(MASS*pi)) ! [m/s] Thermal speed 
+   
+         nu = n_CELL*BGK_SIGMA*V_TH ! [1/s] Compute collision frequency (CONSTANT SIGMA FOR NOW)
+    
+         ! ++++++++++ Test particles for collisions +++++++++++
+         DO JP = JP_START, JP_END
+    
+            IDp = IND(JP) ! ID of current particle
+    
+            ! Try collision - note that in this BGK model I use a collision frequency function of T:
+            !                 collisions happen only depending on \nu and on a random number, independently
+            !                 from the actual particle velocity.
+    
+            IF (rf() .LT. (1 - EXP(-nu*DT))) THEN ! PROBABILITY OF COLLISION = 1 - exp(-nu*dt)
+   
+               ! Sample from Maxwellian (isotropic) at local velocity and temperature 
+               CALL MAXWELL(VX_CELL, VY_CELL, VZ_CELL, T_CELL, T_CELL, T_CELL, T_CELL, &
+                            VX_NOW, VY_NOW, VZ_NOW, EI_NOW, MASS)
+   
+               ! Assign new velocities and internal energy to particle
+               particles(IDp)%VX = VX_NOW
+               particles(IDp)%VY = VY_NOW
+               particles(IDp)%VZ = VZ_NOW
+   
+               particles(IDp)%EI = EI_NOW
+   
+               ! Update number of collisions happened
+               TIMESTEP_COLL = TIMESTEP_COLL + 1
+    
+            END IF
 
-      E_SUM   = 0
+         END DO
 
-      V_TH   = 0
-      P_CELL = 0
-
-      MASS = SPECIES(1)%MOLMASS  ! ONLY 1 SPECIES FOR BGK!
-
-      ! Compute average velocities and total energy
-      DO JP = JP_START, JP_END ! Loop on particles in cell
-        
-         IDp = IND(JP) ! ID of current particle
-
-         ! Extract velocities and internal energy
-         VX_NOW   = particles(IDp)%VX
-         VY_NOW   = particles(IDp)%VY
-         VZ_NOW   = particles(IDp)%VZ
-         EI_NOW   = particles(IDp)%EI
-
-         ! Average velocity in the cell
-         VX_CELL = VX_CELL + VX_NOW/NPC(JC)
-         VY_CELL = VY_CELL + VY_NOW/NPC(JC)
-         VZ_CELL = VZ_CELL + VZ_NOW/NPC(JC)
-
-         ! Total energy, sum over the particles
-         E_SUM   = E_SUM + MASS*(VX_NOW**2 + VY_NOW**2 + VZ_NOW**2)/2 + MASS*EI_NOW ! [J] Total energy
-
-      END DO
-
-      n_CELL   = FNUM*NPC(JC)/CELL_VOL ! Number density in the cell
-
-      Etot_cell = n_CELL*E_SUM/NPC(JC)                                 ! [J/m3]
-      Ekin_cell = MASS*n_CELL*(VX_CELL**2 + VY_CELL**2 + VZ_CELL**2)/2 ! [J/m3]
- 
-      N_DOF_TOT = 3 + SPECIES(1)%ROTDOF + SPECIES(1)%VIBDOF ! Total number of DOFs. BGK works only for 1 species!!!
-      T_CELL = 2/(N_DOF_TOT*kB*n_CELL)*(Etot_cell - Ekin_cell) ! [K] Compute temperature from internal energy
-
-      V_TH = sqrt(8*kB*T_CELL/(MASS*pi)) ! [m/s] Thermal speed 
-
-      nu = n_CELL*BGK_SIGMA*V_TH ! [1/s] Compute collision frequency (CONSTANT SIGMA FOR NOW)
- 
-      ! ++++++++++ Test particles for collisions +++++++++++
-      DO JP = JP_START, JP_END
- 
-         IDp = IND(JP) ! ID of current particle
- 
-         ! Try collision - note that in this BGK model I use a collision frequency function of T:
-         !                 collisions happen only depending on \nu and on a random number, independently
-         !                 from the actual particle velocity.
- 
-         IF (rf() .LT. (1 - EXP(-nu*DT))) THEN ! PROBABILITY OF COLLISION = 1 - exp(-nu*dt)
-
-            ! Sample from Maxwellian (isotropic) at local velocity and temperature 
-            CALL MAXWELL(VX_CELL, VY_CELL, VZ_CELL, T_CELL, T_CELL, T_CELL, T_CELL, &
-                         VX_NOW, VY_NOW, VZ_NOW, EI_NOW, MASS)
-
-            ! Assign new velocities and internal energy to particle
-            particles(IDp)%VX = VX_NOW
-            particles(IDp)%VY = VY_NOW
-            particles(IDp)%VZ = VZ_NOW
-
-            particles(IDp)%EI = EI_NOW
-
-            ! Update number of collisions happened
-            TIMESTEP_COLL = TIMESTEP_COLL + 1
- 
-         END IF
-
-      END DO
+      END IF
  
    END DO
 

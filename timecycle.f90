@@ -28,6 +28,9 @@ MODULE timecycle
    
    ! Dump particles before the first time step, but after the initial seeding
    ! CALL DUMP_PARTICLES_FILE(0)
+
+   CALL DUMP_GLOBAL_MOMENTS_FILE(0) ! Compute and dump moments at initial timestep
+
    tID = 1
    DO WHILE (tID .LE. NT)
 
@@ -65,13 +68,15 @@ MODULE timecycle
 
       IF (BOOL_BGK)  CALL BGK_COLLISIONS
 
-      ! ########### Dump particles ##############################################
+      ! ########### Dump quantities ##############################################
+
+      ! ++++ Dump particles
 
       IF (DUMP_PART_EVERY .NE. -1) THEN ! Ok, dump particles
          IF (MOD(tID, DUMP_PART_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
       END IF
 
-      ! ########### Dump flowfield ##############################################
+      ! ++++ Dump flowfield to VTK 
 
       IF (DUMP_GRID_START .NE. -1) THEN ! Ok, you can dump stuff
          IF (tID .GE. DUMP_GRID_START) THEN
@@ -83,6 +88,13 @@ MODULE timecycle
             END IF
          END IF
       END IF
+
+      ! ++++ Dump moments to file
+
+      IF (DUMP_GLOB_MOM_EVERY .NE. -1) THEN ! Ok, you can dump moments
+         IF (MOD(tID, DUMP_GLOB_MOM_EVERY) .EQ. 0) CALL DUMP_GLOBAL_MOMENTS_FILE(tID)
+      END IF
+
       ! ~~~~~ Hmm that's it! ~~~~~
 
       tID = tID + 1

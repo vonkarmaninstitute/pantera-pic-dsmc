@@ -729,7 +729,7 @@ MODULE initialization
 
       CALL SRAND(RNG_SEED_LOCAL) ! Seed RNG with local quantity
       ! And call it a number of times, so that initial correlation between the similar seeds 
-      ! is lost (apparently, some nonnegligible correlation is retained!!!!!)
+      ! is lost (apparently, some non-negligible correlation is retained!!!!!)
       DO I = 1,100
         dummy = RAND()
       END DO
@@ -742,6 +742,37 @@ MODULE initialization
       END IF
 
       CELL_VOL = (XMAX-XMIN)*(YMAX-YMIN)/(NX*NY)
+
+      ! ~~~~~~~~ DUMPS ~~~~~~~
+
+      ! Master should make sure that there are the appropriate folders for dumping, and initialize file
+      IF (PROC_ID .EQ. 0) THEN 
+
+         CALL system("mkdir -p dumps") ! Make sure the dumps directory exists (only works in unix)
+  
+         ! ++++ Inits file to dump moments, if required ++++
+         IF (DUMP_GLOB_MOM_EVERY .NE. -1) THEN ! "-1" is default, standing for "don't do this."
+
+            OPEN(12, FILE=DUMP_GLOB_MOM_FILENAME) ! Create new file, or empty it if it exists
+            WRITE(12, *) "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
+            WRITE(12, *) "% Every line represents the global moments of the system, considering all particles"
+            WRITE(12, *) "% in all the domain, at a certain time. In the order (SI units):"
+            WRITE(12, *) "%"
+            WRITE(12, *) "% Time [s]"
+            WRITE(12, *) "% rho" 
+            WRITE(12, *) "% ux  uy  uz" 
+            WRITE(12, *) "% Pxx  Pxy  Pxz  Pyy  Pyz  Pzz" 
+            WRITE(12, *) "% qx  qy  qz" 
+            WRITE(12, *) "% Qxxx  Qxxy  Qxyy  Qyyy  Qyyz  Qyzz  Qzzz  Qxxz  Qxzz  Qxyz" 
+            WRITE(12, *) "% Riijj" 
+            WRITE(12, *) "% Rxxjj  Rxyjj  Rxzjj  Ryyjj  Ryzjj  Rzzjj" 
+            WRITE(12, *) "% Sxiijj  Syiijj  Sziijj"
+            WRITE(12, *) "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
+            CLOSE(12)
+
+         END IF
+
+      END IF
 
    END SUBROUTINE INITVARIOUS
 

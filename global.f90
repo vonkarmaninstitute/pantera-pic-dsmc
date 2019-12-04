@@ -39,16 +39,20 @@ MODULE global
 
    ! Dump quantities. Init to negative 1: if user does not define them, dump is not performed
    INTEGER :: DUMP_PART_EVERY      = -1
+
    INTEGER :: DUMP_GRID_AVG_EVERY  = -1
    INTEGER :: DUMP_GRID_START      = -1
    INTEGER :: DUMP_GRID_N_AVG      = -1
+
+   ! Dump global moments
    INTEGER :: DUMP_GLOB_MOM_EVERY  = -1
+   CHARACTER(26) :: DUMP_GLOB_MOM_FILENAME = "./dumps/global_moments.dat" ! Hard-coded
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Collisions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-   CHARACTER(LEN=64) :: COLLISION_TYPE
+   CHARACTER(LEN=64) :: COLLISION_TYPE = "NONE" ! Init collisions to none
    LOGICAL           :: BOOL_MCC = .FALSE., BOOL_DSMC = .FALSE., BOOL_BGK = .FALSE.
    REAL(KIND=8)      :: MCC_BG_DENS, MCC_SIGMA
    REAL(KIND=8)      :: BGK_SIGMA

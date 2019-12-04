@@ -26,7 +26,7 @@ Number_of_cells:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0E16
+    1.0E15
 Timestep:
     5.E-8
 Number_of_timesteps:
@@ -35,11 +35,12 @@ RNG_seed:
     12343
 
 ! ========= Dump quantities =========================
-Dump_glob_mom_every:
-    1
+
+Dump_glob_mom_every: ! Global moments, averaged on the domain
+    10
 
 Dump_part_every:
-    30
+    3000000
 
 Dump_grid_start:
     0
@@ -67,7 +68,7 @@ Def_mixture:
 
 Collision_type: ! [MCC / DSMC / BGK / NONE]
   BGK
-
+ 
 BGK_cross_section:
   5.0e-19 ! [m2] argon-argon
 

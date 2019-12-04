@@ -167,3 +167,4 @@ CHANGES:
   - In initialization.f90, mixture file did not accept commented lines (it would read it as a blank line
     and crash). Now it's ok
     TODO: do the same in VSS collisions reader
+  - DUMP_EVERY -> DUMP_PART_EVERY

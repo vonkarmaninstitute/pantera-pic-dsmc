@@ -67,16 +67,20 @@ MODULE timecycle
 
       ! ########### Dump particles ##############################################
 
-      IF (MOD(tID, DUMP_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
+      IF (DUMP_PART_EVERY .NE. -1) THEN ! Ok, dump particles
+         IF (MOD(tID, DUMP_PART_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
+      END IF
 
       ! ########### Dump flowfield ##############################################
 
-      IF (tID .GE. DUMP_GRID_START) THEN
-         IF (MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY) .EQ. 0) CALL GRID_AVG
-         IF (MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY*DUMP_GRID_N_AVG) .EQ. 0) THEN
-            CALL GRID_AVG
-            CALL GRID_SAVE
-            CALL GRID_RESET
+      IF (DUMP_GRID_START .NE. -1) THEN ! Ok, you can dump stuff
+         IF (tID .GE. DUMP_GRID_START) THEN
+            IF (MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY) .EQ. 0) CALL GRID_AVG
+            IF (MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY*DUMP_GRID_N_AVG) .EQ. 0) THEN
+               CALL GRID_AVG
+               CALL GRID_SAVE
+               CALL GRID_RESET
+            END IF
          END IF
       END IF
       ! ~~~~~ Hmm that's it! ~~~~~

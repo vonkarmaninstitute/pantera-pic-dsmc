@@ -61,7 +61,8 @@ MODULE initialization
          IF (line=='Timestep:')                READ(in1,*) DT
          IF (line=='Number_of_timesteps:')     READ(in1,*) NT
          IF (line=='RNG_seed:')                READ(in1,*) RNG_SEED_GLOBAL
-         IF (line=='Dump_part_every:')         READ(in1,*) DUMP_EVERY
+         IF (line=='Dump_part_every:')         READ(in1,*) DUMP_PART_EVERY
+         IF (line=='Dump_glob_mom_every:')     READ(in1,*) DUMP_GLOB_MOM_EVERY
          IF (line=='Dump_grid_avgevery:')      READ(in1,*) DUMP_GRID_AVG_EVERY
          IF (line=='Dump_grid_start:')         READ(in1,*) DUMP_GRID_START
          IF (line=='Dump_grid_numavgs:')       READ(in1,*) DUMP_GRID_N_AVG

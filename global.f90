@@ -36,10 +36,13 @@ MODULE global
    INTEGER      :: NT, tID
    REAL(KIND=8) :: FNUM, DT
    INTEGER      :: RNG_SEED_GLOBAL, RNG_SEED_LOCAL
-   INTEGER      :: DUMP_EVERY
-   INTEGER      :: DUMP_GRID_AVG_EVERY
-   INTEGER      :: DUMP_GRID_START
-   INTEGER      :: DUMP_GRID_N_AVG
+
+   ! Dump quantities. Init to negative 1: if user does not define them, dump is not performed
+   INTEGER :: DUMP_PART_EVERY      = -1
+   INTEGER :: DUMP_GRID_AVG_EVERY  = -1
+   INTEGER :: DUMP_GRID_START      = -1
+   INTEGER :: DUMP_GRID_N_AVG      = -1
+   INTEGER :: DUMP_GLOB_MOM_EVERY  = -1
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Collisions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

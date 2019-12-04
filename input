@@ -26,20 +26,25 @@ Number_of_cells:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0E14
+    1.0E16
 Timestep:
-    5.E-6
+    5.E-8
 Number_of_timesteps:
     3000
 RNG_seed:
     12343
+
+! ========= Dump quantities =========================
+Dump_glob_mom_every:
+    1
+
 Dump_part_every:
-    300
+    30
 
 Dump_grid_start:
     0
 Dump_grid_avgevery:
-    200000
+    200000000
 Dump_grid_numavgs:
     1
 
@@ -75,7 +80,8 @@ BGK_cross_section:
 ! DSMC VHS collisions  ! NOT IMPLEMENTED YET!
 
 ! DSMC_collisions_mixture:
-!     collmix
+!     Argon1
+!     ! collmix
 ! VSS_parameters_file:
 !     ar.vss
 
@@ -86,7 +92,7 @@ Initial_particles_bool:
 Initial_particles_dens:
     1.4e20
 Initial_particles_vel:
-    0.  0.  0.
+    0.  0.  2000.
 Initial_particles_Ttra:
     2000.  500.  100.
 Initial_particles_Trot:

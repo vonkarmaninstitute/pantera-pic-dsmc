@@ -157,14 +157,31 @@ Other TODOs: ###################################################################
   - Update INPUT_DATA_SANITY_CHECK with the new features.
     > DSMC for example throws a segmentation fault if the proper data is not defined
     > If I leave some DSMC settings in the input file, it tries to read, but fails and crashes
+
   - Update PRINTINPUT with the new features
+
   - In boundary inject, 3 temperatures, as did for the initial injection
 
   - Rename COLLIS into VSS_COLLIS
+
   - Rename MOLMASS into MASS o MOLEC_MASS (or one thinks "molar mass")
+
+  - With debug options (the ones in the Makefile, line with -O0), the part of initialization.f90 that
+    creates species crashes and complains. I think it's due to the flag "-fcheck=all", that comes from
+    Gambler's makefile. TODO: understand why.
 
 CHANGES:
   - In initialization.f90, mixture file did not accept commented lines (it would read it as a blank line
     and crash). Now it's ok
     TODO: do the same in VSS collisions reader
+
   - DUMP_EVERY -> DUMP_PART_EVERY
+
+  - Initialization.f90 had a problem reading filenames: 
+    when using "read(in1, *) line", if line is a string starting by ".", it doesn't work and stops reading. 
+    So, if you use the whole path such as "./input_files/whatever", it reads crazy characters, or only "."
+    Remedy: for strings, use " read(in1, "(A)") "
+    Problem 2: need to trim off leading spaces. So use:
+    read(in1, "(A)") bufferchar
+    MYVARIABLE = TRIM(ADJUSTL(bufferchar))
+

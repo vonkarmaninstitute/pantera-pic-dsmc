@@ -37,9 +37,14 @@ MODULE global
    REAL(KIND=8) :: FNUM, DT
    INTEGER      :: RNG_SEED_GLOBAL, RNG_SEED_LOCAL
 
-   ! Dump quantities. Init to negative 1: if user does not define them, dump is not performed
-   INTEGER :: DUMP_PART_EVERY      = -1
+   ! ++++++ Dump quantities. Init to negative 1: if user does not define them, 
+   ! ++++++ dump is not performed.
 
+   ! Dump particles
+   INTEGER        :: DUMP_PART_EVERY = -1
+   CHARACTER(512) :: DUMP_PART_PATH  = "./dumps/" ! Default position
+
+   ! Dump grid-averaged quantities
    INTEGER :: DUMP_GRID_AVG_EVERY  = -1
    INTEGER :: DUMP_GRID_START      = -1
    INTEGER :: DUMP_GRID_N_AVG      = -1
@@ -53,11 +58,33 @@ MODULE global
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    CHARACTER(LEN=64) :: COLLISION_TYPE = "NONE" ! Init collisions to none
-   LOGICAL           :: BOOL_MCC = .FALSE., BOOL_DSMC = .FALSE., BOOL_BGK = .FALSE.
-   REAL(KIND=8)      :: MCC_BG_DENS, MCC_SIGMA
-   REAL(KIND=8)      :: BGK_SIGMA
+
+   ! Variables for DSMC
+   LOGICAL           :: BOOL_DSMC = .FALSE.
    INTEGER           :: DSMC_COLL_MIX
    INTEGER           :: TIMESTEP_COLL
+
+   ! Variables for BGK
+   LOGICAL           :: BOOL_BGK  = .FALSE.
+   REAL(KIND=8)      :: BGK_SIGMA      = -1     ! Init value
+   REAL(KIND=8)      :: BGK_BG_MASS    = -1     ! Init value
+   REAL(KIND=8)      :: BGK_BG_DENS    = -1     ! Init value
+   CHARACTER(LEN=64) :: BGK_MODEL_TYPE = "NONE" ! Init 
+   INTEGER           :: BGK_MODEL_TYPE_INT      ! INT = "integer" or "internal variable"
+
+   ! Variables for MCC
+   LOGICAL           :: BOOL_MCC  = .FALSE.
+   REAL(KIND=8)      :: MCC_BG_DENS, MCC_SIGMA
+
+   ! Variables for custom collision model
+   LOGICAL           :: BOOL_CUSTOM_COLL = .FALSE.
+   REAL(KIND=8)      :: CUSTOM_BG_MASS = -1
+   REAL(KIND=8)      :: CUSTOM_BG_DENS = -1
+   REAL(KIND=8)      :: DeltaE_exc_J  = -1
+   REAL(KIND=8)      :: DeltaE_exc_eV = -1
+   REAL(KIND=8)      :: DeltaE_iz_J   = -1
+   REAL(KIND=8)      :: DeltaE_iz_eV  = -1
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: T_rates, k_el, k_exc, k_iz
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Initial particles seed !!!!!!!!!!!!!!!!!!!!!!!!!!!!!

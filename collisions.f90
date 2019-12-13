@@ -380,8 +380,22 @@
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
   ! SUBROUTINE BGK_COLLISIONS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+
+  SUBROUTINE BGK_COLLISIONS
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! Implements BGK model for the collision operator.           !!
-  ! Performs relaxation towards a local Maxwellian.            !!
+  ! Allows two types of relaxation, following the internal     !!
+  ! variable "BGK_MODEL_TYPE_INT" (see INITCOLLISIONS          !!
+  ! subroutine):                                               !!
+  !                                                            !!
+  ! BGK_MODEL_TYPE == 0                                        !!
+  !   Classical BGK, performs relaxation towards a local       !!
+  !   Maxwellian.                                              !!
+  !                                                            !!
+  ! BGK_MODEL_TYPE == 1                                        !!
+  !   Light particles (such as electrons) colliding with       !!
+  !   background medium.                                       !!
   !                                                            !!
   ! ATTENTION! WORKS ONLY FOR SINGLE SPECIES GAS MIXTURE!!!    !!
   ! The temperature of the local Maxwellian is found from the  !!
@@ -389,10 +403,9 @@
   ! "EI" in the particle object).                              !!
   ! The local Maxwellian has a rotational temperature equal to !!
   ! the translational one.                                     !!
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
-
-  SUBROUTINE BGK_COLLISIONS
-
+  !                                                            !!
+  !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  !
   ! First, create vectors holding the position of particles in the "particles" array,
   ! so that it's practical to extract them.
   ! Particles in the "particles" array are not actually moved aroud, in order to save computational
@@ -418,10 +431,11 @@
 
    ! For actual collisions
    INTEGER :: IDp, N_DOF_TOT, JP_START, JP_END
-   REAL(KIND=8) :: VX_CELL, VY_CELL, VZ_CELL, P_CELL, T_CELL, n_CELL, MASS
+   REAL(KIND=8) :: VX_CELL, VY_CELL, VZ_CELL, P_CELL, T_CELL, Ttr_CELL, n_CELL, MASS
    REAL(KIND=8) :: nu, V_TH
-   REAL(KIND=8) :: VX_NOW, VY_NOW, VZ_NOW, EI_NOW
-   REAL(KIND=8) :: Etot_cell, Ekin_cell, E_SUM
+   REAL(KIND=8) :: VX_NOW, VY_NOW, VZ_NOW, V2_NOW, EI_NOW
+   REAL(KIND=8) :: Etot_cell, Etot_tra_cell, Ekin_cell, E_SUM, Etr_SUM
+   REAL(KIND=8) :: Q, CHI, COS_TH, SIN_TH, COS_CHI, SIN_CHI
 
 
    REAL(KIND=8) :: kB = 1.38064852E-23
@@ -488,6 +502,7 @@
          VZ_CELL = 0
    
          E_SUM   = 0
+         Etr_SUM = 0
    
          V_TH   = 0
          P_CELL = 0
@@ -511,21 +526,27 @@
             VZ_CELL = VZ_CELL + VZ_NOW/NPC(JC)
    
             ! Total energy, sum over the particles
-            E_SUM   = E_SUM + MASS*(VX_NOW**2 + VY_NOW**2 + VZ_NOW**2)/2 + MASS*EI_NOW ! [J] Total energy
+            E_SUM   = E_SUM   + MASS*(VX_NOW**2 + VY_NOW**2 + VZ_NOW**2)/2 + MASS*EI_NOW ! [J] Total energy
+            Etr_SUM = Etr_SUM + MASS*(VX_NOW**2 + VY_NOW**2 + VZ_NOW**2)/2               ! [J] Translational energy
    
          END DO
    
          n_CELL   = FNUM*NPC(JC)/CELL_VOL ! Number density in the cell
    
-         Etot_cell = n_CELL*E_SUM/NPC(JC)                                 ! [J/m3]
-         Ekin_cell = MASS*n_CELL*(VX_CELL**2 + VY_CELL**2 + VZ_CELL**2)/2 ! [J/m3]
+         Etot_cell     = n_CELL*E_SUM/NPC(JC)                                 ! [J/m3] total energy
+         Etot_tra_cell = n_CELL*Etr_SUM/NPC(JC)                               ! [J/m3] total translational energy
+         Ekin_cell     = MASS*n_CELL*(VX_CELL**2 + VY_CELL**2 + VZ_CELL**2)/2 ! [J/m3] (ordered) kinetic energy in cell
     
-         N_DOF_TOT = 3 + SPECIES(1)%ROTDOF + SPECIES(1)%VIBDOF ! Total number of DOFs. BGK works only for 1 species!!!
-         T_CELL = 2/(N_DOF_TOT*kB*n_CELL)*(Etot_cell - Ekin_cell) ! [K] Compute temperature from internal energy
-   
-         V_TH = sqrt(8*kB*T_CELL/(MASS*pi)) ! [m/s] Thermal speed 
-   
-         nu = n_CELL*BGK_SIGMA*V_TH ! [1/s] Compute collision frequency (CONSTANT SIGMA FOR NOW)
+         N_DOF_TOT = 3 + SPECIES(1)%ROTDOF + SPECIES(1)%VIBDOF       ! Total number of DOFs. BGK works only for 1 species!!!
+         T_CELL    = 2/(N_DOF_TOT*kB*n_CELL)*(Etot_cell - Ekin_cell) ! [K] Compute equilibr temp from internal energy
+         Ttr_CELL  = 2/(3*kB*n_CELL)*(Etot_tra_cell - Ekin_cell)     ! [K] Compute translational temperature
+
+         V_TH = sqrt(8*kB*Ttr_CELL/(MASS*pi)) ! [m/s] Thermal speed (from translational energy only!)
+ 
+         ! +++++++ Compute collision frequency according to the model ++++++++
+         nu = 0
+         IF (BGK_MODEL_TYPE_INT == 0)  nu = n_CELL*BGK_SIGMA*V_TH ! [1/s]       ! Classical BGK
+         IF (BGK_MODEL_TYPE_INT == 1)  nu = BGK_BG_DENS*BGK_SIGMA*V_TH ! [1/s]  ! Collisions with background
     
          ! ++++++++++ Test particles for collisions +++++++++++
          DO JP = JP_START, JP_END
@@ -537,11 +558,35 @@
             !                 from the actual particle velocity.
     
             IF (rf() .LT. (1 - EXP(-nu*DT))) THEN ! PROBABILITY OF COLLISION = 1 - exp(-nu*dt)
-   
-               ! Sample from Maxwellian (isotropic) at local velocity and temperature 
-               CALL MAXWELL(VX_CELL, VY_CELL, VZ_CELL, T_CELL, T_CELL, T_CELL, T_CELL, &
-                            VX_NOW, VY_NOW, VZ_NOW, EI_NOW, MASS)
-   
+  
+               IF (BGK_MODEL_TYPE_INT == 0) THEN ! Classical collisions, just pick from a Maxwellian at the  cell equil temp
+
+                  ! Sample from Maxwellian (isotropic) at local velocity and temperature 
+                  CALL MAXWELL(VX_CELL, VY_CELL, VZ_CELL, T_CELL, T_CELL, T_CELL, T_CELL, &
+                               VX_NOW, VY_NOW, VZ_NOW, EI_NOW, MASS)
+
+               ELSE IF (BGK_MODEL_TYPE_INT == 1) THEN ! Collisions with background (heavy) particle
+
+                  ! New particle velocity, obtained reducing the energy by the average factor 2 M/M_BG
+                  V2_NOW = ( particles(IDp)%VX**2 + particles(IDp)%VY**2 + particles(IDp)%VZ**2 ) ! Initial V2
+                  MASS   = SPECIES(particles(IDp)%S_ID)%MOLMASS
+                  V2_NOW = V2_NOW*(1 - 2*MASS/BGK_BG_MASS) ! Rescale it
+ 
+                  ! Now sample new velocity on a sphere (see Bird for example)
+                  Q      = 2*rf() - 1
+                  COS_TH = Q
+                  SIN_TH = SQRT(1 - Q**2)
+
+                  CHI     = 2*pi*rf()
+                  COS_CHI = COS(CHI)
+                  SIN_CHI = SIN(CHI)
+
+                  VX_NOW = SIN_TH*COS_CHI*SQRT(V2_NOW)
+                  VY_NOW = SIN_TH*SIN_CHI*SQRT(V2_NOW)
+                  VZ_NOW = COS_TH*SQRT(V2_NOW)
+
+               END IF
+
                ! Assign new velocities and internal energy to particle
                particles(IDp)%VX = VX_NOW
                particles(IDp)%VY = VY_NOW
@@ -564,7 +609,249 @@
 
   END SUBROUTINE BGK_COLLISIONS
 
-  
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! SUBROUTINE CUSTOM_COLLISIONS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+
+  SUBROUTINE CUSTOM_COLLISIONS
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! Implements custom collisions, BGK-style, reading the rates from !!
+  ! the custom_rates.dat. This is intended to be just a simple test.!!
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !
+  ! First, create vectors holding the position of particles in the "particles" array,
+  ! so that it's practical to extract them.
+  ! Particles in the "particles" array are not actually moved aroud, in order to save computational
+  ! time. Instead, the particle array is scanned so that:
+  ! 1) the number of particles in each cell is computed
+  ! 2) the ID of each particle is copied in the array IND, ordered by cell: first the particles
+  !    belonging to the first cell, then these belonging to the second one etc.
+  ! The IDs in the IND array allow to pick the particle quickly from the "particles" array.
+  !
+  !
+  ! NPC => number of particles in each cell. Array of size NX*NY (total cells of the simulation)
+  !        In the cells belonging to the current processor, there will be some particle, in other
+  !        cells it will be zero.
+  !
+  ! IND => array of length NP_PROC, containing the ID of particles, ordered per cell.
+  ! 
+  ! IOF => index of first particle in a cell (it indicates the offset in IND). 
+  !        Conceptually: IOF = cumsum(NPC).
+
+   INTEGER, DIMENSION(NX*NY)          :: NPC, IOF
+   INTEGER, DIMENSION(:), ALLOCATABLE :: IND
+   INTEGER                            :: JP, JC, NCELLS, IDX
+
+   ! For actual collisions
+   INTEGER :: IDp, JP_START, JP_END
+   REAL(KIND=8) :: VX_CELL, VY_CELL, VZ_CELL, V2_CELL, P_CELL, Ttr_CELL, n_CELL, MASS
+!   REAL(KIND=8) :: nu, V_TH
+   REAL(KIND=8) :: VX_NOW, VY_NOW, VZ_NOW, EI_NOW
+   REAL(KIND=8) :: Etot_cell, Etot_tra_cell, Ekin_cell, E_SUM, Etr_SUM
+   REAL(KIND=8) :: k_el_NOW, k_exc_NOW, k_iz_NOW
+   REAL(KIND=8) :: nu_el, nu_exc, nu_iz
+   REAL(KIND=8) :: T_el_CELL, T_exc_CELL, T_iz_CELL
+
+
+   REAL(KIND=8) :: kB = 1.38064852E-23
+
+   ! Check that the gas is composed by only one species
+   IF (SIZE(SPECIES) .NE. 1) THEN
+      PRINT*
+      PRINT*, "  ATTENTION! CUSTOM collis model work for single species gas only. Sorry about that."
+      PRINT*, "  You may have one only species in your actual particle vector, but I see the SPECIES "
+      PRINT*, "  structure has more entries, so I will stop here just to be sure. "
+      PRINT*, "  Use only one species, or generalize this BGK function."
+      PRINT*
+      PRINT*, "  ABORTING!"
+      PRINT*
+      STOP
+   END IF
+
+   IF (SPECIES(1)%VIBDOF .NE. 0) THEN
+      PRINT*, "  ATTENTION! CUSTOM collis model works only for species with zero vibrational DOFs."
+      PRINT*, "  ABORTING!"
+      STOP
+   ELSE IF(SPECIES(1)%ROTDOF .NE. 0) THEN
+      PRINT*, "  ATTENTION! CUSTOM collis model works only for species with zero vibrational DOFs."
+      PRINT*, "  ABORTING!"
+      STOP
+   END IF
+
+   ! =========== Here, create vectors of particle indices ===========
+   NPC = 0
+   DO JP = 1, NP_PROC
+      JC = particles(JP)%IC
+      NPC(JC) = NPC(JC) + 1
+   END DO
+
+   NCELLS = NX*NY
+
+   IOF = -1
+   IDX = 1
+   DO JC = 1, NCELLS
+      IF (NPC(JC) .NE. 0) THEN
+         IOF(JC) = IDX
+         IDX = IDX + NPC(JC)
+      END IF
+   END DO
+
+   ALLOCATE(IND(NP_PROC))
  
+   NPC = 0
+   DO JP = 1, NP_PROC
+      JC = particles(JP)%IC
+      IND(IOF(JC) + NPC(JC)) = JP
+      NPC(JC) = NPC(JC) + 1
+   END DO
+ 
+   ! =========== LOOP ON CELLS AND COMPUTE BGK COLLISIONS =========
+ 
+   TIMESTEP_COLL = 0 ! Init number of collisions that happened
+
+   DO JC = 1, NCELLS
+
+      ! Note that in the current formulation, some cells may be not owned by me. 
+      ! These will have zero particles inside, so I will skip them.
+      IF (NPC(JC) .GT. 0) THEN
+
+         JP_START = IOF(JC)                ! First particle in the cell 
+         JP_END   = IOF(JC) + NPC(JC) - 1  ! Last particle in the cell
+   
+         ! ++++++++ Compute average quantities in cell +++++++++++
+         ! First, put internal quantities to zero
+         VX_CELL = 0
+         VY_CELL = 0
+         VZ_CELL = 0
+   
+         E_SUM   = 0
+         Etr_SUM = 0
+   
+         P_CELL = 0
+   
+         MASS = SPECIES(1)%MOLMASS  ! ONLY 1 SPECIES FOR BGK!
+   
+         ! Compute average velocities and total energy
+         DO JP = JP_START, JP_END ! Loop on particles in cell
+           
+            IDp = IND(JP) ! ID of current particle
+   
+            ! Extract velocities and internal energy
+            VX_NOW   = particles(IDp)%VX
+            VY_NOW   = particles(IDp)%VY
+            VZ_NOW   = particles(IDp)%VZ
+            EI_NOW   = particles(IDp)%EI
+   
+            ! Average velocity in the cell
+            VX_CELL = VX_CELL + VX_NOW/NPC(JC)
+            VY_CELL = VY_CELL + VY_NOW/NPC(JC)
+            VZ_CELL = VZ_CELL + VZ_NOW/NPC(JC)
+   
+            ! Total energy, sum over the particles
+            E_SUM   = E_SUM   + MASS*(VX_NOW**2 + VY_NOW**2 + VZ_NOW**2)/2 + MASS*EI_NOW ! [J] Total energy
+            Etr_SUM = Etr_SUM + MASS*(VX_NOW**2 + VY_NOW**2 + VZ_NOW**2)/2               ! [J] Translational energy
+   
+         END DO
+   
+         n_CELL   = FNUM*NPC(JC)/CELL_VOL ! Number density in the cell
+   
+         Etot_cell     = n_CELL*E_SUM/NPC(JC)                                 ! [J/m3] total energy
+         Etot_tra_cell = n_CELL*Etr_SUM/NPC(JC)                               ! [J/m3] total translational energy
+         Ekin_cell     = MASS*n_CELL*(VX_CELL**2 + VY_CELL**2 + VZ_CELL**2)/2 ! [J/m3] (ordered) kinetic energy in cell
+    
+         Ttr_CELL  = 2/(3*kB*n_CELL)*(Etot_tra_cell - Ekin_cell)     ! [K] Compute translational temperature
+
+         ! Find rates by interpolation of tabulated ones, at the cell translational temperature
+         k_el_NOW  = INTERP_VECTOR(T_rates, k_el,  Ttr_CELL) 
+         k_exc_NOW = INTERP_VECTOR(T_rates, k_exc, Ttr_CELL)
+         k_iz_NOW  = INTERP_VECTOR(T_rates, k_iz,  Ttr_CELL)
+
+         ! Compute collision frequencies
+         nu_el  = CUSTOM_BG_DENS*k_el_NOW
+         nu_exc = CUSTOM_BG_DENS*k_exc_NOW
+         nu_iz  = CUSTOM_BG_DENS*k_iz_NOW
+
+! AAAAAA
+! AAAAAA
+! AAAAAA
+! AAAAAA
+! AAAAAA
+print*, 'DBDBDBDB only elastic on'
+nu_el  = 0
+nu_iz  = 0
+print*, 'DBDBDBDB only elastic on'
+! AAAAAA
+! AAAAAA
+! AAAAAA
+! AAAAAA
+! AAAAAA
+
+         ! Compute Maxwellian temperatures, reduced by the energies lost in the collision
+         ! Note that we use a MAX() operator for excitation and ionization, or we may end up with a negative temperature
+         ! when the gas is cold.
+         ! This is OK, since the collision frequencies will anyway account for that.
+         V2_CELL = VX_CELL**2 + VY_CELL**2 + VZ_CELL**2
+
+         T_el_CELL  = (1 - 2*MASS/CUSTOM_BG_MASS)*(Ttr_CELL + MASS*V2_CELL/3/kB)
+         T_exc_CELL = MAX(1.0D0, Ttr_CELL + MASS*V2_CELL/3/kB - 2*DeltaE_exc_J/3/kB) 
+         T_iz_CELL  = MAX(1.0D0, 0.5D0*(Ttr_CELL + MASS*V2_CELL/3/kB - 2*DeltaE_iz_J/3/kB))
+
+PRINT*, "DBDB ", DeltaE_exc_J
+PRINT*, "DBDBDB CELL T: ", Ttr_CELL, T_el_CELL, T_exc_CELL, T_iz_CELL
+
+         ! ++++++++++ Test particles for collisions +++++++++++
+         DO JP = JP_START, JP_END
+
+            IDp = IND(JP) ! ID of current particle
+    
+            ! ===== Try elastic collision =====
+            IF (rf() .LT. (1 - EXP(-nu_el*DT))) THEN ! PROBABILITY OF COLLISION = 1 - exp(-nu*dt)
+
+              CALL MAXWELL(0.0D0, 0.0D0, 0.0D0, T_el_CELL, T_el_CELL, T_el_CELL, 0.0D0, &
+                           VX_NOW, VY_NOW, VZ_NOW, EI_NOW, MASS)
+
+              ! Assign new velocities and internal energy to particle
+              particles(IDp)%VX = VX_NOW
+              particles(IDp)%VY = VY_NOW
+              particles(IDp)%VZ = VZ_NOW
+  
+              particles(IDp)%EI = EI_NOW
+  
+              ! Update number of collisions happened
+              TIMESTEP_COLL = TIMESTEP_COLL + 1
+
+            END IF
+
+            ! ===== Try excitation collision =====
+            IF (rf() .LT. (1 - EXP(-nu_exc*DT))) THEN ! PROBABILITY OF COLLISION = 1 - exp(-nu*dt)
+
+              CALL MAXWELL(0.0D0, 0.0D0, 0.0D0, T_exc_CELL, T_exc_CELL, T_exc_CELL, 0.0D0, &
+                           VX_NOW, VY_NOW, VZ_NOW, EI_NOW, MASS)
+
+              ! Assign new velocities and internal energy to particle
+              particles(IDp)%VX = VX_NOW
+              particles(IDp)%VY = VY_NOW
+              particles(IDp)%VZ = VZ_NOW
+  
+              particles(IDp)%EI = EI_NOW
+  
+              ! Update number of collisions happened
+              TIMESTEP_COLL = TIMESTEP_COLL + 1
+
+            END IF
+
+
+         END DO
+
+      END IF
+ 
+   END DO
+
+   DEALLOCATE(IND)
+
+  END SUBROUTINE CUSTOM_COLLISIONS
+
+
   END MODULE collisions
 

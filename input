@@ -21,26 +21,28 @@ Domain_periodicity:
 Domain_specular:
     .FALSE.    .FALSE.    .FALSE.    .FALSE.
 Number_of_cells:
-    7  2  1
+    1  1  1
 
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0E15
+    1.0E10
 Timestep:
-    5.E-8
+    1.E-8
 Number_of_timesteps:
-    3000
+    5000
 RNG_seed:
     12343
 
 ! ========= Dump quantities =========================
 
 Dump_glob_mom_every: ! Global moments, averaged on the domain
-    10
+    1
 
 Dump_part_every:
-    3000000
+    100000000
+Dump_part_directory: ! can be also "."
+    /media/starlight/Maxtor/PANTERA_data/
 
 Dump_grid_start:
     0
@@ -52,8 +54,14 @@ Dump_grid_numavgs:
 ! ========= Multispecies ==============================
 
 Species_file:
-    ar.species
+   ./data/myspecies
     
+Def_mixture:
+   elec e 1.0
+ 
+Def_mixture:
+   Argonp Arp 1.0
+ 
 Def_mixture:
     Argon1 Ar1 1.0
 
@@ -66,11 +74,36 @@ Def_mixture:
     
 ! ========= Collisions ==============================
 
-Collision_type: ! [MCC / DSMC / BGK / NONE]
-  BGK
+Collision_type: ! [MCC / DSMC / BGK / CUSTOM_LOAD_RATES / NONE]
+  CUSTOM_LOAD_RATES
+
+CUSTOM_background_mass:
+  2.18E-25 ! Xenon
  
-BGK_cross_section:
-  5.0e-19 ! [m2] argon-argon
+CUSTOM_background_dens:
+  1.4E20
+
+CUSTOM_excitation_energy_eV:
+8.315D0
+
+! 8.315
+! 1st: 8.315, 2nd: 9.447, 3rd: 9.917, 4th: 11.7  eV ! For xenon
+
+CUSTOM_ionization_energy_eV:
+  12.13D0
+
+! BGK_model_type: ! [classical / small-mass-ratio]
+!   background
+!  
+! BGK_cross_section:
+!  1.0e-19 ! [m2] electron-heavy, random value
+!   ! 5.0e-19 ! [m2] argon-argon
+! 
+! BGK_background_mass:
+!   6.62E-26
+! 
+! BGK_background_dens:
+!   1.0E21
 
 ! MCC_background_dens:
 !   1.0e20
@@ -79,27 +112,27 @@ BGK_cross_section:
 ! MCC_species: ! NOT IMPLEMENTED YET!
 
 ! DSMC VHS collisions  ! NOT IMPLEMENTED YET!
-
+! 
 ! DSMC_collisions_mixture:
-!     Argon1
-!     ! collmix
+!    collmix
+! 
 ! VSS_parameters_file:
-!     ar.vss
+!     ./data/ar.vss
 
 ! ========= Initial particle seed ===================
 
 Initial_particles_bool:
     .TRUE.
 Initial_particles_dens:
-    1.4e20
+    1.0e17
 Initial_particles_vel:
-    0.  0.  2000.
+    0.  0.  0.
 Initial_particles_Ttra:
-    2000.  500.  100.
+    20000.  100000.  200000.
 Initial_particles_Trot:
     0. 
 Initial_particles_mixture:
-    Argon1
+    elec 
 
 ! ========== Injection from boundaries ==============
 
@@ -118,6 +151,7 @@ Boundaries_inject_Trot:
     0.
 Boundaries_inject_mixture:
     Argon1
+
 ! ========== Injection from line source =============
 
 Linesource_bool:

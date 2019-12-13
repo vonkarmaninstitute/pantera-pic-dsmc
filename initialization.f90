@@ -25,6 +25,7 @@ MODULE initialization
       CHARACTER*512      :: line
       INTEGER            :: ReasonEOF
 
+      CHARACTER*512      :: bufferchar ! working variable
       CHARACTER*512      :: MIXTURE_DEFINITION, VSS_PARAMS_FILENAME, LINESOURCE_DEFINITION
       CHARACTER*64       :: MIX_INIT_NAME, MIX_BOUNDINJECT_NAME, DSMC_COLL_MIX_NAME
 
@@ -61,15 +62,30 @@ MODULE initialization
          IF (line=='Timestep:')                READ(in1,*) DT
          IF (line=='Number_of_timesteps:')     READ(in1,*) NT
          IF (line=='RNG_seed:')                READ(in1,*) RNG_SEED_GLOBAL
-         IF (line=='Dump_part_every:')         READ(in1,*) DUMP_PART_EVERY
-         IF (line=='Dump_glob_mom_every:')     READ(in1,*) DUMP_GLOB_MOM_EVERY
+
+         ! ~~~~~~~~~~~~~  Dump quantities  ~~~~~~~~~~~~~~~~
+         ! Dump grid-averaged quantities
          IF (line=='Dump_grid_avgevery:')      READ(in1,*) DUMP_GRID_AVG_EVERY
          IF (line=='Dump_grid_start:')         READ(in1,*) DUMP_GRID_START
          IF (line=='Dump_grid_numavgs:')       READ(in1,*) DUMP_GRID_N_AVG
 
+         ! Dump global moments
+         IF (line=='Dump_glob_mom_every:')     READ(in1,*) DUMP_GLOB_MOM_EVERY
+
+         ! Dump particles
+         IF (line=='Dump_part_every:')         READ(in1,*) DUMP_PART_EVERY
+
+         IF (line=='Dump_part_directory:')     THEN
+            bufferchar = ''
+            READ(in1,'(A)') bufferchar
+            DUMP_PART_PATH = TRIM(ADJUSTL(bufferchar))
+         END IF
+
          ! ~~~~~~~~~~~~~  Multispecies ~~~~~~~~~~~~~~~
-         IF (line=='Species_file:') THEN
-            READ(in1,*) SPECIES_FILENAME
+         IF (line=='Species_file:') THEN ! Attention, must deal with paths, "./" and remove leading spaces
+            bufferchar = '' ! reset
+            READ(in1,'(A)') bufferchar
+            SPECIES_FILENAME = TRIM(ADJUSTL(bufferchar))
             CALL READ_SPECIES
          END IF
 
@@ -80,18 +96,42 @@ MODULE initialization
 
          ! ~~~~~~~~~~~~~  Collision type  ~~~~~~~~~~~~~~~~~
          IF (line=='Collision_type:')          READ(in1,*) COLLISION_TYPE
+
+         ! MCC collisions
          IF (line=='MCC_background_dens:')     READ(in1,*) MCC_BG_DENS
          IF (line=='MCC_cross_section:')       READ(in1,*) MCC_SIGMA
+
+         ! BGK collisions
          IF (line=='BGK_cross_section:')       READ(in1,*) BGK_SIGMA
+         IF (line=='BGK_background_mass:')     READ(in1,*) BGK_BG_MASS
+         IF (line=='BGK_background_dens:')     READ(in1,*) BGK_BG_DENS
+          
+         IF (line=='BGK_model_type:')          THEN
+            bufferchar = '' ! reset
+            READ(in1,'(A)') bufferchar 
+            BGK_MODEL_TYPE = TRIM(ADJUSTL(bufferchar))
+         END IF            
+
+         ! DSMC collisions 
          IF (line=='VSS_parameters_file:')     THEN
-            READ(in1,*) VSS_PARAMS_FILENAME
+            bufferchar = '' ! reset
+            READ(in1,'(A)') bufferchar
+            VSS_PARAMS_FILENAME = TRIM(ADJUSTL(bufferchar))
             CALL READ_VSS(VSS_PARAMS_FILENAME)
          END IF
+
          IF (line=='DSMC_collisions_mixture:') THEN
-            READ(in1,*) DSMC_COLL_MIX_NAME
+            bufferchar = '' ! reset
+            READ(in1,'(A)') bufferchar
+            DSMC_COLL_MIX_NAME = TRIM(ADJUSTL(bufferchar))
             DSMC_COLL_MIX = MIXTURE_NAME_TO_ID(DSMC_COLL_MIX_NAME)
          END IF
-         
+
+         ! CUSTOM collisions
+         IF (line=='CUSTOM_background_mass:')        READ(in1,*) CUSTOM_BG_MASS
+         IF (line=='CUSTOM_background_dens:')        READ(in1,*) CUSTOM_BG_DENS
+         IF (line=='CUSTOM_excitation_energy_eV:')   READ(in1,*) DeltaE_exc_eV
+         IF (line=='CUSTOM_ionization_energy_eV:')   READ(in1,*) DeltaE_iz_eV
 
          ! ~~~~~~~~~~~~~  Initial particles seeding  ~~~~~~~~~~~~~~~~~
          IF (line=='Initial_particles_bool:')  READ(in1,*) BOOL_INITIAL_SEED
@@ -203,6 +243,9 @@ MODULE initialization
             WRITE(*,'(A5,A50,ES14.3)') '     ', string, MCC_SIGMA 
 
          ELSE IF (COLLISION_TYPE == 'BGK') THEN ! Only print this if BGK collisions are ON
+
+            string = 'BGK collision model type:'
+            WRITE(*,'(A5,A50,A20)') '     ', string, BGK_MODEL_TYPE
 
             string = 'Collision cross-section [m^2]:'
             WRITE(*,'(A5,A50,ES14.3)') '     ', string, BGK_SIGMA 
@@ -341,7 +384,7 @@ MODULE initialization
 
       IF (ios.NE.0) THEN
          PRINT*
-         WRITE(*,*)'  Attention, species definition file not found! ABORTING.'
+         WRITE(*,*)'  Attention, species definition file "', SPECIES_FILENAME, '" not found! ABORTING.'
          PRINT*
          STOP
       ENDIF
@@ -450,6 +493,9 @@ MODULE initialization
 
    END SUBROUTINE READ_VSS
 
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE DEF_MIXTURE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    SUBROUTINE DEF_MIXTURE(DEFINITION)
       
@@ -467,9 +513,8 @@ MODULE initialization
       TYPE(MIXTURE), DIMENSION(:), ALLOCATABLE :: TEMP_MIXTURES
       TYPE(MIXTURE_COMPONENT), DIMENSION(:), ALLOCATABLE :: TEMP_COMPONENTS
 
-
       CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
-      
+
       READ(STRARRAY(1),'(A10)') MIX_NAME
       N_COMP = (N_STR-1)/2
       ALLOCATE(TEMP_COMPONENTS(N_COMP))
@@ -703,6 +748,90 @@ MODULE initialization
 
       END IF
 
+      ! --------------- BGK collisions -------------------
+      IF (COLLISION_TYPE == "BGK") THEN
+
+         ! For BGK you must specify what kind of BGK (classical / background)
+         ! and the cross section (constant).
+         ! For "background" also need to specify the background density
+
+         ! Cross section is initialized to negative value to generate this check. 
+         IF (BGK_SIGMA .LT. 0.0) THEN
+            WRITE(*,*) '*************************************************************************'
+            WRITE(*,*) '* ERROR! You did not specify the cross section in the input file, or'
+            WRITE(*,*) '* you used a negative value! Use input file keyword "BGK_cross_section:"'
+            WRITE(*,*) '* Aborting!'
+            WRITE(*,*) '*************************************************************************'
+            STOP
+         END IF
+
+         ! BGK_MODEL_TYPE (initialized as "NONE" to generate this check)
+         IF (BGK_MODEL_TYPE == "NONE") THEN
+            WRITE(*,*) '*************************************************************************'
+            WRITE(*,*) '* ERROR! Must specify a BGK type! Use "BGK_model_type:" in input file.'
+            WRITE(*,*) '* Aborting!'
+            WRITE(*,*) '*************************************************************************'
+            STOP
+         END IF
+
+         IF (BGK_MODEL_TYPE == "background") THEN
+
+            IF (BGK_BG_MASS .LT. 0.0) THEN 
+               WRITE(*,*) '************************************************************'
+               WRITE(*,*) '* ERROR! BGK background mass not specified or negative! '
+               WRITE(*,*) '* Check input file! Keyword: "BGK_background_mass:"'
+               WRITE(*,*) '************************************************************'
+               STOP
+            END IF
+
+            IF (BGK_BG_DENS .LT. 0.0) THEN 
+               WRITE(*,*) '************************************************************'
+               WRITE(*,*) '* ERROR! BGK background number density not specified or negative! '
+               WRITE(*,*) '* Check input file! Keyword: "BGK_background_dens:"'
+               WRITE(*,*) '************************************************************'
+               STOP
+            END IF
+
+
+         END IF
+      END IF
+
+      ! CUSTOM collisions
+      IF (COLLISION_TYPE == "CUSTOM_LOAD_RATES") THEN
+
+            IF (CUSTOM_BG_MASS .LT. 0.0) THEN 
+               WRITE(*,*) '************************************************************'
+               WRITE(*,*) '* ERROR! CUSTOM collision background mass not specified or negative! '
+               WRITE(*,*) '* Check input file! Keyword: "CUSTOM_background_mass:"'
+               WRITE(*,*) '************************************************************'
+               STOP
+            END IF
+
+            IF (CUSTOM_BG_DENS .LT. 0.0) THEN 
+               WRITE(*,*) '************************************************************'
+               WRITE(*,*) '* ERROR! CUSTOM collision background number density not specified or negative! '
+               WRITE(*,*) '* Check input file! Keyword: "CUSTOM_background_dens:"'
+               WRITE(*,*) '************************************************************'
+               STOP
+            END IF
+
+            IF (DeltaE_exc_eV .LT. 0.0) THEN 
+               WRITE(*,*) '************************************************************'
+               WRITE(*,*) '* ERROR! CUSTOM collision excitation energy loss not specified or negative! '
+               WRITE(*,*) '* Check input file! Keyword: "CUSTOM_excitation_energy_eV:"'
+               WRITE(*,*) '************************************************************'
+               STOP
+            END IF
+
+            IF (DeltaE_iz_eV .LT. 0.0) THEN 
+               WRITE(*,*) '************************************************************'
+               WRITE(*,*) '* ERROR! CUSTOM collision excitation energy loss not specified or negative! '
+               WRITE(*,*) '* Check input file! Keyword: "CUSTOM_ionization_energy_eV:"'
+               WRITE(*,*) '************************************************************'
+               STOP
+            END IF
+
+      END IF 
 
    END SUBROUTINE INPUT_DATA_SANITY_CHECK
 
@@ -1010,29 +1139,58 @@ MODULE initialization
 
       ! Set logicals
       IF (COLLISION_TYPE == "NONE") THEN
-         BOOL_DSMC = .FALSE.
-         BOOL_MCC  = .FALSE.
-         BOOL_BGK  = .FALSE.
+         BOOL_DSMC         = .FALSE.
+         BOOL_MCC          = .FALSE.
+         BOOL_BGK          = .FALSE.
+         BOOL_CUSTOM_COLL  = .FALSE.
 
       ELSE IF (COLLISION_TYPE == "DSMC") THEN
-         BOOL_DSMC = .TRUE.
-         BOOL_MCC  = .FALSE.
-         BOOL_BGK  = .FALSE.
+         BOOL_DSMC         = .TRUE.
+         BOOL_MCC          = .FALSE.
+         BOOL_BGK          = .FALSE.
+         BOOL_CUSTOM_COLL  = .FALSE.
 
       ELSE IF (COLLISION_TYPE == "MCC") THEN
-         BOOL_DSMC = .FALSE.
-         BOOL_MCC  = .TRUE.
-         BOOL_BGK  = .FALSE.
+         BOOL_DSMC         = .FALSE.
+         BOOL_MCC          = .TRUE.
+         BOOL_BGK          = .FALSE.
+         BOOL_CUSTOM_COLL  = .FALSE.
 
       ELSE IF (COLLISION_TYPE == "BGK") THEN
-         BOOL_DSMC = .FALSE.
-         BOOL_MCC  = .FALSE.
-         BOOL_BGK  = .TRUE.
+         BOOL_DSMC         = .FALSE.
+         BOOL_MCC          = .FALSE.
+         BOOL_BGK          = .TRUE.
+         BOOL_CUSTOM_COLL  = .FALSE.
+
+      ELSE IF (COLLISION_TYPE == "CUSTOM_LOAD_RATES") THEN
+         BOOL_DSMC         = .FALSE.
+         BOOL_MCC          = .FALSE.
+         BOOL_BGK          = .FALSE.
+         BOOL_CUSTOM_COLL  = .TRUE.
 
       ELSE ! ERROR!
          CALL ONLYMASTERPRINT1(PROC_ID, '$$$ ATTENTION! Collision type in input file not recognized! ABORTING!')
          STOP
 
+      END IF
+
+      ! Initialize internal values for BGK collisions 
+      IF (BOOL_BGK) THEN
+         IF (BGK_MODEL_TYPE .EQ. "classical") THEN
+            BGK_MODEL_TYPE_INT = 0
+         ELSE IF (BGK_MODEL_TYPE .EQ. "background") THEN
+            BGK_MODEL_TYPE_INT = 1
+         END IF
+      END IF
+
+      ! Read rate files for CUSTOM_COLLISION type
+      IF (BOOL_CUSTOM_COLL) THEN
+         ! Initialize internal variables
+         DeltaE_exc_J = 1.60217662E-19*DeltaE_exc_eV
+         DeltaE_iz_J  = 1.60217662E-19*DeltaE_iz_eV
+
+         ! Read rates
+         CALL INIT_CUSTOM_COLL_RATES
       END IF
 
    END SUBROUTINE INITCOLLISIONS
@@ -1078,5 +1236,80 @@ MODULE initialization
    
    END FUNCTION MIXTURE_NAME_TO_ID
 
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE INIT_CUSTOM_COLL_RATES !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ 
+   SUBROUTINE INIT_CUSTOM_COLL_RATES
+ 
+   ! This subroutine reads files and initializes the vectors containing collision rates
+ 
+   INTEGER            :: N_lines, io, ii
+   REAL(KIND=8)       :: T_NOW, k_el_NOW, k_exc_NOW, k_iz_NOW
+   CHARACTER(LEN=512) :: dummy
+
+   WRITE(*,*) 'CUSTOM collision model: reading rates file...'
+ 
+   ! First, count lines in the file
+ 
+   N_lines = 0 ! Init
+ 
+   OPEN(UNIT=99, FILE='custom_rates.dat', STATUS='old', ACTION='read')
+ 
+   io = 0 ! init
+   DO WHILE (io .EQ. 0)
+       READ(99,*,IOSTAT=io)  dummy 
+       IF (io > 0) THEN
+          WRITE(*,*) 'Check reaction rates file.  Something went wrong. ABORTING!'
+          STOP
+       ELSE IF (io < 0) THEN
+          WRITE(*,*)  ' Collision rates contain ', N_lines, ' lines'
+       ELSE
+          N_lines = N_lines + 1
+       END IF
+ 
+   END DO
+
+   CLOSE(99)
+
+   ! Init arrays with this length
+   ALLOCATE(T_rates(N_lines))
+   ALLOCATE(k_el(N_lines))
+   ALLOCATE(k_exc(N_lines))
+   ALLOCATE(k_iz(N_lines))
+ 
+   ! Now again, read file and save its values
+   OPEN(UNIT=99, FILE='custom_rates.dat', STATUS='old', ACTION='read')
+ 
+   ! Read until EOF
+   ii = 0
+   DO
+      READ(99,*,IOSTAT=io)  T_NOW,  k_el_NOW,  k_exc_NOW,  k_iz_NOW
+  
+      IF (io > 0) THEN
+
+         WRITE(*,*) 'Check input.  Something was wrong'
+         EXIT
+
+      ELSE IF (io < 0) THEN ! EOF reached, quit.
+    
+         CLOSE(99)
+         EXIT
+
+      ELSE ! Proper values were read
+
+         ii = ii + 1
+
+         T_rates(ii) = T_NOW
+         k_el(ii)    = k_el_NOW
+         k_exc(ii)   = k_exc_NOW
+         k_iz(ii)    = k_iz_NOW
+
+         PRINT*, 'I read: ', T_rates(ii), k_el(ii), k_exc(ii), k_iz(ii)
+
+      END IF
+   END DO
+ 
+  END SUBROUTINE INIT_CUSTOM_COLL_RATES
 
 END MODULE initialization

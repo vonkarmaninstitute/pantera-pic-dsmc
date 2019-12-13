@@ -41,7 +41,7 @@ MODULE timecycle
       CALL MPI_REDUCE(NP_PROC, NP_TOT, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
       CALL MPI_REDUCE(TIMESTEP_COLL, NCOLL_TOT, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
 
-      WRITE(stringTMP, '(A13,I5,A4,I8,A9,ES14.3,A28,I10,A25,I10)') '   Timestep: ', tID, ' of ', NT, &
+      WRITE(stringTMP, '(A13,I9,A4,I8,A9,ES14.3,A28,I10,A25,I10)') '   Timestep: ', tID, ' of ', NT, &
                        ' - time: ', CURRENT_TIME, ' [s] - number of particles: ', NP_TOT, &
                        ' - number of collisions: ', NCOLL_TOT
 
@@ -54,7 +54,10 @@ MODULE timecycle
 
       ! ########### Advect particles ############################################
 
-      CALL ADVECT 
+      !CALL ADVECT 
+
+      ! PRINT*, "           > ATTENTION! I'm using a weird advection! Check timecycle.f90 ~~~~~~~~~~~~~~~"
+      ! CALL ADVECT_0D_ExB_ANALYTICAL(dt) ! Advects only velocity
 
       ! ########### Exchange particles among processes ##########################
 
@@ -67,6 +70,8 @@ MODULE timecycle
       IF (BOOL_DSMC) CALL DSMC_COLLISIONS
 
       IF (BOOL_BGK)  CALL BGK_COLLISIONS
+
+      IF (BOOL_CUSTOM_COLL) CALL CUSTOM_COLLISIONS
 
       ! ########### Dump quantities ##############################################
 
@@ -614,5 +619,43 @@ MODULE timecycle
    END DO
 
    END SUBROUTINE MCC_COLLISIONS
+
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE ADVECT_0D_ExB_ANALYTICAL -> Advects particles in the domain     !!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+   SUBROUTINE ADVECT_0D_ExB_ANALYTICAL(dt)
+
+      ! This subroutine only changes the velocity (0D simulation), and uses an analytical law for
+      ! the motion in the ExB field.
+      ! E is assumed to be along the z direction and B is assumed to be along x.
+
+      INTEGER :: IP
+      REAL(KIND=8), INTENT(IN) :: dt
+      REAL(KIND=8) :: E, B !Electric and magnetic fields
+      REAL(KIND=8) :: VY0, VZ0, M, Q, omega_cycl
+
+      E = 20000
+      B = 0.01
+
+      DO IP = 1, NP_PROC ! Loop on particles
+
+         VY0 = particles(IP)%VY
+         VZ0 = particles(IP)%VZ
+
+         M = SPECIES(particles(IP)%S_ID)%MOLMASS
+         Q = SPECIES(particles(IP)%S_ID)%CHARGE
+
+         omega_cycl = Q*B/M
+
+         ! This assumes electric field is along z and magnetic field along x
+         particles(IP)%VY =  (VY0 - E/B)*cos(omega_cycl*dt) + VZ0*sin(omega_cycl*dt) + E/B;
+         particles(IP)%VZ = -(VY0 - E/B)*sin(omega_cycl*dt) + VZ0*cos(omega_cycl*dt);
+
+      END DO
+
+   END SUBROUTINE ADVECT_0D_ExB_ANALYTICAL
+
+
 
 END MODULE timecycle

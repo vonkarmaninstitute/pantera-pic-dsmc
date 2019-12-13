@@ -123,8 +123,8 @@ CONTAINS
   REAL(KIND=8)                :: R, R1, RO, TETA, BETA
   REAL(KIND=8), DIMENSION(3)  :: VEL, TT
 
-  PI   = 3.141593
-  PI2  = 2.*PI
+  PI   = 2.0D0*ASIN(1.0D0)
+  PI2  = 2.0D0*PI
 
   KB = 1.38064852E-23
 
@@ -235,7 +235,9 @@ CONTAINS
      CHARACTER(LEN=512)  :: filename
      INTEGER :: IP
 
-     WRITE(filename, "(A13,I0.5,A6,I0.8)") "./dumps/proc_", PROC_ID, "_time_", TIMESTEP ! Compose filename
+     !! old !! WRITE(filename, "(A13,I0.5,A6,I0.8)") "./dumps/proc_", PROC_ID, "_time_", TIMESTEP ! Hard-coded filename
+     WRITE(filename, "(A,A6,I0.5,A6,I0.8)") ADJUSTL(TRIM(DUMP_PART_PATH)), &
+                                      "/proc_", PROC_ID, "_time_", TIMESTEP ! Compose filename
 
      ! Open file for writing
      OPEN(10, FILE=filename )
@@ -581,5 +583,71 @@ CONTAINS
 
   END SUBROUTINE COMPUTE_GLOBAL_MOMENTS
 
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! FUNCTION INTERP_VECTOR !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  
+  FUNCTION INTERP_VECTOR(x_vect, y_vect, x_target)
+
+  ! Very basic interpolation routine. Very inefficient. Use bisection at least!
+
+     REAL(KIND=8) :: INTERP_VECTOR, x_target
+     REAL(KIND=8), DIMENSION(:) :: x_vect, y_vect
+
+     INTEGER :: ii
+     REAL(KIND=8) :: X1, X2, Y1, Y2
+
+     ! Check that requested element is in same position
+     IF (x_target .LE. x_vect(1)) THEN
+
+        WRITE(*,*) 'Attention! In function INTERP_VECTOR(): out of vector range! Using first element.'
+        INTERP_VECTOR = y_vect(1)
+        RETURN
+
+     ELSE IF (x_target .GE. x_vect(size(x_vect))) THEN
+
+        WRITE(*,*) 'Attention! In function INTERP_VECTOR(): out vector range! Using last element.'
+        WRITE(*,*) 'Asked value at: ', x_target, ' Max tabulated value: ', x_vect(size(x_vect))
+        INTERP_VECTOR = y_vect(SIZE(y_vect))
+        RETURN
+       
+     END IF
+
+     ! Check that x_vect and y_vect have same size
+     IF (SIZE(x_vect) .NE. SIZE(y_vect)) THEN
+        WRITE(*,*) 'ERROR! In function INTERP_VECTOR(): number of elements of X and Y does not match. ABORTING!'
+        WRITE(*,*) 'Asked value at: ', x_target, ' Min tabulated value: ', x_vect(1)
+        STOP
+     END IF
+
+     ! Classical interpolation
+     DO ii = 1, SIZE(x_vect)
+        IF (x_vect(ii) .GT. x_target) THEN ! We just paseed it!
+
+           X1 = x_vect(ii - 1)
+           X2 = x_vect(ii)
+           Y1 = y_vect(ii - 1)
+           Y2 = y_vect(ii)
+           
+           INTERP_VECTOR = Y1 + (Y2 - Y1)/(X2 - X1)*(x_target - X1)
+           RETURN
+
+        END IF
+     END DO
+
+     RETURN
+  END FUNCTION
+
+
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!   ! SUBROUTINE INTERP_VECTOR !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! 
+!   SUBROUTINE INTERP_VECTOR(x_vec, y_vec, T_target, y)
+! 
+!     
+! 
+! 
+!   END SUBROUTINE INTERP_VECTOR
 
 END MODULE tools

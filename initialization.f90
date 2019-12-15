@@ -7,6 +7,7 @@ MODULE initialization
    USE mpi_common
    USE tools
    USE grid_and_partition
+   USE mt19937_64
 
    IMPLICIT NONE
 
@@ -844,9 +845,6 @@ MODULE initialization
 
       IMPLICIT NONE
 
-      INTEGER         :: I
-      REAL(KIND=8)    :: dummy
- 
       ! ~~~~~~~~ Initial allocation for vector of particles in each process ~~~~~~~~
       NP_PROC = 0
       ALLOCATE(particles(0))
@@ -856,12 +854,7 @@ MODULE initialization
       ! Create local seed for RNG (different for each processor)
       RNG_SEED_LOCAL = RNG_SEED_GLOBAL*(PROC_ID + 1) 
 
-      CALL SRAND(RNG_SEED_LOCAL) ! Seed RNG with local quantity
-      ! And call it a number of times, so that initial correlation between the similar seeds 
-      ! is lost (apparently, some non-negligible correlation is retained!!!!!)
-      DO I = 1,100
-        dummy = RAND()
-      END DO
+      CALL init_genrand64(RNG_SEED_LOCAL) ! Seed Mersenne Twister PRNG with local quantity
 
       ! ~~~~~~~~ Additional variables for MPI domain decomposition ~~~~~~
       IF (DOMPART_TYPE == 1) THEN ! "blocks" domain partition
@@ -1304,8 +1297,6 @@ MODULE initialization
          k_el(ii)    = k_el_NOW
          k_exc(ii)   = k_exc_NOW
          k_iz(ii)    = k_iz_NOW
-
-         PRINT*, 'I read: ', T_rates(ii), k_el(ii), k_exc(ii), k_iz(ii)
 
       END IF
    END DO

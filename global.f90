@@ -33,9 +33,9 @@ MODULE global
    !!!!!!!!! Numerical settings !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-   INTEGER      :: NT, tID
-   REAL(KIND=8) :: FNUM, DT
-   INTEGER      :: RNG_SEED_GLOBAL, RNG_SEED_LOCAL
+   INTEGER         :: NT, tID
+   REAL(KIND=8)    :: FNUM, DT
+   INTEGER(KIND=8) :: RNG_SEED_GLOBAL, RNG_SEED_LOCAL
 
    ! ++++++ Dump quantities. Init to negative 1: if user does not define them, 
    ! ++++++ dump is not performed.

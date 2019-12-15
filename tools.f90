@@ -2,6 +2,7 @@ MODULE tools
 
 USE grid_and_partition
 USE mpi_common
+USE mt19937_64
 USE global
 
 CONTAINS 
@@ -17,7 +18,7 @@ CONTAINS
 
       REAL(KIND=8) :: out
 
-      out = RAND()
+      out = genrand64_real1() ! From the Mersenne Twister module
 
       RETURN
 

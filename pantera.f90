@@ -11,7 +11,7 @@ PROGRAM PANTERA
    USE grid_and_partition
 
    IMPLICIT NONE
-   
+
    ! ========= Init MPI environment ========================
    CALL MPI_INIT(ierr)
    CALL MPI_COMM_SIZE(MPI_COMM_WORLD, N_MPI_THREADS, ierr)

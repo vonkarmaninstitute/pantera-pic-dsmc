@@ -1,0 +1,11 @@
+PROGRAM test
+
+  IMPLICIT NONE
+
+  INTEGER :: II
+
+  CALL SRAND(1234)
+  DO II = 1,2000
+    PRINT*, rand(), rand()
+  END DO
+END PROGRAM test

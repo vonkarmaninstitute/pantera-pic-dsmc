@@ -61,10 +61,13 @@ MODULE initialization
          IF (line=='Timestep:')                READ(in1,*) DT
          IF (line=='Number_of_timesteps:')     READ(in1,*) NT
          IF (line=='RNG_seed:')                READ(in1,*) RNG_SEED_GLOBAL
-         IF (line=='Dump_part_every:')              READ(in1,*) DUMP_EVERY
-         IF (line=='Dump_grid_avgevery:')              READ(in1,*) DUMP_GRID_AVG_EVERY
-         IF (line=='Dump_grid_start:')              READ(in1,*) DUMP_GRID_START
-         IF (line=='Dump_grid_numavgs:')              READ(in1,*) DUMP_GRID_N_AVG
+         IF (line=='Dump_part_every:')         READ(in1,*) DUMP_EVERY
+         IF (line=='Dump_grid_avgevery:')      READ(in1,*) DUMP_GRID_AVG_EVERY
+         IF (line=='Dump_grid_start:')         READ(in1,*) DUMP_GRID_START
+         IF (line=='Dump_grid_numavgs:')       READ(in1,*) DUMP_GRID_N_AVG
+         IF (line=='Perform_checks:')          READ(in1,*) PERFORM_CHECKS
+         IF (line=='Stats_every:')             READ(in1,*) STATS_EVERY
+         
 
 
          ! ~~~~~~~~~~~~~  Multispecies ~~~~~~~~~~~~~~~
@@ -435,7 +438,16 @@ MODULE initialization
 
          SPECIES(SP_ID)%SIGMA = PI*DIAM**2
          SPECIES(SP_ID)%NU    = OMEGA - 0.5
-         SPECIES(SP_ID)%CREF  = SQRT(3.*KB*TREF / SPECIES(SP_ID)%MOLMASS)
+         !SPECIES(SP_ID)%CREF  = SQRT(3.*KB*TREF / SPECIES(SP_ID)%MOLMASS)
+
+
+         IF (OMEGA .EQ. 0.5) THEN
+            SPECIES(SP_ID)%CREF  = (4.*KB*TREF/SPECIES(SP_ID)%MOLMASS)**0.5 * 1.2354
+         ELSE
+            SPECIES(SP_ID)%CREF  = (4.*KB*TREF/SPECIES(SP_ID)%MOLMASS)**0.5 * (GAMMA(2.5-OMEGA))**(-0.5/(OMEGA-0.5))
+         END IF
+         
+         
          
          
       END DO
@@ -911,8 +923,8 @@ MODULE initialization
             LINESOURCES(ILINE)%NORMY = NORMY
 
             U_NORM = LINESOURCES(ILINE)%UX*NORMX + LINESOURCES(ILINE)%UY*NORMY ! Molecular speed ratio normal to boundary
-            LINESOURCES(ILINE)%U_NORM = U_NORM
             S_NORM = U_NORM*BETA
+            LINESOURCES(ILINE)%S_NORM = S_NORM
             Snow   = S_NORM     ! temp variable
 
             FLUXLINESOURCE   = LINESOURCES(ILINE)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) &

@@ -40,6 +40,8 @@ MODULE global
    INTEGER      :: DUMP_GRID_AVG_EVERY
    INTEGER      :: DUMP_GRID_START
    INTEGER      :: DUMP_GRID_N_AVG
+   LOGICAL      :: PERFORM_CHECKS = .FALSE.
+   INTEGER      :: STATS_EVERY = 1
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Collisions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -105,7 +107,7 @@ MODULE global
 
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: nfs
       REAL(KIND=8) :: KAPPA
-      REAL(KIND=8) :: U_NORM
+      REAL(KIND=8) :: S_NORM
       REAL(KIND=8) :: NORMX, NORMY
    END TYPE LINESOURCE
 
@@ -173,9 +175,9 @@ MODULE global
    !!!!!!!!! Average flowfield !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-   INTEGER, DIMENSION(:), ALLOCATABLE      :: AVG_NP
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_N
 
-   INTEGER, DIMENSION(:), ALLOCATABLE      :: AVG_N
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_NP
 
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_VX
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_VY

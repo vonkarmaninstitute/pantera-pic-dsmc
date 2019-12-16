@@ -35,15 +35,17 @@ MODULE timecycle
 
       CURRENT_TIME = tID*DT
 
-      CALL MPI_REDUCE(NP_PROC, NP_TOT, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-      CALL MPI_REDUCE(TIMESTEP_COLL, NCOLL_TOT, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      IF (MOD(tID, STATS_EVERY) .EQ. 0) THEN
+         CALL MPI_REDUCE(NP_PROC, NP_TOT, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         CALL MPI_REDUCE(TIMESTEP_COLL, NCOLL_TOT, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
 
-      WRITE(stringTMP, '(A13,I5,A4,I8,A9,ES14.3,A28,I10,A25,I10)') '   Timestep: ', tID, ' of ', NT, &
-                       ' - time: ', CURRENT_TIME, ' [s] - number of particles: ', NP_TOT, &
-                       ' - number of collisions: ', NCOLL_TOT
+         WRITE(stringTMP, '(A13,I8,A4,I8,A9,ES14.3,A28,I10,A25,I10)') '   Timestep: ', tID, ' of ', NT, &
+                          ' - time: ', CURRENT_TIME, ' [s] - number of particles: ', NP_TOT, &
+                          ' - number of collisions: ', NCOLL_TOT
 
-      CALL ONLYMASTERPRINT1(PROC_ID, TRIM(stringTMP))
-
+         CALL ONLYMASTERPRINT1(PROC_ID, TRIM(stringTMP))
+      END IF
+      
       ! ########### Inject particles from boundaries/injection sources ##########
 
       CALL BOUNDARIES_INJECT
@@ -69,15 +71,21 @@ MODULE timecycle
 
       ! ########### Dump flowfield ##############################################
 
-      IF (tID .GE. DUMP_GRID_START) THEN
-         IF (MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY) .EQ. 0) CALL GRID_AVG
-         IF (MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY*DUMP_GRID_N_AVG) .EQ. 0) THEN
+      IF (tID .GT. DUMP_GRID_START) THEN
+         ! If we are in the grid save timestep, average, then dump the cumulated averages
+         IF (tID .NE. DUMP_GRID_START .AND. MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY*DUMP_GRID_N_AVG) .EQ. 0) THEN
             CALL GRID_AVG
             CALL GRID_SAVE
             CALL GRID_RESET
+         ! If we are just in a grid average timestep, compute the grid average
+         ELSE IF (MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY) .EQ. 0) THEN
+            CALL GRID_AVG
          END IF
       END IF
       ! ~~~~~ Hmm that's it! ~~~~~
+
+      ! Perform the conservation checks
+      IF (PERFORM_CHECKS .AND. MOD(tID, 100) .EQ. 0) CALL CHECKS
 
       tID = tID + 1
    END DO
@@ -91,7 +99,7 @@ MODULE timecycle
       IMPLICIT NONE
    
       INTEGER      :: IP, IC, IS, NFS, ILINE
-      REAL(KIND=8) :: DTFRAC, Vdummy, V_NORM, V_PERP, U_NORM, POS
+      REAL(KIND=8) :: DTFRAC, Vdummy, V_NORM, V_PERP, POS
       REAL(KIND=8) :: X, Y, Z, VX, VY, VZ, EI 
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
    
@@ -119,7 +127,7 @@ MODULE timecycle
                             LINESOURCES(ILINE)%TROT, &
                             Vdummy, V_PERP, VZ, EI, M)
                             
-               V_NORM = FLX(U_NORM, TTRA_BOUND, M) !!AAAAAAAAAAA
+               V_NORM = FLX(LINESOURCES(ILINE)%S_NORM, LINESOURCES(ILINE)%TTRA, M) !!AAAAAAAAAAA
 
                VX = V_NORM*LINESOURCES(ILINE)%NORMX - V_PERP*LINESOURCES(ILINE)%NORMY + LINESOURCES(ILINE)%UX
                VY = V_PERP*LINESOURCES(ILINE)%NORMX + V_NORM*LINESOURCES(ILINE)%NORMY + LINESOURCES(ILINE)%UY

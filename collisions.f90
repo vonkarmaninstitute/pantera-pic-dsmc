@@ -92,7 +92,7 @@
   INTEGER      :: SP_ID1, SP_ID2
   INTEGER      :: NCOLL,NCOLLMAX_INT
   REAL(KIND=8) :: SIGMA, ALPHA, SIGMAMAX, NCOLLMAX,FCORR,VR,VR2,rfp
-  REAL(KIND=8) :: OMEGA, CREF, ZETA, MASS
+  REAL(KIND=8) :: OMEGA, CREF, ZETA, MASS, COLLPROB
   REAL(KIND=8) :: PPMAX
   REAL(KIND=8) :: B,C,EINT,ETOT,ETR,PHI,SITETA,VRX,VRY,VRZ
   REAL(KIND=8) :: VXMAX,VXMIN,VYMAX,VYMIN,VZMAX,VZMIN,VRMAX
@@ -179,9 +179,9 @@
       JP2 = IOFJ + INT(NPCJ*rf())
       JP2 = IND(JP2)
      END DO
-     ! Compute the relative velocity
 
-     VR2 = (particles(JP2)%VX - particles(JP1)%VX)**2 + &
+     ! Compute the relative velocity
+        VR2 = (particles(JP2)%VX - particles(JP1)%VX)**2 + &
            (particles(JP2)%VY - particles(JP1)%VY)**2 + &
            (particles(JP2)%VZ - particles(JP1)%VZ)**2 
 
@@ -216,10 +216,19 @@
 
      !WRITE(*,*) SIGMA*(VR/CREF)**(1.-2.*OMEGA)/5.3e-19
      !WRITE(*,*) 'Collision probability:', (FCORR/(SIGMAMAX*VRMAX)*SIGMA*(VR/CREF)**(1.-2.*NU))
-     IF ( rfp .LT. (FCORR/(SIGMAMAX*VRMAX)*VR*SIGMA*(VR/CREF)**(1.-2.*OMEGA)) ) THEN
+
+     ! Compute (simulated) collision probability
+     IF (OMEGA .EQ. 0.5) THEN
+       COLLPROB = FCORR/(SIGMAMAX*VRMAX)*VR*SIGMA
+     ELSE
+       COLLPROB = FCORR/(SIGMAMAX*VRMAX)*VR*SIGMA*(VR/CREF)**(1.-2.*OMEGA)
+     END IF
+
+
+     IF ( rfp .LT. COLLPROB ) THEN
 
         ! Rimuovere commento per avere avviso
-        IF ((FCORR/(SIGMAMAX*VRMAX)*VR*SIGMA*(VR/CREF)**(1.-2.*OMEGA)) .GT. 1.) THEN
+        IF (COLLPROB .GT. 1.) THEN
            WRITE(*,*) 'Attention => this was a bad collision!!!'
         END IF
 

@@ -17,45 +17,48 @@ Axial_symmetry_bool:
 Domain_limits:
     -0.5  0.5      -0.5  0.5      -0.5  0.5
 Domain_periodicity:
-    .FALSE.   .FALSE.   .TRUE.
+    .TRUE.   .TRUE.   .TRUE.
 Domain_specular:
-    .FALSE.    .FALSE.    .TRUE.    .TRUE.
+    .FALSE.    .FALSE.    .FALSE.    .FALSE.
 Number_of_cells:
-    200  1  1
+    100  100  1
 
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0E15
+    1.0E14
 Timestep:
-    5.E-6
+    1.E-5
 Number_of_timesteps:
     200000
+!200000
+Stats_every:
+    1
+
 RNG_seed:
     12343
 Dump_part_every:
-    200000
+    200001
 
 Dump_grid_start:
-    40000
+    200001   
+    
+!40000
 Dump_grid_avgevery:
-    20
+    20    
+!20
 Dump_grid_numavgs:
-    5000
+    9000
+!7000
 ! ========= Multispecies ==============================
 
 Species_file:
-    ar.species
+    air.species
     
 Def_mixture:
-    Argon1 Ar1 1.0
+    aria O2 1.0
     
 
-Def_mixture:
-    Argon2 Ar2 1.0
-
-Def_mixture:
-    collmix Ar1 0.5 Ar2 0.5
     
     
 ! ========= Collisions ==============================
@@ -72,24 +75,24 @@ MCC_species: ! NOT IMPLEMENTED YET!
 ! DSMC VHS collisions  ! NOT IMPLEMENTED YET!
 
 DSMC_collisions_mixture:
-    collmix
+    aria
 VSS_parameters_file:
-    ar.vss
+    air.vss
 
 ! ========= Initial particle seed ===================
 
 Initial_particles_bool:
-    .FALSE.
+    .TRUE.
 Initial_particles_dens:
-    1.4e20
+    5.0e19
 Initial_particles_vel:
     0.  0.  0.
 Initial_particles_Ttra:
-    273.  273.  273.
+    1000.0 1000.0  1000.0
 Initial_particles_Trot:
     0. 
 Initial_particles_mixture:
-    Argon1
+    aria
 ! ========== Injection from boundaries ==============
 
 Boundaries_inject_bool:
@@ -98,7 +101,7 @@ Boundaries_inject_bool:
 Boundaries_inject_which_bool:        ! From which boundary you want to inject particles
     .FALSE.  .FALSE.  .FALSE.  .FALSE. 
 Boundaries_inject_dens:
-    1.4e20
+    1.0e19
 Boundaries_inject_vel:
     0. 0. 0.
 Boundaries_inject_Ttra:
@@ -125,11 +128,14 @@ Linesource_Trot:
     0.
 
 !   center       length        density  velocity xyz         Ttr      Trot   mix
-Linesource:
-    -0.5    0.0    0.0    1.0    1.4e20    0.0    0.0    0.0    273.0    0.0    Argon1
-Linesource:
-    0.5    0.0    0.0    -1.0    1.4e20    0.0    0.0    0.0    273.0    0.0    Argon2
-
+!Linesource:
+!    -0.5    0.0    0.0    1.0    1.0e19    6000.0    -2000.0    3000.0    1000.0    0.0    aria
+!Linesource:
+!    0.5    0.0    0.0    -1.0    1.0e19    6000.0    -2000.0    3000.0    1000.0    0.0    aria
+!Linesource:
+!    0.0    -0.5    -1.0    0.0    1.0e19    6000.0    -2000.0    3000.0    1000.0    0.0    aria
+!Linesource:
+!    0.0    0.5    1.0    0.0    1.0e19    6000.0    -2000.0    3000.0    1000.0    0.0    aria
 
 ! ========= MPI parallelization =====================
 ! == Style for MPI domain partition can be:

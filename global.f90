@@ -34,7 +34,7 @@ MODULE global
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    INTEGER      :: NT, tID
-   REAL(KIND=8) :: FNUM, DT
+   REAL(KIND=8) :: FNUM, DT, START_CPU_TIME
    INTEGER      :: RNG_SEED_GLOBAL, RNG_SEED_LOCAL
    INTEGER      :: DUMP_EVERY
    INTEGER      :: DUMP_GRID_AVG_EVERY
@@ -52,6 +52,7 @@ MODULE global
    REAL(KIND=8)      :: MCC_BG_DENS, MCC_SIGMA
    INTEGER           :: DSMC_COLL_MIX
    INTEGER           :: TIMESTEP_COLL
+   REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: GREFS ! Matrix of reference relative velocities for VSS
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Initial particles seed !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -133,7 +134,7 @@ MODULE global
    TYPE SPECIES_DATA_STRUCTURE
       CHARACTER*10 :: NAME
       REAL(KIND=8) :: MOLWT
-      REAL(KIND=8) :: MOLMASS
+      REAL(KIND=8) :: MOLECULAR_MASS
       INTEGER      :: ROTDOF
       REAL(KIND=8) :: ROTREL
       INTEGER      :: VIBDOF

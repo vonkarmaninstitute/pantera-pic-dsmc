@@ -32,6 +32,7 @@
    INTEGER                            :: JP, JC, NCELLS, IDX
    INTEGER                            :: NCOLLREAL
 
+   ! Count the number of particles in each cell, to allocate arrays later
    NPC = 0
    DO JP = 1, NP_PROC
       JC = particles(JP)%IC
@@ -40,6 +41,8 @@
 
    NCELLS = NX*NY
 
+   ! Fill the array of offsets (IOF). IOF(IC) is the the index of the first
+   ! particle in cell IP
    IOF = -1
    IDX = 1
    DO JC = 1, NCELLS
@@ -49,6 +52,8 @@
       END IF
    END DO
 
+   ! Allocate and fill the array of indices (IND). IND(IP) is the particle index (for the "particles" array)
+   ! but ordered by cells, with offsets given by IND(IC) and stride length NPC(IC)
    ALLOCATE(IND(NP_PROC))
  
    NPC = 0
@@ -58,12 +63,12 @@
       NPC(JC) = NPC(JC) + 1
    END DO
  
-   ! Calcola collisioni fra particelle
- 
+   ! Compute collisions between particles
    TIMESTEP_COLL = 0
    DO JC = 1, NCELLS
       IF (NPC(JC) .GT. 1) THEN
-         CALL COLLIS(JC, NPC, IOF, IND, NCOLLREAL)
+         CALL VSS_COLLIS(JC, NPC, IOF, IND, NCOLLREAL)
+         ! Add to the total number of collisions for this process
          TIMESTEP_COLL = TIMESTEP_COLL + NCOLLREAL
       END IF
    END DO
@@ -75,10 +80,14 @@
    END SUBROUTINE DSMC_COLLISIONS
  
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! SUBROUTINE COLLIS -> Calcola le collisioni tra le particelle !!!!!!!
+  ! SUBROUTINE VSS_COLLIS -> Compute collisions with VSS model !!!!!!!!!
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  SUBROUTINE COLLIS(JC,NPC,IOF,IND, NCOLLREAL)
+  SUBROUTINE VSS_COLLIS(JC,NPC,IOF,IND, NCOLLREAL)
+
+  ! Computes the collisions using the VSS (or VHS, HS, depending on parameters)
+  ! in cell JC. Needs the particles to be sorted by cell. This is done by the calling
+  ! function DSMC_COLLISIONS
 
   IMPLICIT NONE
 
@@ -92,18 +101,20 @@
   INTEGER      :: SP_ID1, SP_ID2
   INTEGER      :: NCOLL,NCOLLMAX_INT
   REAL(KIND=8) :: SIGMA, ALPHA, SIGMAMAX, NCOLLMAX,FCORR,VR,VR2,rfp
-  REAL(KIND=8) :: OMEGA, CREF, ZETA, MASS, COLLPROB
+  REAL(KIND=8) :: OMEGA, CREF, TREF, ZETA, MRED, COLLPROB
   REAL(KIND=8) :: PPMAX
   REAL(KIND=8) :: B,C,EINT,ETOT,ETR,PHI,SITETA,VRX,VRY,VRZ
   REAL(KIND=8) :: VXMAX,VXMIN,VYMAX,VYMIN,VZMAX,VZMIN,VRMAX
-  REAL(KIND=8) :: PI,PI2
+  REAL(KIND=8) :: PI, PI2, KB
   REAL(KIND=8), DIMENSION(3) :: C1, C2, GREL, W
   REAL(KIND=8) :: GX, GY, GZ, G
   REAL(KIND=8) :: COSCHI, SINCHI, THETA, COSTHETA, SINTHETA
-  REAL(KIND=8) :: M1, M2, MTOT, MR, COSA, SINA, BB
+  REAL(KIND=8) :: M1, M2, COSA, SINA, BB
   
   PI   = 3.141593
   PI2  = 2.*PI
+  
+  KB = 1.38064852E-23
 
   IOFJ  = IOF(JC)               ! First particle in the cell
   IOLJ  = IOF(JC) + NPC(JC) - 1 ! Last particle in the cell
@@ -130,6 +141,7 @@
      VZMAX = DMAX1(VZMAX,particles(INDJ)%VZ)
   END DO
 
+  ! Find the maximum cross section of all the species involved in the collisions
   NSP = MIXTURES(DSMC_COLL_MIX)%N_COMPONENTS
   SIGMAMAX = 0
   DO JSP = 1, NSP
@@ -137,8 +149,9 @@
     IF (SIGMA.GT.SIGMAMAX) SIGMAMAX = SIGMA
   END DO
 
+  ! Compute the "worst case scenario" relative velocity
   VRMAX    = SQRT((VXMAX-VXMIN)**2 + (VYMAX-VYMIN)**2 + (VZMAX-VZMIN)**2)
-
+  ! Compute the maximum expected number of collisions
   NCOLLMAX = 0.5*NPC(JC)*(NPC(JC)-1)*SIGMAMAX*VRMAX*FNUM*DT/CELL_VOL
   
   NCOLLMAX_INT = FLOOR(NCOLLMAX+0.5)
@@ -166,7 +179,7 @@
 
   ! Step 3. Perform the collision => actual probability correct via FCORR
 
-  DO JCOL = 1,NCOLL
+  DO JCOL = 1, NCOLL
   
      ! Select first collision partner randomly
 
@@ -193,13 +206,16 @@
 
      SIGMA = PI * (0.5 * (SPECIES(SP_ID1)%DIAM + SPECIES(SP_ID2)%DIAM))**2
      OMEGA    = 0.5 * (SPECIES(SP_ID1)%OMEGA + SPECIES(SP_ID2)%OMEGA)
-     CREF  = 0.5 * (SPECIES(SP_ID1)%CREF + SPECIES(SP_ID2)%CREF) ! Not correct DBDBDBDBDBDBDDBDBDB
+     !CREF  = 0.5 * (SPECIES(SP_ID1)%CREF + SPECIES(SP_ID2)%CREF) ! Not correct DBDBDBDBDBDBDDBDBDB
+     TREF = 0.5 * (SPECIES(SP_ID1)%TREF + SPECIES(SP_ID2)%TREF)
+     
      
      ALPHA = 0.5 * (SPECIES(SP_ID1)%ALPHA + SPECIES(SP_ID2)%ALPHA)
-     M1    = SPECIES(SP_ID1)%MOLMASS
-     M2    = SPECIES(SP_ID2)%MOLMASS
-     MTOT  = M1 + M2
-     MASS  = 0.5 * MTOT
+     M1    = SPECIES(SP_ID1)%MOLECULAR_MASS
+     M2    = SPECIES(SP_ID2)%MOLECULAR_MASS
+     MRED  = M1*M2/(M1+M2)
+
+     
      
      C1(1) = particles(JP1)%VX
      C1(2) = particles(JP1)%VY
@@ -221,6 +237,7 @@
      IF (OMEGA .EQ. 0.5) THEN
        COLLPROB = FCORR/(SIGMAMAX*VRMAX)*VR*SIGMA
      ELSE
+       CREF = (2.*KB*TREF/MRED)**0.5 * (GAMMA(2.5-OMEGA))**(-0.5/(OMEGA-0.5))
        COLLPROB = FCORR/(SIGMAMAX*VRMAX)*VR*SIGMA*(VR/CREF)**(1.-2.*OMEGA)
      END IF
 
@@ -242,7 +259,7 @@
                
            ! Inelastic collision - Larsen/Borgnakke model
 
-           ETOT = MASS*VR2/4. + particles(JP1)%EI + particles(JP2)%EI
+           ETOT = MRED*VR2/4. + particles(JP1)%EI + particles(JP2)%EI
 
            ! Step 1. Compute post-collision translational energy
 
@@ -265,7 +282,7 @@
 
            ! Step 3. Compute post-collision velocities
 
-           VR = 2.*SQRT(ETR/MASS)
+           VR = 2.*SQRT(ETR/MRED)
 
            B = 1. - 2.*rf()
            SITETA = SQRT(1.-B*B)
@@ -291,7 +308,8 @@
         ELSE
 
          ! Elastic collision => Compute post-collision velocities
-         ! HS Collisions
+
+         ! HS Collisions (old)
          !   B = 1. - 2.*rf() ! COSTHETA
          !   SITETA = SQRT(1.-B*B) ! SINTHETA
 
@@ -315,43 +333,28 @@
          ! End of HS collisions
 
          ! VSS Collisions
-         !ALPHA = 1.0 ! DBDBDBDBDBDBDBDBDBDBBDBDBDBBDBDBDBBDBDBBDBDBDBBDDBBDBDBDBDBBDBDBBDBD
+
          COSCHI = 2.*rf()**(1./ALPHA) - 1.
          SINCHI = SQRT(1.-COSCHI*COSCHI)
          THETA = PI2*rf()
          COSTHETA = COS(THETA)
          SINTHETA = SIN(THETA)
 
-         MR = M1*M2/(M1+M2)         
-         ETR = 0.5*MR*VR**2 ! Will be different for inelastic collisions.
-         G = SQRT(2.*ETR/MR)
+         ETR = 0.5*MRED*VR**2 ! Will be different for inelastic collisions.
+         G = SQRT(2.*ETR/MRED)
 
          ! Randomize relative velocity vector
          COSA = 2.*rf()-1.0
          SINA = SQRT(1-COSA*COSA)
          BB = PI2 * rf()
 
-
          GX = G*SINA*COS(BB)
          GY = G*SINA*SIN(BB)
          GZ = G*COSA
 
-
-         !GX = G*SINCHI*COSTHETA
-         !GY = G*SINCHI*SINTHETA
-         !GZ = G*COSCHI
-         
-         !GX = particles(JP1)%VX - particles(JP2)%VX
-         !GY = particles(JP1)%VY - particles(JP2)%VY
-         !GZ = particles(JP1)%VZ - particles(JP2)%VZ
-
          GREL(1) = GX*COSCHI + SQRT(GY*GY+GZ*GZ)*SINTHETA*SINCHI
          GREL(2) = GY*COSCHI + (G*GZ*COSTHETA - GX*GY*SINTHETA)/SQRT(GY*GY+GZ*GZ)*SINCHI
          GREL(3) = GZ*COSCHI - (G*GY*COSTHETA + GX*GZ*SINTHETA)/SQRT(GY*GY+GZ*GZ)*SINCHI
-
-         !GREL(1) = GX
-         !GREL(2) = GY
-         !GREL(3) = GZ
 
          ! Compute center of mass velocity vector
          DO I = 1, 3
@@ -383,7 +386,7 @@
 
   RETURN
       
-  END SUBROUTINE COLLIS
+  END SUBROUTINE VSS_COLLIS
   
   END MODULE collisions
 

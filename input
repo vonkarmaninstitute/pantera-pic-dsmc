@@ -17,11 +17,11 @@ Axial_symmetry_bool:
 Domain_limits:
     -0.5  0.5      -0.5  0.5      -0.5  0.5
 Domain_periodicity:
-    .TRUE.   .TRUE.   .TRUE.
+    .FALSE.   .FALSE.   .TRUE.
 Domain_specular:
-    .FALSE.    .FALSE.    .FALSE.    .FALSE.
+    .TRUE.    .TRUE.    .TRUE.    .TRUE.
 Number_of_cells:
-    100  100  1
+    10  10  1
 
 ! ========= Numerical parameters ====================
 
@@ -56,7 +56,7 @@ Species_file:
     air.species
     
 Def_mixture:
-    aria O2 1.0
+    aria N2 0.8 O2 0.2
     
 
     
@@ -88,7 +88,7 @@ Initial_particles_dens:
 Initial_particles_vel:
     0.  0.  0.
 Initial_particles_Ttra:
-    1000.0 1000.0  1000.0
+    10000.0 10000.0 10000.0
 Initial_particles_Trot:
     0. 
 Initial_particles_mixture:

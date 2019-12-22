@@ -32,10 +32,7 @@ MODULE initialization
       OPEN(UNIT=in1,FILE='input', STATUS='old',IOSTAT=ios)
 
       IF (ios.NE.0) THEN
-         PRINT*
-         WRITE(*,*)'  Attention, "input" file not found! ABORTING.'
-         PRINT*
-         STOP
+         CALL ERROR_ABORT('Attention, "input" file not found! ABORTING.')
       ENDIF
 
       line = '' ! Init empty
@@ -324,7 +321,7 @@ MODULE initialization
 
       CHARACTER*10 :: NAME
       REAL(KIND=8) :: MOLWT
-      REAL(KIND=8) :: MOLMASS
+      REAL(KIND=8) :: MOLECULAR_MASS
       INTEGER      :: ROTDOF
       REAL(KIND=8) :: ROTREL
       INTEGER      :: VIBDOF
@@ -332,15 +329,13 @@ MODULE initialization
       REAL(KIND=8) :: VIBTEMP
       REAL(KIND=8) :: SPWT
       REAL(KIND=8) :: CHARGE
+
    
       ! Open input file for reading
       OPEN(UNIT=in2,FILE=SPECIES_FILENAME, STATUS='old',IOSTAT=ios)
 
       IF (ios.NE.0) THEN
-         PRINT*
-         WRITE(*,*)'  Attention, species definition file not found! ABORTING.'
-         PRINT*
-         STOP
+         CALL ERROR_ABORT('Attention, species definition file not found! ABORTING.')
       ENDIF
 
       line = '' ! Init empty
@@ -358,7 +353,7 @@ MODULE initialization
          
          !READ(line,'(A2, ES14.3, ES14.3, I1, ES14.3, I1, ES14.3, ES14.3, ES14.3, ES14.3)') &
          READ(line,*) &
-         NAME, MOLWT, MOLMASS, ROTDOF, ROTREL, VIBDOF, VIBREL, VIBTEMP, SPWT, CHARGE
+         NAME, MOLWT, MOLECULAR_MASS, ROTDOF, ROTREL, VIBDOF, VIBREL, VIBTEMP, SPWT, CHARGE
       
          ALLOCATE(TEMP_SPECIES(N_SPECIES+1)) ! Append the species to the list
          TEMP_SPECIES(1:N_SPECIES) = SPECIES
@@ -367,7 +362,7 @@ MODULE initialization
 
          SPECIES(N_SPECIES)%NAME = NAME
          SPECIES(N_SPECIES)%MOLWT = MOLWT
-         SPECIES(N_SPECIES)%MOLMASS = MOLMASS
+         SPECIES(N_SPECIES)%MOLECULAR_MASS = MOLECULAR_MASS
          SPECIES(N_SPECIES)%ROTDOF = ROTDOF
          SPECIES(N_SPECIES)%ROTREL = ROTREL
          SPECIES(N_SPECIES)%VIBDOF = VIBDOF
@@ -401,6 +396,9 @@ MODULE initialization
       REAL(KIND=8) :: ALPHA
       REAL(KIND=8) :: PI, KB
 
+      INTEGER      :: IS, JS
+      REAL(KIND=8) :: M1, M2, MRED
+
       PI   = 3.141593
       KB = 1.38064852E-23
 
@@ -408,10 +406,7 @@ MODULE initialization
       OPEN(UNIT=in2,FILE=FILENAME, STATUS='old',IOSTAT=ios)
 
       IF (ios.NE.0) THEN
-         PRINT*
-         WRITE(*,*)'  Attention, VSS parameters definition file not found! ABORTING.'
-         PRINT*
-         STOP
+         CALL ERROR_ABORT('Attention, VSS parameters definition file not found! ABORTING.')
       ENDIF
 
       line = '' ! Init empty
@@ -438,18 +433,31 @@ MODULE initialization
 
          SPECIES(SP_ID)%SIGMA = PI*DIAM**2
          SPECIES(SP_ID)%NU    = OMEGA - 0.5
-         !SPECIES(SP_ID)%CREF  = SQRT(3.*KB*TREF / SPECIES(SP_ID)%MOLMASS)
+         !SPECIES(SP_ID)%CREF  = SQRT(3.*KB*TREF / SPECIES(SP_ID)%MOLECULAR_MASS)
 
 
          IF (OMEGA .EQ. 0.5) THEN
-            SPECIES(SP_ID)%CREF  = (4.*KB*TREF/SPECIES(SP_ID)%MOLMASS)**0.5 * 1.2354
+            SPECIES(SP_ID)%CREF  = (4.*KB*TREF/SPECIES(SP_ID)%MOLECULAR_MASS)**0.5 * 1.2354
          ELSE
-            SPECIES(SP_ID)%CREF  = (4.*KB*TREF/SPECIES(SP_ID)%MOLMASS)**0.5 * (GAMMA(2.5-OMEGA))**(-0.5/(OMEGA-0.5))
+            SPECIES(SP_ID)%CREF  = (4.*KB*TREF/SPECIES(SP_ID)%MOLECULAR_MASS)**0.5 * (GAMMA(2.5-OMEGA))**(-0.5/(OMEGA-0.5))
          END IF
          
          
          
          
+      END DO
+
+      ALLOCATE(GREFS(N_SPECIES, N_SPECIES))
+      DO IS = 1, N_SPECIES
+         DO JS = 1, N_SPECIES
+            M1    = SPECIES(IS)%MOLECULAR_MASS
+            M2    = SPECIES(JS)%MOLECULAR_MASS
+            MRED  = M1*M2/(M1+M2)
+            OMEGA    = 0.5 * (SPECIES(IS)%OMEGA + SPECIES(JS)%OMEGA)
+            TREF = 0.5 * (SPECIES(IS)%TREF + SPECIES(JS)%TREF)
+            
+            GREFS(IS, JS) = (2.*KB*TREF/MRED)**0.5 * (GAMMA(2.5-OMEGA))**(-0.5/(OMEGA-0.5))
+         END DO
       END DO
 
       CLOSE(in2) ! Close input file
@@ -468,7 +476,7 @@ MODULE initialization
 
       CHARACTER(LEN=*), INTENT(IN) :: DEFINITION
       INTEGER :: N_STR
-      CHARACTER(LEN=80), allocatable :: STRARRAY(:)
+      CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
       INTEGER :: i, N_COMP
       !TYPE(MIXTURE_COMPONENT) NEW_MIXTURE
       TYPE(MIXTURE), DIMENSION(:), ALLOCATABLE :: TEMP_MIXTURES
@@ -602,7 +610,7 @@ MODULE initialization
          END DO
       
          ! Assign velocity and energy following a Boltzmann distribution
-         M = SPECIES(S_ID)%MOLMASS
+         M = SPECIES(S_ID)%MOLECULAR_MASS
          CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
                       TTRAX_INIT, TTRAY_INIT, TTRAZ_INIT, TROT_INIT, &
                       VXP, VYP, VZP, EIP, M)
@@ -628,28 +636,18 @@ MODULE initialization
  
       ! ------------ Check values for number of cells ------------
       IF ( (NX < 1) .OR. (NY < 1) ) THEN
-         WRITE(*,*)
-         WRITE(*,*) 'ERROR! Number of cells along X or Y smaller than one. ABORTING!'
-         WRITE(*,*)
-         STOP
+         CALL ERROR_ABORT('ERROR! Number of cells along X or Y smaller than one. ABORTING!')
       END IF 
 
       IF (NZ /= 1) THEN
-         WRITE(*,*)
-         WRITE(*,*) 'ERROR! Number of cells along Z different than 1 is not supported. ABORTING!'
-         WRITE(*,*)
-         STOP
+         CALL ERROR_ABORT('ERROR! Number of cells along Z different than 1 is not supported. ABORTING!')
       END IF 
      
       ! ------------ Check geometrical symmetries and flags ------
       ! For axisymmetric simulations, Y cannot be periodic (YMIN is the symmetry axis)
       IF (BOOL_AXI) THEN 
          IF (BOOL_Y_PERIODIC) THEN
-            WRITE(*,*)
-            WRITE(*,*) 'ERROR! For axisymmetric simulations, Y cannot be periodic:'
-            WRITE(*,*) 'YMIN is the symmetry axis! Check the input file. ABORTING!'
-            WRITE(*,*)
-            STOP
+            CALL ERROR_ABORT('ERROR! For axisymmetric simulations, Y cannot be periodic.')
          END IF
       END IF
 
@@ -785,7 +783,7 @@ MODULE initialization
 
          DO IS = 1, N_COMP ! Loop on mixture components
             S_ID = MIXTURES(MIX_BOUNDINJECT)%COMPONENTS(IS)%ID
-            M = SPECIES(S_ID)%MOLMASS
+            M = SPECIES(S_ID)%MOLECULAR_MASS
             FRAC = MIXTURES(MIX_BOUNDINJECT)%COMPONENTS(IS)%MOLFRAC
             BETA = 1./SQRT(2.*KB/M*TTRA_BOUND) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
 
@@ -881,37 +879,19 @@ MODULE initialization
       END IF
 
       ! =====================================================
-      ! Injection from line source !!!!!!!!!TO IMPLEMENT FOR MULTISPECIES
-      ! IF (BOOL_LINESOURCE) THEN 
-
-      !    BETA = 1./SQRT(2.*KB/M*TTRA_LINESOURCE) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
-
-      !    S_NORM_LINESOURCE = UX_LINESOURCE*BETA ! Molecular speed ratio normal to line source (which is y-aligned)
-      !    Snow              = S_NORM_LINESOURCE  ! temp variable
-
-      !    FLUXLINESOURCE = NRHO_LINESOURCE/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) & 
-      !                              + SQRT(PI)*Snow*(1.+ERF1(Snow)))          ! Tot number flux emitted [1/(s m^2)]
-      !    NtotINJECT = FLUXLINESOURCE*L_LINESOURCE*(ZMAX-ZMIN)*DT/FNUM        ! Tot num of particles to be injected
-      !    nfs_LINESOURCE = FLOOR(NtotINJECT/REAL(N_MPI_THREADS,KIND=8)+rf())  ! Particles injected by each proc
-      !    ACCA = SQRT(Snow**2+2.)                                             ! Tmp variable
-      !    KAPPA_LINESOURCE = 2./(Snow+ACCA) * EXP(0.5 + 0.5*Snow*(Snow-ACCA)) ! global variable
-
-      ! END IF 
-
-      ! Injection from linesource new way
+      ! Injection from line sources
+      ! Can have multiple ones and can be used as boundary injection
 
       DO ILINE = 1, N_LINESOURCES ! Loop on line sources
-         WRITE(*,*) 'Mixture id is:', LINESOURCES(ILINE)%MIX_ID
+         
          N_COMP = MIXTURES(LINESOURCES(ILINE)%MIX_ID)%N_COMPONENTS
-         WRITE(*,*) 'NCOMP is:', N_COMP
-
+         
          ALLOCATE(nfs_LINE(N_COMP))
 
          DO IS = 1, N_COMP ! Loop on mixture components
+            ! The species ID of the component
             S_ID = MIXTURES(LINESOURCES(ILINE)%MIX_ID)%COMPONENTS(IS)%ID
-            WRITE(*,*) 'Species id is:', S_ID
-            M = SPECIES(S_ID)%MOLMASS
-            WRITE(*,*) 'Mixture id is:', LINESOURCES(ILINE)%MIX_ID
+            M = SPECIES(S_ID)%MOLECULAR_MASS
             FRAC = MIXTURES(LINESOURCES(ILINE)%MIX_ID)%COMPONENTS(IS)%MOLFRAC
             BETA = 1./SQRT(2.*KB/M*LINESOURCES(ILINE)%TTRA) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
          
@@ -931,13 +911,8 @@ MODULE initialization
                                     + SQRT(PI)*Snow*(1.+ERF1(Snow)))      ! Tot number flux emitted 
             NtotINJECT  = FLUXLINESOURCE*LINELENGTH*(ZMAX-ZMIN)*DT/FNUM         ! Tot num of particles to be injected
 
-            
-
             nfs_LINE(IS)    = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
-            WRITE(*,*)'ON LINESOURCE ', nfs_LINE(IS)
-            !ACCA        = SQRT(Snow**2+2.)                                  ! Tmp variable
-            !KAPPA_YMAX  = 2./(Snow+ACCA) * EXP(0.5 + 0.5*Snow*(Snow-ACCA))  ! global variable
-
+            
             ! Check: if we are hypersonic and stuff exits domain print a warning
             IF (S_NORM .LE. -3.) THEN 
                CALL ONLYMASTERPRINT1(PROC_ID, '$$$ Warning! Hypersonic boundary! Almost no &
@@ -991,28 +966,30 @@ MODULE initialization
       DO INDEX = 1, N_SPECIES
          IF (SPECIES(INDEX)%NAME == NAME) MATCH = INDEX
       END DO
+
+
       SPECIES_NAME_TO_ID = MATCH
 
    END FUNCTION SPECIES_NAME_TO_ID
 
-INTEGER FUNCTION MIXTURE_NAME_TO_ID(NAME)
+   INTEGER FUNCTION MIXTURE_NAME_TO_ID(NAME)
 
-   IMPLICIT NONE
+      IMPLICIT NONE
 
-   CHARACTER(LEN=*), INTENT(IN)  :: NAME
-   INTEGER                       :: INDEX, MATCH
-   MATCH = -1
-   DO INDEX = 1, N_MIXTURES
-      IF (MIXTURES(INDEX)%NAME == NAME) MATCH = INDEX
-   END DO
+      CHARACTER(LEN=*), INTENT(IN)  :: NAME
+      INTEGER                       :: INDEX, MATCH
+      MATCH = -1
+      DO INDEX = 1, N_MIXTURES
+         IF (MIXTURES(INDEX)%NAME == NAME) MATCH = INDEX
+      END DO
 
-   IF (MATCH .EQ. -1) THEN
-      WRITE(*,*) 'Error! Mixture name not found.'
-   END IF
+      IF (MATCH .EQ. -1) THEN
+         WRITE(*,*) 'Error! Mixture name not found.'
+      END IF
 
-   MIXTURE_NAME_TO_ID = MATCH
+      MIXTURE_NAME_TO_ID = MATCH
 
-END FUNCTION MIXTURE_NAME_TO_ID
+   END FUNCTION MIXTURE_NAME_TO_ID
 
 
 END MODULE initialization

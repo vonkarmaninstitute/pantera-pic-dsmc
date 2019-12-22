@@ -18,7 +18,7 @@ MODULE timecycle
    IMPLICIT NONE
  
    INTEGER :: NP_TOT, NCOLL_TOT
-   REAL(KIND=8) :: CURRENT_TIME
+   REAL(KIND=8) :: CURRENT_TIME, CURRENT_CPU_TIME
 
    CHARACTER(len=512) :: stringTMP
 
@@ -29,18 +29,22 @@ MODULE timecycle
    ! Dump particles before the first time step, but after the initial seeding
    CALL DUMP_PARTICLES_FILE(0)
    tID = 1
+   CALL CPU_TIME(START_CPU_TIME)
    DO WHILE (tID .LE. NT)
 
       ! ########### Print simulation info #######################################
 
       CURRENT_TIME = tID*DT
+      CALL CPU_TIME(CURRENT_CPU_TIME)
+      CURRENT_CPU_TIME = CURRENT_CPU_TIME - START_CPU_TIME 
 
       IF (MOD(tID, STATS_EVERY) .EQ. 0) THEN
          CALL MPI_REDUCE(NP_PROC, NP_TOT, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
          CALL MPI_REDUCE(TIMESTEP_COLL, NCOLL_TOT, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
 
-         WRITE(stringTMP, '(A13,I8,A4,I8,A9,ES14.3,A28,I10,A25,I10)') '   Timestep: ', tID, ' of ', NT, &
-                          ' - time: ', CURRENT_TIME, ' [s] - number of particles: ', NP_TOT, &
+         WRITE(stringTMP, '(A13,I8,A4,I8,A9,ES14.3,A17,F10.1,A28,I10,A25,I10)') '   Timestep: ', tID, ' of ', NT, &
+                          ' - time: ', CURRENT_TIME, ' [s] - CPU time: ', CURRENT_CPU_TIME, &
+                          ' [s] - number of particles: ', NP_TOT, &
                           ' - number of collisions: ', NCOLL_TOT
 
          CALL ONLYMASTERPRINT1(PROC_ID, TRIM(stringTMP))
@@ -114,7 +118,7 @@ MODULE timecycle
          DO IS = 1, MIXTURES(LINESOURCES(ILINE)%MIX_ID)%N_COMPONENTS ! Loop on mixture components
 
             S_ID = MIXTURES(LINESOURCES(ILINE)%MIX_ID)%COMPONENTS(IS)%ID
-            M = SPECIES(S_ID)%MOLMASS
+            M = SPECIES(S_ID)%MOLECULAR_MASS
             NFS = FLOOR(LINESOURCES(ILINE)%nfs(IS))
             IF (LINESOURCES(ILINE)%nfs(IS)-REAL(NFS, KIND=8) .GE. rf()) THEN ! Same as SPARTA's perspeciess
                NFS = NFS + 1
@@ -175,7 +179,7 @@ MODULE timecycle
 
       DO IS = 1, MIXTURES(MIX_BOUNDINJECT)%N_COMPONENTS ! Loop on mixture components
          S_ID = MIXTURES(MIX_BOUNDINJECT)%COMPONENTS(IS)%ID
-         M = SPECIES(S_ID)%MOLMASS
+         M = SPECIES(S_ID)%MOLECULAR_MASS
          NFS = FLOOR(nfs_XMIN(IS))
          IF (nfs_XMIN(IS)-REAL(NFS, KIND=8) .GE. rf()) THEN ! Same as SPARTA's perspeciess
             NFS = NFS + 1
@@ -211,7 +215,7 @@ MODULE timecycle
 
       DO IS = 1, MIXTURES(MIX_BOUNDINJECT)%N_COMPONENTS ! Loop on mixture components
          S_ID = MIXTURES(MIX_BOUNDINJECT)%COMPONENTS(IS)%ID
-         M = SPECIES(S_ID)%MOLMASS
+         M = SPECIES(S_ID)%MOLECULAR_MASS
          NFS = FLOOR(nfs_XMAX(IS))
          IF (nfs_XMAX(IS)-REAL(NFS, KIND=8) .GE. rf()) THEN
             NFS = NFS + 1
@@ -246,7 +250,7 @@ MODULE timecycle
 
       DO IS = 1, MIXTURES(MIX_BOUNDINJECT)%N_COMPONENTS ! Loop on mixture components
          S_ID = MIXTURES(MIX_BOUNDINJECT)%COMPONENTS(IS)%ID
-         M = SPECIES(S_ID)%MOLMASS
+         M = SPECIES(S_ID)%MOLECULAR_MASS
          NFS = FLOOR(nfs_YMIN(IS))
          IF (nfs_YMIN(IS)-REAL(NFS, KIND=8) .GE. rf()) THEN
             NFS = NFS + 1
@@ -280,7 +284,7 @@ MODULE timecycle
 
       DO IS = 1, MIXTURES(MIX_BOUNDINJECT)%N_COMPONENTS ! Loop on mixture components
          S_ID = MIXTURES(MIX_BOUNDINJECT)%COMPONENTS(IS)%ID
-         M = SPECIES(S_ID)%MOLMASS
+         M = SPECIES(S_ID)%MOLECULAR_MASS
          NFS = FLOOR(nfs_YMAX(IS))
          IF (nfs_YMAX(IS)-REAL(NFS, KIND=8) .GE. rf()) THEN
             NFS = NFS + 1
@@ -335,7 +339,7 @@ MODULE timecycle
    INTEGER      :: BOUNDCOLL
    REAL(KIND=8) :: DTCOLL
    REAL(KIND=8), DIMENSION(4) :: NX, NY, NZ, XW, YW, ZW
-   REAL(KIND=8) :: XCOLL, YCOLL, ZCOLL
+   ! REAL(KIND=8) :: XCOLL, YCOLL, ZCOLL
    REAL(KIND=8) :: VN, DX
    LOGICAL, DIMENSION(:), ALLOCATABLE :: REMOVE_PART
 
@@ -355,25 +359,29 @@ MODULE timecycle
       
       DO WHILE (particles(IP)%DTRIM .GT. 0.) ! Repeat the procedure until step is done
 
-         DTCOLL = particles(IP)%DTRIM ! Start by looking for collisions within the remaining time
-
+         DTCOLL = particles(IP)%DTRIM ! Looking for collisions within the remaining time
          ! ______ ADVECTION ______
 
          BOUNDCOLL = -1
-         DO i = 1, 4 ! Check collisions with boundaries
-            VN = particles(IP)%VX * NX(i) + particles(IP)%VY * NY(i) + particles(IP)%VZ * NZ(i) ! The velocity normal to the boundary
-            DX = (XW(i) - particles(IP)%X) * NX(i) + (YW(i) - particles(IP)%Y) * NY(i) + (ZW(i) - particles(IP)%Z) * NZ(i) ! The distance from the boundary
+         DO i = 1, 4 ! Check collisions with boundaries (xmin, xmax, ymin, ymax)
+            ! Compute he velocity normal to the boundary
+            VN = particles(IP)%VX * NX(i) + particles(IP)%VY * NY(i) + particles(IP)%VZ * NZ(i)
+            ! Compute the distance from the boundary
+            DX = (XW(i) - particles(IP)%X) * NX(i) + (YW(i) - particles(IP)%Y) * NY(i) + (ZW(i) - particles(IP)%Z) * NZ(i)
+            ! Check if a collision happens (sooner than previously calculated)
             IF (VN * DTCOLL .LE. DX) THEN
                
-               XCOLL = particles(IP)%X + particles(IP)%VX * DTCOLL ! Find candidate collision point
-               YCOLL = particles(IP)%Y + particles(IP)%VY * DTCOLL
-               ZCOLL = particles(IP)%Z + particles(IP)%VZ * DTCOLL
+               ! Find candidate collision point (don't need this for boundaries)
+               ! XCOLL = particles(IP)%X + particles(IP)%VX * DTCOLL 
+               ! YCOLL = particles(IP)%Y + particles(IP)%VY * DTCOLL
+               ! ZCOLL = particles(IP)%Z + particles(IP)%VZ * DTCOLL
 
                DTCOLL = DX/VN
                BOUNDCOLL = i                                 
 
             END IF
          END DO
+
 
          ! Check collisions with surfaces
          ! If earlier than dtcoll remember to set BOUNDCOLL to -1 and the new dtcoll
@@ -382,92 +390,88 @@ MODULE timecycle
          IF (BOUNDCOLL == 1) THEN ! Collision with XMIN
             ! Tally boundary properties
             IF (BOOL_X_PERIODIC) THEN
-               particles(IP)%X = particles(IP)%X + particles(IP)%VX * DTCOLL + XMAX - XMIN
-               particles(IP)%Y = particles(IP)%Y + particles(IP)%VY * DTCOLL
-               particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ * DTCOLL
 
+               CALL MOVE_PARTICLE(IP, DTCOLL)
+               particles(IP)%X = particles(IP)%X + XMAX - XMIN
                particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
+
             ELSE IF (BOOL_XMIN_SPECULAR) THEN
-               particles(IP)%X = particles(IP)%X + particles(IP)%VX * DTCOLL
-               particles(IP)%Y = particles(IP)%Y + particles(IP)%VY * DTCOLL
-               particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ * DTCOLL
 
+               CALL MOVE_PARTICLE(IP, DTCOLL)
                particles(IP)%VX = - particles(IP)%VX
-
                particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
-            ELSE
-               REMOVE_PART(IP) = .TRUE.
 
+            ELSE
+
+               REMOVE_PART(IP) = .TRUE.
                particles(IP)%DTRIM = 0.
+
             END IF
          ELSE IF (BOUNDCOLL == 2) THEN ! Collision with XMAX
             ! Tally boundary properties
             IF (BOOL_X_PERIODIC) THEN
-               particles(IP)%X = particles(IP)%X + particles(IP)%VX * DTCOLL - XMAX + XMIN
-               particles(IP)%Y = particles(IP)%Y + particles(IP)%VY * DTCOLL
-               particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ * DTCOLL
 
+               CALL MOVE_PARTICLE(IP, DTCOLL)
+               particles(IP)%X = particles(IP)%X - XMAX + XMIN
                particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
+
             ELSE IF (BOOL_XMAX_SPECULAR) THEN
-               particles(IP)%X = particles(IP)%X + particles(IP)%VX * DTCOLL
-               particles(IP)%Y = particles(IP)%Y + particles(IP)%VY * DTCOLL
-               particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ * DTCOLL
 
+               CALL MOVE_PARTICLE(IP, DTCOLL)
                particles(IP)%VX = - particles(IP)%VX
-
                particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
-            ELSE
-               REMOVE_PART(IP) = .TRUE.
 
+            ELSE
+
+               REMOVE_PART(IP) = .TRUE.
                particles(IP)%DTRIM = 0.
+
             END IF
          ELSE IF (BOUNDCOLL == 3) THEN ! Collision with YMIN
             ! Tally boundary properties
             IF (BOOL_Y_PERIODIC) THEN
-               particles(IP)%X = particles(IP)%X + particles(IP)%VX * DTCOLL
-               particles(IP)%Y = particles(IP)%Y + particles(IP)%VY * DTCOLL + YMAX - YMIN
-               particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ * DTCOLL
 
+               CALL MOVE_PARTICLE(IP, DTCOLL)
+               particles(IP)%Y = particles(IP)%Y + YMAX - YMIN
                particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
+
             ELSE IF (BOOL_YMIN_SPECULAR) THEN
-               particles(IP)%X = particles(IP)%X + particles(IP)%VX * DTCOLL
-               particles(IP)%Y = particles(IP)%Y + particles(IP)%VY * DTCOLL
-               particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ * DTCOLL
 
+               CALL MOVE_PARTICLE(IP, DTCOLL)
                particles(IP)%VY = - particles(IP)%VY
-
                particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
-            ELSE
-               REMOVE_PART(IP) = .TRUE.
 
+            ELSE
+
+               REMOVE_PART(IP) = .TRUE.
                particles(IP)%DTRIM = 0.
+
             END IF
-         ELSE IF (BOUNDCOLL == 4) THEN ! Collision with YMIN
+         ELSE IF (BOUNDCOLL == 4) THEN ! Collision with YMAX
             ! Tally boundary properties
             IF (BOOL_Y_PERIODIC) THEN
-               particles(IP)%X = particles(IP)%X + particles(IP)%VX * DTCOLL
-               particles(IP)%Y = particles(IP)%Y + particles(IP)%VY * DTCOLL - YMAX + YMIN
-               particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ * DTCOLL
 
+               CALL MOVE_PARTICLE(IP, DTCOLL)
+               particles(IP)%Y = particles(IP)%Y - YMAX + YMIN
                particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
+
             ELSE IF (BOOL_YMAX_SPECULAR) THEN
-               particles(IP)%X = particles(IP)%X + particles(IP)%VX * DTCOLL
-               particles(IP)%Y = particles(IP)%Y + particles(IP)%VY * DTCOLL
-               particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ * DTCOLL
 
+               CALL MOVE_PARTICLE(IP, DTCOLL)
                particles(IP)%VY = - particles(IP)%VY
-
                particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
-            ELSE
-               REMOVE_PART(IP) = .TRUE.
 
+            ELSE
+
+               REMOVE_PART(IP) = .TRUE.
                particles(IP)%DTRIM = 0.
+
             END IF
          ELSE
-            particles(IP)%X = particles(IP)%X + particles(IP)%VX * particles(IP)%DTRIM
-            particles(IP)%Y = particles(IP)%Y + particles(IP)%VY * particles(IP)%DTRIM
-            particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ * particles(IP)%DTRIM
+
+            CALL MOVE_PARTICLE(IP, particles(IP)%DTRIM)
             particles(IP)%DTRIM = 0.
+
          END IF
          
             
@@ -548,6 +552,26 @@ MODULE timecycle
    END DO
 
    END SUBROUTINE ADVECT
+
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE MOVE_PARTICLE -> Move the particles !!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+   SUBROUTINE MOVE_PARTICLE(IP, TIME)
+
+      ! Moves particle with index IP for time TIME.
+      ! For now simply rectilinear movement, will have to include Lorentz's force
+
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN)      :: IP
+      REAL(KIND=8), INTENT(IN) :: TIME
+
+      particles(IP)%X = particles(IP)%X + particles(IP)%VX * TIME
+      particles(IP)%Y = particles(IP)%Y + particles(IP)%VY * TIME
+      particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ * TIME
+
+   END SUBROUTINE MOVE_PARTICLE
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE MCC_COLLISIONS -> perform MCC collisions !!!!!!!!!!!!!!!!!!!!!!

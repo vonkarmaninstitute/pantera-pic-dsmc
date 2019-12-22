@@ -82,5 +82,18 @@ MODULE screen
    END SUBROUTINE ONLYMASTERPRINT2
 
 
+   SUBROUTINE ERROR_ABORT(string)
+
+      IMPLICIT NONE
+
+      CHARACTER(LEN=*), INTENT(IN)  :: string
+
+      PRINT*
+      WRITE(*,*) '   ', string
+      PRINT*
+      STOP
+      
+   END SUBROUTINE ERROR_ABORT
+
 
 END MODULE screen

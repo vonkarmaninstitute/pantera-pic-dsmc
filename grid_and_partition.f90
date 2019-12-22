@@ -32,14 +32,18 @@ MODULE grid_and_partition
 
       IF (XCELL .GT. (NX-1)) THEN 
          XCELL = NX-1
+         WRITE(*,*) 'Particle out of bounds!'
       ELSE IF (XCELL .LT. 0) THEN
          XCELL = 0
+         WRITE(*,*) 'Particle out of bounds!'
       END IF
 
       IF (YCELL .GT. (NY-1)) THEN 
          YCELL = NY-1
+         WRITE(*,*) 'Particle out of bounds!'
       ELSE IF (YCELL .LT. 0) THEN
          YCELL = 0
+         WRITE(*,*) 'Particle out of bounds!'
       END IF
 
       IDCELL = XCELL + NX*YCELL + 1

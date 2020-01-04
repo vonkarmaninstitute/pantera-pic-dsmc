@@ -86,7 +86,7 @@ CUSTOM_background_dens:
 CUSTOM_excitation_energy_eV:
 8.315D0
 
-! 8.315
+! Excitation energies:
 ! 1st: 8.315, 2nd: 9.447, 3rd: 9.917, 4th: 11.7  eV ! For xenon
 
 CUSTOM_ionization_energy_eV:

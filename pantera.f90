@@ -12,6 +12,9 @@ PROGRAM PANTERA
 
    IMPLICIT NONE
 
+   INTEGER:: ii
+   REAL(KIND=8) :: Tnow, rate_now
+
    ! ========= Init MPI environment ========================
    CALL MPI_INIT(ierr)
    CALL MPI_COMM_SIZE(MPI_COMM_WORLD, N_MPI_THREADS, ierr)

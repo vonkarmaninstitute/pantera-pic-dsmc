@@ -772,21 +772,6 @@
          nu_exc = CUSTOM_BG_DENS*k_exc_NOW
          nu_iz  = CUSTOM_BG_DENS*k_iz_NOW
 
-! AAAAAA
-! AAAAAA
-! AAAAAA
-! AAAAAA
-! AAAAAA
-print*, 'DBDBDBDB only elastic on'
-nu_el  = 0
-nu_iz  = 0
-print*, 'DBDBDBDB only elastic on'
-! AAAAAA
-! AAAAAA
-! AAAAAA
-! AAAAAA
-! AAAAAA
-
          ! Compute Maxwellian temperatures, reduced by the energies lost in the collision
          ! Note that we use a MAX() operator for excitation and ionization, or we may end up with a negative temperature
          ! when the gas is cold.
@@ -797,8 +782,7 @@ print*, 'DBDBDBDB only elastic on'
          T_exc_CELL = MAX(1.0D0, Ttr_CELL + MASS*V2_CELL/3/kB - 2*DeltaE_exc_J/3/kB) 
          T_iz_CELL  = MAX(1.0D0, 0.5D0*(Ttr_CELL + MASS*V2_CELL/3/kB - 2*DeltaE_iz_J/3/kB))
 
-PRINT*, "DBDB ", DeltaE_exc_J
-PRINT*, "DBDBDB CELL T: ", Ttr_CELL, T_el_CELL, T_exc_CELL, T_iz_CELL
+PRINT*, 'DBDBDBD ionization does not produce secondary electron!!!'
 
          ! ++++++++++ Test particles for collisions +++++++++++
          DO JP = JP_START, JP_END
@@ -827,6 +811,24 @@ PRINT*, "DBDBDB CELL T: ", Ttr_CELL, T_el_CELL, T_exc_CELL, T_iz_CELL
             IF (rf() .LT. (1 - EXP(-nu_exc*DT))) THEN ! PROBABILITY OF COLLISION = 1 - exp(-nu*dt)
 
               CALL MAXWELL(0.0D0, 0.0D0, 0.0D0, T_exc_CELL, T_exc_CELL, T_exc_CELL, 0.0D0, &
+                           VX_NOW, VY_NOW, VZ_NOW, EI_NOW, MASS)
+
+              ! Assign new velocities and internal energy to particle
+              particles(IDp)%VX = VX_NOW
+              particles(IDp)%VY = VY_NOW
+              particles(IDp)%VZ = VZ_NOW
+  
+              particles(IDp)%EI = EI_NOW
+  
+              ! Update number of collisions happened
+              TIMESTEP_COLL = TIMESTEP_COLL + 1
+
+            END IF
+
+            ! ===== Try ionizing collision =====
+            IF (rf() .LT. (1 - EXP(-nu_iz*DT))) THEN ! PROBABILITY OF COLLISION = 1 - exp(-nu*dt)
+
+              CALL MAXWELL(0.0D0, 0.0D0, 0.0D0, T_iz_CELL, T_iz_CELL, T_iz_CELL, 0.0D0, &
                            VX_NOW, VY_NOW, VZ_NOW, EI_NOW, MASS)
 
               ! Assign new velocities and internal energy to particle

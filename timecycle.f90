@@ -6,6 +6,7 @@ MODULE timecycle
    USE tools
    USE collisions
    USE postprocess
+   USE EM_fields
 
    CONTAINS
 
@@ -36,7 +37,7 @@ MODULE timecycle
 
       ! ########### Print simulation info #######################################
 
-      CURRENT_TIME = tID*DT
+      CURRENT_TIME = tID*DT ! Current time is a variable of the "global.f90" module
 
       CALL MPI_REDUCE(NP_PROC, NP_TOT, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
       CALL MPI_REDUCE(TIMESTEP_COLL, NCOLL_TOT, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
@@ -58,6 +59,8 @@ MODULE timecycle
 
       ! PRINT*, "           > ATTENTION! I'm using a weird advection! Check timecycle.f90 ~~~~~~~~~~~~~~~"
       ! CALL ADVECT_0D_ExB_ANALYTICAL(dt) ! Advects only velocity
+      PRINT*, "           > ATTENTION! BCs NOT IMPLEMENTED! Check timecycle.f90"
+      CALL ADVECT_BORIS
 
       ! ########### Exchange particles among processes ##########################
 
@@ -102,7 +105,7 @@ MODULE timecycle
 
       ! ~~~~~ Hmm that's it! ~~~~~
 
-      tID = tID + 1
+      tID = tID + 1 ! Don't forget this, at the end of the loop!
    END DO
 
    END SUBROUTINE TIME_LOOP
@@ -656,6 +659,151 @@ MODULE timecycle
 
    END SUBROUTINE ADVECT_0D_ExB_ANALYTICAL
 
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE ADVECT_BORIS -> Advects particles in the domain using Boris scheme !!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+   SUBROUTINE ADVECT_BORIS
+
+      ! This subroutine advects particles using the Boris pusher.
+      ! E is assumed to be along the x direction and B is assumed to be along z.
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! THIS FUNCTION IS TO BE VERIFIED!!!!!!!!!!!!!!!!!!!!!!!! 
+! THIS FUNCTION IS TO BE VERIFIED!!!!!!!!!!!!!!!!!!!!!!!!
+! THIS FUNCTION IS TO BE VERIFIED!!!!!!!!!!!!!!!!!!!!!!!!
+! THIS FUNCTION IS TO BE VERIFIED!!!!!!!!!!!!!!!!!!!!!!!!
+! THIS FUNCTION IS TO BE VERIFIED!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! PROPER TREATMENT FOR BOUNDARIES TO BE FORMULATED!!!!!!!
+! PROPER TREATMENT FOR BOUNDARIES TO BE FORMULATED!!!!!!!
+! PROPER TREATMENT FOR BOUNDARIES TO BE FORMULATED!!!!!!!
+! PROPER TREATMENT FOR BOUNDARIES TO BE FORMULATED!!!!!!!
+! PROPER TREATMENT FOR BOUNDARIES TO BE FORMULATED!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+      INTEGER :: IP
+      REAL(KIND=8) :: E, B !Electric and magnetic fields
+      REAL(KIND=8) :: M, Q
+      REAL(KIND=8), DIMENSION(3) :: E_vec, B_vec, V_now, V_minus, V_plus, V_prime, t_vec, s_vec
+      REAL(KIND=8) :: Xold, Yold, Zold
+
+      ! Loop on particles from the LAST ONE to the FIRST ONE. 
+      ! In this way, if a particle exits the domain, you can just remove it, and this doesn't
+      ! mix the position of the previous particles.
+      DO IP = NP_PROC, 1, -1
+
+         ! Compute fields at the particle position
+         CALL GET_E_B_POSITION_1D(particles(IP)%X, E, B)
+         E_vec = (/ E,     0.0d0, 0.0d0 /)
+         B_vec = (/ 0.0d0, 0.0d0, B /)
+
+         ! Advect particle in space (using the current velocity, which BTW should be staggered)
+         Xold = particles(IP)%X
+         Yold = particles(IP)%Y
+         Zold = particles(IP)%Z
+
+         particles(IP)%X = particles(IP)%X + particles(IP)%VX*DT
+         particles(IP)%Y = particles(IP)%Y + particles(IP)%VY*DT
+         particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ*DT
+
+         ! Find new particle velocity
+         M = SPECIES(particles(IP)%S_ID)%MOLMASS
+         Q = SPECIES(particles(IP)%S_ID)%CHARGE
+
+         V_now   = (/particles(IP)%VX, particles(IP)%VY, particles(IP)%VZ/)
+         V_minus = V_now + Q/M*E_vec*DT/2
+         t_vec   = Q/M*B_vec*DT/2
+         V_prime = V_minus + CROSS(V_minus, t_vec)
+         s_vec   = 2*t_vec/(1 + DOT(t_vec, t_vec))
+         V_plus  = V_minus + CROSS(V_prime, s_vec)
+
+         particles(IP)%VX = V_plus(1) + Q/M*DT/2*E_vec(1)
+         particles(IP)%VY = V_plus(2) + Q/M*DT/2*E_vec(2)
+         particles(IP)%VZ = V_plus(3) + Q/M*DT/2*E_vec(3)
+
+         ! Apply boundary condition
+          CALL IMPOSE_BOUNDARIES_TEST(IP, Xold, Yold, Zold)
+
+      END DO
+
+
+   END SUBROUTINE ADVECT_BORIS
+
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE IMPOSE_BOUNDARIES_TEST -> Imposes the boundaries !!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+   SUBROUTINE IMPOSE_BOUNDARIES_TEST(IP, Xold, Yold, Zold)
+
+      ! Checks the position of particle.
+      ! IP: particle identifier in the "particles" vector
+      ! Xold, Yold, Zold: position before advection took place (we need it for the BCs)
+      ! 
+      ! ATTENTION!!! The MOD() fortran operation does not work well with the left boundary!
+      ! Therefore, I implemented it by hand. 
+ 
+      INTEGER, INTENT(IN) :: IP
+      REAL(KIND=8), INTENT(IN) :: Xold, Yold, Zold
+      INTEGER :: NdomainOUT
+
+      ! =========== Are periodic BCs requested? =========
+      ! Then if the particle is outside the domain, put it back in.
+      ! Do it recursively, since a very fast particle could be "very very" outside.
+      ! Another way (probably more efficient): define how many domains it's "out", and 
+      ! put it back by this amount.
+      ! 
+      ! BEWARE THE MOD() FUNCTION IN F90!! DOESN'T WORK WELL FOR THE LEFT INTERFACE!!
+
+      IF (BOOL_X_PERIODIC) THEN ! Periodicity along X
+ 
+         DO WHILE (particles(IP)%X < XMIN)
+            particles(IP)%X = particles(IP)%X + (XMAX - XMIN)
+         END DO
+
+         DO WHILE (particles(IP)%X > XMAX)
+            particles(IP)%X = particles(IP)%X - (XMAX - XMIN)
+         END DO
+
+      END IF
+ 
+      IF (BOOL_Y_PERIODIC) THEN ! Periodicity along y
+
+         DO WHILE (particles(IP)%Y < YMIN)
+            particles(IP)%Y = particles(IP)%Y + (YMAX - YMIN)
+         END DO
+
+         DO WHILE (particles(IP)%Y > YMAX)
+            particles(IP)%Y = particles(IP)%Y - (YMAX - YMIN)
+         END DO
+
+      END IF
+
+      IF (BOOL_Z_PERIODIC) THEN ! Periodicity along z
+
+         DO WHILE (particles(IP)%Z < ZMIN)
+            particles(IP)%Z = particles(IP)%Z + (ZMAX - ZMIN)
+         END DO
+
+         DO WHILE (particles(IP)%Z > ZMAX)
+            particles(IP)%Z = particles(IP)%Z - (ZMAX - ZMIN)
+         END DO
+
+      END IF
+
+      ! ========= Remove particles outside of the domain =========
+      ! At this point, if a particle is still out of the domain 
+      ! it means that no condition was imposed -> remove it.
+
+      IF ( (particles(IP)%X .LT. XMIN) .OR. (particles(IP)%X .GT. XMAX) .OR. &
+           (particles(IP)%Y .LT. YMIN) .OR. (particles(IP)%Y .GT. YMAX) .OR. &
+           (particles(IP)%Z .LT. ZMIN) .OR. (particles(IP)%Z .GT. ZMAX)) THEN
+
+         CALL REMOVE_PARTICLE_ARRAY(IP, particles, NP_PROC)
+
+      END IF
+
+   END SUBROUTINE IMPOSE_BOUNDARIES_TEST
+ 
 
 END MODULE timecycle

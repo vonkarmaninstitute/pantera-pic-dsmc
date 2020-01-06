@@ -19,7 +19,7 @@ MODULE global
 
    LOGICAL      :: BOOL_AXI = .FALSE. ! Assign default value!
    INTEGER      :: NX, NY, NZ
-   REAL(KIND=8) :: XMIN, XMAX, YMIN, YMAX, ZMIN, ZMAX
+   REAL(KIND=8) :: XMIN, XMAX, YMIN, YMAX, ZMIN, ZMAX ! Dimensions of domain
    REAL(KIND=8) :: CELL_VOL
    LOGICAL      :: BOOL_X_PERIODIC = .FALSE. ! Assign default value!
    LOGICAL      :: BOOL_Y_PERIODIC = .FALSE.
@@ -34,7 +34,7 @@ MODULE global
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    INTEGER         :: NT, tID
-   REAL(KIND=8)    :: FNUM, DT
+   REAL(KIND=8)    :: FNUM, DT, CURRENT_TIME
    INTEGER(KIND=8) :: RNG_SEED_GLOBAL, RNG_SEED_LOCAL
 
    ! ++++++ Dump quantities. Init to negative 1: if user does not define them, 
@@ -52,6 +52,31 @@ MODULE global
    ! Dump global moments
    INTEGER :: DUMP_GLOB_MOM_EVERY  = -1
    CHARACTER(26) :: DUMP_GLOB_MOM_FILENAME = "./dumps/global_moments.dat" ! Hard-coded
+
+ 
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!! Electrical and magnetic fields !!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+   LOGICAL :: B_FIELD_BOOL = .FALSE. ! Init fields boolean value
+   LOGICAL :: E_FIELD_BOOL = .FALSE. ! Init fields boolean value
+
+   CHARACTER(LEN=64) :: B_FIELD_TYPE = "NONE" ! Init field to none
+   CHARACTER(LEN=64) :: E_FIELD_TYPE = "NONE" ! Init field to none
+
+   ! Parameters for E and B fields
+   REAL(KIND=8) :: B_UNIFORM_VAL = 0
+   REAL(KIND=8) :: E_UNIFORM_VAL = 0
+
+   REAL(KIND=8) :: B_SIN_AMPL      = 0
+   REAL(KIND=8) :: B_SIN_k         = 0
+   REAL(KIND=8) :: B_SIN_omega     = 0
+   REAL(KIND=8) :: B_SIN_PHASE_rad = 0
+
+   REAL(KIND=8) :: E_SIN_AMPL      = 0
+   REAL(KIND=8) :: E_SIN_k         = 0
+   REAL(KIND=8) :: E_SIN_omega     = 0
+   REAL(KIND=8) :: E_SIN_PHASE_rad = 0
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Collisions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

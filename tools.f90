@@ -425,9 +425,9 @@ CONTAINS
      IF (PROC_ID .EQ. 0) THEN 
 
         ! First, redefine moments 2, 3 and 4 as velocities, by dividing by the density
-        MOMENTS(2) = MOMENTS(2)/MOMENTS(1)
-        MOMENTS(3) = MOMENTS(3)/MOMENTS(1)
-        MOMENTS(4) = MOMENTS(4)/MOMENTS(1)
+        MOMENTS(2) = MOMENTS(2)/(MOMENTS(1) + 1.0e-35)
+        MOMENTS(3) = MOMENTS(3)/(MOMENTS(1) + 1.0e-35)
+        MOMENTS(4) = MOMENTS(4)/(MOMENTS(1) + 1.0e-35)
 
         ! Then, write
         OPEN(12, FILE=DUMP_GLOB_MOM_FILENAME, STATUS="old", POSITION="append", ACTION="write") 
@@ -639,16 +639,33 @@ CONTAINS
      RETURN
   END FUNCTION
 
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! FUNCTION CROSS(a,b) -> computes cross product !!!!!!!!
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   ! SUBROUTINE INTERP_VECTOR !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! 
-!   SUBROUTINE INTERP_VECTOR(x_vec, y_vec, T_target, y)
-! 
-!     
-! 
-! 
-!   END SUBROUTINE INTERP_VECTOR
+  FUNCTION CROSS(a,b)
+
+     REAL(KIND=8), DIMENSION(3) :: CROSS
+     REAL(KIND=8), DIMENSION(3), INTENT(IN) :: a, b
+
+     CROSS(1) = a(2)*b(3) - a(3)*b(2)
+     CROSS(2) = a(3)*b(1) - a(1)*b(3)
+     CROSS(3) = a(1)*b(2) - a(2)*b(1)
+
+  END FUNCTION CROSS
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! FUNCTION DOT(a,b) -> computes dot product !!!!!!!!
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  FUNCTION DOT(a,b)
+
+     REAL(KIND=8) :: DOT
+     REAL(KIND=8), DIMENSION(3), INTENT(IN) :: a, b
+
+     DOT = a(1)*b(1) + a(2)*b(2) + a(3)*b(3)
+
+  END FUNCTION DOT
+
 
 END MODULE tools

@@ -171,6 +171,11 @@ Other TODOs: ###################################################################
     Gambler's makefile. TODO: understand why.
 
 CHANGES:
+  - Particles advection: 
+    While advecting particles one should advect them all and only then check which are to be removed, or
+    the particle vector gets mixed up while I'm advecting.
+    SOLUTION: do the advection from the LAST particle in the array to the FIRST!
+
   - In initialization.f90, mixture file did not accept commented lines (it would read it as a blank line
     and crash). Now it's ok
     TODO: do the same in VSS collisions reader

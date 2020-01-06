@@ -82,6 +82,15 @@ MODULE initialization
             DUMP_PART_PATH = TRIM(ADJUSTL(bufferchar))
          END IF
 
+         ! ~~~~~~~~~~~~~  Electric and magnetic fields ~~~~~~~~~~~~~
+
+         IF (line=='B_field_type:')  READ(in1,*) B_FIELD_TYPE
+         IF (line=='E_field_type:')  READ(in1,*) E_FIELD_TYPE
+         IF (line=='B_field_params_uniform:')  READ(in1,*) B_UNIFORM_VAL 
+         IF (line=='E_field_params_uniform:')  READ(in1,*) E_UNIFORM_VAL
+         IF (line=='B_field_params_sin:')  READ(in1,*) B_SIN_AMPL, B_SIN_k, B_SIN_omega, B_SIN_PHASE_rad 
+         IF (line=='E_field_params_sin:')  READ(in1,*) E_SIN_AMPL, E_SIN_k, E_SIN_omega, E_SIN_PHASE_rad 
+
          ! ~~~~~~~~~~~~~  Multispecies ~~~~~~~~~~~~~~~
          IF (line=='Species_file:') THEN ! Attention, must deal with paths, "./" and remove leading spaces
             bufferchar = '' ! reset
@@ -229,6 +238,40 @@ MODULE initialization
 
          string = 'RNG seed (global):'
          WRITE(*,'(A5,A50,I9)') '     ', string, RNG_SEED_GLOBAL
+
+         ! ~~~~ Electric and magnetic fields ~~~~
+         WRITE(*,*) '  =========== Electric and magnetic fields =========='
+         string = 'Electric field type:'
+         WRITE(*,'(A5,A50,A64)') '     ', string, E_FIELD_TYPE
+     
+         ! If sine, plot parameters 
+         IF (E_FIELD_TYPE .EQ. "UNIFORM") THEN
+
+            WRITE(*,'(A5, ES14.7)') '     ', E_UNIFORM_VAL
+
+         ELSE IF (E_FIELD_TYPE .EQ. "SINE") THEN
+
+            string = 'Parameters:'
+            WRITE(*,'(A5,ES14.7,A5,ES14.7, A5, ES14.7, A4, ES14.7, A2)') '     ', & 
+            E_SIN_AMPL, ' SIN(', E_SIN_k, ' x - ', E_SIN_omega, ' t + ', E_SIN_PHASE_rad , ' )'
+
+         END IF
+
+         string = 'Magnetic field type:'
+         WRITE(*,'(A5,A50,A64)') '     ', string, B_FIELD_TYPE
+
+         ! If sine, plot parameters 
+         IF (B_FIELD_TYPE .EQ. "UNIFORM") THEN
+
+            WRITE(*,'(A5, ES14.7, A4)') '     ', B_UNIFORM_VAL
+
+         ELSE IF (B_FIELD_TYPE .EQ. "SINE") THEN
+
+            string = 'Parameters:'
+            WRITE(*,'(A5,ES14.7,A5,ES14.7, A5, ES14.7, A4, ES14.7, A2)') '     ', & 
+            B_SIN_AMPL, ' SIN(', B_SIN_k, ' x - ', B_SIN_omega, ' t + ', B_SIN_PHASE_rad , ' )'
+
+         END IF
 
          ! ~~~~ Collisions ~~~~
          WRITE(*,*) '  =========== Collisions ============================'
@@ -864,6 +907,10 @@ MODULE initialization
       END IF
 
       CELL_VOL = (XMAX-XMIN)*(YMAX-YMIN)/(NX*NY)
+
+      ! ~~~~~~~~ ELECTRIC AND MAGNETIC FIELDS ~~~~~~~~~~
+      IF (B_FIELD_TYPE .NE. "NONE") B_FIELD_BOOL = .TRUE.
+      IF (E_FIELD_TYPE .NE. "NONE") E_FIELD_BOOL = .TRUE.
 
       ! ~~~~~~~~ DUMPS ~~~~~~~
 

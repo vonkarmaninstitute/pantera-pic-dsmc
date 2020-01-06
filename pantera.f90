@@ -7,13 +7,11 @@ PROGRAM PANTERA
    USE screen
    USE tools
    USE initialization
+   USE EM_fields
    USE timecycle
    USE grid_and_partition
 
    IMPLICIT NONE
-
-   INTEGER:: ii
-   REAL(KIND=8) :: Tnow, rate_now
 
    ! ========= Init MPI environment ========================
    CALL MPI_INIT(ierr)

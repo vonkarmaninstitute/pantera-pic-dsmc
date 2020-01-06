@@ -26,11 +26,11 @@ Number_of_cells:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0E9
+    1.0E6
 Timestep:
-    1.E-11
+    1.E-12
 Number_of_timesteps:
-    1000
+    500
 RNG_seed:
     12343
 
@@ -146,9 +146,9 @@ CUSTOM_ionization_energy_eV:
 ! ========= Initial particle seed ===================
 
 Initial_particles_bool:
-    .TRUE.
+    .FALSE.
 Initial_particles_dens:
-    1.0e17
+    1.0e16
 Initial_particles_vel:
     0.  0.  0.
 Initial_particles_Ttra:
@@ -178,24 +178,25 @@ Boundaries_inject_mixture:
 
 ! ========== Injection from line source =============
 
-Linesource_bool:
-    .FALSE.
-Linesource_center:
-    0.5   0.
-Linesource_length_y:
-    0.2
-Linesource_dens:
-    1.e24
-Linesource_vel:
-    200.  0. 0.
-Linesource_Ttra:
-    0.0001
-Linesource_Trot:
-    0.
+!! OLD !! Linesource_bool:
+!! OLD !!     .FALSE.
+!! OLD !! Linesource_center:
+!! OLD !!     0.5   0.
+!! OLD !! Linesource_length_y:
+!! OLD !!     0.2
+!! OLD !! Linesource_dens:
+!! OLD !!     1.e24
+!! OLD !! Linesource_vel:
+!! OLD !!     200.  0. 0.
+!! OLD !! Linesource_Ttra:
+!! OLD !!     0.0001
+!! OLD !! Linesource_Trot:
+!! OLD !!     0.
 
-! !   center       length        density  velocity xyz         Ttr      Trot   mix
-! Linesource:
-!     -0.5    0.0    0.0    1.0    1.4e20    0.0    0.0    0.0    273.0    0.0    Argon1
+!   x_center  y_center  length_x   length_y   density [1/m3]    Vx     Vy     Vz     Ttr         Trot   mix
+Linesource:
+    0.0       0.0       0.0        0.0001     1.0e17            0.0    0.0    0.0    100000.0    0.0    elec
+
 ! Linesource:
 !     0.5    0.0    0.0    -1.0    1.4e20    0.0    0.0    0.0    273.0    0.0    Argon2
 

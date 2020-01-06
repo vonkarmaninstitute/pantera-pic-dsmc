@@ -402,6 +402,9 @@ MODULE initialization
 
    END SUBROUTINE PRINTINPUT
 
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE READ_SPECIES !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    SUBROUTINE READ_SPECIES
       
@@ -586,6 +589,9 @@ MODULE initialization
    END SUBROUTINE DEF_MIXTURE
 
 
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE DEF_LINESOURCE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    
    SUBROUTINE DEF_LINESOURCE(DEFINITION)
 
@@ -978,8 +984,11 @@ MODULE initialization
       IMPLICIT NONE
 
       REAL(KIND=8) :: BETA, FLUXBOUND, NtotINJECT, Snow
-      REAL(KIND=8) :: U_NORM, S_NORM, FLUXLINESOURCE, LINELENGTH, NORMX, NORMY
+      REAL(KIND=8) :: U_NORM, S_NORM, FLUXLINESOURCE, NORMX, NORMY
       REAL(KIND=8) :: PI, PI2  
+
+      REAL(KIND=8) :: Vth, Ainject, Linelength, FlxTot
+
 
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: nfs_LINE
  
@@ -1098,25 +1107,25 @@ MODULE initialization
       END IF
 
       ! =====================================================
-      ! Injection from line source !!!!!!!!!TO IMPLEMENT FOR MULTISPECIES
-      ! IF (BOOL_LINESOURCE) THEN 
+      ! ========= Injection from line sources ===============
+      !
+      ! We define a line source as a line in the X-Y plane (a plane in the X-Y-Z volume)
+      ! AT which particles are injected following a distribution.
+      ! Particles are injected at both sides of the linesource, so the computation of 
+      ! the number of particles to be injected is simple:
+      !
+      ! Gamma = n v_th / 2 = flux of particles through a UNIT surface, both going right and left 
+      ! 
+      ! Ndot_real = Gamma*Asurf = flux of particles trough surface of area Asurf 
+      !                           In our case, Asurf = LINELENGTH * Zdomain
+      ! 
+      ! Ndot_simulated = Ndot_real/Fnum = particles to be emitted per unit time
+      ! 
+      ! NtotINJECT = Ndot_simluated*dt
+      ! 
+      ! FOR mixtures, only the fraction FRAC is to be injected for each species.
 
-      !    BETA = 1./SQRT(2.*KB/M*TTRA_LINESOURCE) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
-
-      !    S_NORM_LINESOURCE = UX_LINESOURCE*BETA ! Molecular speed ratio normal to line source (which is y-aligned)
-      !    Snow              = S_NORM_LINESOURCE  ! temp variable
-
-      !    FLUXLINESOURCE = NRHO_LINESOURCE/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) & 
-      !                              + SQRT(PI)*Snow*(1.+ERF1(Snow)))          ! Tot number flux emitted [1/(s m^2)]
-      !    NtotINJECT = FLUXLINESOURCE*L_LINESOURCE*(ZMAX-ZMIN)*DT/FNUM        ! Tot num of particles to be injected
-      !    nfs_LINESOURCE = FLOOR(NtotINJECT/REAL(N_MPI_THREADS,KIND=8)+rf())  ! Particles injected by each proc
-      !    ACCA = SQRT(Snow**2+2.)                                             ! Tmp variable
-      !    KAPPA_LINESOURCE = 2./(Snow+ACCA) * EXP(0.5 + 0.5*Snow*(Snow-ACCA)) ! global variable
-
-      ! END IF 
-
-      ! Injection from linesource new way
-
+      
       DO ILINE = 1, N_LINESOURCES ! Loop on line sources
          WRITE(*,*) 'Mixture id is:', LINESOURCES(ILINE)%MIX_ID
          N_COMP = MIXTURES(LINESOURCES(ILINE)%MIX_ID)%N_COMPONENTS
@@ -1125,41 +1134,18 @@ MODULE initialization
          ALLOCATE(nfs_LINE(N_COMP))
 
          DO IS = 1, N_COMP ! Loop on mixture components
+
             S_ID = MIXTURES(LINESOURCES(ILINE)%MIX_ID)%COMPONENTS(IS)%ID
-            WRITE(*,*) 'Species id is:', S_ID
-            M = SPECIES(S_ID)%MOLMASS
-            WRITE(*,*) 'Mixture id is:', LINESOURCES(ILINE)%MIX_ID
-            FRAC = MIXTURES(LINESOURCES(ILINE)%MIX_ID)%COMPONENTS(IS)%MOLFRAC
-            BETA = 1./SQRT(2.*KB/M*LINESOURCES(ILINE)%TTRA) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
-         
-            LINELENGTH = SQRT(LINESOURCES(ILINE)%DX**2 + LINESOURCES(ILINE)%DY**2)
+            M    = SPECIES(S_ID)%MOLMASS
 
-            NORMX = LINESOURCES(ILINE)%DY/LINELENGTH
-            LINESOURCES(ILINE)%NORMX = NORMX
-            NORMY = - LINESOURCES(ILINE)%DX/LINELENGTH
-            LINESOURCES(ILINE)%NORMY = NORMY
+            Vth          = SQRT(8*KB*LINESOURCES(ILINE)%TTRA/(PI*M)) ! Thermal velocity
+            Linelength   = SQRT(LINESOURCES(ILINE)%DX**2 + LINESOURCES(ILINE)%DY**2)
+            Ainject      = Linelength*(ZMAX-ZMIN)
+            FRAC         = MIXTURES(LINESOURCES(ILINE)%MIX_ID)%COMPONENTS(IS)%MOLFRAC
+            FlxTot       = LINESOURCES(ILINE)%NRHO*FRAC*Vth/2
+            NtotINJECT   = Ainject*FlxTot*DT/Fnum
+            nfs_LINE(IS) = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
 
-            U_NORM = LINESOURCES(ILINE)%UX*NORMX + LINESOURCES(ILINE)%UY*NORMY ! Molecular speed ratio normal to boundary
-            LINESOURCES(ILINE)%U_NORM = U_NORM
-            S_NORM = U_NORM*BETA
-            Snow   = S_NORM     ! temp variable
-
-            FLUXLINESOURCE   = LINESOURCES(ILINE)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) &
-                                    + SQRT(PI)*Snow*(1.+ERF1(Snow)))      ! Tot number flux emitted 
-            NtotINJECT  = FLUXLINESOURCE*LINELENGTH*(ZMAX-ZMIN)*DT/FNUM         ! Tot num of particles to be injected
-
-            
-
-            nfs_LINE(IS)    = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
-            WRITE(*,*)'ON LINESOURCE ', nfs_LINE(IS)
-            !ACCA        = SQRT(Snow**2+2.)                                  ! Tmp variable
-            !KAPPA_YMAX  = 2./(Snow+ACCA) * EXP(0.5 + 0.5*Snow*(Snow-ACCA))  ! global variable
-
-            ! Check: if we are hypersonic and stuff exits domain print a warning
-            IF (S_NORM .LE. -3.) THEN 
-               CALL ONLYMASTERPRINT1(PROC_ID, '$$$ Warning! Hypersonic boundary! Almost no &
-                                                   &particles will be emitted at line source.')
-            END IF
          END DO
 
          CALL MOVE_ALLOC(nfs_LINE, LINESOURCES(ILINE)%nfs)

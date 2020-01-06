@@ -15,25 +15,29 @@ for ii = 1:numel(files_list)
 
   % Load file
   % dd = load(['../dumps/',files_list(ii).name]);
-  dd = load(['/media/starlight/Maxtor/PANTERA_data_test_Boris/',files_list(ii).name]);
-  fprintf('Data from: %s\n', files_list(ii).name)
-
-  t_vec(ii)  = dd(1,1);
-  vx_vec(ii) = dd(1,5);
-  vy_vec(ii) = dd(1,6);
-  vz_vec(ii) = dd(1,7);
-
-
-  XX = dd(:, 2);
-  YY = dd(:, 3);
-  ZZ = dd(:, 4);
-
-  hold off
-  plot(XX, YY, 'ok', 'linewidth',2)
-  xlim([-0.0005, 0.0005])
-  ylim([-0.0005, 0.0005])
+  try % File may be empty
+    dd = load(['/media/starlight/Maxtor/PANTERA_data_test_Boris/',files_list(ii).name]);
+    fprintf('Data from: %s\n', files_list(ii).name)
   
-  pause(0.001)
+    t_vec(ii)  = dd(1,1);
+    vx_vec(ii) = dd(1,5);
+    vy_vec(ii) = dd(1,6);
+    vz_vec(ii) = dd(1,7);
+  
+  
+    XX = dd(:, 2);
+    YY = dd(:, 3);
+    ZZ = dd(:, 4);
+  
+    hold off
+    plot(XX, YY, 'ok', 'linewidth',2)
+    hold on
+    plot([0,0], [-0.00005, 0.00005])
+    xlim([-0.0005, 0.0005])
+    ylim([-0.0005, 0.0005])
+    
+    pause(0.001)
+  end
 end 
 
 

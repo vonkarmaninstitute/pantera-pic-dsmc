@@ -55,12 +55,12 @@ MODULE timecycle
 
       ! ########### Advect particles ############################################
 
-      !CALL ADVECT 
+      CALL ADVECT 
 
       ! PRINT*, "           > ATTENTION! I'm using a weird advection! Check timecycle.f90 ~~~~~~~~~~~~~~~"
       ! CALL ADVECT_0D_ExB_ANALYTICAL(dt) ! Advects only velocity
-      PRINT*, "           > ATTENTION! BCs NOT IMPLEMENTED! Check timecycle.f90"
-      CALL ADVECT_BORIS
+      ! PRINT*, "           > ATTENTION! BCs NOT IMPLEMENTED! Check timecycle.f90"
+      ! CALL ADVECT_BORIS
 
       ! ########### Exchange particles among processes ##########################
 
@@ -119,7 +119,8 @@ MODULE timecycle
       IMPLICIT NONE
    
       INTEGER      :: IP, IC, IS, NFS, ILINE
-      REAL(KIND=8) :: DTFRAC, Vdummy, V_NORM, V_PERP, U_NORM, POS
+      REAL(KIND=8) :: DTFRAC, POS
+      REAL(KIND=8) :: UX_LSRC, UY_LSRC, UZ_LSRC, TTRA_LSRC, TROT_LSRC ! Working variables
       REAL(KIND=8) :: X, Y, Z, VX, VY, VZ, EI 
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
    
@@ -130,7 +131,13 @@ MODULE timecycle
    
       ! Linesource
       DO ILINE = 1, N_LINESOURCES
-   
+        
+         UX_LSRC = LINESOURCES(ILINE)%UX
+         UY_LSRC = LINESOURCES(ILINE)%UY
+         UZ_LSRC = LINESOURCES(ILINE)%UZ
+         TTRA_LSRC = LINESOURCES(ILINE)%TTRA
+         TROT_LSRC = LINESOURCES(ILINE)%TROT
+
          DO IS = 1, MIXTURES(LINESOURCES(ILINE)%MIX_ID)%N_COMPONENTS ! Loop on mixture components
 
             S_ID = MIXTURES(LINESOURCES(ILINE)%MIX_ID)%COMPONENTS(IS)%ID
@@ -142,16 +149,9 @@ MODULE timecycle
    
             DO IP = 1, NFS ! Loop on particles to be injected
    
-               CALL MAXWELL(ZERO, ZERO, ZERO, &
-                            LINESOURCES(ILINE)%TTRA, LINESOURCES(ILINE)%TTRA, LINESOURCES(ILINE)%TTRA, &
-                            LINESOURCES(ILINE)%TROT, &
-                            Vdummy, V_PERP, VZ, EI, M)
-                            
-               V_NORM = FLX(U_NORM, TTRA_BOUND, M) !!AAAAAAAAAAA
-
-               VX = V_NORM*LINESOURCES(ILINE)%NORMX - V_PERP*LINESOURCES(ILINE)%NORMY + LINESOURCES(ILINE)%UX
-               VY = V_PERP*LINESOURCES(ILINE)%NORMX + V_NORM*LINESOURCES(ILINE)%NORMY + LINESOURCES(ILINE)%UY
-               VZ = VZ + LINESOURCES(ILINE)%UZ
+               CALL MAXWELL(UX_LSRC, UY_LSRC, UZ_LSRC, &
+                            TTRA_LSRC, TTRA_LSRC, TTRA_LSRC, TROT_LSRC, &
+                            VX, VY, VZ, EI, M)
 
                DTFRAC = rf()*DT
                POS = rf()

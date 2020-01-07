@@ -984,7 +984,7 @@ MODULE initialization
       IMPLICIT NONE
 
       REAL(KIND=8) :: BETA, FLUXBOUND, NtotINJECT, Snow
-      REAL(KIND=8) :: U_NORM, S_NORM, FLUXLINESOURCE, NORMX, NORMY
+      ! REAL(KIND=8) :: U_NORM, S_NORM, FLUXLINESOURCE, NORMX, NORMY
       REAL(KIND=8) :: PI, PI2  
 
       REAL(KIND=8) :: Vth, Ainject, Linelength, FlxTot

@@ -87,16 +87,28 @@ MODULE timecycle
 
       ! ++++ Dump flowfield to VTK 
 
-      IF (DUMP_GRID_START .NE. -1) THEN ! Ok, you can dump stuff
-         IF (tID .GE. DUMP_GRID_START) THEN
-            IF (MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY) .EQ. 0) CALL GRID_AVG_MOMENTS
-            IF (MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY*DUMP_GRID_N_AVG) .EQ. 0) THEN
-               CALL GRID_AVG_MOMENTS
-               CALL GRID_SAVE_MOMENTS
-               CALL GRID_RESET_MOMENTS
-            END IF
-         END IF
-      END IF
+       IF (DUMP_GRID_START .NE. -1) THEN ! Ok, you can dump stuff
+          IF (tID .GE. DUMP_GRID_START) THEN
+             IF (MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY) .EQ. 0) CALL GRID_AVG_MOMENTS
+             IF (MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY*DUMP_GRID_N_AVG) .EQ. 0) THEN
+                CALL GRID_AVG_MOMENTS
+                CALL GRID_SAVE_MOMENTS
+                CALL GRID_RESET_MOMENTS
+             END IF
+          END IF
+       END IF
+
+
+!       IF (DUMP_GRID_START .NE. -1) THEN ! Ok, you can dump stuff
+!          IF (tID .GE. DUMP_GRID_START) THEN
+!             IF (MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY) .EQ. 0) CALL GRID_AVG
+!             IF (MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY*DUMP_GRID_N_AVG) .EQ. 0) THEN
+!                CALL GRID_AVG
+!                CALL GRID_SAVE
+!                CALL GRID_RESET
+!             END IF
+!          END IF
+!       END IF
 
       ! ++++ Dump moments to file
 
@@ -127,8 +139,6 @@ MODULE timecycle
    
       INTEGER :: S_ID
       REAL(KIND=8) :: M
-      REAL(KIND=8) :: ZERO = 0.0
-   
    
       ! Linesource
       DO ILINE = 1, N_LINESOURCES
@@ -758,7 +768,6 @@ MODULE timecycle
  
       INTEGER, INTENT(IN) :: IP
       REAL(KIND=8), INTENT(IN) :: Xold, Yold, Zold
-      INTEGER :: NdomainOUT
 
       ! =========== Are periodic BCs requested? =========
       ! Then if the particle is outside the domain, put it back in.

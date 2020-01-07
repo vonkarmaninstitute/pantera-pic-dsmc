@@ -21,12 +21,12 @@ Domain_periodicity:
 Domain_specular:
     .FALSE.    .FALSE.    .FALSE.    .FALSE.
 Number_of_cells:
-    30  1  1
+    400  1  1
 
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0E6
+    1.0E4
 Timestep:
     1.E-12
 Number_of_timesteps:
@@ -40,13 +40,13 @@ B_field_type: ! NONE / SINE / UNIFORM
     UNIFORM
 
 B_field_params_uniform:
-    0.02
+    0.0
 
 E_field_type:  ! NONE/ SINE/ UNIFORM / POISSON
    UNIFORM 
 
 E_field_params_uniform:
-   10000.0
+   0.0
 
 !!!!! B_field_params_sin: 
 !!!!!     0.1 100 0 0 ! PARAM FOR SINE: 1) Amplitude [Tesla]   2) k wavenumber [1/m]   3) omega [rad/s]   4) phase phi [rad] 
@@ -64,7 +64,7 @@ Dump_glob_mom_every: ! Global moments, averaged on the domain
     1
 
 Dump_part_every:
-    1
+    200000000
 Dump_part_directory: ! can be also "."
     /media/starlight/Maxtor/PANTERA_data_test_Boris/
 
@@ -73,7 +73,7 @@ Dump_grid_start:
 Dump_grid_avgevery:
     1
 Dump_grid_numavgs:
-    5
+    20
 
 ! ========= Multispecies ==============================
 
@@ -99,7 +99,8 @@ Def_mixture:
 ! ========= Collisions ==============================
 
 Collision_type: ! [MCC / DSMC / BGK / CUSTOM_LOAD_RATES / NONE]
-  CUSTOM_LOAD_RATES
+   NONE
+!  CUSTOM_LOAD_RATES
 
 CUSTOM_background_mass:
   2.18E-25 ! Xenon

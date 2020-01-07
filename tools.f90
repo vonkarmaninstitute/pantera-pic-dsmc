@@ -136,7 +136,7 @@ CONTAINS
   DO I = 1,3
 
      ! Step 1.
-     R = RAND()
+     R = rf()
       
      TETA = PI2*R
 
@@ -148,9 +148,9 @@ CONTAINS
      ! or the log() will explode
      !R = rf()*0.99999999999 + 1.0d-13 ! Please fix this!!!!! MAKE THIS ELEGANT!!!
      ! Fixed at the root.
-     R1 = RAND()
+     R1 = rf()
       DO WHILE (R1 < 1.0D-13)
-         R1 = RAND()
+         R1 = rf()
       END DO
 
      RO = SQRT(-LOG(R1))/BETA ! The random number here shouldn't be correlated to the one for teta!!
@@ -167,9 +167,9 @@ CONTAINS
 
   ! Step 4. 
 
-  R = RAND()
+  R = rf()
   DO WHILE (R < 1.0D-13)
-    R = RAND()
+    R = rf()
   END DO
 
   EI = -LOG(R)*KB*TR
@@ -635,6 +635,10 @@ CONTAINS
 
         END IF
      END DO
+
+     INTERP_VECTOR = -1.0d0 ! Give it a wrong value, if I reach this point, and quit.
+     WRITE(*,*) 'ERROR! Apparently the interpolation in function INTERP_VECTOR() did not go through! ABORTING!' 
+     STOP
 
      RETURN
   END FUNCTION

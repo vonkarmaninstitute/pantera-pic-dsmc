@@ -55,12 +55,13 @@ MODULE timecycle
 
       ! ########### Advect particles ############################################
 
-      CALL ADVECT 
+      ! CALL ADVECT 
 
       ! PRINT*, "           > ATTENTION! I'm using a weird advection! Check timecycle.f90 ~~~~~~~~~~~~~~~"
       ! CALL ADVECT_0D_ExB_ANALYTICAL(dt) ! Advects only velocity
-      ! PRINT*, "           > ATTENTION! BCs NOT IMPLEMENTED! Check timecycle.f90"
-      ! CALL ADVECT_BORIS
+
+      PRINT*, "           > ATTENTION! BCs NOT IMPLEMENTED! Check timecycle.f90"
+      CALL ADVECT_BORIS
 
       ! ########### Exchange particles among processes ##########################
 
@@ -88,11 +89,11 @@ MODULE timecycle
 
       IF (DUMP_GRID_START .NE. -1) THEN ! Ok, you can dump stuff
          IF (tID .GE. DUMP_GRID_START) THEN
-            IF (MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY) .EQ. 0) CALL GRID_AVG
+            IF (MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY) .EQ. 0) CALL GRID_AVG_MOMENTS
             IF (MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY*DUMP_GRID_N_AVG) .EQ. 0) THEN
-               CALL GRID_AVG
-               CALL GRID_SAVE
-               CALL GRID_RESET
+               CALL GRID_AVG_MOMENTS
+               CALL GRID_SAVE_MOMENTS
+               CALL GRID_RESET_MOMENTS
             END IF
          END IF
       END IF
@@ -682,16 +683,18 @@ MODULE timecycle
 ! PROPER TREATMENT FOR BOUNDARIES TO BE FORMULATED!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-      INTEGER :: IP
+      INTEGER :: IP, IC
       REAL(KIND=8) :: E, B !Electric and magnetic fields
       REAL(KIND=8) :: M, Q
       REAL(KIND=8), DIMENSION(3) :: E_vec, B_vec, V_now, V_minus, V_plus, V_prime, t_vec, s_vec
-      REAL(KIND=8) :: Xold, Yold, Zold
+      REAL(KIND=8) :: DTRIM, Xold, Yold, Zold
 
       ! Loop on particles from the LAST ONE to the FIRST ONE. 
       ! In this way, if a particle exits the domain, you can just remove it, and this doesn't
       ! mix the position of the previous particles.
       DO IP = NP_PROC, 1, -1
+
+         DTRIM = particles(IP)%DTRIM ! Remaining time
 
          ! Compute fields at the particle position
          CALL GET_E_B_POSITION_1D(particles(IP)%X, E, B)
@@ -703,30 +706,40 @@ MODULE timecycle
          Yold = particles(IP)%Y
          Zold = particles(IP)%Z
 
-         particles(IP)%X = particles(IP)%X + particles(IP)%VX*DT
-         particles(IP)%Y = particles(IP)%Y + particles(IP)%VY*DT
-         particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ*DT
+         particles(IP)%X = particles(IP)%X + particles(IP)%VX*DTRIM 
+         particles(IP)%Y = particles(IP)%Y + particles(IP)%VY*DTRIM
+         particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ*DTRIM
 
          ! Find new particle velocity
          M = SPECIES(particles(IP)%S_ID)%MOLMASS
          Q = SPECIES(particles(IP)%S_ID)%CHARGE
 
          V_now   = (/particles(IP)%VX, particles(IP)%VY, particles(IP)%VZ/)
-         V_minus = V_now + Q/M*E_vec*DT/2
-         t_vec   = Q/M*B_vec*DT/2
+         V_minus = V_now + Q/M*E_vec*DTRIM/2
+         t_vec   = Q/M*B_vec*DTRIM/2
          V_prime = V_minus + CROSS(V_minus, t_vec)
          s_vec   = 2*t_vec/(1 + DOT(t_vec, t_vec))
          V_plus  = V_minus + CROSS(V_prime, s_vec)
 
-         particles(IP)%VX = V_plus(1) + Q/M*DT/2*E_vec(1)
-         particles(IP)%VY = V_plus(2) + Q/M*DT/2*E_vec(2)
-         particles(IP)%VZ = V_plus(3) + Q/M*DT/2*E_vec(3)
+         particles(IP)%VX = V_plus(1) + Q/M*DTRIM/2*E_vec(1)
+         particles(IP)%VY = V_plus(2) + Q/M*DTRIM/2*E_vec(2)
+         particles(IP)%VZ = V_plus(3) + Q/M*DTRIM/2*E_vec(3)
 
          ! Apply boundary condition
           CALL IMPOSE_BOUNDARIES_TEST(IP, Xold, Yold, Zold)
 
+         ! Convection is over, put DTRIM = DT for the next timestep
+         particles(IP)%DTRIM = DT 
+
       END DO
 
+      ! Finally, after particles have even collided with boundaries, find their new cell ID.
+      ! Note that NP_PROC is automatically updated if you remove particles via "REMOVE_PARTICLE_..."
+
+      DO IP = 1, NP_PROC
+         CALL CELL_FROM_POSITION(particles(IP)%X, particles(IP)%Y, IC)
+         particles(IP)%IC = IC
+      END DO
 
    END SUBROUTINE ADVECT_BORIS
 

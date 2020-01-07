@@ -6,6 +6,51 @@
 
   IMPLICIT NONE
 
+  ! Average quantities (14 moments Max-Ent and their closure)
+  INTEGER, DIMENSION(:), ALLOCATABLE      :: AVG_MOM_NP
+
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_VX
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_VY
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_VZ
+
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Pxx
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Pxy
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Pxz
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Pyy
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Pyz
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Pzz
+
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Qxxx
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Qxxy
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Qxyy
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Qyyy
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Qyyz
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Qyzz
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Qzzz
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Qxxz
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Qxzz
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Qxyz
+
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_qx
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_qy
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_qz
+
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Riijj
+
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Rxxjj
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Rxyjj
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Rxzjj
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Ryyjj
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Ryzjj
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Rzzjj
+
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Sxiijj
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Syiijj
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_MOM_Sziijj
+
+  ! And the cumulative average counter
+  INTEGER :: AVG_MOM_CUMULATED
+
   CONTAINS
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -173,11 +218,9 @@
   END SUBROUTINE GRID_AVG
 
 
-
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! SUBROUTINE GRID_SAVE -> Saves cumulated average !!!!!!!!!!!!!!!!!!!!
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
 
   SUBROUTINE GRID_SAVE
     
@@ -191,8 +234,6 @@
 
     INTEGER                            :: NCELLS, NSPECIES
     INTEGER                            :: i, JS, FIRST, LAST
-
-
 
     NCELLS = NX*NY
     NSPECIES = N_SPECIES
@@ -208,9 +249,9 @@
          YNODES(i+1) = YMIN + (YMAX-YMIN)/NY*i
       END DO
 
-      ! DSMC flowfield file
+      ! Flowfield file
 
-      WRITE(file_name,'(A, I0, A)') 'dsmc_flowfield_', tID, '.vtk'
+      WRITE(file_name,'(A, I8.8, A)') './dumps/flowfield_', tID, '.vtk'
 
       OPEN(54321, FILE=file_name, ACCESS='SEQUENTIAL', FORM='formatted', STATUS='new')
 
@@ -280,6 +321,9 @@
 
   END SUBROUTINE GRID_SAVE
 
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! SUBROUTINE INIT_POSTPROCESS !!!!!!!!!!!!!!!!!!!!!!!!!!
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   SUBROUTINE INIT_POSTPROCESS
 
@@ -317,6 +361,72 @@
 
     AVG_CUMULATED = 0
 
+    ! Allocate and put to zero AVG_MOMENTS stuff
+    ALLOCATE(AVG_MOM_NP(LENGTH))
+
+    ALLOCATE(AVG_MOM_VX(LENGTH))
+    ALLOCATE(AVG_MOM_VY(LENGTH))
+    ALLOCATE(AVG_MOM_VZ(LENGTH))
+
+    ALLOCATE(AVG_MOM_Pxx(LENGTH)) 
+    ALLOCATE(AVG_MOM_Pxy(LENGTH))
+    ALLOCATE(AVG_MOM_Pxz(LENGTH))
+    ALLOCATE(AVG_MOM_Pyy(LENGTH))
+    ALLOCATE(AVG_MOM_Pyz(LENGTH))
+    ALLOCATE(AVG_MOM_Pzz(LENGTH))
+
+    ALLOCATE(AVG_MOM_Qxxx(LENGTH)) 
+    ALLOCATE(AVG_MOM_Qxxy(LENGTH))
+    ALLOCATE(AVG_MOM_Qxyy(LENGTH))
+    ALLOCATE(AVG_MOM_Qyyy(LENGTH))
+    ALLOCATE(AVG_MOM_Qyyz(LENGTH))
+    ALLOCATE(AVG_MOM_Qyzz(LENGTH))
+    ALLOCATE(AVG_MOM_Qxxz(LENGTH))
+    ALLOCATE(AVG_MOM_Qxzz(LENGTH))
+    ALLOCATE(AVG_MOM_Qzzz(LENGTH))
+    ALLOCATE(AVG_MOM_Qxyz(LENGTH))
+
+    ALLOCATE(AVG_MOM_qx(LENGTH)) 
+    ALLOCATE(AVG_MOM_qy(LENGTH))
+    ALLOCATE(AVG_MOM_qz(LENGTH))
+
+    ALLOCATE(AVG_MOM_Riijj(LENGTH))
+
+    ALLOCATE(AVG_MOM_Rxxjj(LENGTH))
+    ALLOCATE(AVG_MOM_Rxyjj(LENGTH))
+    ALLOCATE(AVG_MOM_Rxzjj(LENGTH))
+    ALLOCATE(AVG_MOM_Ryyjj(LENGTH))
+    ALLOCATE(AVG_MOM_Ryzjj(LENGTH))
+    ALLOCATE(AVG_MOM_Rzzjj(LENGTH)) 
+
+    ALLOCATE(AVG_MOM_Sxiijj(LENGTH)) 
+    ALLOCATE(AVG_MOM_Syiijj(LENGTH))
+    ALLOCATE(AVG_MOM_Sziijj(LENGTH))
+    
+
+    AVG_MOM_NP = 0;
+
+    AVG_MOM_VX = 0;     AVG_MOM_VY = 0;     AVG_MOM_VZ = 0 
+
+    AVG_MOM_Pxx = 0;    AVG_MOM_Pxy = 0;    AVG_MOM_Pxz = 0;  
+    AVG_MOM_Pyy = 0;    AVG_MOM_Pyz = 0;    AVG_MOM_Pzz = 0 
+
+    AVG_MOM_Qxxx = 0;   AVG_MOM_Qxxy = 0;   AVG_MOM_Qxyy = 0
+    AVG_MOM_Qyyy = 0;   AVG_MOM_Qyyz = 0;   AVG_MOM_Qyzz = 0
+    AVG_MOM_Qxxz = 0;   AVG_MOM_Qxzz = 0;   AVG_MOM_Qzzz = 0
+    AVG_MOM_Qxyz = 0 
+
+    AVG_MOM_qx = 0;     AVG_MOM_qy = 0;     AVG_MOM_qz = 0
+
+    AVG_MOM_Riijj = 0 
+
+    AVG_MOM_Rxxjj = 0;  AVG_MOM_Rxyjj = 0;  AVG_MOM_Rxzjj = 0
+    AVG_MOM_Ryyjj = 0;  AVG_MOM_Ryzjj = 0;  AVG_MOM_Rzzjj = 0
+
+    AVG_MOM_Sxiijj = 0; AVG_MOM_Syiijj = 0; AVG_MOM_Sziijj = 0 
+
+    AVG_MOM_CUMULATED = 0
+
   END SUBROUTINE INIT_POSTPROCESS
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -343,5 +453,619 @@
     AVG_CUMULATED = 0
 
   END SUBROUTINE GRID_RESET
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! SUBROUTINE GRID_AVG_MOMENTS -> Adds timestep to cumulative average !!!
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  SUBROUTINE GRID_AVG_MOMENTS
+
+    IMPLICIT NONE
+
+    INTEGER                            :: NCELLS, NSPECIES
+    INTEGER                            :: JP, JC, JS, INDEX
+
+    REAL(KIND=8)                       :: KB
+    REAL(KIND=8)                       :: MASS, CX_NOW, CY_NOW, CZ_NOW, C2_NOW
+
+    INTEGER, DIMENSION(:), ALLOCATABLE      :: TIMESTEP_NP
+
+    INTEGER, DIMENSION(:), ALLOCATABLE      :: TIMESTEP_N
+ 
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_VX
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_VY
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_VZ
+
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_VX2
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_VY2
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_VZ2
+ 
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_TTRX
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_TTRY
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_TTRZ
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_TTR
+
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Pxx
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Pxy
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Pxz
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Pyy
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Pyz
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Pzz
+
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Qxxx
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Qxxy
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Qxyy
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Qyyy
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Qyyz
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Qyzz
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Qxxz
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Qxzz
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Qzzz
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Qxyz
+
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_qx
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_qy
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_qz
+
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Riijj
+
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Rxxjj
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Rxyjj
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Rxzjj
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Ryyjj
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Ryzjj
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Rzzjj
+
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Sxiijj
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Syiijj
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_Sziijj
+
+    INTEGER :: LENGTH
+
+    KB = 1.38064852E-23
+
+    LENGTH = NX*NY * N_SPECIES
+
+    ALLOCATE(TIMESTEP_NP(LENGTH))
+    ALLOCATE(TIMESTEP_N(LENGTH))
+ 
+    ALLOCATE(TIMESTEP_VX(LENGTH))
+    ALLOCATE(TIMESTEP_VY(LENGTH))
+    ALLOCATE(TIMESTEP_VZ(LENGTH))
+
+    ALLOCATE(TIMESTEP_VX2(LENGTH)) 
+    ALLOCATE(TIMESTEP_VY2(LENGTH))
+    ALLOCATE(TIMESTEP_VZ2(LENGTH))
+ 
+    ALLOCATE(TIMESTEP_TTRX(LENGTH)) 
+    ALLOCATE(TIMESTEP_TTRY(LENGTH))
+    ALLOCATE(TIMESTEP_TTRZ(LENGTH)) 
+    ALLOCATE(TIMESTEP_TTR(LENGTH))
+
+    ALLOCATE(TIMESTEP_Pxx(LENGTH)) 
+    ALLOCATE(TIMESTEP_Pxy(LENGTH))
+    ALLOCATE(TIMESTEP_Pxz(LENGTH))
+    ALLOCATE(TIMESTEP_Pyy(LENGTH))
+    ALLOCATE(TIMESTEP_Pyz(LENGTH))
+    ALLOCATE(TIMESTEP_Pzz(LENGTH))
+
+    ALLOCATE(TIMESTEP_Qxxx(LENGTH)) 
+    ALLOCATE(TIMESTEP_Qxxy(LENGTH))
+    ALLOCATE(TIMESTEP_Qxyy(LENGTH))
+    ALLOCATE(TIMESTEP_Qyyy(LENGTH))
+    ALLOCATE(TIMESTEP_Qyyz(LENGTH))
+    ALLOCATE(TIMESTEP_Qyzz(LENGTH))
+    ALLOCATE(TIMESTEP_Qxxz(LENGTH))
+    ALLOCATE(TIMESTEP_Qxzz(LENGTH))
+    ALLOCATE(TIMESTEP_Qzzz(LENGTH))
+    ALLOCATE(TIMESTEP_Qxyz(LENGTH))
+
+    ALLOCATE(TIMESTEP_qx(LENGTH)) 
+    ALLOCATE(TIMESTEP_qy(LENGTH))
+    ALLOCATE(TIMESTEP_qz(LENGTH))
+
+    ALLOCATE(TIMESTEP_Riijj(LENGTH))
+
+    ALLOCATE(TIMESTEP_Rxxjj(LENGTH))
+    ALLOCATE(TIMESTEP_Rxyjj(LENGTH))
+    ALLOCATE(TIMESTEP_Rxzjj(LENGTH))
+    ALLOCATE(TIMESTEP_Ryyjj(LENGTH))
+    ALLOCATE(TIMESTEP_Ryzjj(LENGTH))
+    ALLOCATE(TIMESTEP_Rzzjj(LENGTH)) 
+
+    ALLOCATE(TIMESTEP_Sxiijj(LENGTH)) 
+    ALLOCATE(TIMESTEP_Syiijj(LENGTH))
+    ALLOCATE(TIMESTEP_Sziijj(LENGTH))
+    
+
+    TIMESTEP_NP = 0;     TIMESTEP_N  = 0
+
+    TIMESTEP_VX = 0;     TIMESTEP_VY = 0;     TIMESTEP_VZ = 0 
+    TIMESTEP_VX2 = 0;    TIMESTEP_VY2 = 0;    TIMESTEP_VZ2 = 0 
+    
+    TIMESTEP_TTRX = 0;   TIMESTEP_TTRY = 0;   TIMESTEP_TTRZ = 0;   
+    TIMESTEP_TTR  = 0 
+
+    TIMESTEP_Pxx = 0;    TIMESTEP_Pxy = 0;    TIMESTEP_Pxz = 0;  
+    TIMESTEP_Pyy = 0;    TIMESTEP_Pyz = 0;    TIMESTEP_Pzz = 0 
+
+    TIMESTEP_Qxxx = 0;   TIMESTEP_Qxxy = 0;   TIMESTEP_Qxyy = 0
+    TIMESTEP_Qyyy = 0;   TIMESTEP_Qyyz = 0;   TIMESTEP_Qyzz = 0
+    TIMESTEP_Qxxz = 0;   TIMESTEP_Qxzz = 0;   TIMESTEP_Qzzz = 0
+    TIMESTEP_Qxyz = 0 
+
+    TIMESTEP_qx = 0;     TIMESTEP_qy = 0;     TIMESTEP_qz = 0
+
+    TIMESTEP_Riijj = 0 
+
+    TIMESTEP_Rxxjj = 0;  TIMESTEP_Rxyjj = 0;  TIMESTEP_Rxzjj = 0
+    TIMESTEP_Ryyjj = 0;  TIMESTEP_Ryzjj = 0;  TIMESTEP_Rzzjj = 0
+
+    TIMESTEP_Sxiijj = 0; TIMESTEP_Syiijj = 0; TIMESTEP_Sziijj = 0 
+
+    ! Define internal variables..
+    NCELLS = NX*NY
+    NSPECIES = N_SPECIES
+
+    ! Compute average values for this timestep on this process
+
+    ! Number of particles and velocities
+    DO JP = 1, NP_PROC
+      JC = particles(JP)%IC
+      JS = particles(JP)%S_ID
+      INDEX = JC+NCELLS*(JS-1)
+      TIMESTEP_NP(INDEX) = TIMESTEP_NP(INDEX) + 1
+    END DO
+
+    ! Velocity
+    DO JP = 1, NP_PROC
+
+      ! Check that we have at least 1 particle in the cell
+      IF (TIMESTEP_NP(INDEX) .GT. 0) THEN 
+        JC = particles(JP)%IC
+        JS = particles(JP)%S_ID
+        INDEX = JC+NCELLS*(JS-1)
+        TIMESTEP_VX(INDEX) = TIMESTEP_VX(INDEX) + particles(JP)%VX/TIMESTEP_NP(INDEX) 
+        TIMESTEP_VY(INDEX) = TIMESTEP_VY(INDEX) + particles(JP)%VY/TIMESTEP_NP(INDEX)
+        TIMESTEP_VZ(INDEX) = TIMESTEP_VZ(INDEX) + particles(JP)%VZ/TIMESTEP_NP(INDEX)
+      END IF
+
+    END DO
+
+    ! Central moments
+    DO JP = 1, NP_PROC
+
+      ! Check that we have at least 1 particle in the cell
+      IF (TIMESTEP_NP(INDEX) .GT. 0) THEN 
+        JC = particles(JP)%IC
+        JS = particles(JP)%S_ID
+        INDEX = JC+NCELLS*(JS-1)
+        MASS  = SPECIES(JS)%MOLMASS ! [kg]
+
+        ! Peculiar velocities 
+        CX_NOW = particles(JP)%VX - TIMESTEP_VX(INDEX)
+        CY_NOW = particles(JP)%VY - TIMESTEP_VY(INDEX)
+        CZ_NOW = particles(JP)%VZ - TIMESTEP_VZ(INDEX)
+
+        C2_NOW = CX_NOW**2 + CY_NOW**2 + CZ_NOW**2
+
+        ! Compute pressure tensor
+        TIMESTEP_Pxx(INDEX) = TIMESTEP_Pxx(INDEX) + MASS*CX_NOW*CX_NOW*Fnum/CELL_VOL
+        TIMESTEP_Pxy(INDEX) = TIMESTEP_Pxy(INDEX) + MASS*CX_NOW*CY_NOW*Fnum/CELL_VOL
+        TIMESTEP_Pxz(INDEX) = TIMESTEP_Pxz(INDEX) + MASS*CX_NOW*CZ_NOW*Fnum/CELL_VOL
+        TIMESTEP_Pyy(INDEX) = TIMESTEP_Pyy(INDEX) + MASS*CY_NOW*CY_NOW*Fnum/CELL_VOL
+        TIMESTEP_Pyz(INDEX) = TIMESTEP_Pyz(INDEX) + MASS*CY_NOW*CZ_NOW*Fnum/CELL_VOL
+        TIMESTEP_Pzz(INDEX) = TIMESTEP_Pzz(INDEX) + MASS*CZ_NOW*CZ_NOW*Fnum/CELL_VOL
+
+        ! Heat flux vector components
+        TIMESTEP_qx(INDEX) = TIMESTEP_qx(INDEX) + MASS*CX_NOW*C2_NOW*Fnum/CELL_VOL
+        TIMESTEP_qy(INDEX) = TIMESTEP_qy(INDEX) + MASS*CY_NOW*C2_NOW*Fnum/CELL_VOL
+        TIMESTEP_qz(INDEX) = TIMESTEP_qz(INDEX) + MASS*CZ_NOW*C2_NOW*Fnum/CELL_VOL
+
+        ! Heat flux tensor components
+        TIMESTEP_Qxxx(INDEX) = TIMESTEP_Qxxx(INDEX) + MASS*CX_NOW*CX_NOW*CX_NOW*Fnum/CELL_VOL
+        TIMESTEP_Qxxy(INDEX) = TIMESTEP_Qxxy(INDEX) + MASS*CX_NOW*CX_NOW*CY_NOW*Fnum/CELL_VOL
+        TIMESTEP_Qxyy(INDEX) = TIMESTEP_Qxyy(INDEX) + MASS*CX_NOW*CY_NOW*CY_NOW*Fnum/CELL_VOL
+        TIMESTEP_Qyyy(INDEX) = TIMESTEP_Qyyy(INDEX) + MASS*CY_NOW*CY_NOW*CY_NOW*Fnum/CELL_VOL
+        TIMESTEP_Qyyz(INDEX) = TIMESTEP_Qyyz(INDEX) + MASS*CY_NOW*CY_NOW*CZ_NOW*Fnum/CELL_VOL
+        TIMESTEP_Qyzz(INDEX) = TIMESTEP_Qyzz(INDEX) + MASS*CY_NOW*CZ_NOW*CZ_NOW*Fnum/CELL_VOL
+        TIMESTEP_Qzzz(INDEX) = TIMESTEP_Qzzz(INDEX) + MASS*CZ_NOW*CZ_NOW*CZ_NOW*Fnum/CELL_VOL
+        TIMESTEP_Qxxz(INDEX) = TIMESTEP_Qxxz(INDEX) + MASS*CX_NOW*CX_NOW*CZ_NOW*Fnum/CELL_VOL
+        TIMESTEP_Qxzz(INDEX) = TIMESTEP_Qxzz(INDEX) + MASS*CX_NOW*CZ_NOW*CZ_NOW*Fnum/CELL_VOL
+        TIMESTEP_Qxyz(INDEX) = TIMESTEP_Qxyz(INDEX) + MASS*CX_NOW*CY_NOW*CZ_NOW*Fnum/CELL_VOL
+
+        ! Riijj
+        TIMESTEP_Riijj(INDEX) = TIMESTEP_Riijj(INDEX) + MASS*C2_NOW*C2_NOW*Fnum/CELL_VOL
+
+        ! Rijkk
+        TIMESTEP_Rxxjj(INDEX) = TIMESTEP_Rxxjj(INDEX) + MASS*CX_NOW*CX_NOW*C2_NOW*Fnum/CELL_VOL
+        TIMESTEP_Rxyjj(INDEX) = TIMESTEP_Rxyjj(INDEX) + MASS*CX_NOW*CY_NOW*C2_NOW*Fnum/CELL_VOL
+        TIMESTEP_Rxzjj(INDEX) = TIMESTEP_Rxzjj(INDEX) + MASS*CX_NOW*CZ_NOW*C2_NOW*Fnum/CELL_VOL
+        TIMESTEP_Ryyjj(INDEX) = TIMESTEP_Ryyjj(INDEX) + MASS*CY_NOW*CY_NOW*C2_NOW*Fnum/CELL_VOL
+        TIMESTEP_Ryzjj(INDEX) = TIMESTEP_Ryzjj(INDEX) + MASS*CY_NOW*CZ_NOW*C2_NOW*Fnum/CELL_VOL
+        TIMESTEP_Rzzjj(INDEX) = TIMESTEP_Rzzjj(INDEX) + MASS*CZ_NOW*CZ_NOW*C2_NOW*Fnum/CELL_VOL
+
+        ! Sxiijj
+        TIMESTEP_Sxiijj(INDEX) = TIMESTEP_Sxiijj(INDEX) + MASS*CX_NOW*C2_NOW*C2_NOW*Fnum/CELL_VOL
+        TIMESTEP_Syiijj(INDEX) = TIMESTEP_Syiijj(INDEX) + MASS*CY_NOW*C2_NOW*C2_NOW*Fnum/CELL_VOL
+        TIMESTEP_Sziijj(INDEX) = TIMESTEP_Sziijj(INDEX) + MASS*CZ_NOW*C2_NOW*C2_NOW*Fnum/CELL_VOL
+
+      END IF
+
+    END DO
+
+    ! Translational Temperature
+    DO JP = 1, NP_PROC
+      JC = particles(JP)%IC
+      JS = particles(JP)%S_ID
+      INDEX = JC+NCELLS*(JS-1)
+      TIMESTEP_VX2(INDEX) = TIMESTEP_VX2(INDEX) + particles(JP)%VX*particles(JP)%VX
+      TIMESTEP_VY2(INDEX) = TIMESTEP_VY2(INDEX) + particles(JP)%VY*particles(JP)%VY
+      TIMESTEP_VZ2(INDEX) = TIMESTEP_VZ2(INDEX) + particles(JP)%VZ*particles(JP)%VZ
+    END DO
+
+
+    DO JC = 1, NCELLS
+      DO JS = 1, NSPECIES
+        INDEX = JC+NCELLS*(JS-1)
+        IF (TIMESTEP_NP(INDEX) .GT. 0) THEN
+          TIMESTEP_TTRX(INDEX) = SPECIES(JS)%MOLMASS / KB * (TIMESTEP_VX2(INDEX) / TIMESTEP_NP(INDEX) &
+                                - TIMESTEP_VX(INDEX)*TIMESTEP_VX(INDEX))
+          TIMESTEP_TTRY(INDEX) = SPECIES(JS)%MOLMASS / KB * (TIMESTEP_VY2(INDEX) / TIMESTEP_NP(INDEX) &
+                                - TIMESTEP_VY(INDEX)*TIMESTEP_VY(INDEX))
+          TIMESTEP_TTRZ(INDEX) = SPECIES(JS)%MOLMASS / KB * (TIMESTEP_VZ2(INDEX) / TIMESTEP_NP(INDEX) &
+                                - TIMESTEP_VZ(INDEX)*TIMESTEP_VZ(INDEX))
+        END IF
+      END DO
+    END DO
+
+
+
+    ! Master process collects data from all the processes
+    IF (PROC_ID .EQ. 0) THEN
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_NP,     NCELLS*NSPECIES, MPI_INTEGER,          MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_VX,     NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_VY,     NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_VZ,     NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Pxx,    NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Pxy,    NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Pxz,    NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Pyy,    NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Pyz,    NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Pzz,    NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Qxxx,   NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Qxxy,   NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Qxyy,   NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Qyyy,   NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Qyyz,   NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Qyzz,   NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Qzzz,   NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Qxxz,   NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Qxzz,   NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Qxyz,   NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_qx,     NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_qy,     NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_qz,     NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Riijj,  NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Rxxjj,  NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Rxyjj,  NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Rxzjj,  NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Ryyjj,  NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Ryzjj,  NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Rzzjj,  NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Sxiijj, NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Syiijj, NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_Sziijj, NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+     
+    ELSE
+!       CALL MPI_REDUCE(TIMESTEP_NP,  TIMESTEP_NP,  NCELLS*NSPECIES, MPI_INTEGER,          MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+!       CALL MPI_REDUCE(TIMESTEP_VX,   TIMESTEP_VX,   NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+!       CALL MPI_REDUCE(TIMESTEP_VY,   TIMESTEP_VY,   NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+!       CALL MPI_REDUCE(TIMESTEP_VZ,   TIMESTEP_VZ,   NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+!       CALL MPI_REDUCE(TIMESTEP_TTRX,   TIMESTEP_TTRX,   NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+!       CALL MPI_REDUCE(TIMESTEP_TTRY,   TIMESTEP_TTRY,   NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+!       CALL MPI_REDUCE(TIMESTEP_TTRZ,   TIMESTEP_TTRZ,   NCELLS*NSPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+    END IF
+
+    ! Add to cumulated average
+    AVG_MOM_NP     =  (AVG_MOM_NP*AVG_MOM_CUMULATED     +  TIMESTEP_NP     )/(AVG_MOM_CUMULATED + 1)     
+    
+    AVG_MOM_VX     =  (AVG_MOM_VX*AVG_MOM_CUMULATED     +  TIMESTEP_VX     )/(AVG_MOM_CUMULATED + 1) 
+    AVG_MOM_VY     =  (AVG_MOM_VY*AVG_MOM_CUMULATED     +  TIMESTEP_VY     )/(AVG_MOM_CUMULATED + 1) 
+    AVG_MOM_VZ     =  (AVG_MOM_VZ*AVG_MOM_CUMULATED     +  TIMESTEP_VZ     )/(AVG_MOM_CUMULATED + 1) 
+    
+    AVG_MOM_Pxx    =  (AVG_MOM_Pxx*AVG_MOM_CUMULATED    +  TIMESTEP_Pxx    )/(AVG_MOM_CUMULATED + 1) 
+    AVG_MOM_Pxy    =  (AVG_MOM_Pxy*AVG_MOM_CUMULATED    +  TIMESTEP_Pxy    )/(AVG_MOM_CUMULATED + 1) 
+    AVG_MOM_Pxz    =  (AVG_MOM_Pxz*AVG_MOM_CUMULATED    +  TIMESTEP_Pxz    )/(AVG_MOM_CUMULATED + 1) 
+    AVG_MOM_Pyy    =  (AVG_MOM_Pyy*AVG_MOM_CUMULATED    +  TIMESTEP_Pyy    )/(AVG_MOM_CUMULATED + 1) 
+    AVG_MOM_Pyz    =  (AVG_MOM_Pyz*AVG_MOM_CUMULATED    +  TIMESTEP_Pyz    )/(AVG_MOM_CUMULATED + 1) 
+    AVG_MOM_Pzz    =  (AVG_MOM_Pzz*AVG_MOM_CUMULATED    +  TIMESTEP_Pzz    )/(AVG_MOM_CUMULATED + 1) 
+    
+    AVG_MOM_Qxxx   =  (AVG_MOM_Qxxx*AVG_MOM_CUMULATED   +  TIMESTEP_Qxxx   )/(AVG_MOM_CUMULATED + 1) 
+    AVG_MOM_Qxxy   =  (AVG_MOM_Qxxy*AVG_MOM_CUMULATED   +  TIMESTEP_Qxxy   )/(AVG_MOM_CUMULATED + 1) 
+    AVG_MOM_Qxyy   =  (AVG_MOM_Qxyy*AVG_MOM_CUMULATED   +  TIMESTEP_Qxyy   )/(AVG_MOM_CUMULATED + 1) 
+    AVG_MOM_Qyyy   =  (AVG_MOM_Qyyy*AVG_MOM_CUMULATED   +  TIMESTEP_Qyyy   )/(AVG_MOM_CUMULATED + 1) 
+    AVG_MOM_Qyyz   =  (AVG_MOM_Qyyz*AVG_MOM_CUMULATED   +  TIMESTEP_Qyyz   )/(AVG_MOM_CUMULATED + 1) 
+    AVG_MOM_Qyzz   =  (AVG_MOM_Qyzz*AVG_MOM_CUMULATED   +  TIMESTEP_Qyzz   )/(AVG_MOM_CUMULATED + 1) 
+    AVG_MOM_Qzzz   =  (AVG_MOM_Qzzz*AVG_MOM_CUMULATED   +  TIMESTEP_Qzzz   )/(AVG_MOM_CUMULATED + 1) 
+    AVG_MOM_Qxxz   =  (AVG_MOM_Qxxz*AVG_MOM_CUMULATED   +  TIMESTEP_Qxxz   )/(AVG_MOM_CUMULATED + 1) 
+    AVG_MOM_Qxzz   =  (AVG_MOM_Qxzz*AVG_MOM_CUMULATED   +  TIMESTEP_Qxzz   )/(AVG_MOM_CUMULATED + 1) 
+    AVG_MOM_Qxyz   =  (AVG_MOM_Qxyz*AVG_MOM_CUMULATED   +  TIMESTEP_Qxyz   )/(AVG_MOM_CUMULATED + 1) 
+    
+    AVG_MOM_qx     =  (AVG_MOM_qx*AVG_MOM_CUMULATED     +  TIMESTEP_qx     )/(AVG_MOM_CUMULATED + 1) 
+    AVG_MOM_qy     =  (AVG_MOM_qy*AVG_MOM_CUMULATED     +  TIMESTEP_qy     )/(AVG_MOM_CUMULATED + 1) 
+    AVG_MOM_qz     =  (AVG_MOM_qz*AVG_MOM_CUMULATED     +  TIMESTEP_qz     )/(AVG_MOM_CUMULATED + 1) 
+    
+    AVG_MOM_Riijj  =  (AVG_MOM_Riijj*AVG_MOM_CUMULATED  +  TIMESTEP_Riijj  )/(AVG_MOM_CUMULATED + 1) 
+    
+    AVG_MOM_Rxxjj  =  (AVG_MOM_Rxxjj*AVG_MOM_CUMULATED  +  TIMESTEP_Rxxjj  )/(AVG_MOM_CUMULATED + 1) 
+    AVG_MOM_Rxyjj  =  (AVG_MOM_Rxyjj*AVG_MOM_CUMULATED  +  TIMESTEP_Rxyjj  )/(AVG_MOM_CUMULATED + 1) 
+    AVG_MOM_Rxzjj  =  (AVG_MOM_Rxzjj*AVG_MOM_CUMULATED  +  TIMESTEP_Rxzjj  )/(AVG_MOM_CUMULATED + 1) 
+    AVG_MOM_Ryyjj  =  (AVG_MOM_Ryyjj*AVG_MOM_CUMULATED  +  TIMESTEP_Ryyjj  )/(AVG_MOM_CUMULATED + 1) 
+    AVG_MOM_Ryzjj  =  (AVG_MOM_Ryzjj*AVG_MOM_CUMULATED  +  TIMESTEP_Ryzjj  )/(AVG_MOM_CUMULATED + 1) 
+    AVG_MOM_Rzzjj  =  (AVG_MOM_Rzzjj*AVG_MOM_CUMULATED  +  TIMESTEP_Rzzjj  )/(AVG_MOM_CUMULATED + 1) 
+    
+    AVG_MOM_Sxiijj =  (AVG_MOM_Sxiijj*AVG_MOM_CUMULATED +  TIMESTEP_Sxiijj )/(AVG_MOM_CUMULATED + 1) 
+    AVG_MOM_Syiijj =  (AVG_MOM_Syiijj*AVG_MOM_CUMULATED +  TIMESTEP_Syiijj )/(AVG_MOM_CUMULATED + 1)
+    AVG_MOM_Sziijj =  (AVG_MOM_Sziijj*AVG_MOM_CUMULATED +  TIMESTEP_Sziijj )/(AVG_MOM_CUMULATED + 1)
+
+    AVG_MOM_CUMULATED = AVG_MOM_CUMULATED + 1
+
+    
+  END SUBROUTINE GRID_AVG_MOMENTS
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! SUBROUTINE GRID_RESET_MOMENTS -> Resets cumulated average !!!!!!!!!!!!!!!!!!
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  SUBROUTINE GRID_RESET_MOMENTS
+
+    IMPLICIT NONE
+
+    AVG_MOM_NP     = 0 
+    
+    AVG_MOM_VX     = 0 
+    AVG_MOM_VY     = 0 
+    AVG_MOM_VZ     = 0 
+    
+    AVG_MOM_Pxx    = 0 
+    AVG_MOM_Pxy    = 0 
+    AVG_MOM_Pxz    = 0 
+    AVG_MOM_Pyy    = 0 
+    AVG_MOM_Pyz    = 0 
+    AVG_MOM_Pzz    = 0 
+    
+    AVG_MOM_Qxxx   = 0 
+    AVG_MOM_Qxxy   = 0 
+    AVG_MOM_Qxyy   = 0 
+    AVG_MOM_Qyyy   = 0 
+    AVG_MOM_Qyyz   = 0 
+    AVG_MOM_Qyzz   = 0 
+    AVG_MOM_Qzzz   = 0 
+    AVG_MOM_Qxxz   = 0 
+    AVG_MOM_Qxzz   = 0 
+    AVG_MOM_Qxyz   = 0 
+    
+    AVG_MOM_qx     = 0 
+    AVG_MOM_qy     = 0 
+    AVG_MOM_qz     = 0 
+    
+    AVG_MOM_Riijj  = 0 
+    
+    AVG_MOM_Rxxjj  = 0 
+    AVG_MOM_Rxyjj  = 0 
+    AVG_MOM_Rxzjj  = 0 
+    AVG_MOM_Ryyjj  = 0 
+    AVG_MOM_Ryzjj  = 0 
+    AVG_MOM_Rzzjj  = 0 
+    
+    AVG_MOM_Sxiijj = 0 
+    AVG_MOM_Syiijj = 0 
+    AVG_MOM_Sziijj = 0 
+
+    AVG_MOM_CUMULATED = 0
+
+  END SUBROUTINE GRID_RESET_MOMENTS
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! SUBROUTINE GRID_SAVE_MOMENTS -> Saves cumulated average !!!!!!!!!!!!
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  SUBROUTINE GRID_SAVE_MOMENTS
+    
+    IMPLICIT NONE
+
+    CHARACTER*30                       :: string, file_name
+
+    INTEGER                            :: NCELLS, NSPECIES
+    INTEGER                            :: i, JS, FIRST, LAST, JC
+
+    INTEGER      :: ID_xC, ID_yC, INDEX
+    REAL(KIND=8) :: DX_cell, DY_cell, x_centercell, y_centercell
+    REAL(KIND=8), DIMENSION(33) :: MOM_VECT
+    CHARACTER(LEN=512) :: FORMATTT
+
+    NCELLS = NX*NY
+    NSPECIES = N_SPECIES
+
+    IF (PROC_ID .EQ. 0) THEN
+
+      ! Format for writing the 33 moments
+!       FORMATTT = '(ES14.7,ES14.7,ES14.7,ES14.7,ES14.7,ES14.7,ES14.7,ES14.7,ES14.7,ES14.7,&
+!                   ES14.7,ES14.7,ES14.7,ES14.7,ES14.7,ES14.7,ES14.7,ES14.7,ES14.7,ES14.7,&
+!                   ES14.7,ES14.7,ES14.7,ES14.7,ES14.7,ES14.7,ES14.7,ES14.7,ES14.7,ES14.7,ES14.7,ES14.7,ES14.7)'
+
+      FORMATTT = '(ES14.7,A2,ES14.7,A2,ES14.7,A2,ES14.7,A2,ES14.7,A2,ES14.7,A2,ES14.7,A2,ES14.7,A2,ES14.7,A2,ES14.7,A2,&
+                   ES14.7,A2,ES14.7,A2,ES14.7,A2,ES14.7,A2,ES14.7,A2,ES14.7,A2,ES14.7,A2,ES14.7,A2,ES14.7,A2,ES14.7,A2,&
+                   ES14.7,A2,ES14.7,A2,ES14.7,A2,ES14.7,A2,ES14.7,A2,ES14.7,A2,ES14.7,A2,ES14.7,A2,ES14.7,A2,ES14.7,A2,&
+                   ES14.7,A2,ES14.7,A2,ES14.7)'
+
+
+      ! Moments file
+      WRITE(file_name,'(A, I8.8, A)') './dumps/moments_', tID, '.dat'
+
+      OPEN(12399, FILE=file_name, STATUS="replace", FORM="formatted")
+
+      WRITE(12399, '(A)') '# Format: '
+      WRITE(12399, '(A)') '# ( 1 ) Cell ID '
+      WRITE(12399, '(A)') '# ( 2 ) Position along x (center cell) '
+      WRITE(12399, '(A)') '# ( 3 ) Position along y (center cell) '
+      WRITE(12399, '(A)') '# ( 4 ) Time [s] '
+
+      WRITE(12399, '(A)') '# ( 5 ) n [1/m3] '
+
+      WRITE(12399, '(A)') '# ( 6 ) Ux [m/s] '
+      WRITE(12399, '(A)') '# ( 7 ) Uy [m/s] '
+      WRITE(12399, '(A)') '# ( 8 ) Uz [m/s] '
+
+      WRITE(12399, '(A)') '# ( 9 ) Pxx [m/s] '
+      WRITE(12399, '(A)') '# ( 10 ) Pxy [m/s] '
+      WRITE(12399, '(A)') '# ( 11 ) Pxz [m/s] '
+      WRITE(12399, '(A)') '# ( 12 ) Pyy [m/s] '
+      WRITE(12399, '(A)') '# ( 13 ) Pyz [m/s] '
+      WRITE(12399, '(A)') '# ( 14 ) Pzz [m/s] '
+
+      WRITE(12399, '(A)') '# ( 15 ) qx [m/s] '
+      WRITE(12399, '(A)') '# ( 16 ) qy [m/s] '
+      WRITE(12399, '(A)') '# ( 17 ) qz [m/s] '
+      
+      WRITE(12399, '(A)') '# ( 18 ) Qxxx [m/s] '
+      WRITE(12399, '(A)') '# ( 19 ) Qxxy [m/s] '
+      WRITE(12399, '(A)') '# ( 20 ) Qxyy [m/s] '
+      WRITE(12399, '(A)') '# ( 21 ) Qyyy [m/s] '
+      WRITE(12399, '(A)') '# ( 22 ) Qyyz [m/s] '
+      WRITE(12399, '(A)') '# ( 23 ) Qyzz [m/s] '
+      WRITE(12399, '(A)') '# ( 24 ) Qzzz [m/s] '
+      WRITE(12399, '(A)') '# ( 25 ) Qxxz [m/s] '
+      WRITE(12399, '(A)') '# ( 26 ) Qxzz [m/s] '
+      WRITE(12399, '(A)') '# ( 27 ) Qxyz [m/s] '
+
+      WRITE(12399, '(A)') '# ( 28 ) Riijj [m/s] '
+
+      WRITE(12399, '(A)') '# ( 29 ) Rxxjj [m/s] '
+      WRITE(12399, '(A)') '# ( 30 ) Rxyjj [m/s] '
+      WRITE(12399, '(A)') '# ( 31 ) Rxzjj [m/s] '
+      WRITE(12399, '(A)') '# ( 32 ) Ryyjj [m/s] '
+      WRITE(12399, '(A)') '# ( 33 ) Ryzjj [m/s] '
+      WRITE(12399, '(A)') '# ( 34 ) Rzzjj [m/s] '
+
+      WRITE(12399, '(A)') '# ( 35 ) Sxiijj [m/s] '
+      WRITE(12399, '(A)') '# ( 36 ) Syiijj [m/s] '
+      WRITE(12399, '(A)') '# ( 37 ) Sziijj [m/s] '
+
+      WRITE(12399, '(A)') '# THIS IS REPEATED FOR EVERY SPECIES PRESENT.'
+
+      WRITE(12399, '(A)') '' ! empty line
+
+      ! Loop on cells
+      DX_cell = (XMAX - XMIN)/NX ! Length of cells along x
+      DY_cell = (YMAX - YMIN)/NY ! Length of cells along y
+      
+      DO ID_xC = 1, NX
+        DO ID_yC = 1, NY
+
+          INDEX = (ID_yC-1)*NX + ID_xC 
+
+          ! Position of cell center
+          x_centercell = XMIN + DX_cell/2 + ID_xC*DX_cell
+          y_centercell = YMIN + DY_cell/2 + ID_yC*DY_cell
+  
+          WRITE(12399, '(I8, A4, ES14.7, A4, ES14.7, A4, ES14.7, A4)', advance="no") & 
+                        INDEX, '    ', x_centercell, '    ', y_centercell, '    ', CURRENT_TIME, '    '
+
+          ! Assemble moments vector
+          MOM_VECT(1)  = AVG_MOM_NP(INDEX) 
+          MOM_VECT(2)  = AVG_MOM_Vx(INDEX) 
+          MOM_VECT(3)  = AVG_MOM_Vy(INDEX) 
+          MOM_VECT(4)  = AVG_MOM_Vz(INDEX) 
+          MOM_VECT(5)  = AVG_MOM_Pxx(INDEX) 
+          MOM_VECT(6)  = AVG_MOM_Pxy(INDEX)
+          MOM_VECT(7)  = AVG_MOM_Pxz(INDEX)
+          MOM_VECT(8)  = AVG_MOM_Pyy(INDEX)
+          MOM_VECT(9)  = AVG_MOM_Pyz(INDEX)
+          MOM_VECT(10) = AVG_MOM_Pzz(INDEX)
+          MOM_VECT(11) = AVG_MOM_qx(INDEX) 
+          MOM_VECT(12) = AVG_MOM_qy(INDEX)
+          MOM_VECT(13) = AVG_MOM_qz(INDEX)
+          MOM_VECT(14) = AVG_MOM_Qxxx(INDEX) 
+          MOM_VECT(15) = AVG_MOM_Qxxy(INDEX)
+          MOM_VECT(16) = AVG_MOM_Qxyy(INDEX)
+          MOM_VECT(17) = AVG_MOM_Qyyy(INDEX)
+          MOM_VECT(18) = AVG_MOM_Qyyz(INDEX)
+          MOM_VECT(19) = AVG_MOM_Qyzz(INDEX)
+          MOM_VECT(20) = AVG_MOM_Qzzz(INDEX)
+          MOM_VECT(21) = AVG_MOM_Qxxz(INDEX)
+          MOM_VECT(22) = AVG_MOM_Qxzz(INDEX)
+          MOM_VECT(23) = AVG_MOM_Qxyz(INDEX)
+          MOM_VECT(24) = AVG_MOM_Riijj(INDEX)  
+          MOM_VECT(25) = AVG_MOM_Rxxjj(INDEX)
+          MOM_VECT(26) = AVG_MOM_Rxyjj(INDEX)
+          MOM_VECT(27) = AVG_MOM_Rxzjj(INDEX)
+          MOM_VECT(28) = AVG_MOM_Ryyjj(INDEX)
+          MOM_VECT(29) = AVG_MOM_Ryzjj(INDEX)
+          MOM_VECT(30) = AVG_MOM_Rzzjj(INDEX)
+          MOM_VECT(31) = AVG_MOM_Sxiijj(INDEX) 
+          MOM_VECT(32) = AVG_MOM_Syiijj(INDEX)
+          MOM_VECT(33) = AVG_MOM_Sziijj(INDEX)
+
+          ! Now loop on species
+          DO JS = 1, NSPECIES
+            ! WRITE(12399, FORMATTT, advance="no") (MOM_VECT(i), i = 1, SIZE(MOM_VECT)), '  '
+            WRITE(12399, FORMATTT, advance="no") MOM_VECT(1), '  ', &
+                                                 MOM_VECT(2), '  ', &
+                                                 MOM_VECT(3), '  ', &
+                                                 MOM_VECT(4), '  ', &
+                                                 MOM_VECT(5), '  ', &
+                                                 MOM_VECT(6), '  ', &
+                                                 MOM_VECT(7), '  ', &
+                                                 MOM_VECT(8), '  ', &
+                                                 MOM_VECT(9), '  ', &
+                                                 MOM_VECT(10), '  ', &
+                                                 MOM_VECT(11), '  ', &
+                                                 MOM_VECT(12), '  ', &
+                                                 MOM_VECT(13), '  ', &
+                                                 MOM_VECT(14), '  ', &
+                                                 MOM_VECT(15), '  ', &
+                                                 MOM_VECT(16), '  ', &
+                                                 MOM_VECT(17), '  ', &
+                                                 MOM_VECT(18), '  ', &
+                                                 MOM_VECT(19), '  ', &
+                                                 MOM_VECT(20), '  ', &
+                                                 MOM_VECT(21), '  ', &
+                                                 MOM_VECT(22), '  ', &
+                                                 MOM_VECT(23), '  ', &
+                                                 MOM_VECT(24), '  ', &
+                                                 MOM_VECT(25), '  ', &
+                                                 MOM_VECT(26), '  ', &
+                                                 MOM_VECT(27), '  ', &
+                                                 MOM_VECT(28), '  ', &
+                                                 MOM_VECT(29), '  ', &
+                                                 MOM_VECT(30), '  ', &
+                                                 MOM_VECT(31), '  ', &
+                                                 MOM_VECT(32), '  ', &
+                                                 MOM_VECT(33)
+
+          END DO
+
+          ! Finally, new line 
+          WRITE(12399, '(A)') '' 
+
+        END DO
+      END DO
+
+      CLOSE(12399)
+
+   END IF 
+
+  END SUBROUTINE GRID_SAVE_MOMENTS
+
+
 
 END MODULE postprocess

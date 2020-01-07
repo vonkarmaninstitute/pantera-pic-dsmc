@@ -36,7 +36,7 @@ for ii = 1:numel(files_list)
     xlim([-0.0005, 0.0005])
     ylim([-0.0005, 0.0005])
     
-    pause(0.001)
+    pause(0.1)
   end
 end 
 

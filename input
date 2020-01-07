@@ -17,11 +17,11 @@ Axial_symmetry_bool:
 Domain_limits:
     -0.0005  0.0005      -0.0005  0.0005      -0.5  0.5
 Domain_periodicity:
-    .TRUE.   .TRUE.   .TRUE.
+    .FALSE.   .TRUE.   .TRUE.
 Domain_specular:
     .FALSE.    .FALSE.    .FALSE.    .FALSE.
 Number_of_cells:
-    3  1  1
+    30  1  1
 
 ! ========= Numerical parameters ====================
 
@@ -71,9 +71,9 @@ Dump_part_directory: ! can be also "."
 Dump_grid_start:
     0
 Dump_grid_avgevery:
-    200000000
-Dump_grid_numavgs:
     1
+Dump_grid_numavgs:
+    5
 
 ! ========= Multispecies ==============================
 

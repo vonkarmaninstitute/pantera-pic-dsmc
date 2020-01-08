@@ -38,7 +38,7 @@ for ii = 1:size(nn, 2)
   hold on
   title(num2str(ii))
   xlabel('x [m]')
-  ylabel('Npart [-]')
+  ylabel('n [1/m3]')
 
   subplot(2,3,2)
   hold off

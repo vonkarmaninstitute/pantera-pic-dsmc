@@ -35,8 +35,8 @@ MODULE screen
          WRITE(*,*)  '  /  / / /_/ / / / / /_/  __/ /  / /_/ /    ______\(,  ,)   /V \              '
          WRITE(*,*)  ' /___| \__,_/_/ /_/\__/\___/_/   \__,_/        ____\\__/__~`V   ) ./          '
          WRITE(*,*)  '                                  V  V              V_M._V.M/\/` /            '
-         WRITE(*,*)  ' PArticle Numerical Tool for non-Equilibrium         \          /             '
-         WRITE(*,*)  '                            Reacting Aerodynamics     (__.,-_.,/              '
+         WRITE(*,*)  '                                                     \          /             '
+         WRITE(*,*)  '    Pantera Advection N` scatTERing Algorithms        (__.,-_.,/              '
          WRITE(*,*)
          WRITE(*,*)
          WRITE(*,*)

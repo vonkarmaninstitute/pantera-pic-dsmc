@@ -129,9 +129,16 @@ MODULE timecycle
 
    SUBROUTINE LINE_SOURCE_INJECT
   
+      ! This subroutine injects particles from all defined linesources.
+      ! The number of particles to be injected during a timestep DT was previously computed
+      ! and stored in LINESOURCES(i)%nfs.
+      ! Note that this is a floating point number! The actual number of particles to be 
+      ! injected will be incremented stochastically, if a random number is lower than the
+      ! decimal part of LINESOURCES(i)%nfs.
+
       IMPLICIT NONE
    
-      INTEGER      :: IP, IC, IS, NFS, ILINE
+      INTEGER      :: IP, IC, IS, NFS_INT, ILINE
       REAL(KIND=8) :: DTFRAC, POS
       REAL(KIND=8) :: UX_LSRC, UY_LSRC, UZ_LSRC, TTRA_LSRC, TROT_LSRC ! Working variables
       REAL(KIND=8) :: X, Y, Z, VX, VY, VZ, EI 
@@ -143,40 +150,43 @@ MODULE timecycle
       ! Linesource
       DO ILINE = 1, N_LINESOURCES
         
-         UX_LSRC = LINESOURCES(ILINE)%UX
-         UY_LSRC = LINESOURCES(ILINE)%UY
-         UZ_LSRC = LINESOURCES(ILINE)%UZ
+         UX_LSRC   = LINESOURCES(ILINE)%UX
+         UY_LSRC   = LINESOURCES(ILINE)%UY
+         UZ_LSRC   = LINESOURCES(ILINE)%UZ
          TTRA_LSRC = LINESOURCES(ILINE)%TTRA
          TROT_LSRC = LINESOURCES(ILINE)%TROT
+         S_ID      = LINESOURCES(ILINE)%S_ID
 
-         DO IS = 1, MIXTURES(LINESOURCES(ILINE)%MIX_ID)%N_COMPONENTS ! Loop on mixture components
+         M = SPECIES(S_ID)%MOLMASS
 
-            S_ID = MIXTURES(LINESOURCES(ILINE)%MIX_ID)%COMPONENTS(IS)%ID
-            M = SPECIES(S_ID)%MOLMASS
-            NFS = FLOOR(LINESOURCES(ILINE)%nfs(IS))
-            IF (LINESOURCES(ILINE)%nfs(IS)-REAL(NFS, KIND=8) .GE. rf()) THEN ! Same as SPARTA's perspeciess
-               NFS = NFS + 1
-            END IF
-   
-            DO IP = 1, NFS ! Loop on particles to be injected
-   
-               CALL MAXWELL(UX_LSRC, UY_LSRC, UZ_LSRC, &
-                            TTRA_LSRC, TTRA_LSRC, TTRA_LSRC, TROT_LSRC, &
-                            VX, VY, VZ, EI, M)
+         ! Number of particles to be injected is the lower integer of nfs, and we add or not one more particle
+         ! taking the remainder.
+         ! Example: if nfs = 44.7, we inject 44 particles, plus another one with probability 0.7.
 
-               DTFRAC = rf()*DT
-               POS = rf()
-               X = LINESOURCES(ILINE)%CX + (0.5-POS)*LINESOURCES(ILINE)%DX
-               Y = LINESOURCES(ILINE)%CY + (0.5-POS)*LINESOURCES(ILINE)%DY
-               Z = ZMIN + (ZMAX-ZMIN)*rf()
+         NFS_INT = FLOOR(LINESOURCES(ILINE)%nfs)
+         IF (LINESOURCES(ILINE)%nfs-REAL(NFS_INT, KIND=8) .GE. rf()) THEN ! Same as SPARTA's perspeciess
+            NFS_INT = NFS_INT + 1
+         END IF
    
-               CALL CELL_FROM_POSITION(X,Y,  IC)
+         ! Loop on particles and inject them
+         DO IP = 1, NFS_INT 
    
-               ! Init a particle object and assign it to the local vector of particles
-               CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EI,S_ID,IC,DTFRAC,  particleNOW)
-               CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles)
+            CALL MAXWELL(UX_LSRC, UY_LSRC, UZ_LSRC, &
+                         TTRA_LSRC, TTRA_LSRC, TTRA_LSRC, TROT_LSRC, &
+                         VX, VY, VZ, EI, M)
+
+            DTFRAC = rf()*DT
+            POS = rf()
+            X = LINESOURCES(ILINE)%CX + (0.5-POS)*LINESOURCES(ILINE)%DX
+            Y = LINESOURCES(ILINE)%CY + (0.5-POS)*LINESOURCES(ILINE)%DY
+            Z = ZMIN + (ZMAX-ZMIN)*rf()
    
-            END DO
+            CALL CELL_FROM_POSITION(X,Y,  IC)
+   
+            ! Init a particle object and assign it to the local vector of particles
+            CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EI,S_ID,IC,DTFRAC,  particleNOW)
+            CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles)
+   
          END DO
    
       END DO

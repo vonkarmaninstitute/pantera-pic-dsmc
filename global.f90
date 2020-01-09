@@ -141,7 +141,12 @@ MODULE global
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Particles injection from line source !!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   ! Not used anymore
+   ! Not used anymore OLD OLD OLD OLD
+   ! Not used anymore OLD OLD OLD OLD
+   ! Not used anymore OLD OLD OLD OLD
+   ! Not used anymore OLD OLD OLD OLD
+   ! Not used anymore OLD OLD OLD OLD
+   ! Not used anymore OLD OLD OLD OLD
    LOGICAL      :: BOOL_LINESOURCE = .FALSE. ! Assign default value!
   
    REAL(KIND=8) :: X_LINESOURCE, Y_LINESOURCE, L_LINESOURCE
@@ -161,9 +166,9 @@ MODULE global
       REAL(KIND=8) :: NRHO
       REAL(KIND=8) :: UX, UY, UZ
       REAL(KIND=8) :: TTRA, TROT ! No TTRAX_ TTRAY_ TTRAZ_ for now! IMPLEMENT IT!
-      INTEGER      :: MIX_ID
+      INTEGER      :: S_ID ! Id of species to be injected
 
-      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: nfs
+      REAL(KIND=8) :: nfs
       REAL(KIND=8) :: KAPPA
       REAL(KIND=8) :: U_NORM
       REAL(KIND=8) :: NORMX, NORMY

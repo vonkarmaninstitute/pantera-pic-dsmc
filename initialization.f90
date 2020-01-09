@@ -167,14 +167,6 @@ MODULE initialization
          END IF
 
          ! ~~~~~~~~~~~~~  Particle injection at line source ~~~~~~~~~~~
-         IF (line=='Linesource_bool:')      READ(in1,*)BOOL_LINESOURCE
-         IF (line=='Linesource_center:')    READ(in1,*)X_LINESOURCE, Y_LINESOURCE
-         IF (line=='Linesource_length_y:')  READ(in1,*)L_LINESOURCE
-         IF (line=='Linesource_dens:')      READ(in1,*)NRHO_LINESOURCE
-         IF (line=='Linesource_vel:')       READ(in1,*)UX_LINESOURCE, UY_LINESOURCE, UZ_LINESOURCE
-         IF (line=='Linesource_Ttra:')      READ(in1,*)TTRA_LINESOURCE
-         IF (line=='Linesource_Trot:')      READ(in1,*)TROT_LINESOURCE 
-
          IF (line=='Linesource:') THEN
             READ(in1,'(A)') LINESOURCE_DEFINITION
             CALL DEF_LINESOURCE(LINESOURCE_DEFINITION)
@@ -602,8 +594,7 @@ MODULE initialization
       INTEGER :: N_STR
       CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
 
-      CHARACTER*64 :: MIX_NAME
-      INTEGER      :: MIX_ID
+      CHARACTER*64 :: S_NAME
       TYPE(LINESOURCE), DIMENSION(:), ALLOCATABLE :: TEMP_LINESOURCES
 
       
@@ -626,10 +617,9 @@ MODULE initialization
       READ(STRARRAY(8), '(ES14.3)') LINESOURCES(N_LINESOURCES)%UZ
       READ(STRARRAY(9), '(ES14.3)') LINESOURCES(N_LINESOURCES)%TTRA
       READ(STRARRAY(10),'(ES14.3)') LINESOURCES(N_LINESOURCES)%TROT
-      READ(STRARRAY(11),'(A10)') MIX_NAME
+      READ(STRARRAY(11),'(A200)') S_NAME ! Species name
 
-      MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
-      LINESOURCES(N_LINESOURCES)%MIX_ID = MIX_ID
+      LINESOURCES(N_LINESOURCES)%S_ID = SPECIES_NAME_TO_ID(S_NAME)
 
    END SUBROUTINE
 
@@ -990,8 +980,6 @@ MODULE initialization
       REAL(KIND=8) :: Vth, Ainject, Linelength, FlxTot
 
 
-      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: nfs_LINE
- 
       REAL(KIND=8)  :: M, FRAC, KB
       INTEGER :: N_COMP, IS, S_ID, ILINE
     
@@ -1111,6 +1099,7 @@ MODULE initialization
       !
       ! We define a line source as a line in the X-Y plane (a plane in the X-Y-Z volume)
       ! AT which particles are injected following a distribution.
+      ! Every MPI process injects particles, which will be exchanged afterwards.
       ! Particles are injected at both sides of the linesource, so the computation of 
       ! the number of particles to be injected is simple:
       !
@@ -1122,34 +1111,20 @@ MODULE initialization
       ! Ndot_simulated = Ndot_real/Fnum = particles to be emitted per unit time
       ! 
       ! NtotINJECT = Ndot_simluated*dt
-      ! 
-      ! FOR mixtures, only the fraction FRAC is to be injected for each species.
-
+      !
+      ! NprocINJECT = NtotINJECT/N_processors 
       
       DO ILINE = 1, N_LINESOURCES ! Loop on line sources
-         WRITE(*,*) 'Mixture id is:', LINESOURCES(ILINE)%MIX_ID
-         N_COMP = MIXTURES(LINESOURCES(ILINE)%MIX_ID)%N_COMPONENTS
-         WRITE(*,*) 'NCOMP is:', N_COMP
 
-         ALLOCATE(nfs_LINE(N_COMP))
+         M                      = SPECIES(  LINESOURCES(ILINE)%S_ID  )%MOLMASS
+         Vth                    = SQRT(8*KB*LINESOURCES(ILINE)%TTRA/(PI*M)) ! Thermal velocity
+         Linelength             = SQRT(LINESOURCES(ILINE)%DX**2 + LINESOURCES(ILINE)%DY**2)
+         Ainject                = Linelength*(ZMAX-ZMIN)
+         FlxTot                 = LINESOURCES(ILINE)%NRHO*Vth/2
+         NtotINJECT             = Ainject*FlxTot*DT/Fnum
 
-         DO IS = 1, N_COMP ! Loop on mixture components
+         LINESOURCES(ILINE)%nfs  = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc (variable type: double!)
 
-            S_ID = MIXTURES(LINESOURCES(ILINE)%MIX_ID)%COMPONENTS(IS)%ID
-            M    = SPECIES(S_ID)%MOLMASS
-
-            Vth          = SQRT(8*KB*LINESOURCES(ILINE)%TTRA/(PI*M)) ! Thermal velocity
-            Linelength   = SQRT(LINESOURCES(ILINE)%DX**2 + LINESOURCES(ILINE)%DY**2)
-            Ainject      = Linelength*(ZMAX-ZMIN)
-            FRAC         = MIXTURES(LINESOURCES(ILINE)%MIX_ID)%COMPONENTS(IS)%MOLFRAC
-            FlxTot       = LINESOURCES(ILINE)%NRHO*FRAC*Vth/2
-            NtotINJECT   = Ainject*FlxTot*DT/Fnum
-            nfs_LINE(IS) = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
-
-         END DO
-
-         CALL MOVE_ALLOC(nfs_LINE, LINESOURCES(ILINE)%nfs)
-      
       END DO
 
 

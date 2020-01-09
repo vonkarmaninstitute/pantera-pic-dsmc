@@ -179,24 +179,9 @@ Boundaries_inject_mixture:
 
 ! ========== Injection from line source =============
 
-!! OLD !! Linesource_bool:
-!! OLD !!     .FALSE.
-!! OLD !! Linesource_center:
-!! OLD !!     0.5   0.
-!! OLD !! Linesource_length_y:
-!! OLD !!     0.2
-!! OLD !! Linesource_dens:
-!! OLD !!     1.e24
-!! OLD !! Linesource_vel:
-!! OLD !!     200.  0. 0.
-!! OLD !! Linesource_Ttra:
-!! OLD !!     0.0001
-!! OLD !! Linesource_Trot:
-!! OLD !!     0.
-
-!   x_center  y_center  length_x   length_y   density [1/m3]    Vx     Vy     Vz     Ttr         Trot   mix
+!   x_center  y_center  length_x   length_y   density [1/m3]    Vx     Vy     Vz     Ttr         Trot   species
 Linesource:
-    0.0       0.0       0.0        0.0001     1.0e17            0.0    0.0    0.0    100000.0    0.0    elec
+    0.0       0.0       0.0        0.0001     1.0e17            0.0    0.0    0.0    100000.0    0.0    e
 
 ! Linesource:
 !     0.5    0.0    0.0    -1.0    1.4e20    0.0    0.0    0.0    273.0    0.0    Argon2

@@ -141,37 +141,19 @@ MODULE global
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Particles injection from line source !!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   ! Not used anymore OLD OLD OLD OLD
-   ! Not used anymore OLD OLD OLD OLD
-   ! Not used anymore OLD OLD OLD OLD
-   ! Not used anymore OLD OLD OLD OLD
-   ! Not used anymore OLD OLD OLD OLD
-   ! Not used anymore OLD OLD OLD OLD
-   LOGICAL      :: BOOL_LINESOURCE = .FALSE. ! Assign default value!
-  
-   REAL(KIND=8) :: X_LINESOURCE, Y_LINESOURCE, L_LINESOURCE
-   REAL(KIND=8) :: NRHO_LINESOURCE
-   REAL(KIND=8) :: UX_LINESOURCE, UY_LINESOURCE, UZ_LINESOURCE
-   REAL(KIND=8) :: TTRA_LINESOURCE, TROT_LINESOURCE ! No TTRAX_ TTRAY_ TTRAZ_ for now! IMPLEMENT IT!
-
-   INTEGER      :: nfs_LINESOURCE
-   REAL(KIND=8) :: KAPPA_LINESOURCE
-   REAL(KIND=8) :: S_NORM_LINESOURCE
-
-   ! This is used instead.
    INTEGER         :: N_LINESOURCES = 0
 
    TYPE LINESOURCE
-      REAL(KIND=8) :: CX, CY, DX, DY
+      REAL(KIND=8) :: CX, CY, NORMX, NORMY, L
       REAL(KIND=8) :: NRHO
       REAL(KIND=8) :: UX, UY, UZ
       REAL(KIND=8) :: TTRA, TROT ! No TTRAX_ TTRAY_ TTRAZ_ for now! IMPLEMENT IT!
       INTEGER      :: S_ID ! Id of species to be injected
 
+      REAL(KIND=8) :: S_NORM
       REAL(KIND=8) :: nfs
       REAL(KIND=8) :: KAPPA
       REAL(KIND=8) :: U_NORM
-      REAL(KIND=8) :: NORMX, NORMY
    END TYPE LINESOURCE
 
    TYPE(LINESOURCE), DIMENSION(:), ALLOCATABLE :: LINESOURCES

@@ -17,7 +17,7 @@ Axial_symmetry_bool:
 Domain_limits:
     -0.0005  0.0005      -0.0005  0.0005      -0.5  0.5
 Domain_periodicity:
-    .FALSE.   .TRUE.   .TRUE.
+    .TRUE.   .TRUE.   .TRUE.
 Domain_specular:
     .FALSE.    .FALSE.    .FALSE.    .FALSE.
 Number_of_cells:
@@ -30,7 +30,7 @@ Fnum:  ! Ratio of real-to-simulated particles
 Timestep:
     1.E-12
 Number_of_timesteps:
-    500
+    200
 RNG_seed:
     12343
 
@@ -64,7 +64,7 @@ Dump_glob_mom_every: ! Global moments, averaged on the domain
     1
 
 Dump_part_every:
-    200000000
+    1
 Dump_part_directory: ! can be also "."
     /media/starlight/Maxtor/PANTERA_data_test_Boris/
 
@@ -82,18 +82,18 @@ Species_file:
     
 Def_mixture:
    elec e 1.0
- 
-Def_mixture:
-   Argonp Arp 1.0
- 
-Def_mixture:
-    Argon1 Ar1 1.0
-
-Def_mixture:
-    Argon2 Ar2 1.0
-
-Def_mixture:
-    collmix Ar1 0.5 Ar2 0.5
+!  
+! Def_mixture:
+!    Argonp Arp 1.0
+!  
+! Def_mixture:
+!     Argon1 Ar1 1.0
+! 
+! Def_mixture:
+!     Argon2 Ar2 1.0
+! 
+! Def_mixture:
+!     collmix Ar1 0.5 Ar2 0.5
     
     
 ! ========= Collisions ==============================
@@ -101,22 +101,22 @@ Def_mixture:
 Collision_type: ! [MCC / DSMC / BGK / CUSTOM_LOAD_RATES / NONE]
    NONE
 !  CUSTOM_LOAD_RATES
-
-CUSTOM_background_mass:
-  2.18E-25 ! Xenon
- 
-CUSTOM_background_dens:
-  1.4E20
-
-CUSTOM_excitation_energy_eV:
-8.315D0
-
-! Excitation energies:
-! 1st: 8.315, 2nd: 9.447, 3rd: 9.917, 4th: 11.7  eV ! For xenon
-
-CUSTOM_ionization_energy_eV:
-  12.13D0
-
+! 
+! CUSTOM_background_mass:
+!   2.18E-25 ! Xenon
+!  
+! CUSTOM_background_dens:
+!   1.4E20
+! 
+! CUSTOM_excitation_energy_eV:
+! 8.315D0
+! 
+! ! Excitation energies:
+! ! 1st: 8.315, 2nd: 9.447, 3rd: 9.917, 4th: 11.7  eV ! For xenon
+! 
+! CUSTOM_ionization_energy_eV:
+!   12.13D0
+! 
 ! BGK_model_type: ! [classical / small-mass-ratio]
 !   background
 !  
@@ -139,7 +139,7 @@ CUSTOM_ionization_energy_eV:
 ! DSMC VHS collisions  ! NOT IMPLEMENTED YET!
 ! 
 ! DSMC_collisions_mixture:
-!    collmix
+!    Argon1 
 ! 
 ! VSS_parameters_file:
 !     ./data/ar.vss
@@ -179,12 +179,17 @@ Boundaries_inject_mixture:
 
 ! ========== Injection from line source =============
 
-!   x_center  y_center  length_x   length_y   density [1/m3]    Vx     Vy     Vz     Ttr         Trot   species
+! FORMAT:  Length   x_center  y_center  norm_x  norm_y  nrho     Vx   Vy   Vz   Ttr        Trot   species
 Linesource:
-    0.0       0.0       0.0        0.0001     1.0e17            0.0    0.0    0.0    100000.0    0.0    e
+           0.0002    0.0       0.0      -0.2     -0.5     1.0e17   0.0  -50000000.0  0.0  100000.0   0.0    e 
 
-! Linesource:
-!     0.5    0.0    0.0    -1.0    1.4e20    0.0    0.0    0.0    273.0    0.0    Argon2
+
+!!!!   x_center  y_center  length_x   length_y   density [1/m3]    Vx     Vy     Vz     Ttr         Trot   species
+!!!! Linesource:
+!!!!     0.0       0.0       0.0        0.0001     1.0e17            0.0    0.0    0.0    100000.0    0.0    e
+!!!
+!!!! Linesource:
+!!!!     0.5    0.0    0.0    -1.0    1.4e20    0.0    0.0    0.0    273.0    0.0    Argon2
 
 
 ! ========= MPI parallelization =====================

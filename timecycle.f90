@@ -140,8 +140,9 @@ MODULE timecycle
    
       INTEGER      :: IP, IC, IS, NFS_INT, ILINE
       REAL(KIND=8) :: DTFRAC, POS
-      REAL(KIND=8) :: UX_LSRC, UY_LSRC, UZ_LSRC, TTRA_LSRC, TROT_LSRC ! Working variables
+      REAL(KIND=8) :: TTRA_LSRC, TROT_LSRC ! Working variables
       REAL(KIND=8) :: X, Y, Z, VX, VY, VZ, EI 
+      REAL(KIND=8) :: Vdummy, V_NORM, V_PERP
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
    
       INTEGER :: S_ID
@@ -150,9 +151,6 @@ MODULE timecycle
       ! Linesource
       DO ILINE = 1, N_LINESOURCES
         
-         UX_LSRC   = LINESOURCES(ILINE)%UX
-         UY_LSRC   = LINESOURCES(ILINE)%UY
-         UZ_LSRC   = LINESOURCES(ILINE)%UZ
          TTRA_LSRC = LINESOURCES(ILINE)%TTRA
          TROT_LSRC = LINESOURCES(ILINE)%TROT
          S_ID      = LINESOURCES(ILINE)%S_ID
@@ -171,19 +169,28 @@ MODULE timecycle
          ! Loop on particles and inject them
          DO IP = 1, NFS_INT 
    
-            CALL MAXWELL(UX_LSRC, UY_LSRC, UZ_LSRC, &
+            ! Call MAXWELL function to compute perpendicular velocity V_PERP and velocity VX
+            ! Use zero average velocities. We will add them later.
+            CALL MAXWELL(0.0D0, 0.0D0, 0.0D0, &
                          TTRA_LSRC, TTRA_LSRC, TTRA_LSRC, TROT_LSRC, &
-                         VX, VY, VZ, EI, M)
+                         Vdummy, V_PERP, VZ, EI, M)
 
+            ! Compute velocities using FLX function 
+            V_NORM = FLX(LINESOURCES(ILINE)%S_NORM, LINESOURCES(ILINE)%TTRA, M) !!AAAAAAAAAAA
+ 
+            VX = V_NORM*LINESOURCES(ILINE)%NORMX - V_PERP*LINESOURCES(ILINE)%NORMY + LINESOURCES(ILINE)%UX
+            VY = V_PERP*LINESOURCES(ILINE)%NORMX + V_NORM*LINESOURCES(ILINE)%NORMY + LINESOURCES(ILINE)%UY
+            VZ = VZ + LINESOURCES(ILINE)%UZ
+
+            ! Sample particle position
             DTFRAC = rf()*DT
             POS = rf()
-            X = LINESOURCES(ILINE)%CX + (0.5-POS)*LINESOURCES(ILINE)%DX
-            Y = LINESOURCES(ILINE)%CY + (0.5-POS)*LINESOURCES(ILINE)%DY
+            X = LINESOURCES(ILINE)%CX + (0.5-POS)*LINESOURCES(ILINE)%L*LINESOURCES(ILINE)%NORMY
+            Y = LINESOURCES(ILINE)%CY - (0.5-POS)*LINESOURCES(ILINE)%L*LINESOURCES(ILINE)%NORMX
             Z = ZMIN + (ZMAX-ZMIN)*rf()
    
-            CALL CELL_FROM_POSITION(X,Y,  IC)
-   
             ! Init a particle object and assign it to the local vector of particles
+            CALL CELL_FROM_POSITION(X,Y,  IC)
             CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EI,S_ID,IC,DTFRAC,  particleNOW)
             CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles)
    

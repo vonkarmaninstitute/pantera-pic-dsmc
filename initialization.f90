@@ -331,31 +331,6 @@ MODULE initialization
    
          END IF
 
-         ! ~~~~ Injection from line source ~~~~
-         WRITE(*,*) '  =========== Particle injection from line source ====================='
-
-         string = 'Particle injection from line source bool [T/F]:'
-         WRITE(*,'(A5,A50,L)') '     ', string, BOOL_LINESOURCE
-
-         IF (BOOL_LINESOURCE) THEN ! Only print if this is ON
- 
-            string = 'Line source center position [m]:'
-            WRITE(*,'(A5,A50,ES14.3,ES14.3)') '     ', string, X_LINESOURCE, Y_LINESOURCE
-   
-            string = 'Line source y-length [m]:'
-            WRITE(*,'(A5,A50,ES14.3)') '     ', string, L_LINESOURCE
-   
-            string = 'Line source injection number density [1/m^3]:'
-            WRITE(*,'(A5,A50,ES14.3)') '     ', string, NRHO_LINESOURCE
-   
-            string = 'Line source injection average velocities [m/s]:'
-            WRITE(*,'(A5,A50,ES14.3,ES14.3,ES14.3)')'     ',string,UX_LINESOURCE,UY_LINESOURCE,UZ_LINESOURCE
-   
-            string = 'Line source transl and rot Temps [K]:'
-            WRITE(*,'(A5,A50,ES14.3,ES14.3)') '     ', string, TTRA_LINESOURCE, TROT_LINESOURCE
-
-         END IF
-
          ! ~~~~ MPI parallelization ~~~~
          WRITE(*,*) '  =========== MPI parallelization settings ========================='
 
@@ -587,6 +562,10 @@ MODULE initialization
    
    SUBROUTINE DEF_LINESOURCE(DEFINITION)
 
+   !
+   ! Reads a "Linesource:" line from the input file and creates an entry in the LINESOURCES vector
+   !
+
       IMPLICIT NONE
 
       CHARACTER(LEN=*), INTENT(IN) :: DEFINITION
@@ -597,27 +576,26 @@ MODULE initialization
       CHARACTER*64 :: S_NAME
       TYPE(LINESOURCE), DIMENSION(:), ALLOCATABLE :: TEMP_LINESOURCES
 
-      
       ALLOCATE(TEMP_LINESOURCES(N_LINESOURCES+1)) ! Append the mixture to the list
       TEMP_LINESOURCES(1:N_LINESOURCES) = LINESOURCES
       CALL MOVE_ALLOC(TEMP_LINESOURCES, LINESOURCES)
-      N_LINESOURCES = N_LINESOURCES + 1
 
-
+      N_LINESOURCES = N_LINESOURCES + 1 ! Update number of line sources!
 
       CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
 
-      READ(STRARRAY(1), '(ES14.3)') LINESOURCES(N_LINESOURCES)%CX
-      READ(STRARRAY(2), '(ES14.3)') LINESOURCES(N_LINESOURCES)%CY
-      READ(STRARRAY(3), '(ES14.3)') LINESOURCES(N_LINESOURCES)%DX
-      READ(STRARRAY(4), '(ES14.3)') LINESOURCES(N_LINESOURCES)%DY
-      READ(STRARRAY(5), '(ES14.3)') LINESOURCES(N_LINESOURCES)%NRHO
-      READ(STRARRAY(6), '(ES14.3)') LINESOURCES(N_LINESOURCES)%UX
-      READ(STRARRAY(7), '(ES14.3)') LINESOURCES(N_LINESOURCES)%UY
-      READ(STRARRAY(8), '(ES14.3)') LINESOURCES(N_LINESOURCES)%UZ
-      READ(STRARRAY(9), '(ES14.3)') LINESOURCES(N_LINESOURCES)%TTRA
-      READ(STRARRAY(10),'(ES14.3)') LINESOURCES(N_LINESOURCES)%TROT
-      READ(STRARRAY(11),'(A200)') S_NAME ! Species name
+      READ(STRARRAY(1), '(ES14.3)') LINESOURCES(N_LINESOURCES)%L     ! Length
+      READ(STRARRAY(2), '(ES14.3)') LINESOURCES(N_LINESOURCES)%CX    ! Center position, x
+      READ(STRARRAY(3), '(ES14.3)') LINESOURCES(N_LINESOURCES)%CY    ! Center position, y
+      READ(STRARRAY(4), '(ES14.3)') LINESOURCES(N_LINESOURCES)%NORMX ! Normal along x
+      READ(STRARRAY(5), '(ES14.3)') LINESOURCES(N_LINESOURCES)%NORMY ! Normal along y
+      READ(STRARRAY(6), '(ES14.3)') LINESOURCES(N_LINESOURCES)%NRHO  ! Number density
+      READ(STRARRAY(7), '(ES14.3)') LINESOURCES(N_LINESOURCES)%UX    ! Velocity of gas, along x
+      READ(STRARRAY(8), '(ES14.3)') LINESOURCES(N_LINESOURCES)%UY    ! Velocity of gas, along y
+      READ(STRARRAY(9), '(ES14.3)') LINESOURCES(N_LINESOURCES)%UZ    ! Velocity of gas, along z
+      READ(STRARRAY(10),'(ES14.3)') LINESOURCES(N_LINESOURCES)%TTRA  ! Translational temperature
+      READ(STRARRAY(11),'(ES14.3)') LINESOURCES(N_LINESOURCES)%TROT  ! Rotational temperature
+      READ(STRARRAY(12),'(A200)')   S_NAME                           ! Species name
 
       LINESOURCES(N_LINESOURCES)%S_ID = SPECIES_NAME_TO_ID(S_NAME)
 
@@ -973,8 +951,9 @@ MODULE initialization
 
       IMPLICIT NONE
 
-      REAL(KIND=8) :: BETA, FLUXBOUND, NtotINJECT, Snow
-      ! REAL(KIND=8) :: U_NORM, S_NORM, FLUXLINESOURCE, NORMX, NORMY
+      REAL(KIND=8) :: BETA, FLUXBOUND, NtotINJECT, Snow, NORM_LEN
+      REAL(KIND=8) :: U_NORM, S_NORM, FLUXLINESOURCE
+
       REAL(KIND=8) :: PI, PI2  
 
       REAL(KIND=8) :: Vth, Ainject, Linelength, FlxTot
@@ -1098,34 +1077,87 @@ MODULE initialization
       ! ========= Injection from line sources ===============
       !
       ! We define a line source as a line in the X-Y plane (a plane in the X-Y-Z volume)
-      ! AT which particles are injected following a distribution.
+      ! from where particles are injected following a distribution.
       ! Every MPI process injects particles, which will be exchanged afterwards.
-      ! Particles are injected at both sides of the linesource, so the computation of 
-      ! the number of particles to be injected is simple:
+      ! Particles are injected at one side of the linesource only, indicated in the direction of
+      ! the normals NX and NY.
       !
-      ! Gamma = n v_th / 2 = flux of particles through a UNIT surface, both going right and left 
-      ! 
-      ! Ndot_real = Gamma*Asurf = flux of particles trough surface of area Asurf 
-      !                           In our case, Asurf = LINELENGTH * Zdomain
-      ! 
-      ! Ndot_simulated = Ndot_real/Fnum = particles to be emitted per unit time
-      ! 
-      ! NtotINJECT = Ndot_simluated*dt
-      !
-      ! NprocINJECT = NtotINJECT/N_processors 
-      
+      ! Can have multiple line sources and can be used as boundary injection 
+
       DO ILINE = 1, N_LINESOURCES ! Loop on line sources
 
-         M                      = SPECIES(  LINESOURCES(ILINE)%S_ID  )%MOLMASS
-         Vth                    = SQRT(8*KB*LINESOURCES(ILINE)%TTRA/(PI*M)) ! Thermal velocity
-         Linelength             = SQRT(LINESOURCES(ILINE)%DX**2 + LINESOURCES(ILINE)%DY**2)
-         Ainject                = Linelength*(ZMAX-ZMIN)
-         FlxTot                 = LINESOURCES(ILINE)%NRHO*Vth/2
-         NtotINJECT             = Ainject*FlxTot*DT/Fnum
+         ! FIRST, renormalize "normals" to be sure
+         NORM_LEN = SQRT(LINESOURCES(ILINE)%NORMX**2 + LINESOURCES(ILINE)%NORMY**2)
 
-         LINESOURCES(ILINE)%nfs  = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc (variable type: double!)
+         LINESOURCES(ILINE)%NORMX = LINESOURCES(ILINE)%NORMX/NORM_LEN
+         LINESOURCES(ILINE)%NORMY = LINESOURCES(ILINE)%NORMY/NORM_LEN
+
+         ! The species ID of the component
+         S_ID = LINESOURCES(ILINE)%S_ID
+         M    = SPECIES(S_ID)%MOLMASS
+         BETA = 1./SQRT(2.*KB/M*LINESOURCES(ILINE)%TTRA) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
+
+         ! OLD ! LINELENGTH = LINESOURCES(ILINE)%L
+         ! OLD ! NORMX = LINESOURCES(ILINE)%DY/LINELENGTH
+         ! OLD ! LINESOURCES(ILINE)%NORMX = NORMX
+         ! OLD ! NORMY = - LINESOURCES(ILINE)%DX/LINELENGTH
+         ! OLD ! LINESOURCES(ILINE)%NORMY = NORMY
+
+
+         ! Compute normal velocity and parameters..
+         U_NORM = LINESOURCES(ILINE)%UX * LINESOURCES(ILINE)%NORMX &
+                + LINESOURCES(ILINE)%UY * LINESOURCES(ILINE)%NORMY ! Velocity normal to the line. Can be negative!
+
+         S_NORM = U_NORM*BETA
+         LINESOURCES(ILINE)%S_NORM = S_NORM
+         Snow   = S_NORM     ! temp variable
+
+         ! Total number flux passing through a surface, from a Maxwellian distribution with nonzero average velocity:
+         ! FLUX = nrho * v_thermal / 4 * exp(-S^2) + sqrt(pi)*S*(1 + erf(S))
+         ! with S the speed ratio, S = U_NORM/BETA, and v_thermal = 2*BETA/sqrt(pi)
+
+         FLUXLINESOURCE = LINESOURCES(ILINE)%NRHO/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) &
+                                 + SQRT(PI)*Snow*(1.+ERF1(Snow)))         ! Tot number flux emitted 
+
+         NtotINJECT     = FLUXLINESOURCE*LINESOURCES(ILINE)%L*(ZMAX-ZMIN)*DT/FNUM   ! Tot num of particles to be injected
+
+         LINESOURCES(ILINE)%nfs = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
+
+         ! Check: if we are hypersonic and stuff exits domain print a warning
+         IF (S_NORM .LE. -3.) THEN
+            CALL ONLYMASTERPRINT1(PROC_ID, '$$$ Warning! Hypersonic boundary! Almost no &
+                                                &particles will be emitted at line source.')
+         END IF
 
       END DO
+
+
+      !!! OLD ! Particles are injected at both sides of the linesource, so the computation of 
+      !!! OLD ! the number of particles to be injected is simple:
+      !!! OLD !
+      !!! OLD ! Gamma = n v_th / 2 = flux of particles through a UNIT surface, both going right and left 
+      !!! OLD ! 
+      !!! OLD ! Ndot_real = Gamma*Asurf = flux of particles trough surface of area Asurf 
+      !!! OLD !                           In our case, Asurf = LINELENGTH * Zdomain
+      !!! OLD ! 
+      !!! OLD ! Ndot_simulated = Ndot_real/Fnum = particles to be emitted per unit time
+      !!! OLD ! 
+      !!! OLD ! NtotINJECT = Ndot_simluated*dt
+      !!! OLD !
+      !!! OLD ! NprocINJECT = NtotINJECT/N_processors 
+      !!! OLD 
+      !!! OLD DO ILINE = 1, N_LINESOURCES ! Loop on line sources
+
+      !!! OLD    M                      = SPECIES(  LINESOURCES(ILINE)%S_ID  )%MOLMASS
+      !!! OLD    Vth                    = SQRT(8*KB*LINESOURCES(ILINE)%TTRA/(PI*M)) ! Thermal velocity
+      !!! OLD    Linelength             = SQRT(LINESOURCES(ILINE)%DX**2 + LINESOURCES(ILINE)%DY**2)
+      !!! OLD    Ainject                = Linelength*(ZMAX-ZMIN)
+      !!! OLD    FlxTot                 = LINESOURCES(ILINE)%NRHO*Vth/2
+      !!! OLD    NtotINJECT             = Ainject*FlxTot*DT/Fnum
+
+      !!! OLD    LINESOURCES(ILINE)%nfs  = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc (variable type: double!)
+
+      !!! OLD END DO
 
 
    END SUBROUTINE INITINJECTION

@@ -854,6 +854,7 @@
     IMPLICIT NONE
 
     AVG_MOM_NP     = 0 
+    AVG_MOM_NRHO   = 0 
     
     AVG_MOM_VX     = 0 
     AVG_MOM_VY     = 0 

@@ -32,9 +32,9 @@ for ii = 1:numel(files_list)
     hold off
     plot(XX, YY, '.k', 'linewidth',2)
     hold on
-    plot([0,0], [-0.00005, 0.00005])
-    xlim([-0.0005, 0.0005])
-    ylim([-0.0005, 0.0005])
+    % plot([0,0], [-0.00005, 0.00005])
+    % xlim([-0.0005, 0.0005])
+    % ylim([-0.0005, 0.0005])
     grid on
     
     pause(0.1)

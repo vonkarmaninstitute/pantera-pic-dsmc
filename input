@@ -15,22 +15,22 @@
 Axial_symmetry_bool:
     .FALSE.
 Domain_limits:
-    -0.0005  0.0005      -0.0005  0.0005      -0.5  0.5
+    0.0  0.01   -0.005  0.005      -0.5  0.5
 Domain_periodicity:
     .TRUE.   .TRUE.   .TRUE.
 Domain_specular:
     .FALSE.    .FALSE.    .FALSE.    .FALSE.
 Number_of_cells:
-    400  1  1
+    2000  1  1
 
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0E4
+    1.0E12
 Timestep:
-    1.E-12
+    1.E-13
 Number_of_timesteps:
-    200
+    200000
 RNG_seed:
     12343
 
@@ -43,20 +43,20 @@ B_field_params_uniform:
     0.0
 
 E_field_type:  ! NONE/ SINE/ UNIFORM / POISSON
-   UNIFORM 
+    SINE
 
-E_field_params_uniform:
-   0.0
+! E_field_params_uniform:
+!    0.0
 
 !!!!! B_field_params_sin: 
 !!!!!     0.1 100 0 0 ! PARAM FOR SINE: 1) Amplitude [Tesla]   2) k wavenumber [1/m]   3) omega [rad/s]   4) phase phi [rad] 
 !!!!! 
-!!!!! E_field_type: ! NONE / SINE / GAUSSIAN / POISSON
-!!!!!     SINE
-!!!!! 
-!!!!! E_field_params_sin:
-!!!!!     10000 100 0 0 ! PARAM FOR SINE: 1) Amplitude [V/m]   2) k wavenumber [1/m]   3) omega [rad/s]   4) phase phi [rad] 
-!!!!! 
+E_field_type: ! NONE / SINE / GAUSSIAN / POISSON
+    SINE
+
+E_field_params_sin:
+    10000 2513.27412287183 0 0 ! PARAM FOR SINE: 1) Amplitude [V/m]   2) k wavenumber [1/m]   3) omega [rad/s]   4) phase phi [rad] 
+
 
 ! ========= Dump quantities =========================
 
@@ -64,7 +64,7 @@ Dump_glob_mom_every: ! Global moments, averaged on the domain
     1
 
 Dump_part_every:
-    1
+    1000000000
 Dump_part_directory: ! can be also "."
     /media/starlight/Maxtor/PANTERA_data_test_Boris/
 
@@ -73,7 +73,7 @@ Dump_grid_start:
 Dump_grid_avgevery:
     1
 Dump_grid_numavgs:
-    20
+    1
 
 ! ========= Multispecies ==============================
 
@@ -147,13 +147,13 @@ Collision_type: ! [MCC / DSMC / BGK / CUSTOM_LOAD_RATES / NONE]
 ! ========= Initial particle seed ===================
 
 Initial_particles_bool:
-    .FALSE.
+    .TRUE.
 Initial_particles_dens:
-    1.0e16
+    1.0e20
 Initial_particles_vel:
     0.  0.  0.
 Initial_particles_Ttra:
-    20000.  100000.  200000.
+    100000.  100000.  100000.
 Initial_particles_Trot:
     0. 
 Initial_particles_mixture:
@@ -179,10 +179,10 @@ Boundaries_inject_mixture:
 
 ! ========== Injection from line source =============
 
-! FORMAT:  Length   x_center  y_center  norm_x  norm_y  nrho     Vx   Vy   Vz   Ttr        Trot   species
-Linesource:
-           0.0002    0.0       0.0      -0.2     -0.5     1.0e17   0.0  -50000000.0  0.0  100000.0   0.0    e 
-
+! ! FORMAT:  Length   x_center  y_center  norm_x  norm_y  nrho     Vx   Vy   Vz   Ttr        Trot   species
+! Linesource:
+!            0.0002    0.0       0.0      -0.2     -0.5     1.0e17   0.0  -50000000.0  0.0  100000.0   0.0    e 
+! 
 
 !!!!   x_center  y_center  length_x   length_y   density [1/m3]    Vx     Vy     Vz     Ttr         Trot   species
 !!!! Linesource:

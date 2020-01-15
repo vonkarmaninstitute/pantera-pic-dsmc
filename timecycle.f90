@@ -19,7 +19,6 @@ MODULE timecycle
    IMPLICIT NONE
  
    INTEGER :: NP_TOT, NCOLL_TOT
-   REAL(KIND=8) :: CURRENT_TIME
 
    CHARACTER(len=512) :: stringTMP
 
@@ -60,7 +59,7 @@ MODULE timecycle
       ! PRINT*, "           > ATTENTION! I'm using a weird advection! Check timecycle.f90 ~~~~~~~~~~~~~~~"
       ! CALL ADVECT_0D_ExB_ANALYTICAL(dt) ! Advects only velocity
 
-      PRINT*, "           > ATTENTION! BCs NOT IMPLEMENTED! Check timecycle.f90"
+      PRINT*, "           > ATTENTION! BCs NOT COMPLETELY IMPLEMENTED! Check timecycle.f90"
       CALL ADVECT_BORIS
 
       ! ########### Exchange particles among processes ##########################

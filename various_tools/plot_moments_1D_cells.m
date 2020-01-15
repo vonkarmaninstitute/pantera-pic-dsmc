@@ -99,3 +99,16 @@ for ii = 1:size(nn, 2)
 %   ylim([0, 400])
   pause(0.1)
 end
+
+figure
+maxNN = max(max(nn));
+minNN = min(min(nn));
+
+for ii = 1:size(nn, 2)
+
+  plot(x_cc, nn(:, ii), '-b', 'linewidth', 2)
+
+  ylim([minNN, maxNN])
+  pause(0.5)
+end
+

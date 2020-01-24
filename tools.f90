@@ -109,14 +109,13 @@ CONTAINS
   ! It works also for monatomic, if you give Trot = 0.                 !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  SUBROUTINE MAXWELL(UX, UY, UZ, TX, TY, TZ, TR, VX, VY, VZ, EI, M)
+  SUBROUTINE MAXWELL(UX, UY, UZ, TX, TY, TZ, VX, VY, VZ, M)
 
   IMPLICIT NONE
 
-  REAL(KIND=8), INTENT(IN)    :: UX, UY, UZ, TX, TY, TZ, TR
-  !REAL(KIND=8), INTENT(IN)    :: RGAS !RGAS = KB / M
+  REAL(KIND=8), INTENT(IN)    :: UX, UY, UZ, TX, TY, TZ
   REAL(KIND=8), INTENT(IN)    :: M ! Molecular mass
-  REAL(KIND=8), INTENT(INOUT) :: VX, VY, VZ, EI
+  REAL(KIND=8), INTENT(INOUT) :: VX, VY, VZ
 
   INTEGER                     :: I
   REAL(KIND=8)                :: PI, PI2, KB
@@ -135,7 +134,7 @@ CONTAINS
   DO I = 1,3
 
      ! Step 1.
-     R = RAND()
+     R = rf()
       
      TETA = PI2*R
 
@@ -143,13 +142,11 @@ CONTAINS
      
      BETA = 1./SQRT(2.*KB/M*TT(I))
 
-     ! R goes from 0 to 1 included. Remove the extremes in a very rough way
+     ! R goes from 0 to 1 included. Remove the extremes
      ! or the log() will explode
-     !R = rf()*0.99999999999 + 1.0d-13 ! Please fix this!!!!! MAKE THIS ELEGANT!!!
-     ! Fixed at the root.
-     R1 = RAND()
+     R1 = rf()
       DO WHILE (R1 < 1.0D-13)
-         R1 = RAND()
+         R1 = rf()
       END DO
 
      RO = SQRT(-LOG(R1))/BETA ! The random number here shouldn't be correlated to the one for teta!!
@@ -164,18 +161,57 @@ CONTAINS
   VY = UY + VEL(2)
   VZ = UZ + VEL(3)
 
-  ! Step 4. 
-
-  R = RAND()
-  DO WHILE (R < 1.0D-13)
-    R = RAND()
-  END DO
-
-  EI = -LOG(R)*KB*TR
-
   RETURN
 
   END SUBROUTINE MAXWELL
+
+
+
+  SUBROUTINE INTERNAL_ENERGY(DOF, TEMP, EI)
+
+   IMPLICIT NONE
+
+   INTEGER, INTENT(IN)       :: DOF
+   REAL(KIND=8), INTENT(IN)  :: TEMP
+   REAL(KIND=8), INTENT(OUT) :: EI
+   REAL(KIND=8)              :: KB, R, X, PARAM
+
+   KB = 1.38064852E-23
+
+   IF (DOF .EQ. 0) THEN
+
+      EI = 0.
+   
+   ELSE IF (DOF .EQ. 2) THEN
+
+      R = rf()
+      DO WHILE (R < 1.0D-13)
+        R = rf()
+      END DO
+      EI = -LOG(R)*KB*TEMP
+
+   ELSE
+      
+      IF (DOF .EQ. 1) THEN
+         PARAM = 5.0
+      ELSE
+         PARAM = 0.01
+      END IF
+      R = rf()
+      X = -LOG(R)
+      R = rf()
+      DO WHILE ( R .GT. (X/PARAM)**(DOF/2.-1.) )
+         R = rf()
+         X = -LOG(R)
+         R = rf()
+      END DO
+      EI = X*KB*TEMP
+
+   END IF
+
+  END SUBROUTINE INTERNAL_ENERGY
+
+
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! SUBROUTINE DUMP_PARTICLES_SCREEN -> dumps particle properties on the screen !!!
@@ -240,10 +276,10 @@ CONTAINS
      ! Open file for writing
      OPEN(10, FILE=filename )
 
-     WRITE(10,*) '% Timestep | X | Y | Z | VX | VY | VZ | S_ID | proc_ID'
+     WRITE(10,*) '% Timestep | X | Y | Z | VX | VY | VZ | EROT | EVIB | S_ID | proc_ID'
      DO IP = 1, NP_PROC
         WRITE(10,*) TIMESTEP, particles(IP)%X, particles(IP)%Y, particles(IP)%Z, &
-        particles(IP)%VX, particles(IP)%VY, particles(IP)%VZ, particles(IP)%S_ID, PROC_ID
+        particles(IP)%VX, particles(IP)%VY, particles(IP)%VZ, particles(IP)%EROT, particles(IP)%EVIB, particles(IP)%S_ID, PROC_ID
      END DO
 
   END SUBROUTINE DUMP_PARTICLES_FILE
@@ -313,6 +349,29 @@ CONTAINS
   RETURN
 
   END FUNCTION FLX
+
+
+  SUBROUTINE THERMAL_BATH
+
+   IMPLICIT NONE
+
+   REAL(KIND=8)             :: VXP, VYP, VZP, M
+   INTEGER                  :: S_ID, JP
+
+   DO JP = 1, NP_PROC
+      S_ID = particles(JP)%S_ID
+      M = SPECIES(S_ID)%MOLECULAR_MASS
+      CALL MAXWELL(0.d0, 0.d0, 0.d0, &
+                   TBATH, TBATH, TBATH, &
+                   VXP, VYP, VZP, M)
+      
+      particles(JP)%VX = VXP
+      particles(JP)%VY = VYP
+      particles(JP)%VZ = VZP
+   END DO
+
+  END SUBROUTINE THERMAL_BATH
+
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! SUBROUTINE STRIP_COMMENTS -> strips a part of string containing a comment, !!

@@ -21,16 +21,16 @@ Domain_periodicity:
 Domain_specular:
     .TRUE.    .TRUE.    .TRUE.    .TRUE.
 Number_of_cells:
-    10  10  1
+    1  1  1
 
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0E14
+    1.0E12
 Timestep:
-    1.E-5
+    5.E-5
 Number_of_timesteps:
-    200000
+    10000
 !200000
 Stats_every:
     1
@@ -38,27 +38,24 @@ Stats_every:
 RNG_seed:
     12343
 Dump_part_every:
-    200001
+    10001
 
 Dump_grid_start:
-    200001   
+    0  
     
-!40000
 Dump_grid_avgevery:
-    20    
-!20
+    100   
+
 Dump_grid_numavgs:
-    9000
-!7000
+    1
+
 ! ========= Multispecies ==============================
 
 Species_file:
-    air.species
+    ar.species
     
 Def_mixture:
-    aria N2 0.8 O2 0.2
-    
-
+    Argon Ar 1.0
     
     
 ! ========= Collisions ==============================
@@ -75,24 +72,24 @@ MCC_species: ! NOT IMPLEMENTED YET!
 ! DSMC VHS collisions  ! NOT IMPLEMENTED YET!
 
 DSMC_collisions_mixture:
-    aria
+    Argon
 VSS_parameters_file:
-    air.vss
+    ar.vss
 
 ! ========= Initial particle seed ===================
 
 Initial_particles_bool:
     .TRUE.
 Initial_particles_dens:
-    5.0e19
+    1.0e17
 Initial_particles_vel:
     0.  0.  0.
 Initial_particles_Ttra:
-    10000.0 10000.0 10000.0
+    10000.0 1000.0 1000.0
 Initial_particles_Trot:
     0. 
 Initial_particles_mixture:
-    aria
+    Argon
 ! ========== Injection from boundaries ==============
 
 Boundaries_inject_bool:
@@ -129,9 +126,10 @@ Linesource_Trot:
 
 !   center       length        density  velocity xyz         Ttr      Trot   mix
 !Linesource:
-!    -0.5    0.0    0.0    1.0    1.0e19    6000.0    -2000.0    3000.0    1000.0    0.0    aria
+!    -0.5    0.0    0.0    1.0    2.8e20    0.0    0.0    0.0    273.0    0.0    Argon
 !Linesource:
-!    0.5    0.0    0.0    -1.0    1.0e19    6000.0    -2000.0    3000.0    1000.0    0.0    aria
+!    0.5    0.0    0.0    -1.0    2.8e20    0.0    0.0    0.0    273.0    0.0    Helium
+
 !Linesource:
 !    0.0    -0.5    -1.0    0.0    1.0e19    6000.0    -2000.0    3000.0    1000.0    0.0    aria
 !Linesource:

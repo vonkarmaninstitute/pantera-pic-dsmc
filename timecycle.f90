@@ -26,8 +26,15 @@ MODULE timecycle
    NP_TOT = 0
    CALL INIT_POSTPROCESS
    
-   ! Dump particles before the first time step, but after the initial seeding
+   ! Dump particles and flowfield before the first time step, but after the initial seeding
    CALL DUMP_PARTICLES_FILE(0)
+   IF (DUMP_GRID_START .EQ. 0 .AND. DUMP_GRID_N_AVG .EQ. 1) THEN
+      CALL GRID_AVG
+      CALL GRID_SAVE
+      CALL GRID_RESET
+   END IF
+
+
    tID = 1
    CALL CPU_TIME(START_CPU_TIME)
    DO WHILE (tID .LE. NT)
@@ -69,6 +76,9 @@ MODULE timecycle
 
       IF (BOOL_DSMC) CALL DSMC_COLLISIONS
 
+
+      IF (BOOL_THERMAL_BATH) CALL THERMAL_BATH
+
       ! ########### Dump particles ##############################################
 
       IF (MOD(tID, DUMP_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
@@ -104,7 +114,7 @@ MODULE timecycle
    
       INTEGER      :: IP, IC, IS, NFS, ILINE
       REAL(KIND=8) :: DTFRAC, Vdummy, V_NORM, V_PERP, POS
-      REAL(KIND=8) :: X, Y, Z, VX, VY, VZ, EI 
+      REAL(KIND=8) :: X, Y, Z, VX, VY, VZ, EROT, EVIB 
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
    
       INTEGER :: S_ID
@@ -128,8 +138,10 @@ MODULE timecycle
    
                CALL MAXWELL(ZERO, ZERO, ZERO, &
                             LINESOURCES(ILINE)%TTRA, LINESOURCES(ILINE)%TTRA, LINESOURCES(ILINE)%TTRA, &
-                            LINESOURCES(ILINE)%TROT, &
-                            Vdummy, V_PERP, VZ, EI, M)
+                            Vdummy, V_PERP, VZ, M)
+
+               CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, LINESOURCES(ILINE)%TROT, EROT)
+               CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, LINESOURCES(ILINE)%TVIB, EVIB)
                             
                V_NORM = FLX(LINESOURCES(ILINE)%S_NORM, LINESOURCES(ILINE)%TTRA, M) !!AAAAAAAAAAA
 
@@ -146,7 +158,7 @@ MODULE timecycle
                CALL CELL_FROM_POSITION(X,Y,  IC)
    
                ! Init a particle object and assign it to the local vector of particles
-               CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EI,S_ID,IC,DTFRAC,  particleNOW)
+               CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EROT,EVIB,S_ID,IC,DTFRAC,  particleNOW)
                CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles)
    
             END DO
@@ -167,7 +179,7 @@ MODULE timecycle
 
    INTEGER      :: IP, IC, IS, NFS
    REAL(KIND=8) :: DTFRAC, Vdummy 
-   REAL(KIND=8) :: X, Y, Z, VX, VY, VZ, EI 
+   REAL(KIND=8) :: X, Y, Z, VX, VY, VZ, EROT, EVIB 
    TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
 
    INTEGER :: S_ID
@@ -188,9 +200,12 @@ MODULE timecycle
          DO IP = 1, NFS ! Loop on particles to be injected
 
             CALL MAXWELL(UX_BOUND,UY_BOUND,UZ_BOUND, &
-                        TTRA_BOUND,TTRA_BOUND,TTRA_BOUND,TROT_BOUND, &
-                        Vdummy,VY,VZ,EI,M)
+                        TTRA_BOUND,TTRA_BOUND,TTRA_BOUND, &
+                        Vdummy,VY,VZ,M)
             
+            CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, TROT_BOUND, EROT)
+            CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, TVIB_BOUND, EVIB)
+
             VX = UX_BOUND + FLX(S_NORM_XMIN,TTRA_BOUND,M) !!AAAAAAAAAAA
 
             DTFRAC = rf()*DT
@@ -201,7 +216,7 @@ MODULE timecycle
             CALL CELL_FROM_POSITION(X,Y,  IC)
 
             ! Init a particle object and assign it to the local vector of particles
-            CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EI,S_ID,IC,DTFRAC,  particleNOW)
+            CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EROT,EVIB,S_ID,IC,DTFRAC,  particleNOW)
             CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles)
 
          END DO
@@ -224,8 +239,11 @@ MODULE timecycle
          DO IP = 1, NFS ! Loop on particles to be injected
 
             CALL MAXWELL(UX_BOUND,UY_BOUND,UZ_BOUND, &
-                        TTRA_BOUND,TTRA_BOUND,TTRA_BOUND,TROT_BOUND, &
-                        Vdummy,VY,VZ,EI,M)
+                        TTRA_BOUND,TTRA_BOUND,TTRA_BOUND, &
+                        Vdummy,VY,VZ,M)
+
+            CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, TROT_BOUND, EROT)
+            CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, TVIB_BOUND, EVIB)
 
             VX = UX_BOUND - FLX(S_NORM_XMAX,TTRA_BOUND,M) !! I think something was wrong here with the sign
 
@@ -237,7 +255,7 @@ MODULE timecycle
             CALL CELL_FROM_POSITION(X,Y,  IC)
 
             ! Init a particle object and assign it to vector of particles
-            CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EI,S_ID,IC,DTFRAC,  particleNOW)
+            CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EROT,EVIB,S_ID,IC,DTFRAC,  particleNOW)
             CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles)
             
          END DO
@@ -259,8 +277,11 @@ MODULE timecycle
          DO IP = 1, NFS ! Loop on particles to be injected
 
             CALL MAXWELL(UX_BOUND,UY_BOUND,UZ_BOUND, &
-                        TTRA_BOUND,TTRA_BOUND,TTRA_BOUND,TROT_BOUND, &
-                        VX,Vdummy,VZ,EI,M)
+                        TTRA_BOUND,TTRA_BOUND,TTRA_BOUND, &
+                        VX,Vdummy,VZ,M)
+
+            CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, TROT_BOUND, EROT)
+            CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, TVIB_BOUND, EVIB)
 
             VY = UY_BOUND + FLX(S_NORM_YMIN,TTRA_BOUND,M) !!AAAAAAAAAAA
 
@@ -272,7 +293,7 @@ MODULE timecycle
             CALL CELL_FROM_POSITION(X,Y,  IC)
 
             ! Init a particle object and assign it to the local vector of particles
-            CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EI,S_ID,IC,DTFRAC,  particleNOW)
+            CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EROT,EVIB,S_ID,IC,DTFRAC,  particleNOW)
             CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles)
          END DO
       END DO
@@ -293,8 +314,11 @@ MODULE timecycle
          DO IP = 1, NFS ! Loop on particles to be injected
 
             CALL MAXWELL(UX_BOUND,UY_BOUND,UZ_BOUND, &
-                        TTRA_BOUND,TTRA_BOUND,TTRA_BOUND,TROT_BOUND, &
-                        VX,Vdummy,VZ,EI,M)
+                        TTRA_BOUND,TTRA_BOUND,TTRA_BOUND, &
+                        VX,Vdummy,VZ,M)
+
+            CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, TROT_BOUND, EROT)
+            CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, TVIB_BOUND, EVIB)
 
             VY = UY_BOUND - FLX(S_NORM_YMAX,TTRA_BOUND,M) !!AAAAAAAAAAA
 
@@ -306,7 +330,7 @@ MODULE timecycle
             CALL CELL_FROM_POSITION(X,Y,  IC)
 
             ! Init a particle object and assign it to vector of particles
-            CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EI,S_ID,IC,DTFRAC,  particleNOW)
+            CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EROT,EVIB,S_ID,IC,DTFRAC,  particleNOW)
             CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles)
          END DO
       END DO

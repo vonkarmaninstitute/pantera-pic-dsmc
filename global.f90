@@ -54,6 +54,9 @@ MODULE global
    INTEGER           :: TIMESTEP_COLL
    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: GREFS ! Matrix of reference relative velocities for VSS
 
+   LOGICAL           :: BOOL_THERMAL_BATH = .FALSE.
+   REAL(KIND=8)      :: TBATH
+
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Initial particles seed !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -61,7 +64,7 @@ MODULE global
    LOGICAL      :: BOOL_INITIAL_SEED = .FALSE. ! Assign default value!
    REAL(KIND=8) :: NRHO_INIT
    REAL(KIND=8) :: UX_INIT, UY_INIT, UZ_INIT
-   REAL(KIND=8) :: TTRAX_INIT, TTRAY_INIT, TTRAZ_INIT, TROT_INIT
+   REAL(KIND=8) :: TTRAX_INIT, TTRAY_INIT, TTRAZ_INIT, TROT_INIT, TVIB_INIT
    INTEGER      :: MIX_INIT
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -73,7 +76,7 @@ MODULE global
    LOGICAL      :: BOOL_INJ_YMIN=.FALSE.,BOOL_INJ_YMAX=.FALSE. ! Assign default value!
    REAL(KIND=8) :: NRHO_BOUNDINJECT
    REAL(KIND=8) :: UX_BOUND, UY_BOUND, UZ_BOUND
-   REAL(KIND=8) :: TTRA_BOUND, TROT_BOUND ! No TTRAX_ TTRAY_ TTRAZ_ for now! IMPLEMENT IT!
+   REAL(KIND=8) :: TTRA_BOUND, TROT_BOUND, TVIB_BOUND ! No TTRAX_ TTRAY_ TTRAZ_ for now! IMPLEMENT IT!
    INTEGER      :: MIX_BOUNDINJECT
 
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: nfs_XMIN, nfs_XMAX, nfs_YMIN, nfs_YMAX
@@ -90,7 +93,7 @@ MODULE global
    REAL(KIND=8) :: X_LINESOURCE, Y_LINESOURCE, L_LINESOURCE
    REAL(KIND=8) :: NRHO_LINESOURCE
    REAL(KIND=8) :: UX_LINESOURCE, UY_LINESOURCE, UZ_LINESOURCE
-   REAL(KIND=8) :: TTRA_LINESOURCE, TROT_LINESOURCE ! No TTRAX_ TTRAY_ TTRAZ_ for now! IMPLEMENT IT!
+   REAL(KIND=8) :: TTRA_LINESOURCE, TROT_LINESOURCE, TVIB_LINESOURCE ! No TTRAX_ TTRAY_ TTRAZ_ for now! IMPLEMENT IT!
 
    INTEGER      :: nfs_LINESOURCE
    REAL(KIND=8) :: KAPPA_LINESOURCE
@@ -103,7 +106,7 @@ MODULE global
       REAL(KIND=8) :: CX, CY, DX, DY
       REAL(KIND=8) :: NRHO
       REAL(KIND=8) :: UX, UY, UZ
-      REAL(KIND=8) :: TTRA, TROT ! No TTRAX_ TTRAY_ TTRAZ_ for now! IMPLEMENT IT!
+      REAL(KIND=8) :: TTRA, TROT, TVIB ! No TTRAX_ TTRAY_ TTRAZ_ for now! IMPLEMENT IT!
       INTEGER      :: MIX_ID
 
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: nfs
@@ -189,6 +192,9 @@ MODULE global
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_TTRZ
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_TTR
 
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_TROT
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_TVIB
+
    INTEGER                                 :: AVG_CUMULATED
 
 
@@ -202,23 +208,23 @@ MODULE global
    SUBROUTINE NEWTYPE
    
       INTEGER :: ii, extent_dpr, extent_int
-      INTEGER, DIMENSION(10) :: blocklengths, oldtypes, offsets
+      INTEGER, DIMENSION(11) :: blocklengths, oldtypes, offsets
      
       CALL MPI_TYPE_EXTENT(MPI_DOUBLE_PRECISION, extent_dpr, ierr)  
       CALL MPI_TYPE_EXTENT(MPI_INTEGER,          extent_int, ierr)
            
       blocklengths = 1
      
-      oldtypes(1:8) = MPI_DOUBLE_PRECISION  
-      oldtypes(9:10) = MPI_INTEGER
+      oldtypes(1:9) = MPI_DOUBLE_PRECISION  
+      oldtypes(10:11) = MPI_INTEGER
           
       offsets(1) = 0  
-      DO ii = 2, 9
+      DO ii = 2, 10
          offsets(ii) = offsets(ii - 1) + extent_dpr * blocklengths(ii - 1)
       END DO
-      offsets(10) = offsets(9) + extent_int * blocklengths(9)
+      offsets(11) = offsets(10) + extent_int * blocklengths(10)
       
-      CALL MPI_TYPE_STRUCT(10, blocklengths, offsets, oldtypes, MPI_PARTICLE_DATA_STRUCTURE, ierr)  
+      CALL MPI_TYPE_STRUCT(11, blocklengths, offsets, oldtypes, MPI_PARTICLE_DATA_STRUCTURE, ierr)  
       CALL MPI_TYPE_COMMIT(MPI_PARTICLE_DATA_STRUCTURE, ierr)   
    
    END SUBROUTINE NEWTYPE

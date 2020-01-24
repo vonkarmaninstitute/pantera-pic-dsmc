@@ -102,8 +102,8 @@
   INTEGER      :: NCOLL,NCOLLMAX_INT
   REAL(KIND=8) :: SIGMA, ALPHA, SIGMAMAX, NCOLLMAX,FCORR,VR,VR2,rfp
   REAL(KIND=8) :: OMEGA, CREF, TREF, ZETA, MRED, COLLPROB
-  REAL(KIND=8) :: PPMAX
-  REAL(KIND=8) :: B,C,EINT,ETOT,ETR,PHI,SITETA,VRX,VRY,VRZ
+  REAL(KIND=8) :: TRDOF, PROT1, PROT2, PVIB1, PVIB2, EI, ETR, ECOLL, R1, R2
+  !REAL(KIND=8) :: B,C,EINT,ETOT,ETR,PHI,SITETA,VRX,VRY,VRZ
   REAL(KIND=8) :: VXMAX,VXMIN,VYMAX,VYMIN,VZMAX,VZMIN,VRMAX
   REAL(KIND=8) :: PI, PI2, KB
   REAL(KIND=8), DIMENSION(3) :: C1, C2, GREL, W
@@ -206,16 +206,15 @@
 
      SIGMA = PI * (0.5 * (SPECIES(SP_ID1)%DIAM + SPECIES(SP_ID2)%DIAM))**2
      OMEGA    = 0.5 * (SPECIES(SP_ID1)%OMEGA + SPECIES(SP_ID2)%OMEGA)
-     !CREF  = 0.5 * (SPECIES(SP_ID1)%CREF + SPECIES(SP_ID2)%CREF) ! Not correct DBDBDBDBDBDBDDBDBDB
      TREF = 0.5 * (SPECIES(SP_ID1)%TREF + SPECIES(SP_ID2)%TREF)
-     
+     CREF = GREFS(SP_ID1, SP_ID2)
      
      ALPHA = 0.5 * (SPECIES(SP_ID1)%ALPHA + SPECIES(SP_ID2)%ALPHA)
      M1    = SPECIES(SP_ID1)%MOLECULAR_MASS
      M2    = SPECIES(SP_ID2)%MOLECULAR_MASS
      MRED  = M1*M2/(M1+M2)
 
-     
+     ETR = 0.5*MRED*VR2
      
      C1(1) = particles(JP1)%VX
      C1(2) = particles(JP1)%VY
@@ -229,15 +228,10 @@
      rfp = rf()
      ZETA = 0.
 
-
-     !WRITE(*,*) SIGMA*(VR/CREF)**(1.-2.*OMEGA)/5.3e-19
-     !WRITE(*,*) 'Collision probability:', (FCORR/(SIGMAMAX*VRMAX)*SIGMA*(VR/CREF)**(1.-2.*NU))
-
      ! Compute (simulated) collision probability
      IF (OMEGA .EQ. 0.5) THEN
        COLLPROB = FCORR/(SIGMAMAX*VRMAX)*VR*SIGMA
      ELSE
-       CREF = (2.*KB*TREF/MRED)**0.5 * (GAMMA(2.5-OMEGA))**(-0.5/(OMEGA-0.5))
        COLLPROB = FCORR/(SIGMAMAX*VRMAX)*VR*SIGMA*(VR/CREF)**(1.-2.*OMEGA)
      END IF
 
@@ -251,87 +245,72 @@
 
         NCOLLREAL = NCOLLREAL + 1
 
-        ! Select elastic/inelastic collision 
 
+
+        ! Select elastic/inelastic collision 
+        TRDOF = 3.
+
+        !TRDOF = 5. -2.*OMEGA
+
+        PROT1 = (TRDOF + SPECIES(SP_ID1)%ROTDOF)/TRDOF * SPECIES(SP_ID1)%ROTREL
+        PROT2 = (TRDOF + SPECIES(SP_ID2)%ROTDOF)/TRDOF * SPECIES(SP_ID2)%ROTREL
+        PVIB1 = (TRDOF + SPECIES(SP_ID1)%VIBDOF)/TRDOF * SPECIES(SP_ID1)%VIBREL
+        PVIB2 = (TRDOF + SPECIES(SP_ID2)%VIBDOF)/TRDOF * SPECIES(SP_ID2)%VIBREL
+
+        TRDOF = 5. -2.*OMEGA
         rfp = rf()
 
-        IF ( rfp .LT. ZETA ) THEN
-               
-           ! Inelastic collision - Larsen/Borgnakke model
+        IF (rfp .LT. PROT1) THEN
+           ! Particle 1 selected for rotational energy exchange
+           ECOLL = ETR + particles(JP1)%EROT
+           DO
+              R1 = rf()
+              EI = R1*ECOLL
+              R2 = rf()
+              IF (R2 .LE. FUNCTION_I(ECOLL, EI, TRDOF, SPECIES(SP_ID1)%ROTDOF)) EXIT
+           END DO
+           particles(JP1)%EROT = EI
+           ETR = ECOLL - EI
 
-           ETOT = MRED*VR2/4. + particles(JP1)%EI + particles(JP2)%EI
+        ELSE IF (rfp .LT. PROT1 + PROT2) THEN
+         ! Particle 2 selected for rotational energy exchange
+         ECOLL = ETR + particles(JP2)%EROT
+           DO
+              R1 = rf()
+              EI = R1*ECOLL
+              R2 = rf()
+              IF (R2 .LE. FUNCTION_I(ECOLL, EI, TRDOF, SPECIES(SP_ID2)%ROTDOF)) EXIT
+           END DO
+           particles(JP2)%EROT = EI
+           ETR = ECOLL - EI
 
-           ! Step 1. Compute post-collision translational energy
+        ELSE IF (rfp .LT. PROT1 + PROT2 + PVIB1) THEN
+         ! Particle 1 selected for vibrational energy exchange
+         ECOLL = ETR + particles(JP1)%EVIB
+         DO
+            R1 = rf()
+            EI = R1*ECOLL
+            R2 = rf()
+            IF (R2 .LE. FUNCTION_I(ECOLL, EI, TRDOF, SPECIES(SP_ID1)%VIBDOF)) EXIT
+         END DO
+         particles(JP1)%EVIB = EI
+         ETR = ECOLL - EI
 
-10         rfp = rf()
+        ELSE IF (rfp .LT. PROT1 + PROT2 + PVIB1 + PVIB2) THEN
+         ! Particle 2 selected for vibrational energy exchange
+         ECOLL = ETR + particles(JP2)%EVIB
+         DO
+            R1 = rf()
+            EI = R1*ECOLL
+            R2 = rf()
+            IF (R2 .LE. FUNCTION_I(ECOLL, EI, TRDOF, SPECIES(SP_ID2)%VIBDOF)) EXIT
+         END DO
+         particles(JP2)%EVIB = EI
+         ETR = ECOLL - EI
 
-           PPMAX = ((2.5-OMEGA)/(1.5-OMEGA)*rfp)**(1.5-OMEGA) * (2.5-OMEGA)*(1.-rfp)
+        END IF
 
-           IF ( PPMAX .GE. rf() ) THEN
-              ETR = ETOT * rfp
-           ELSE 
-              GO TO 10                 
-           END IF
-
-           ! Step 2. Compute post-collision internal energy
-
-           EINT = ETOT - ETR
-           
-           particles(JP1)%EI = EINT*rf()
-           particles(JP2)%EI = EINT - particles(JP1)%EI
-
-           ! Step 3. Compute post-collision velocities
-
-           VR = 2.*SQRT(ETR/MRED)
-
-           B = 1. - 2.*rf()
-           SITETA = SQRT(1.-B*B)
-
-           PHI = PI2*rf()
-
-           VRZ = VR*B
-           VRX = VR*SITETA*COS(PHI)
-           VRY = VR*SITETA*SIN(PHI)
-
-           C = particles(JP1)%VX + particles(JP2)%VX
-           particles(JP1)%VX = (C-VRX)*0.5
-           particles(JP2)%VX = (C+VRX)*0.5
-
-           C = particles(JP1)%VY + particles(JP2)%VY
-           particles(JP1)%VY = (C-VRY)*0.5
-           particles(JP2)%VY = (C+VRY)*0.5
-
-           C = particles(JP1)%VZ + particles(JP2)%VZ
-           particles(JP1)%VZ = (C-VRZ)*0.5
-           particles(JP2)%VZ = (C+VRZ)*0.5
-
-        ELSE
-
-         ! Elastic collision => Compute post-collision velocities
-
-         ! HS Collisions (old)
-         !   B = 1. - 2.*rf() ! COSTHETA
-         !   SITETA = SQRT(1.-B*B) ! SINTHETA
-
-         !   PHI = PI2*rf()
-
-         !   VRZ = VR*B
-         !   VRX = VR*SITETA*COS(PHI)
-         !   VRY = VR*SITETA*SIN(PHI)
-
-         !   C = particles(JP1)%VX + particles(JP2)%VX
-         !   particles(JP1)%VX = (C-VRX)*0.5
-         !   particles(JP2)%VX = (C+VRX)*0.5
-
-         !   C = particles(JP1)%VY + particles(JP2)%VY
-         !   particles(JP1)%VY = (C-VRY)*0.5
-         !   particles(JP2)%VY = (C+VRY)*0.5
-
-         !   C = particles(JP1)%VZ + particles(JP2)%VZ
-         !   particles(JP1)%VZ = (C-VRZ)*0.5
-         !   particles(JP2)%VZ = (C+VRZ)*0.5
-         ! End of HS collisions
-
+         ! Compute post-collision velocities
          ! VSS Collisions
 
          COSCHI = 2.*rf()**(1./ALPHA) - 1.
@@ -340,17 +319,31 @@
          COSTHETA = COS(THETA)
          SINTHETA = SIN(THETA)
 
-         ETR = 0.5*MRED*VR**2 ! Will be different for inelastic collisions.
-         G = SQRT(2.*ETR/MRED)
 
-         ! Randomize relative velocity vector
-         COSA = 2.*rf()-1.0
-         SINA = SQRT(1-COSA*COSA)
-         BB = PI2 * rf()
+         IF (rfp .LT. PROT1 + PROT2 + PVIB1 + PVIB2) THEN
 
-         GX = G*SINA*COS(BB)
-         GY = G*SINA*SIN(BB)
-         GZ = G*COSA
+            ! Inelastic collision occurred => Randomize relative velocity vector
+            G = SQRT(2.*ETR/MRED)
+            
+            COSA = 2.*rf()-1.0
+            SINA = SQRT(1-COSA*COSA)
+            BB = PI2 * rf()
+
+            GX = G*SINA*COS(BB)
+            GY = G*SINA*SIN(BB)
+            GZ = G*COSA
+         
+         ELSE
+
+            ! No inelastic collision occured => Take actual velocity vector
+            GX = C1(1) - C2(1)
+            GY = C1(2) - C2(2)
+            GZ = C1(3) - C2(3)
+            G = SQRT(GX*GX + GY*GY + GZ*GZ)
+
+         END IF
+
+         ! Compute post-collision velocities
 
          GREL(1) = GX*COSCHI + SQRT(GY*GY+GZ*GZ)*SINTHETA*SINCHI
          GREL(2) = GY*COSCHI + (G*GZ*COSTHETA - GX*GY*SINTHETA)/SQRT(GY*GY+GZ*GZ)*SINCHI
@@ -375,7 +368,7 @@
          particles(JP2)%VY = C2(2)
          particles(JP2)%VZ = C2(3)
 
-        END IF
+        
 
      END IF
 
@@ -387,6 +380,26 @@
   RETURN
       
   END SUBROUTINE VSS_COLLIS
+
+  REAL(KIND=8) FUNCTION FUNCTION_I(ECOLL, EI, TRDOF, IDOF)
+   
+   IMPLICIT NONE
+
+   INTEGER, INTENT(IN)       :: IDOF
+   REAL(KIND=8), INTENT(IN)  :: EI, ECOLL, TRDOF
+   REAL(KIND=8)              :: RESULT
+
+   
+   IF (IDOF .EQ. 2) THEN
+      RESULT = (1.-EI/ECOLL)**(TRDOF/2.-1.)
+   ELSE
+      RESULT = ((TRDOF+IDOF-4.)/(IDOF-2.))**(IDOF/2.-1.) * ((TRDOF+IDOF-4.)/(TRDOF-2.))**(TRDOF/2.-1.) * &
+                   (EI/ECOLL)**(IDOF/2.-1.) * (1.-EI/ECOLL)**(TRDOF/2.-1.)
+   END IF
+   FUNCTION_I = RESULT
+
+  END FUNCTION FUNCTION_I
+
   
   END MODULE collisions
 

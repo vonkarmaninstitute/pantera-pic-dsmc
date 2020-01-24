@@ -98,10 +98,17 @@ MODULE initialization
          IF (line=='Initial_particles_vel:')   READ(in1,*) UX_INIT, UY_INIT, UZ_INIT
          IF (line=='Initial_particles_Ttra:')  READ(in1,*) TTRAX_INIT, TTRAY_INIT, TTRAZ_INIT
          IF (line=='Initial_particles_Trot:')  READ(in1,*) TROT_INIT
+         IF (line=='Initial_particles_Tvib:')  READ(in1,*) TVIB_INIT
          IF (line=='Initial_particles_mixture:') THEN
             READ(in1,*) MIX_INIT_NAME
             MIX_INIT = MIXTURE_NAME_TO_ID(MIX_INIT_NAME)
          END IF
+
+
+         ! ~~~~~~~~~~~~~  Thermal bath  ~~~~~~~~~~~~~~~~~
+         IF (line=='Thermal_bath_bool:')  READ(in1,*) BOOL_THERMAL_BATH
+         IF (line=='Thermal_bath_Ttr:')  READ(in1,*) TBATH
+         
 
          ! ~~~~~~~~~~~~~  Particle injection at boundaries ~~~~~~~~~~~
          IF (line=='Boundaries_inject_bool:')       READ(in1,*)BOOL_BOUNDINJECT
@@ -110,6 +117,7 @@ MODULE initialization
          IF (line=='Boundaries_inject_vel:')        READ(in1,*)UX_BOUND, UY_BOUND, UZ_BOUND
          IF (line=='Boundaries_inject_Ttra:')       READ(in1,*)TTRA_BOUND
          IF (line=='Boundaries_inject_Trot:')       READ(in1,*)TROT_BOUND
+         IF (line=='Boundaries_inject_Tvib:')       READ(in1,*)TVIB_BOUND
          IF (line=='Boundaries_inject_mixture:') THEN
             READ(in1,*) MIX_BOUNDINJECT_NAME
             MIX_BOUNDINJECT = MIXTURE_NAME_TO_ID(MIX_BOUNDINJECT_NAME)
@@ -221,6 +229,9 @@ MODULE initialization
    
             string = 'Initial particles rotational temp [K]:'
             WRITE(*,'(A5,A50,ES14.3)') '    ', string, TROT_INIT
+
+            string = 'Initial particles vibrational temp [K]:'
+            WRITE(*,'(A5,A50,ES14.3)') '    ', string, TVIB_INIT
 
          END IF
 
@@ -433,7 +444,6 @@ MODULE initialization
 
          SPECIES(SP_ID)%SIGMA = PI*DIAM**2
          SPECIES(SP_ID)%NU    = OMEGA - 0.5
-         !SPECIES(SP_ID)%CREF  = SQRT(3.*KB*TREF / SPECIES(SP_ID)%MOLECULAR_MASS)
 
 
          IF (OMEGA .EQ. 0.5) THEN
@@ -456,7 +466,11 @@ MODULE initialization
             OMEGA    = 0.5 * (SPECIES(IS)%OMEGA + SPECIES(JS)%OMEGA)
             TREF = 0.5 * (SPECIES(IS)%TREF + SPECIES(JS)%TREF)
             
-            GREFS(IS, JS) = (2.*KB*TREF/MRED)**0.5 * (GAMMA(2.5-OMEGA))**(-0.5/(OMEGA-0.5))
+            IF (OMEGA .EQ. 0.5) THEN
+               GREFS(IS, JS) = (2.*KB*TREF/MRED)**0.5 * 1.2354
+            ELSE
+               GREFS(IS, JS) = (2.*KB*TREF/MRED)**0.5 * (GAMMA(2.5-OMEGA))**(-0.5/(OMEGA-0.5))
+            END IF
          END DO
       END DO
 
@@ -546,6 +560,7 @@ MODULE initialization
       READ(STRARRAY(8), '(ES14.3)') LINESOURCES(N_LINESOURCES)%UZ
       READ(STRARRAY(9), '(ES14.3)') LINESOURCES(N_LINESOURCES)%TTRA
       READ(STRARRAY(10),'(ES14.3)') LINESOURCES(N_LINESOURCES)%TROT
+      READ(STRARRAY(10),'(ES14.3)') LINESOURCES(N_LINESOURCES)%TVIB
       READ(STRARRAY(11),'(A10)') MIX_NAME
 
       MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
@@ -572,7 +587,7 @@ MODULE initialization
       IMPLICIT NONE
 
       INTEGER            :: IP, NP_INIT, NPPP_INIT
-      REAL(KIND=8)       :: Xp, Yp, Zp, VXp, VYp, VZp, EIp
+      REAL(KIND=8)       :: Xp, Yp, Zp, VXp, VYp, VZp, EROT, EVIB
       INTEGER            :: CID
 
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
@@ -595,12 +610,12 @@ MODULE initialization
       DO IP = 1, NPPP_INIT
 
          ! Create particle position randomly in the domain
-         XP = XMIN + (XMAX-XMIN)*rand()
-         YP = YMIN + (YMAX-YMIN)*rand()
-         ZP = ZMIN + (ZMAX-ZMIN)*rand()
+         XP = XMIN + (XMAX-XMIN)*rf()
+         YP = YMIN + (YMAX-YMIN)*rf()
+         ZP = ZMIN + (ZMAX-ZMIN)*rf()
 
          ! Chose particle species based on mixture specifications
-         RANVAR = rand()
+         RANVAR = rf()
          DO i = 1, MIXTURES(MIX_INIT)%N_COMPONENTS
             RANVAR = RANVAR - MIXTURES(MIX_INIT)%COMPONENTS(i)%MOLFRAC
             IF (RANVAR < 0.) THEN
@@ -612,12 +627,16 @@ MODULE initialization
          ! Assign velocity and energy following a Boltzmann distribution
          M = SPECIES(S_ID)%MOLECULAR_MASS
          CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
-                      TTRAX_INIT, TTRAY_INIT, TTRAZ_INIT, TROT_INIT, &
-                      VXP, VYP, VZP, EIP, M)
+                      TTRAX_INIT, TTRAY_INIT, TTRAZ_INIT, &
+                      VXP, VYP, VZP, M)
+
+
+         CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, TROT_INIT, EROT)
+         CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, TVIB_INIT, EVIB)
 
          CALL CELL_FROM_POSITION(XP,YP,  CID) ! Find cell containing particle
 
-         CALL INIT_PARTICLE(XP,YP,ZP,VXP,VYP,VZP,EIP,S_ID,CID,DT, particleNOW) ! Save in particle
+         CALL INIT_PARTICLE(XP,YP,ZP,VXP,VYP,VZP,EROT,EVIB,S_ID,CID,DT, particleNOW) ! Save in particle
          CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
       END DO
 

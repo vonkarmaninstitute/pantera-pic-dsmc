@@ -91,6 +91,11 @@ MODULE initialization
             DSMC_COLL_MIX = MIXTURE_NAME_TO_ID(DSMC_COLL_MIX_NAME)
          END IF
          
+        ! ~~~~~~~~~~~~~  Readctions ~~~~~~~~~~~~~~~
+         IF (line=='Reactions_file:') THEN
+            READ(in1,*) REACTIONS_FILENAME
+            CALL READ_REACTIONS(REACTIONS_FILENAME)
+         END IF
 
          ! ~~~~~~~~~~~~~  Initial particles seeding  ~~~~~~~~~~~~~~~~~
          IF (line=='Initial_particles_bool:')  READ(in1,*) BOOL_INITIAL_SEED
@@ -568,6 +573,109 @@ MODULE initialization
 
    END SUBROUTINE
 
+
+   SUBROUTINE READ_REACTIONS(FILENAME)
+
+      IMPLICIT NONE
+
+      CHARACTER*64, INTENT(IN) :: FILENAME
+      
+      INTEGER, PARAMETER :: in3 = 457
+      INTEGER            :: ios
+      CHARACTER*512      :: line
+      INTEGER            :: ReasonEOF
+
+      CHARACTER(LEN=80)   :: DEFINITION
+      INTEGER :: N_STR
+      CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
+      TYPE(REACTIONS_DATA_STRUCTURE) :: NEW_REACTION
+      
+      !CHARACTER*64 :: SP_NAME
+      !INTEGER      :: SP_ID
+      !REAL(KIND=8) :: DIAM
+      !REAL(KIND=8) :: OMEGA
+      !REAL(KIND=8) :: TREF
+      !REAL(KIND=8) :: ALPHA
+      !REAL(KIND=8) :: PI, KB
+
+      !INTEGER      :: IS, JS
+      !REAL(KIND=8) :: M1, M2, MRED
+
+      !PI   = 3.141593
+      !KB = 1.38064852E-23
+
+      ! Open input file for reading
+      OPEN(UNIT=in3,FILE=FILENAME, STATUS='old',IOSTAT=ios)
+
+      IF (ios.NE.0) THEN
+         CALL ERROR_ABORT('Attention, reactions definition file not found! ABORTING.')
+      ENDIF
+
+      line = '' ! Init empty
+
+      ! +++++++ Read until the end of file ++++++++
+      DO
+
+         READ(in3,'(A)', IOSTAT=ReasonEOF) DEFINITION ! Read reaction components line         
+         CALL STRIP_COMMENTS(DEFINITION, '!')         ! Remove comments from line
+
+         IF (ReasonEOF < 0) EXIT ! End of file reached
+
+         ! ~~~~~~~~~~~~~  Geometry and computational domain  ~~~~~~~~~~~~~~~~~
+         
+         CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
+
+         IF (N_STR == 0) CYCLE ! This is an empty line
+         IF (STRARRAY(2) .NE. '+' .OR. STRARRAY(4) .NE. '-->' .OR. STRARRAY(6) .NE. '+') THEN
+            CALL ERROR_ABORT('Attention, format is not respected in reactions file.')
+         END IF
+
+         IF (N_STR .GE. 7) THEN
+            NEW_REACTION%N_PROD = 2
+            NEW_REACTION%R1_SP_ID = REACTION_SPECIES_NAME_TO_ID(STRARRAY(1))
+            NEW_REACTION%R2_SP_ID = REACTION_SPECIES_NAME_TO_ID(STRARRAY(3))
+            NEW_REACTION%P1_SP_ID = REACTION_SPECIES_NAME_TO_ID(STRARRAY(5))
+            NEW_REACTION%P2_SP_ID = REACTION_SPECIES_NAME_TO_ID(STRARRAY(7))
+         END IF
+
+         IF (N_STR .GE. 9) THEN
+            IF (STRARRAY(8) .NE. '+') THEN
+               CALL ERROR_ABORT('Attention, format is not respected in reactions file.')
+            END IF
+            NEW_REACTION%N_PROD = 3
+            NEW_REACTION%P3_SP_ID = REACTION_SPECIES_NAME_TO_ID(STRARRAY(9))
+         END IF
+      
+         READ(in3,'(A)', IOSTAT=ReasonEOF) DEFINITION ! Read reaction parameters line
+         CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
+         READ(STRARRAY(1), '(ES14.3)') NEW_REACTION%A
+         READ(STRARRAY(2), '(ES14.3)') NEW_REACTION%N
+         READ(STRARRAY(3), '(ES14.3)') NEW_REACTION%EA
+
+         IF (ReasonEOF < 0) EXIT ! End of file reached
+         
+         ALLOCATE(TEMP_REACTIONS(N_REACTIONS+1)) ! Append the mixture to the list
+         TEMP_REACTIONS(1:N_REACTIONS) = REACTIONS
+         CALL MOVE_ALLOC(TEMP_REACTIONS, REACTIONS)
+         N_REACTIONS = N_REACTIONS + 1
+         REACTIONS(N_REACTIONS) = NEW_REACTION
+
+         WRITE(*,*) 'Done!'
+         DEALLOCATE(STRARRAY)
+
+      END DO
+      
+      CLOSE(in3) ! Close input file
+
+      !DO index = 1, N_REACTIONS
+      !   WRITE(*,*) 'Reaction ', index, 'Has 2 reactants with ids:', REACTIONS(index)%R1_SP_ID, ' and ', REACTIONS(index)%R2_SP_ID
+      !   WRITE(*,*) REACTIONS(index)%N_PROD, 'products with ids:',  REACTIONS(index)%P1_SP_ID, ' and ', REACTIONS(index)%P2_SP_ID, &
+      !   ' and ', REACTIONS(index)%P3_SP_ID
+      !   WRITE(*,*) 'Parameters:', REACTIONS(index)%A, REACTIONS(index)%N, REACTIONS(index)%EA
+      !END DO
+
+   END SUBROUTINE READ_REACTIONS
+
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE INITIAL_SEED -> seeds particles at the beginning of !!
    ! the simulation !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -975,6 +1083,54 @@ MODULE initialization
 
    END SUBROUTINE INITCOLLISIONS
 
+
+   SUBROUTINE INITREACTIONS
+   ! Here we precompute the TCE coefficients, with the input collision parameters
+
+      IMPLICIT NONE
+
+      REAL(KIND=8) :: OMEGA, TREF, SIGMA, ZETA, ETA, LAMBDA, EPS, MR, EA, M1, M2
+      REAL(KIND=8) :: C1, C2, C3
+      REAL(KIND=8) :: PI, KB
+      INTEGER      :: JR, R1_SP_ID, R2_SP_ID
+
+      PI   = 3.141593
+      KB = 1.38064852E-23
+
+      DO JR = 1, N_REACTIONS
+         R1_SP_ID = REACTIONS(JR)%R1_SP_ID
+         R2_SP_ID = REACTIONS(JR)%R2_SP_ID
+
+         ZETA  = 0.5*(3. + SPECIES(R1_SP_ID)%VIBDOF + 3. + SPECIES(R2_SP_ID)%VIBDOF)
+         OMEGA = 0.5*(SPECIES(R1_SP_ID)%OMEGA + SPECIES(R2_SP_ID)%OMEGA)
+         SIGMA = 0.25*PI*(SPECIES(R1_SP_ID)%DIAM + SPECIES(R2_SP_ID)%DIAM)**2
+         TREF  = 0.5*(SPECIES(R1_SP_ID)%TREF + SPECIES(R2_SP_ID)%TREF)
+         M1 = SPECIES(R1_SP_ID)%MOLECULAR_MASS
+         M2 = SPECIES(R2_SP_ID)%MOLECULAR_MASS
+         MR    = M1*M2/(M1+M2)
+         LAMBDA = REACTIONS(JR)%A
+         ETA = REACTIONS(JR)%N
+         EA = REACTIONS(JR)%EA
+
+         IF (R1_SP_ID == R1_SP_ID) THEN
+            EPS = 2.
+         ELSE
+            EPS = 1.
+         END IF
+
+         C1 = SQRT(PI)*EPS*LAMBDA/(2.*SIGMA) * GAMMA(ZETA+2.5-OMEGA)/GAMMA(ZETA+ETA+1.5) &
+              * SQRT(MR/(2.*KB*TREF)) * TREF**(1.-OMEGA) / KB**(ETA-1.+OMEGA)
+         C2 = ETA - 1. + OMEGA
+         C3 = ZETA + 1.5 - OMEGA
+
+         REACTIONS(JR)%C1 = C1
+         REACTIONS(JR)%C2 = C2
+         REACTIONS(JR)%C3 = C3
+      END DO
+
+   END SUBROUTINE INITREACTIONS
+
+
    INTEGER FUNCTION SPECIES_NAME_TO_ID(NAME)
 
       IMPLICIT NONE
@@ -990,6 +1146,29 @@ MODULE initialization
       SPECIES_NAME_TO_ID = MATCH
 
    END FUNCTION SPECIES_NAME_TO_ID
+
+
+
+   INTEGER FUNCTION REACTION_SPECIES_NAME_TO_ID(NAME)
+
+      IMPLICIT NONE
+
+      CHARACTER(LEN=*), INTENT(IN)  :: NAME
+      INTEGER                       :: INDEX, MATCH
+      MATCH = -1
+      DO INDEX = 1, N_SPECIES
+         IF (SPECIES(INDEX)%NAME == NAME) MATCH = INDEX
+      END DO
+      IF (NAME == 'M') THEN
+         MATCH = 0
+      END IF
+
+
+      REACTION_SPECIES_NAME_TO_ID = MATCH
+
+   END FUNCTION REACTION_SPECIES_NAME_TO_ID
+
+
 
    INTEGER FUNCTION MIXTURE_NAME_TO_ID(NAME)
 

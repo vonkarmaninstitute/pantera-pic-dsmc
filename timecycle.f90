@@ -81,7 +81,7 @@ MODULE timecycle
 
       ! ########### Dump particles ##############################################
 
-      IF (MOD(tID, DUMP_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
+      IF (MOD(tID, DUMP_EVERY) .EQ. 1) CALL DUMP_PARTICLES_FILE(tID)
 
       ! ########### Dump flowfield ##############################################
 
@@ -119,7 +119,6 @@ MODULE timecycle
    
       INTEGER :: S_ID
       REAL(KIND=8) :: M
-      REAL(KIND=8) :: ZERO = 0.0
    
    
       ! Linesource
@@ -136,7 +135,7 @@ MODULE timecycle
    
             DO IP = 1, NFS ! Loop on particles to be injected
    
-               CALL MAXWELL(ZERO, ZERO, ZERO, &
+               CALL MAXWELL(0.d0, 0.d0, 0.d0, &
                             LINESOURCES(ILINE)%TTRA, LINESOURCES(ILINE)%TTRA, LINESOURCES(ILINE)%TTRA, &
                             Vdummy, V_PERP, VZ, M)
 

@@ -27,6 +27,7 @@ PROGRAM PANTERA
    CALL INITVARIOUS        ! Initialize some additional variables
    CALL INITINJECTION      ! Initialize variables for injection
    CALL INITCOLLISIONS     ! Initialize variables for collisions
+   CALL INITREACTIONS      ! Initialize variables for reactions
 
    ! ========= Initial particles seed ======================
    IF (BOOL_INITIAL_SEED)   CALL INITIAL_SEED

@@ -175,6 +175,28 @@ MODULE global
    TYPE(MIXTURE), DIMENSION(:), ALLOCATABLE :: MIXTURES
  
 
+
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!! Chemical reactions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   
+   CHARACTER(LEN=256) :: REACTIONS_FILENAME
+   INTEGER :: N_REACTIONS = 0
+   
+   TYPE REACTIONS_DATA_STRUCTURE
+      INTEGER :: R1_SP_ID
+      INTEGER :: R2_SP_ID
+      INTEGER :: P1_SP_ID
+      INTEGER :: P2_SP_ID
+      INTEGER :: P3_SP_ID
+      REAL(KIND=8) :: A, N, EA
+      REAL(KIND=8) :: C1, C2, C3
+      INTEGER :: N_PROD
+   END TYPE REACTIONS_DATA_STRUCTURE
+
+   TYPE(REACTIONS_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: REACTIONS, TEMP_REACTIONS
+
+
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Average flowfield !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

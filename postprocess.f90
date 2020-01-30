@@ -420,12 +420,14 @@
     INTEGER                            :: TOT_NUM
 
     REAL(KIND=8), DIMENSION(3)         :: TOT_MOMENTUM
-    REAL(KIND=8)                       :: TOT_KE
+    REAL(KIND=8)                       :: TOT_KE, TOT_IE, TOT_FE
 
 
     TOT_NUM = 0
     TOT_MOMENTUM = 0
     TOT_KE = 0
+    TOT_IE = 0
+    TOT_FE = 0
 
     ! Number of particles
     DO JP = 1, NP_PROC
@@ -440,6 +442,11 @@
 
       ! Kinietic energy
       TOT_KE = TOT_KE + 0.5*SPECIES(JS)%MOLECULAR_MASS*(particles(JP)%VX**2+particles(JP)%VY**2+particles(JP)%VZ**2)
+      TOT_IE = TOT_IE + particles(JP)%EROT + particles(JP)%EVIB
+
+      IF (JS == 4) THEN
+        TOT_FE = TOT_FE + 15.63e-19/2.
+      END IF
 
     END DO
 
@@ -450,18 +457,25 @@
       CALL MPI_REDUCE(MPI_IN_PLACE,  TOT_NUM,      1, MPI_INTEGER,          MPI_SUM, 0, MPI_COMM_WORLD, ierr)
       CALL MPI_REDUCE(MPI_IN_PLACE,  TOT_MOMENTUM, 3, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
       CALL MPI_REDUCE(MPI_IN_PLACE,  TOT_KE,       1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TOT_IE,       1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TOT_FE,       1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
 
       WRITE(*,*) ' '
       WRITE(*,*) 'Conservation checks:'
       WRITE(*,*) 'Number of particles:  ', TOT_NUM
       WRITE(*,*) 'Total momentum:       [ ', TOT_MOMENTUM, ' ] [kg m/s]'
-      WRITE(*,*) 'Total kinetic energy: ', TOT_KE, ' [J]'
+      WRITE(*,*) 'Total kinetic energy:   ', TOT_KE, ' [J]'
+      WRITE(*,*) 'Total internal energy:  ', TOT_IE, ' [J]'
+      WRITE(*,*) 'Total formation energy: ', TOT_FE, ' [J]'
+      WRITE(*,*) 'Total energy:          ', TOT_KE+TOT_IE+TOT_FE, ' [J]'
       WRITE(*,*) ' '
 
     ELSE
       CALL MPI_REDUCE(TOT_NUM,       TOT_NUM,      1, MPI_INTEGER,          MPI_SUM, 0, MPI_COMM_WORLD, ierr)
       CALL MPI_REDUCE(TOT_MOMENTUM,  TOT_MOMENTUM, 3, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
       CALL MPI_REDUCE(TOT_KE,        TOT_KE,       1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(TOT_IE,        TOT_IE,       1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(TOT_FE,        TOT_FE,       1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
     END IF
 
   END SUBROUTINE CHECKS

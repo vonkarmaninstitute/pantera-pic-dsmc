@@ -9,6 +9,8 @@ PROGRAM PANTERA
    USE initialization
    USE timecycle
    USE grid_and_partition
+   USE mUMFPACK
+   USE fields
 
    IMPLICIT NONE
    
@@ -20,6 +22,8 @@ PROGRAM PANTERA
 
    ! ========= Print header (important things first) =======
    CALL PRINTTITLE(PROC_ID)
+
+   CALL ASSEMBLE_POISSON
 
    ! ========= Read input file and init variables ==========
    CALL ONLYMASTERPRINT1(PROC_ID, '> READING INPUT DATA...')

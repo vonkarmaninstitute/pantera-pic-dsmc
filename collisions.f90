@@ -156,7 +156,7 @@
   ! Compute the "worst case scenario" relative velocity
   VRMAX    = SQRT((VXMAX-VXMIN)**2 + (VYMAX-VYMIN)**2 + (VZMAX-VZMIN)**2)
   ! Compute the maximum expected number of collisions
-  NCOLLMAX = 0.5*NPC(JC)*(NPC(JC)-1)*SIGMAMAX*VRMAX*FNUM*DT/CELL_VOL
+  NCOLLMAX = 0.5*NPC(JC)*(NPC(JC)-1)*SIGMAMAX*VRMAX*FNUM*DT/CELL_VOLUMES(JC)
   
   NCOLLMAX_INT = FLOOR(NCOLLMAX+0.5)
 

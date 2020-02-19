@@ -218,6 +218,31 @@
     
     AVG_CUMULATED = AVG_CUMULATED + 1
 
+
+        
+    DEALLOCATE(TIMESTEP_NP)
+    
+    DEALLOCATE(TIMESTEP_N)
+
+    DEALLOCATE(TIMESTEP_VX)
+    DEALLOCATE(TIMESTEP_VY)
+    DEALLOCATE(TIMESTEP_VZ)
+
+    DEALLOCATE(TIMESTEP_VX2)
+    DEALLOCATE(TIMESTEP_VY2)
+    DEALLOCATE(TIMESTEP_VZ2)
+    
+    DEALLOCATE(TIMESTEP_TTRX)
+    DEALLOCATE(TIMESTEP_TTRY)
+    DEALLOCATE(TIMESTEP_TTRZ)
+    DEALLOCATE(TIMESTEP_TTR)
+    
+    DEALLOCATE(TIMESTEP_EROT)
+    DEALLOCATE(TIMESTEP_EVIB)
+
+    DEALLOCATE(TIMESTEP_TROT)
+    DEALLOCATE(TIMESTEP_TVIB)
+
     
   END SUBROUTINE GRID_AVG
 
@@ -247,16 +272,20 @@
     NSPECIES = N_SPECIES
 
     IF (PROC_ID .EQ. 0) THEN
-      XNODES = 0
-      DO i = 0, NX
-         XNODES(i+1) = XMIN + (XMAX-XMIN)/NX*i 
-      END DO
+      IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
+        XNODES = 0
+        DO i = 0, NX
+          XNODES(i+1) = XMIN + (XMAX-XMIN)/NX*i 
+        END DO
 
-      YNODES = 0
-      DO i = 0, NY
-         YNODES(i+1) = YMIN + (YMAX-YMIN)/NY*i
-      END DO
-
+        YNODES = 0
+        DO i = 0, NY
+          YNODES(i+1) = YMIN + (YMAX-YMIN)/NY*i
+        END DO
+      ELSE IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) THEN
+        XNODES = XCOORD
+        YNODES = YCOORD
+      END IF
       ! DSMC flowfield file
 
       WRITE(file_name,'(A, I0, A)') 'dsmc_flowfield_', tID, '.vtk'
@@ -279,7 +308,7 @@
       WRITE(54321,*) 0.
 
       WRITE(54321,'(A,I10)') 'CELL_DATA', NCELLS
-      WRITE(54321,'(A,I10)') 'FIELD FieldData', 10*NSPECIES
+      WRITE(54321,'(A,I10)') 'FIELD FieldData', 11*NSPECIES
 
 
 
@@ -290,6 +319,14 @@
         WRITE(string, *) 'number_particles_', SPECIES(JS)%NAME
         WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
         WRITE(54321,*) AVG_NP(FIRST:LAST)
+
+        WRITE(string, *) 'nrho_mean_', SPECIES(JS)%NAME
+        WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
+        IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) THEN
+          WRITE(54321,*) AVG_NP(FIRST:LAST)/CELL_VOLUMES
+        ELSE IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
+          WRITE(54321,*) AVG_NP(FIRST:LAST)/CELL_VOL
+        END IF
 
         WRITE(string, *) 'vx_mean_', SPECIES(JS)%NAME
         WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
@@ -329,7 +366,25 @@
 
       END DO
 
-      !WRITE(54321,'(A,I10)') 'POINT_DATA', (NX+1)*(NY+1)*1
+      IF (BOOL_PIC) THEN
+        WRITE(54321,'(A,I10)') 'POINT_DATA', (NX+1)*(NY+1)*1
+        WRITE(54321,'(A,I10)') 'FIELD FieldData', 5
+        
+        WRITE(54321,'(A,I10,I10,A7)') 'QRHO', 1, (NX+1)*(NY+1)*1, 'double'
+        WRITE(54321,*) Q_FIELD
+
+        WRITE(54321,'(A,I10,I10,A7)') 'PHI', 1, (NX+1)*(NY+1)*1, 'double'
+        WRITE(54321,*) PHI_FIELD
+
+        WRITE(54321,'(A,I10,I10,A7)') 'E_X', 1, (NX+1)*(NY+1)*1, 'double'
+        WRITE(54321,*) E_FIELD(:,:,1)
+
+        WRITE(54321,'(A,I10,I10,A7)') 'E_Y', 1, (NX+1)*(NY+1)*1, 'double'
+        WRITE(54321,*) E_FIELD(:,:,2)
+
+        WRITE(54321,'(A,I10,I10,A7)') 'E_Z', 1, (NX+1)*(NY+1)*1, 'double'
+        WRITE(54321,*) E_FIELD(:,:,3)
+      END IF
 
       CLOSE(54321)
 
@@ -420,7 +475,7 @@
     INTEGER                            :: TOT_NUM
 
     REAL(KIND=8), DIMENSION(3)         :: TOT_MOMENTUM
-    REAL(KIND=8)                       :: TOT_KE, TOT_IE, TOT_FE
+    REAL(KIND=8)                       :: TOT_KE, TOT_IE, TOT_FE, TOT_EE, HX, HY
 
 
     TOT_NUM = 0
@@ -428,6 +483,7 @@
     TOT_KE = 0
     TOT_IE = 0
     TOT_FE = 0
+    TOT_EE = 0
 
     ! Number of particles
     DO JP = 1, NP_PROC
@@ -449,7 +505,10 @@
       END IF
 
     END DO
-
+    TOT_MOMENTUM = TOT_MOMENTUM * FNUM
+    TOT_KE = TOT_KE * FNUM
+    TOT_IE = TOT_IE * FNUM
+    TOT_FE = TOT_FE * FNUM
 
 
     ! Collect data from all the processes and print it
@@ -460,15 +519,24 @@
       CALL MPI_REDUCE(MPI_IN_PLACE,  TOT_IE,       1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
       CALL MPI_REDUCE(MPI_IN_PLACE,  TOT_FE,       1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
 
-      WRITE(*,*) ' '
-      WRITE(*,*) 'Conservation checks:'
-      WRITE(*,*) 'Number of particles:  ', TOT_NUM
-      WRITE(*,*) 'Total momentum:       [ ', TOT_MOMENTUM, ' ] [kg m/s]'
-      WRITE(*,*) 'Total kinetic energy:   ', TOT_KE, ' [J]'
-      WRITE(*,*) 'Total internal energy:  ', TOT_IE, ' [J]'
-      WRITE(*,*) 'Total formation energy: ', TOT_FE, ' [J]'
-      WRITE(*,*) 'Total energy:          ', TOT_KE+TOT_IE+TOT_FE, ' [J]'
-      WRITE(*,*) ' '
+      HX = (XMAX-XMIN)/DBLE(NX)
+      HY = (YMAX-YMIN)/DBLE(NY)
+      TOT_EE = -HX*HY*8.8541878128E-12*SUM( Q_FIELD*PACK(PHI_FIELD, .TRUE.) )/FNUM
+
+      ! WRITE(*,*) ' '
+      ! WRITE(*,*) 'Conservation checks:'
+      ! WRITE(*,*) 'Number of particles:  ', TOT_NUM
+      ! WRITE(*,*) 'Total momentum:       [ ', TOT_MOMENTUM, ' ] [kg m/s]'
+      ! WRITE(*,*) 'Total kinetic energy:   ', TOT_KE, ' [J]'
+      ! WRITE(*,*) 'Total internal energy:  ', TOT_IE, ' [J]'
+      ! WRITE(*,*) 'Total formation energy: ', TOT_FE, ' [J]'
+      ! WRITE(*,*) 'Total electrostatic energy: ', TOT_EE, ' [J]'
+      ! WRITE(*,*) 'Total energy:          ', TOT_KE+TOT_IE+TOT_FE+TOT_EE, ' [J]'
+      ! WRITE(*,*) ' '
+
+      OPEN(54331, FILE='conservation_checks', POSITION='append', STATUS='unknown', ACTION='write')
+      WRITE(54331,*) TOT_NUM, TOT_MOMENTUM, TOT_KE, TOT_IE, TOT_FE, TOT_EE
+      CLOSE(54331)
 
     ELSE
       CALL MPI_REDUCE(TOT_NUM,       TOT_NUM,      1, MPI_INTEGER,          MPI_SUM, 0, MPI_COMM_WORLD, ierr)

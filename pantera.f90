@@ -23,8 +23,6 @@ PROGRAM PANTERA
    ! ========= Print header (important things first) =======
    CALL PRINTTITLE(PROC_ID)
 
-   CALL ASSEMBLE_POISSON
-
    ! ========= Read input file and init variables ==========
    CALL ONLYMASTERPRINT1(PROC_ID, '> READING INPUT DATA...')
    CALL READINPUT          ! Read input file
@@ -32,7 +30,9 @@ PROGRAM PANTERA
    CALL INITINJECTION      ! Initialize variables for injection
    CALL INITCOLLISIONS     ! Initialize variables for collisions
    CALL INITREACTIONS      ! Initialize variables for reactions
+   CALL INITFIELDS         ! Initialize electromagnetic fields
 
+   IF (BOOL_PIC) CALL ASSEMBLE_POISSON
    ! ========= Initial particles seed ======================
    IF (BOOL_INITIAL_SEED)   CALL INITIAL_SEED
    ! CALL DUMP_PARTICLES_SCREEN

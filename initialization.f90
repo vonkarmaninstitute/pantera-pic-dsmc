@@ -25,7 +25,7 @@ MODULE initialization
       CHARACTER*512      :: line
       INTEGER            :: ReasonEOF
 
-      CHARACTER*512      :: MIXTURE_DEFINITION, VSS_PARAMS_FILENAME, LINESOURCE_DEFINITION
+      CHARACTER*512      :: MIXTURE_DEFINITION, VSS_PARAMS_FILENAME, LINESOURCE_DEFINITION, WALL_DEFINITION
       CHARACTER*64       :: MIX_INIT_NAME, MIX_BOUNDINJECT_NAME, DSMC_COLL_MIX_NAME
 
       ! Open input file for reading
@@ -48,11 +48,28 @@ MODULE initialization
          ! ~~~~~~~~~~~~~  Geometry and computational domain  ~~~~~~~~~~~~~~~~~
          IF (line=='Axial_symmetry_bool:')     READ(in1,'(L6)') BOOL_AXI
          IF (line=='Domain_limits:')           READ(in1,*) XMIN, XMAX, YMIN, YMAX, ZMIN, ZMAX
-         IF (line=='Domain_periodicity:')      READ(in1,*) BOOL_X_PERIODIC, BOOL_Y_PERIODIC, BOOL_Z_PERIODIC
-         IF (line=='Domain_specular:')         READ(in1,*) BOOL_XMIN_SPECULAR, BOOL_XMAX_SPECULAR, &
-                                                           BOOL_YMIN_SPECULAR, BOOL_YMAX_SPECULAR
+         IF (line=='Domain_periodicity:') THEN
+            READ(in1,*) BOOL_X_PERIODIC, BOOL_Y_PERIODIC, BOOL_Z_PERIODIC
+            BOOL_PERIODIC(1) = BOOL_X_PERIODIC
+            BOOL_PERIODIC(2) = BOOL_X_PERIODIC
+            BOOL_PERIODIC(3) = BOOL_Y_PERIODIC
+            BOOL_PERIODIC(4) = BOOL_Y_PERIODIC
+         END IF
+         IF (line=='Domain_specular:')         READ(in1,*) BOOL_SPECULAR
+         IF (line=='Domain_diffuse:')          READ(in1,*) BOOL_DIFFUSE
+         IF (line=='Boundary_temperature:')    READ(in1,*) BOUNDTEMP
+         IF (line=='Domain_react:')            READ(in1,*) BOOL_REACT
+         IF (line=='Wall_reactions_file:') THEN
+            READ(in1,*) WALL_REACTIONS_FILENAME
+            CALL READ_WALL_REACTIONS(WALL_REACTIONS_FILENAME)
+         END IF
          IF (line=='Number_of_cells:')         READ(in1,*) NX, NY, NZ
 
+         IF (line=='Grid_file:') THEN
+            READ(in1,*) GRID_FILENAME
+            CALL READ_GRID_FILE(GRID_FILENAME)
+            GRID_TYPE = RECTILINEAR_NONUNIFORM
+         END IF
          ! ~~~~~~~~~~~~~  Numerical settings  ~~~~~~~~~~~~~~~~~
          IF (line=='Fnum:')                    READ(in1,*) FNUM
          IF (line=='Timestep:')                READ(in1,*) DT
@@ -64,7 +81,8 @@ MODULE initialization
          IF (line=='Dump_grid_numavgs:')       READ(in1,*) DUMP_GRID_N_AVG
          IF (line=='Perform_checks:')          READ(in1,*) PERFORM_CHECKS
          IF (line=='Stats_every:')             READ(in1,*) STATS_EVERY
-         
+
+         IF (line=='Bool_PIC:')                READ(in1,*) BOOL_PIC
 
 
          ! ~~~~~~~~~~~~~  Multispecies ~~~~~~~~~~~~~~~
@@ -91,7 +109,7 @@ MODULE initialization
             DSMC_COLL_MIX = MIXTURE_NAME_TO_ID(DSMC_COLL_MIX_NAME)
          END IF
          
-        ! ~~~~~~~~~~~~~  Readctions ~~~~~~~~~~~~~~~
+        ! ~~~~~~~~~~~~~  Reactions ~~~~~~~~~~~~~~~
          IF (line=='Reactions_file:') THEN
             READ(in1,*) REACTIONS_FILENAME
             CALL READ_REACTIONS(REACTIONS_FILENAME)
@@ -140,6 +158,14 @@ MODULE initialization
          IF (line=='Linesource:') THEN
             READ(in1,'(A)') LINESOURCE_DEFINITION
             CALL DEF_LINESOURCE(LINESOURCE_DEFINITION)
+         END IF
+
+
+         ! ~~~~~~~~~~~~~  Walls ~~~~~~~~~~~~~~~
+
+         IF (line=='Wall:') THEN
+            READ(in1,'(A)') WALL_DEFINITION
+            CALL DEF_WALL(WALL_DEFINITION)
          END IF
 
          ! ~~~~~~~~~~~~~  MPI parallelization settings ~~~~~~~~~~~~~~~
@@ -307,19 +333,20 @@ MODULE initialization
 
          ! ~~~~ Multispecies ~~~~
          WRITE(*,*) '  =========== Species ========================='
-         WRITE(*,*) 'File read'
-         WRITE(*,'(A30,I9)') 'Number of species present: ', N_SPECIES
+         WRITE(*,*) '    ','File read'
+         WRITE(*,'(A5,A30,I9)') '    ','Number of species present: ', N_SPECIES
 
 
          WRITE(*,*) '  =========== Mixtures ========================='
          DO j = 1, N_MIXTURES
-            WRITE(*,*)'Contents of mixture ', MIXTURES(j)%NAME, 'with ', MIXTURES(j)%N_COMPONENTS, ' components'
+            WRITE(*,*)'    ','Contents of mixture ', MIXTURES(j)%NAME, ' with ', MIXTURES(j)%N_COMPONENTS, ' components:'
             DO k = 1, MIXTURES(j)%N_COMPONENTS
-               WRITE(*,*) 'Mix component ', MIXTURES(j)%COMPONENTS(k)%NAME, &
-                        ' with frac ', MIXTURES(j)%COMPONENTS(k)%MOLFRAC, &
+               WRITE(*,*) '    ','Mixture component ', MIXTURES(j)%COMPONENTS(k)%NAME, &
+                        ' with fraction ', MIXTURES(j)%COMPONENTS(k)%MOLFRAC, &
                         ' and ID ', MIXTURES(j)%COMPONENTS(k)%ID
             END DO
          END DO
+
          
       END IF
 
@@ -571,7 +598,49 @@ MODULE initialization
       MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
       LINESOURCES(N_LINESOURCES)%MIX_ID = MIX_ID
 
-   END SUBROUTINE
+   END SUBROUTINE DEF_LINESOURCE
+
+
+
+   SUBROUTINE DEF_WALL(DEFINITION)
+
+      IMPLICIT NONE
+
+      CHARACTER(LEN=*), INTENT(IN) :: DEFINITION
+
+      INTEGER :: N_STR
+      CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
+      REAL(KIND=8) :: LENGTH
+
+      TYPE(WALL), DIMENSION(:), ALLOCATABLE :: TEMP_WALLS
+
+      
+      ALLOCATE(TEMP_WALLS(N_WALLS+1))
+      TEMP_WALLS(1:N_WALLS) = WALLS
+      CALL MOVE_ALLOC(TEMP_WALLS, WALLS)
+      N_WALLS = N_WALLS + 1
+
+
+
+      CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
+
+      READ(STRARRAY(1), '(ES14.3)') WALLS(N_WALLS)%CX
+      READ(STRARRAY(2), '(ES14.3)') WALLS(N_WALLS)%CY
+      READ(STRARRAY(3), '(ES14.3)') WALLS(N_WALLS)%DX
+      READ(STRARRAY(4), '(ES14.3)') WALLS(N_WALLS)%DY
+      READ(STRARRAY(5), '(ES14.3)') WALLS(N_WALLS)%TEMP
+      READ(STRARRAY(6), *) WALLS(N_WALLS)%SPECULAR
+      READ(STRARRAY(7), *) WALLS(N_WALLS)%DIFFUSE
+      READ(STRARRAY(8), *) WALLS(N_WALLS)%POROUS
+      READ(STRARRAY(9), '(ES14.3)') WALLS(N_WALLS)%TRANSMISSIVITY
+      READ(STRARRAY(10), *) WALLS(N_WALLS)%REACT
+
+      LENGTH = SQRT(WALLS(N_WALLS)%DX**2 + WALLS(N_WALLS)%DY**2)
+
+      WALLS(N_WALLS)%NORMX = WALLS(N_WALLS)%DY/LENGTH
+      WALLS(N_WALLS)%NORMY = - WALLS(N_WALLS)%DX/LENGTH
+
+   END SUBROUTINE DEF_WALL
 
 
    SUBROUTINE READ_REACTIONS(FILENAME)
@@ -660,7 +729,6 @@ MODULE initialization
          N_REACTIONS = N_REACTIONS + 1
          REACTIONS(N_REACTIONS) = NEW_REACTION
 
-         WRITE(*,*) 'Done!'
          DEALLOCATE(STRARRAY)
 
       END DO
@@ -675,6 +743,161 @@ MODULE initialization
       !END DO
 
    END SUBROUTINE READ_REACTIONS
+
+
+
+   SUBROUTINE READ_WALL_REACTIONS(FILENAME)
+
+      IMPLICIT NONE
+
+      CHARACTER*64, INTENT(IN) :: FILENAME
+      
+      INTEGER, PARAMETER :: in4 = 5657
+      INTEGER            :: ios
+      CHARACTER*512      :: line
+      INTEGER            :: ReasonEOF
+
+      CHARACTER(LEN=80)   :: DEFINITION
+      INTEGER :: N_STR, I
+      CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
+      TYPE(WALL_REACTIONS_DATA_STRUCTURE) :: NEW_REACTION
+      
+      ! Open input file for reading
+      OPEN(UNIT=in4,FILE=FILENAME, STATUS='old',IOSTAT=ios)
+
+      IF (ios.NE.0) THEN
+         CALL ERROR_ABORT('Attention, wall reactions definition file not found! ABORTING.')
+      ENDIF
+
+      line = '' ! Init empty
+
+      ! +++++++ Read until the end of file ++++++++
+      DO
+
+         READ(in4,'(A)', IOSTAT=ReasonEOF) DEFINITION ! Read reaction components line         
+         CALL STRIP_COMMENTS(DEFINITION, '!')         ! Remove comments from line
+
+         IF (ReasonEOF < 0) EXIT ! End of file reached
+
+         ! ~~~~~~~~~~~~~  Geometry and computational domain  ~~~~~~~~~~~~~~~~~
+         
+         CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
+
+         IF (N_STR == 0) CYCLE ! This is an empty line
+         IF (STRARRAY(2) .NE. '-->' ) THEN
+            CALL ERROR_ABORT('Attention, format is not respected in wall reactions file.')
+         END IF
+
+         NEW_REACTION%R_SP_ID = SPECIES_NAME_TO_ID(STRARRAY(1))
+         IF (STRARRAY(3) .EQ. 'none' ) THEN
+            NEW_REACTION%N_PROD = 0
+            IF (N_STR .NE. 3) THEN
+               CALL ERROR_ABORT('Attention, format is not respected in wall reactions file.')
+            END IF
+         ELSE
+            NEW_REACTION%N_PROD = (N_STR-1)/2
+            DO I = 1, NEW_REACTION%N_PROD
+               IF (I == 1) THEN
+                  NEW_REACTION%P1_SP_ID = SPECIES_NAME_TO_ID( STRARRAY(3) )
+               ELSE IF (I == 2) THEN
+                  NEW_REACTION%P2_SP_ID = SPECIES_NAME_TO_ID(STRARRAY(5))
+                  IF (STRARRAY(4) .NE. '+' ) THEN
+                     CALL ERROR_ABORT('Attention, format is not respected in wall reactions file.')
+                  END IF
+               ELSE
+                  ! Only acceps up to two products.
+                  CALL ERROR_ABORT('Attention, format is not respected in wall reactions file.')
+               END IF
+            END DO
+         END IF
+      
+         READ(in4,'(A)', IOSTAT=ReasonEOF) DEFINITION ! Read reaction parameters line
+         CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
+         READ(STRARRAY(1), '(ES14.3)') NEW_REACTION%PROB
+
+         IF (ReasonEOF < 0) EXIT ! End of file reached
+         
+         ALLOCATE(TEMP_WALL_REACTIONS(N_WALL_REACTIONS+1)) ! Append the mixture to the list
+         TEMP_WALL_REACTIONS(1:N_WALL_REACTIONS) = WALL_REACTIONS
+         CALL MOVE_ALLOC(TEMP_WALL_REACTIONS, WALL_REACTIONS)
+         N_WALL_REACTIONS = N_WALL_REACTIONS + 1
+         WALL_REACTIONS(N_WALL_REACTIONS) = NEW_REACTION
+
+         DEALLOCATE(STRARRAY)
+
+      END DO
+      
+      CLOSE(in4) ! Close input file
+
+      ! DO I = 1, N_WALL_REACTIONS
+      !    WRITE(*,*) 'Wall reaction ', I, 'Has 1 reactant with id:', WALL_REACTIONS(I)%R_SP_ID
+      !    WRITE(*,*) WALL_REACTIONS(I)%N_PROD, 'products with ids:',  WALL_REACTIONS(I)%P1_SP_ID, ' and ', WALL_REACTIONS(I)%P2_SP_ID
+      !    WRITE(*,*) 'Parameters:', WALL_REACTIONS(I)%PROB
+      ! END DO
+
+   END SUBROUTINE READ_WALL_REACTIONS
+
+
+   SUBROUTINE READ_GRID_FILE(FILENAME)
+
+      IMPLICIT NONE
+
+      CHARACTER*64, INTENT(IN) :: FILENAME
+      
+      INTEGER, PARAMETER :: in5 = 5557
+      INTEGER            :: ios
+      INTEGER            :: ReasonEOF
+
+      INTEGER :: I, J
+      
+      ! Open input file for reading
+      OPEN(UNIT=in5,FILE=FILENAME, STATUS='old',IOSTAT=ios)
+
+      IF (ios.NE.0) THEN
+         CALL ERROR_ABORT('Attention, grid definition file not found! ABORTING.')
+      ENDIF
+
+
+      READ(in5,*, IOSTAT=ReasonEOF) NX ! Read number of x cells
+      IF (ReasonEOF < 0) CALL ERROR_ABORT('Attention, format error in grid definition file! ABORTING.')
+      ALLOCATE(XCOORD(NX+1))
+      READ(in5,*, IOSTAT=ReasonEOF) XCOORD ! Read coords of x cells boundaries
+      XMIN = XCOORD(1)
+      XMAX = XCOORD(NX+1)
+      ALLOCATE(HX(NX))
+      DO I = 1, NX
+         HX(I) = XCOORD(I+1)-XCOORD(I)
+      END DO
+      IF (ReasonEOF < 0) CALL ERROR_ABORT('Attention, format error in grid definition file! ABORTING.')
+
+      READ(in5,*, IOSTAT=ReasonEOF) NY ! Read number of y cells
+      IF (ReasonEOF < 0) CALL ERROR_ABORT('Attention, format error in grid definition file! ABORTING.')
+      ALLOCATE(YCOORD(NY+1))
+      READ(in5,*, IOSTAT=ReasonEOF) YCOORD ! Read coords of y cells boundaries
+      YMIN = YCOORD(1)
+      YMAX = YCOORD(NY+1)
+      ALLOCATE(HY(NY))
+      DO I = 1, NY
+         HY(I) = YCOORD(I+1)-YCOORD(I)
+      END DO
+      IF (ReasonEOF < 0) CALL ERROR_ABORT('Attention, format error in grid definition file! ABORTING.')
+
+      READ(in5,*, IOSTAT=ReasonEOF) NZ ! Read number of z cells
+      IF (ReasonEOF < 0) CALL ERROR_ABORT('Attention, format error in grid definition file! ABORTING.')
+      READ(in5,*, IOSTAT=ReasonEOF) ZMIN, ZMAX ! Read coords of z cells boundaries
+      IF (ReasonEOF < 0) CALL ERROR_ABORT('Attention, format error in grid definition file! ABORTING.')
+   
+      ALLOCATE(CELL_VOLUMES(NX*NY))
+      DO I = 1, NX
+         DO J = 1, NY
+            CELL_VOLUMES(I + NX*(J-1)) = HX(I)*HY(J)*(ZMAX-ZMIN)
+         END DO
+      END DO
+      ! Perform all the checks on these arrays!
+      CLOSE(in5)
+
+   END SUBROUTINE READ_GRID_FILE
+
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE INITIAL_SEED -> seeds particles at the beginning of !!
@@ -812,6 +1035,7 @@ MODULE initialization
       END IF
 
 
+
    END SUBROUTINE INPUT_DATA_SANITY_CHECK
 
 
@@ -852,6 +1076,17 @@ MODULE initialization
       CELL_VOL = (XMAX-XMIN)*(YMAX-YMIN)/(NX*NY)
 
    END SUBROUTINE INITVARIOUS
+
+   
+   SUBROUTINE INITFIELDS
+
+      IMPLICIT NONE
+
+      NPX = NX + 1
+      NPY = NY + 1
+      ALLOCATE(E_FIELD(0:NPX-1, 0:NPY-1, 3))
+
+   END SUBROUTINE INITFIELDS
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE INITINJECTION -> initializes variables for particles injection !!!!!

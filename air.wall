@@ -1,0 +1,7 @@
+! wall reactions definition
+
+N2+ --> N2
+1.0
+
+e --> none
+1.0

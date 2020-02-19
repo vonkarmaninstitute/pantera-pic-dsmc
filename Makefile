@@ -23,7 +23,7 @@ pantera.exe: pantera.o $(OBJS)
 pantera.o: pantera.f90 $(OBJS) 
 	$(CMPF) $(OPTF) pantera.f90
 
-timecycle.o: timecycle.f90  global.o  particle.o  screen.o  collisions.o  postprocess.o
+timecycle.o: timecycle.f90  global.o  particle.o  screen.o  collisions.o  postprocess.o  fields.o
 	$(CMPF) $(OPTF) timecycle.f90
 
 initialization.o: initialization.f90  global.o  tools.o  grid_and_partition.o
@@ -53,7 +53,7 @@ collisions.o: collisions.f90
 postprocess.o: postprocess.f90
 	$(CMPF) $(OPTF) postprocess.f90
 
-fields.o: fields.f90
+fields.o: fields.f90  umfpack.o
 	$(CMPF) $(OPTF) fields.f90
 
 umfpack.o: umfpack.f90

@@ -15,20 +15,34 @@
 Axial_symmetry_bool:
     .FALSE.
 Domain_limits:
-    -0.5  0.5      -0.5  0.5      -0.5  0.5
+    0  2.      -0.5  0.5      -0.5  0.5
+
 Domain_periodicity:
     .FALSE.   .FALSE.   .TRUE.
 Domain_specular:
+    .FALSE.    .FALSE.    .FALSE.    .FALSE.
+Domain_diffuse:
     .TRUE.    .TRUE.    .TRUE.    .TRUE.
-Number_of_cells:
-    2  2  1
+Domain_react:
+    .TRUE.    .TRUE.    .TRUE.    .TRUE.
+
+Boundary_temperature:
+    300.0
+
+!Number_of_cells:
+!    200  100  1
+
+Grid_file:
+    demogrid1.grid
+Bool_PIC:
+    .FALSE.
 
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    5.0E18
+    1.0E12
 Timestep:
-    1.0e-10
+    1e-5
 Number_of_timesteps:
     10000
 !200000
@@ -36,18 +50,18 @@ Stats_every:
     1
 
 RNG_seed:
-    65646
+    65344
 Dump_part_every:
     10001
 
 Dump_grid_start:
-    0  
+    0
     
 Dump_grid_avgevery:
-    100   
+    1
 
 Dump_grid_numavgs:
-    1
+    10
 
 Perform_checks:
     .FALSE.
@@ -58,11 +72,13 @@ Species_file:
     air.species
     
 Def_mixture:
-    Aria N2 0.8 O2 0.2
+    Pos N2+ 1.0
     
 Def_mixture:
-    collmix N2 0.1 O2 0.1 N 0.1 O 0.1 NO 0.1 N2+ 0.1 O2+ 0.1 N+ 0.1 O+ 0.1 NO+ 0.05 e 0.05
+    Neg e 1.0
     
+Def_mixture:
+    Both N2+ 0.5 e 0.5
     
 ! ========= Collisions ==============================
 
@@ -78,37 +94,40 @@ MCC_species: ! NOT IMPLEMENTED YET!
 ! DSMC VHS collisions  ! NOT IMPLEMENTED YET!
 
 DSMC_collisions_mixture:
-    collmix
+    Pos
 VSS_parameters_file:
     air.vss
 
 Thermal_bath_bool:
-    .TRUE.
+    .FALSE.
 Thermal_bath_Ttr:
     20000.0
 
 
 ! ========= Reactions ==============================
 Reactions_file:
-    air.tce
+    air.react
+    
+Wall_reactions_file:
+    air.wall
 
 
 ! ========= Initial particle seed ===================
 
 Initial_particles_bool:
-    .TRUE.
+    .FALSE.
 Initial_particles_dens:
-    5.e23
+    1.e19
 Initial_particles_vel:
     0.  0.  0.
 Initial_particles_Ttra:
-    20000.0 20000.0 20000.0
+    600.0 600.0 600.0
 Initial_particles_Trot:
-    200.
+    600.
 Initial_particles_Tvib:
-    200. 
+    600. 
 Initial_particles_mixture:
-    Aria
+    Pos
 ! ========== Injection from boundaries ==============
 
 Boundaries_inject_bool:
@@ -125,27 +144,13 @@ Boundaries_inject_Ttra:
 Boundaries_inject_Trot:
     0.
 Boundaries_inject_mixture:
-    Aria
+    Both
 ! ========== Injection from line source =============
 
-Linesource_bool:
-    .FALSE.
-Linesource_center:
-    0.5   0.
-Linesource_length_y:
-    0.2
-Linesource_dens:
-    1.e24
-Linesource_vel:
-    200.  0. 0.
-Linesource_Ttra:
-    0.0001
-Linesource_Trot:
-    0.
 
 !   center       length        density  velocity xyz         Ttr      Trot   mix
 !Linesource:
-!    -0.5    0.0    0.0    1.0    2.8e20    0.0    0.0    0.0    273.0    0.0    Argon
+!    -0.5    0.0    0.0    0.2    1.e18    10000.0    0.0    0.0    273.0    0.0    Pos
 !Linesource:
 !    0.5    0.0    0.0    -1.0    2.8e20    0.0    0.0    0.0    273.0    0.0    Helium
 
@@ -154,6 +159,27 @@ Linesource_Trot:
 !Linesource:
 !    0.0    0.5    1.0    0.0    1.0e19    6000.0    -2000.0    3000.0    1000.0    0.0    aria
 
+
+Linesource:
+    0.2     0.0     0.0    0.01   1.0e19    1000.0    0.0    0.0    2000.0    2000.0    Pos
+
+
+Wall:
+    0.15   -0.05    0.1    0.0    300.    .FALSE.    .TRUE.    .FALSE.    0.    .TRUE.
+Wall:
+    0.2     0.0     0.0    0.1    300.    .FALSE.    .TRUE.    .FALSE.    0.    .TRUE.
+Wall:
+    0.15    0.05   -0.1    0.0    300.    .FALSE.    .TRUE.    .FALSE.    0.    .TRUE.  
+Wall:
+    0.1     0.0     0.0   -0.1    300.    .FALSE.    .TRUE.    .FALSE.    0.    .TRUE.
+
+Wall:
+    1.99    0.0     0.0   -0.2    300.    .FALSE.    .TRUE.    .TRUE.     0.3   .TRUE.
+    
+Wall:
+    1.2    -0.49   -0.6    0.0    300.    .FALSE.    .TRUE.    .TRUE.     0.8   .TRUE.
+    
+    
 ! ========= MPI parallelization =====================
 ! == Style for MPI domain partition can be:
 ! ==

@@ -6,6 +6,7 @@ MODULE timecycle
    USE tools
    USE collisions
    USE postprocess
+   USE fields
 
    CONTAINS
 
@@ -79,9 +80,16 @@ MODULE timecycle
 
       IF (BOOL_THERMAL_BATH) CALL THERMAL_BATH
 
+      ! ########### Compute poisson ##########################################
+
+      IF (BOOL_PIC) THEN
+         CALL DEPOSIT_CHARGE
+         CALL SOLVE_POISSON
+      END IF
+
       ! ########### Dump particles ##############################################
 
-      IF (MOD(tID, DUMP_EVERY) .EQ. 1) CALL DUMP_PARTICLES_FILE(tID)
+      IF (MOD(tID, DUMP_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
 
       ! ########### Dump flowfield ##############################################
 
@@ -99,7 +107,7 @@ MODULE timecycle
       ! ~~~~~ Hmm that's it! ~~~~~
 
       ! Perform the conservation checks
-      IF (PERFORM_CHECKS .AND. MOD(tID, 100) .EQ. 0) CALL CHECKS
+      IF (PERFORM_CHECKS .AND. MOD(tID, 1) .EQ. 0) CALL CHECKS
 
       tID = tID + 1
    END DO
@@ -359,40 +367,76 @@ MODULE timecycle
    IMPLICIT NONE
 
    INTEGER      :: IP, IC, i
-   INTEGER      :: BOUNDCOLL
-   REAL(KIND=8) :: DTCOLL
-   REAL(KIND=8), DIMENSION(4) :: NX, NY, NZ, XW, YW, ZW
+   INTEGER      :: BOUNDCOLL, WALLCOLL
+   REAL(KIND=8) :: DTCOLL, TOTDTCOLL, CANDIDATE_DTCOLL
+   REAL(KIND=8), DIMENSION(4) :: NORMX, NORMY, XW, YW, ZW
    ! REAL(KIND=8) :: XCOLL, YCOLL, ZCOLL
    REAL(KIND=8) :: VN, DX
    LOGICAL, DIMENSION(:), ALLOCATABLE :: REMOVE_PART
+   REAL(KIND=8), DIMENSION(3) :: V_OLD, V_NEW
+   REAL(KIND=8), DIMENSION(3) :: E, B
+   REAL(KIND=8) :: V_NORM, V_PERP, VZ, VDUMMY, EROT, EVIB, VDOTN
+   INTEGER :: S_ID
+   LOGICAL :: HASCOLLIDED
+   REAL(KIND=8) :: XCOLL, YCOLL, COLLDIST
 
-   NX = (/ 1., -1., 0., 0. /)
-   NY = (/ 0., 0., 1., -1. /)
-   NZ = (/ 0., 0., 0., 0. /)
+   !E = [0.d0, 0.d0, 0.d0]
+   B = [0.d0, 0.d0, 0.d0]
 
-   XW = (/ XMIN, XMAX, XMIN, XMAX /)
-   YW = (/ YMAX, YMIN, YMIN, YMAX /)
-   ZW = (/ 0., 0., 0., 0. /)
+
+   NORMX = [ 1., -1., 0., 0. ]
+   NORMY = [ 0., 0., 1., -1. ]
+
+   XW = [ XMIN, XMAX, XMIN, XMAX ]
+   YW = [ YMAX, YMIN, YMIN, YMAX ]
+   ZW = [ 0., 0., 0., 0. ]
 
    ALLOCATE(REMOVE_PART(NP_PROC))
 
    DO IP = 1, NP_PROC
       REMOVE_PART(IP) = .FALSE.
 
-      
+
+      ! Update velocity
+      IC = particles(IP)%IC
+
+      IF (BOOL_PIC) THEN
+         CALL APPLY_E_FIELD(IP, E)
+         !E = E_FIELD(MOD(IC-1, NX)+1, (IC-1)/NX+1, :)
+
+
+         V_OLD(1) = particles(IP)%VX
+         V_OLD(2) = particles(IP)%VY
+         V_OLD(3) = particles(IP)%VZ
+
+         CALL UPDATE_VELOCITY_BORIS(DT, V_OLD, V_NEW, &
+         SPECIES(particles(IP)%S_ID)%CHARGE, SPECIES(particles(IP)%S_ID)%MOLECULAR_MASS, &
+         E, B)
+
+         ! Assign v^n to the particle, for simplicity
+         !particles(IP)%VX = 0.5*(V_OLD(1) + V_NEW(1))
+         !particles(IP)%VY = 0.5*(V_OLD(2) + V_NEW(2))
+         !particles(IP)%VZ = 0.5*(V_OLD(3) + V_NEW(3))
+         particles(IP)%VX = V_NEW(1)
+         particles(IP)%VY = V_NEW(2)
+         particles(IP)%VZ = V_NEW(3)
+      END IF
+
+
+      HASCOLLIDED = .FALSE.
+      TOTDTCOLL = 0.
       DO WHILE (particles(IP)%DTRIM .GT. 0.) ! Repeat the procedure until step is done
 
          DTCOLL = particles(IP)%DTRIM ! Looking for collisions within the remaining time
          ! ______ ADVECTION ______
-
          BOUNDCOLL = -1
          DO i = 1, 4 ! Check collisions with boundaries (xmin, xmax, ymin, ymax)
-            ! Compute he velocity normal to the boundary
-            VN = particles(IP)%VX * NX(i) + particles(IP)%VY * NY(i) + particles(IP)%VZ * NZ(i)
+            ! Compute the velocity normal to the boundary
+            VN = -(particles(IP)%VX * NORMX(i) + particles(IP)%VY * NORMY(i))
             ! Compute the distance from the boundary
-            DX = (XW(i) - particles(IP)%X) * NX(i) + (YW(i) - particles(IP)%Y) * NY(i) + (ZW(i) - particles(IP)%Z) * NZ(i)
+            DX = (particles(IP)%X - XW(i)) * NORMX(i) + (particles(IP)%Y - YW(i)) * NORMY(i)
             ! Check if a collision happens (sooner than previously calculated)
-            IF (VN * DTCOLL .LE. DX) THEN
+            IF (VN .GE. 0. .AND. VN * DTCOLL .GT. DX) THEN
                
                ! Find candidate collision point (don't need this for boundaries)
                ! XCOLL = particles(IP)%X + particles(IP)%VX * DTCOLL 
@@ -400,7 +444,9 @@ MODULE timecycle
                ! ZCOLL = particles(IP)%Z + particles(IP)%VZ * DTCOLL
 
                DTCOLL = DX/VN
-               BOUNDCOLL = i                                 
+               BOUNDCOLL = i    
+               TOTDTCOLL = TOTDTCOLL + DTCOLL  
+               HASCOLLIDED = .TRUE.               
 
             END IF
          END DO
@@ -408,21 +454,92 @@ MODULE timecycle
 
          ! Check collisions with surfaces
          ! If earlier than dtcoll remember to set BOUNDCOLL to -1 and the new dtcoll
+         WALLCOLL = -1
+         DO i = 1, N_WALLS
+            ! Compute the velocity normal to the surface
+            VN = -(particles(IP)%VX * WALLS(i)%NORMX + particles(IP)%VY * WALLS(i)%NORMY)
+            ! Compute the distance from the boundary
+            DX = (particles(IP)%X - WALLS(i)%CX) * WALLS(i)%NORMX + (particles(IP)%Y - WALLS(i)%CY) * WALLS(i)%NORMY
+            ! Check if a collision happens (sooner than previously calculated)
+            IF (DX .GE. 0. .AND. VN * DTCOLL .GE. DX) THEN
+               
+               CANDIDATE_DTCOLL = DX/VN
+               ! Find candidate collision point
+               XCOLL = particles(IP)%X + particles(IP)%VX * CANDIDATE_DTCOLL 
+               YCOLL = particles(IP)%Y + particles(IP)%VY * CANDIDATE_DTCOLL
+               COLLDIST = (XCOLL-WALLS(i)%CX)**2+(YCOLL-WALLS(i)%CY)**2
+               IF (COLLDIST .LE. (WALLS(i)%DX**2+WALLS(i)%DY**2)/4.) THEN
+                  BOUNDCOLL = -1
+                  WALLCOLL = i
+                  DTCOLL = CANDIDATE_DTCOLL
+                  TOTDTCOLL = TOTDTCOLL + DTCOLL
+                  HASCOLLIDED = .TRUE.
+               END IF
+            END IF
+         END DO
 
 
-         IF (BOUNDCOLL == 1) THEN ! Collision with XMIN
-            ! Tally boundary properties
-            IF (BOOL_X_PERIODIC) THEN
+         IF (BOUNDCOLL .NE. -1) THEN
+            ! Collision with a boundary
+            IF (BOOL_PERIODIC(BOUNDCOLL)) THEN
 
                CALL MOVE_PARTICLE(IP, DTCOLL)
-               particles(IP)%X = particles(IP)%X + XMAX - XMIN
+               SELECT CASE (BOUNDCOLL)
+                  CASE (1)
+                     particles(IP)%X = particles(IP)%X + XMAX - XMIN
+                  CASE (2)
+                     particles(IP)%X = particles(IP)%X - XMAX + XMIN
+                  CASE (3)
+                     particles(IP)%Y = particles(IP)%Y + YMAX - YMIN
+                  CASE (4)
+                     particles(IP)%Y = particles(IP)%Y - YMAX + YMIN
+               END SELECT
                particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
 
-            ELSE IF (BOOL_XMIN_SPECULAR) THEN
+            ELSE IF (BOOL_SPECULAR(BOUNDCOLL)) THEN
+            
+               CALL MOVE_PARTICLE(IP, DTCOLL)
+               SELECT CASE (BOUNDCOLL)
+                  CASE (1)
+                     particles(IP)%VX = - particles(IP)%VX
+                  CASE (2)
+                     particles(IP)%VX = - particles(IP)%VX
+                  CASE (3)
+                     particles(IP)%VY = - particles(IP)%VY
+                  CASE (4)
+                     particles(IP)%VY = - particles(IP)%VY
+               END SELECT
+               particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
+
+               IF (BOOL_REACT(BOUNDCOLL)) THEN
+                  CALL WALL_REACT(IP, REMOVE_PART(IP))
+               END IF
+
+            ELSE IF (BOOL_DIFFUSE(BOUNDCOLL)) THEN
 
                CALL MOVE_PARTICLE(IP, DTCOLL)
-               particles(IP)%VX = - particles(IP)%VX
                particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
+               IF (BOOL_REACT(BOUNDCOLL)) THEN
+                  CALL WALL_REACT(IP, REMOVE_PART(IP))
+               END IF
+               IF (.NOT. REMOVE_PART(IP)) THEN
+                  S_ID = particles(IP)%S_ID
+                  CALL MAXWELL(0.d0, 0.d0, 0.d0, &
+                  BOUNDTEMP, BOUNDTEMP, BOUNDTEMP, &
+                  VDUMMY, V_PERP, VZ, SPECIES(S_ID)%MOLECULAR_MASS)
+
+                  CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, BOUNDTEMP, EROT)
+                  CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, BOUNDTEMP, EVIB)
+                                 
+                  V_NORM = FLX(0.d0, BOUNDTEMP, SPECIES(S_ID)%MOLECULAR_MASS)
+
+                  particles(IP)%VX = V_NORM*NORMX(BOUNDCOLL) - V_PERP*NORMY(BOUNDCOLL)
+                  particles(IP)%VY = V_PERP*NORMX(BOUNDCOLL) + V_NORM*NORMY(BOUNDCOLL)
+                  particles(IP)%VZ = VZ
+                  particles(IP)%EROT = EROT
+                  particles(IP)%EVIB = EVIB
+
+               END IF
 
             ELSE
 
@@ -430,19 +547,63 @@ MODULE timecycle
                particles(IP)%DTRIM = 0.
 
             END IF
-         ELSE IF (BOUNDCOLL == 2) THEN ! Collision with XMAX
-            ! Tally boundary properties
-            IF (BOOL_X_PERIODIC) THEN
+         ELSE IF (WALLCOLL .NE. -1) THEN
+            ! Collision with a wall
 
-               CALL MOVE_PARTICLE(IP, DTCOLL)
-               particles(IP)%X = particles(IP)%X - XMAX + XMIN
-               particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
+            IF (WALLS(WALLCOLL)%SPECULAR) THEN
 
-            ELSE IF (BOOL_XMAX_SPECULAR) THEN
+               IF (WALLS(WALLCOLL)%POROUS .AND. rf() .LE. WALLS(WALLCOLL)%TRANSMISSIVITY) THEN
 
-               CALL MOVE_PARTICLE(IP, DTCOLL)
-               particles(IP)%VX = - particles(IP)%VX
-               particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
+                  REMOVE_PART(IP) = .TRUE.
+                  particles(IP)%DTRIM = 0.
+
+               ELSE
+
+                  CALL MOVE_PARTICLE(IP, DTCOLL)
+                  VDOTN = particles(IP)%VX*WALLS(WALLCOLL)%NORMX+particles(IP)%VY*WALLS(WALLCOLL)%NORMY
+                  particles(IP)%VX = particles(IP)%VX + 2.*VDOTN*WALLS(WALLCOLL)%NORMX
+                  particles(IP)%VY = particles(IP)%VY + 2.*VDOTN*WALLS(WALLCOLL)%NORMY
+                  
+                  particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
+
+                  IF (WALLS(WALLCOLL)%REACT) THEN
+                     CALL WALL_REACT(IP, REMOVE_PART(IP))
+                  END IF
+
+               END IF
+            ELSE IF (WALLS(WALLCOLL)%DIFFUSE) THEN
+
+               IF (WALLS(WALLCOLL)%POROUS .AND. rf() .LE. WALLS(WALLCOLL)%TRANSMISSIVITY) THEN
+
+                  REMOVE_PART(IP) = .TRUE.
+                  particles(IP)%DTRIM = 0.
+                  
+               ELSE
+                     
+                  CALL MOVE_PARTICLE(IP, DTCOLL)
+                  particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
+                  IF (WALLS(WALLCOLL)%REACT) THEN
+                     CALL WALL_REACT(IP, REMOVE_PART(IP))
+                  END IF
+                  IF (.NOT. REMOVE_PART(IP)) THEN
+                     S_ID = particles(IP)%S_ID
+                     CALL MAXWELL(0.d0, 0.d0, 0.d0, &
+                     WALLS(WALLCOLL)%TEMP, WALLS(WALLCOLL)%TEMP, WALLS(WALLCOLL)%TEMP, &
+                     VDUMMY, V_PERP, VZ, SPECIES(S_ID)%MOLECULAR_MASS)
+
+                     CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, WALLS(WALLCOLL)%TEMP, EROT)
+                     CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, WALLS(WALLCOLL)%TEMP, EVIB)
+                                    
+                     V_NORM = FLX(0.d0, WALLS(WALLCOLL)%TEMP, SPECIES(S_ID)%MOLECULAR_MASS)
+
+                     particles(IP)%VX = V_NORM*WALLS(WALLCOLL)%NORMX - V_PERP*WALLS(WALLCOLL)%NORMY
+                     particles(IP)%VY = V_PERP*WALLS(WALLCOLL)%NORMX + V_NORM*WALLS(WALLCOLL)%NORMY
+                     particles(IP)%VZ = VZ
+                     particles(IP)%EROT = EROT
+                     particles(IP)%EVIB = EVIB
+
+                  END IF
+               END IF
 
             ELSE
 
@@ -450,58 +611,16 @@ MODULE timecycle
                particles(IP)%DTRIM = 0.
 
             END IF
-         ELSE IF (BOUNDCOLL == 3) THEN ! Collision with YMIN
-            ! Tally boundary properties
-            IF (BOOL_Y_PERIODIC) THEN
 
-               CALL MOVE_PARTICLE(IP, DTCOLL)
-               particles(IP)%Y = particles(IP)%Y + YMAX - YMIN
-               particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
-
-            ELSE IF (BOOL_YMIN_SPECULAR) THEN
-
-               CALL MOVE_PARTICLE(IP, DTCOLL)
-               particles(IP)%VY = - particles(IP)%VY
-               particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
-
-            ELSE
-
-               REMOVE_PART(IP) = .TRUE.
-               particles(IP)%DTRIM = 0.
-
-            END IF
-         ELSE IF (BOUNDCOLL == 4) THEN ! Collision with YMAX
-            ! Tally boundary properties
-            IF (BOOL_Y_PERIODIC) THEN
-
-               CALL MOVE_PARTICLE(IP, DTCOLL)
-               particles(IP)%Y = particles(IP)%Y - YMAX + YMIN
-               particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
-
-            ELSE IF (BOOL_YMAX_SPECULAR) THEN
-
-               CALL MOVE_PARTICLE(IP, DTCOLL)
-               particles(IP)%VY = - particles(IP)%VY
-               particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
-
-            ELSE
-
-               REMOVE_PART(IP) = .TRUE.
-               particles(IP)%DTRIM = 0.
-
-            END IF
          ELSE
-
+            ! No collision in this timestep
             CALL MOVE_PARTICLE(IP, particles(IP)%DTRIM)
             particles(IP)%DTRIM = 0.
 
          END IF
-         
-            
-         ! Advect particle in velocity - leapfrog method?
-         ! particles(IP)%VX = ...
-         ! particles(IP)%VY = ...
-         ! particles(IP)%VZ = ...
+
+
+      
 
          ! Axisymmetric domain
          IF (BOOL_AXI .eqv. .TRUE.) THEN 
@@ -551,6 +670,21 @@ MODULE timecycle
 
       particles(IP)%DTRIM = DT ! For the next timestep.
 
+      !IF (HASCOLLIDED) THEN
+      !   V_OLD(1) = particles(IP)%VX
+      !   V_OLD(2) = particles(IP)%VY
+      !   V_OLD(3) = particles(IP)%VZ
+         !Propagate v_coll to v^{n+1/2}
+         !Consistent: does not change for neutral particles.
+         !Also does not change is collision happens at DT/2
+         !CALL UPDATE_VELOCITY_BORIS(DT/2., V_OLD, V_NEW, &
+         !SPECIES(particles(IP)%S_ID)%CHARGE, SPECIES(particles(IP)%S_ID)%MOLECULAR_MASS, &
+         !E, B)
+      !END IF
+      !particles(IP)%VX = V_NEW(1)
+      !particles(IP)%VY = V_NEW(2)
+      !particles(IP)%VZ = V_NEW(3)
+
    END DO ! End loop: DO IP = 1,NP_PROC
 
    ! ==============
@@ -558,7 +692,7 @@ MODULE timecycle
    ! ========= Do this in the end of the advection step, since reordering the array 
    ! ========= mixes the particles.
    ! ==============
-  
+
    IP = NP_PROC
    DO WHILE (IP .GE. 1)
 
@@ -574,7 +708,32 @@ MODULE timecycle
 
    END DO
 
+   DEALLOCATE(REMOVE_PART)
+
    END SUBROUTINE ADVECT
+
+
+   SUBROUTINE UPDATE_VELOCITY_BORIS(DT, V_OLD, V_NEW, CHARGE, MASS, E, B)
+
+      IMPLICIT NONE
+
+      REAL(KIND=8), DIMENSION(3), INTENT(OUT) :: V_NEW
+      REAL(KIND=8), DIMENSION(3), INTENT(IN) :: V_OLD, E, B
+      REAL(KIND=8), DIMENSION(3) :: V_MINUS, V_PLUS, V_PRIME, T, S
+      REAL(KIND=8), INTENT(IN) :: DT, CHARGE, MASS
+      REAL(KIND=8) :: COULOMBCHARGE
+
+      COULOMBCHARGE = CHARGE * 1.602176634e-19
+      V_MINUS = V_OLD + 0.5*COULOMBCHARGE*E/MASS*DT
+
+      T = 0.5*COULOMBCHARGE*B/MASS*DT
+      V_PRIME = V_MINUS + CROSS(V_MINUS, T)
+      S = 2.*T/(1.+( T(1)*T(1) + T(2)*T(2) + T(3)*T(3) ))
+      V_PLUS = V_MINUS + CROSS(V_PRIME, S)
+
+      V_NEW = V_PLUS + 0.5*COULOMBCHARGE*E/MASS*DT
+
+   END SUBROUTINE
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE MOVE_PARTICLE -> Move the particles !!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -595,6 +754,47 @@ MODULE timecycle
       particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ * TIME
 
    END SUBROUTINE MOVE_PARTICLE
+
+
+   SUBROUTINE WALL_REACT(IP, REMOVE)
+      
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN) :: IP
+      LOGICAL, INTENT(OUT) :: REMOVE
+      INTEGER :: JS, JR, JP
+      REAL(KIND=8) :: PROB_SCALE, VEL_SCALE
+
+      JS = particles(IP)%S_ID
+      PROB_SCALE = 1.
+      REMOVE = .FALSE.
+      DO JR = 1, N_WALL_REACTIONS
+         IF (WALL_REACTIONS(JR)%R_SP_ID == JS) THEN
+            IF ( rf() .LE. WALL_REACTIONS(JR)%PROB/PROB_SCALE ) THEN
+               
+               IF (WALL_REACTIONS(JR)%N_PROD == 0) THEN
+                  REMOVE = .TRUE.
+                  particles(IP)%DTRIM = 0.
+               ELSE IF (WALL_REACTIONS(JR)%N_PROD == 1) THEN
+                  JP = WALL_REACTIONS(JR)%P1_SP_ID
+                  particles(IP)%S_ID = JP
+                  VEL_SCALE = SPECIES(JS)%MOLECULAR_MASS/SPECIES(JP)%MOLECULAR_MASS
+                  particles(IP)%VX = particles(IP)%VX*VEL_SCALE
+                  particles(IP)%VY = particles(IP)%VY*VEL_SCALE
+                  particles(IP)%VZ = particles(IP)%VZ*VEL_SCALE
+               ELSE
+                  CALL ERROR_ABORT('Number of products in wall reaction not supported.')
+               END IF
+
+            ELSE
+               PROB_SCALE = PROB_SCALE - WALL_REACTIONS(JR)%PROB
+            END IF
+
+         END IF
+      END DO
+
+
+   END SUBROUTINE WALL_REACT
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE MCC_COLLISIONS -> perform MCC collisions !!!!!!!!!!!!!!!!!!!!!!

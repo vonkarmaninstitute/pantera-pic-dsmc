@@ -28,6 +28,56 @@ MODULE global
    LOGICAL      :: BOOL_XMAX_SPECULAR = .FALSE.
    LOGICAL      :: BOOL_YMIN_SPECULAR = .FALSE.
    LOGICAL      :: BOOL_YMAX_SPECULAR = .FALSE.
+   LOGICAL      :: BOOL_XMIN_REACT = .FALSE.
+   LOGICAL      :: BOOL_XMAX_REACT = .FALSE.
+   LOGICAL      :: BOOL_YMIN_REACT = .FALSE.
+   LOGICAL      :: BOOL_YMAX_REACT = .FALSE.
+   LOGICAL      :: BOOL_XMIN_DIFFUSE = .FALSE.
+   LOGICAL      :: BOOL_XMAX_DIFFUSE = .FALSE.
+   LOGICAL      :: BOOL_YMIN_DIFFUSE = .FALSE.
+   LOGICAL      :: BOOL_YMAX_DIFFUSE = .FALSE.
+   LOGICAL, DIMENSION(4) :: BOOL_PERIODIC = .FALSE.
+   LOGICAL, DIMENSION(4) :: BOOL_SPECULAR = .FALSE.
+   LOGICAL, DIMENSION(4) :: BOOL_REACT    = .FALSE.
+   LOGICAL, DIMENSION(4) :: BOOL_DIFFUSE  = .FALSE.
+   REAL(KIND=8) :: BOUNDTEMP
+   CHARACTER(LEN=256) :: GRID_FILENAME
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: XCOORD, YCOORD
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: HX, HY
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CELL_VOLUMES
+   
+   ENUM, BIND(C)
+      ENUMERATOR RECTILINEAR_UNIFORM, RECTILINEAR_NONUNIFORM, QUADTREE
+   END ENUM
+   INTEGER(KIND(RECTILINEAR_UNIFORM)) :: GRID_TYPE = RECTILINEAR_UNIFORM
+
+
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!! Electromagnetic fields !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+   LOGICAL :: BOOL_PIC = .FALSE.
+
+   INTEGER :: NPX, NPY
+   REAL(KIND=8), DIMENSION(:, :, :), ALLOCATABLE :: E_FIELD
+   REAL(KIND=8), DIMENSION(:, :), ALLOCATABLE :: PHI_FIELD
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: Q_FIELD
+   LOGICAL, DIMENSION(:), ALLOCATABLE :: Q_BC
+   
+
+   TYPE ST_MATRIX
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: VALUE
+      INTEGER, DIMENSION(:), ALLOCATABLE      :: RIDX, CIDX
+      INTEGER :: NNZ
+   END TYPE ST_MATRIX
+
+   TYPE CC_MATRIX
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AX
+      INTEGER, DIMENSION(:), ALLOCATABLE      :: AP, AI
+      INTEGER :: NNZ
+   END TYPE CC_MATRIX
+
+   TYPE(CC_MATRIX) :: A_CC
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Numerical settings !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -119,6 +169,23 @@ MODULE global
 
    
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!! Walls !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   
+   INTEGER         :: N_WALLS = 0
+
+   TYPE WALL
+      REAL(KIND=8) :: CX, CY, DX, DY
+      REAL(KIND=8) :: TEMP
+      LOGICAL      :: SPECULAR, DIFFUSE, POROUS, REACT
+      REAL(KIND=8) :: TRANSMISSIVITY
+      REAL(KIND=8) :: NORMX, NORMY
+   END TYPE WALL
+
+   TYPE(WALL), DIMENSION(:), ALLOCATABLE :: WALLS
+
+   
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! MPI parallelization !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -196,6 +263,23 @@ MODULE global
 
    TYPE(REACTIONS_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: REACTIONS, TEMP_REACTIONS
 
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!! Wall reactions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   
+   CHARACTER(LEN=256) :: WALL_REACTIONS_FILENAME
+   INTEGER :: N_WALL_REACTIONS = 0
+   
+   TYPE WALL_REACTIONS_DATA_STRUCTURE
+      INTEGER :: R_SP_ID
+      INTEGER :: P1_SP_ID
+      INTEGER :: P2_SP_ID
+      REAL(KIND=8) :: PROB
+      INTEGER :: N_PROD
+   END TYPE WALL_REACTIONS_DATA_STRUCTURE
+
+   TYPE(WALL_REACTIONS_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: WALL_REACTIONS, TEMP_WALL_REACTIONS
+
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Average flowfield !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -251,5 +335,96 @@ MODULE global
    
    END SUBROUTINE NEWTYPE
 
+
+   SUBROUTINE ST_MATRIX_ALLOCATE(THIS, MAXDIM)
+
+      TYPE(ST_MATRIX), INTENT(INOUT) :: THIS
+      INTEGER, INTENT(IN) :: MAXDIM
+
+      ALLOCATE(THIS%RIDX(0:MAXDIM-1))
+      ALLOCATE(THIS%CIDX(0:MAXDIM-1))
+      ALLOCATE(THIS%VALUE(0:MAXDIM-1))
+      THIS%NNZ = 0
+
+   END SUBROUTINE ST_MATRIX_ALLOCATE
+
+
+   SUBROUTINE ST_MATRIX_SET(THIS, ROWIDX, COLIDX, VAL)
+
+      TYPE(ST_MATRIX), INTENT(INOUT) :: THIS
+      INTEGER, INTENT(IN) :: ROWIDX, COLIDX
+      REAL(KIND=8), INTENT(IN) :: VAL
+
+      THIS%RIDX(THIS%NNZ) = ROWIDX
+      THIS%CIDX(THIS%NNZ) = COLIDX
+      THIS%VALUE(THIS%NNZ) = VAL
+
+      THIS%NNZ = THIS%NNZ + 1
+
+   END SUBROUTINE ST_MATRIX_SET
+
+
+   SUBROUTINE ST_MATRIX_TO_CC(THIS, NCOLS, CC)
+
+      IMPLICIT NONE
+
+      TYPE(ST_MATRIX), INTENT(IN) :: THIS
+      TYPE(CC_MATRIX), INTENT(OUT) :: CC
+      INTEGER, INTENT(IN) :: NCOLS
+      INTEGER :: NNZ, I, J, K, L
+      INTEGER :: AI_TEMP
+      REAL(KIND=8) :: AX_TEMP
+      INTEGER, DIMENSION(:), ALLOCATABLE :: NPC
+
+      NNZ = THIS%NNZ
+      CC%NNZ = NNZ
+      ALLOCATE(CC%AP(0:NCOLS))
+      ALLOCATE(NPC(0:NCOLS))
+      ALLOCATE(CC%AI(0:NNZ-1))
+      ALLOCATE(CC%AX(0:NNZ-1))
+
+      ! Compute the offsets to the first element of a column
+      ! AP(I) is the offset of column I in rows AI with values AX
+      ! i.e. the matrix entry is a(AI(J), I) = AX(J), with J = AP(I)+K, J<AP(I+1)
+      CC%AP = 0
+      DO I = 0, NNZ-1
+         CC%AP( THIS%CIDX(I)+1 ) = CC%AP( THIS%CIDX(I)+1 ) + 1
+      END DO
+      DO I = 1, NCOLS-1
+         CC%AP(I+1) =  CC%AP(I+1) + CC%AP(I)
+      END DO
+      IF (CC%AP(NCOLS) .NE. NNZ) WRITE(*,*) 'I believe we ve had a problem here.'
+
+      ! Now populate AI and AX at the right offsets (but not sorted!)
+      NPC = 0
+      DO I = 0, NNZ-1
+         J = THIS%CIDX(I)
+         CC%AI(CC%AP(J) + NPC(J)) = THIS%RIDX(I)
+         CC%AX(CC%AP(J) + NPC(J)) = THIS%VALUE(I) 
+         NPC(J) = NPC(J) + 1
+      END DO
+
+      ! Now sort AI and AX by increasing AI in each column
+      DO J = 0, NCOLS-1
+         ! A classic sort routine, within the correct bounds
+         DO K = CC%AP(J), CC%AP(J+1)-2
+            DO L = K+1, CC%AP(J+1)-1
+               IF (CC%AI(K) .GT. CC%AI(L)) THEN
+                  AI_TEMP = CC%AI(K)
+                  AX_TEMP = CC%AX(K)
+                  
+                  CC%AI(K) = CC%AI(L)
+                  CC%AX(K) = CC%AX(L)
+
+                  CC%AI(L) = AI_TEMP
+                  CC%AX(L) = AX_TEMP
+               END IF
+            END DO
+         END DO
+
+      END DO
+
+
+   END SUBROUTINE ST_MATRIX_TO_CC
 
 END MODULE global

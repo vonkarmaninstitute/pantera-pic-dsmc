@@ -23,32 +23,76 @@ MODULE grid_and_partition
       INTEGER      :: XCELL, YCELL
       REAL(KIND=8) :: DX, DY
 
-      ! Cartesian grid with equally spaced cells
-      DX = (XMAX - XMIN)/NX
-      DY = (YMAX - YMIN)/NY
+      IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
+         ! Cartesian grid with equally spaced cells
+         DX = (XMAX - XMIN)/NX
+         DY = (YMAX - YMIN)/NY
 
-      XCELL = INT((XP-XMIN)/DX)
-      YCELL = INT((YP-YMIN)/DY)
+         XCELL = INT((XP-XMIN)/DX)
+         YCELL = INT((YP-YMIN)/DY)
 
-      IF (XCELL .GT. (NX-1)) THEN 
-         XCELL = NX-1
-         !WRITE(*,*) 'Particle out of bound xhi!'
-      ELSE IF (XCELL .LT. 0) THEN
-         XCELL = 0
-         !WRITE(*,*) 'Particle out of bound xlo!'
+         IF (XCELL .GT. (NX-1)) THEN 
+            XCELL = NX-1
+            !WRITE(*,*) 'Particle out of bound xhi!'
+         ELSE IF (XCELL .LT. 0) THEN
+            XCELL = 0
+            !WRITE(*,*) 'Particle out of bound xlo!'
+         END IF
+
+         IF (YCELL .GT. (NY-1)) THEN 
+            YCELL = NY-1
+            !WRITE(*,*) 'Particle out of bound yhi!'
+         ELSE IF (YCELL .LT. 0) THEN
+            YCELL = 0
+            !WRITE(*,*) 'Particle out of bound ylo!'
+         END IF
+
+         IDCELL = XCELL + NX*YCELL + 1
+      ELSE IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) THEN
+         XCELL = BINARY_SEARCH(XP, XCOORD)
+         YCELL = BINARY_SEARCH(YP, YCOORD)
+         IDCELL = XCELL + NX*(YCELL-1)
       END IF
-
-      IF (YCELL .GT. (NY-1)) THEN 
-         YCELL = NY-1
-         !WRITE(*,*) 'Particle out of bound yhi!'
-      ELSE IF (YCELL .LT. 0) THEN
-         YCELL = 0
-         !WRITE(*,*) 'Particle out of bound ylo!'
-      END IF
-
-      IDCELL = XCELL + NX*YCELL + 1
-  
    END SUBROUTINE CELL_FROM_POSITION
+
+
+   FUNCTION BINARY_SEARCH(VALUE, ARRAY) RESULT(INDEX)
+
+      IMPLICIT NONE
+
+      REAL(KIND=8), INTENT(IN) :: VALUE
+      INTEGER :: L, R
+      REAL(KIND=8), DIMENSION(:), INTENT(IN) :: ARRAY
+      INTEGER :: INDEX
+
+      L = LBOUND(ARRAY, DIM=1)
+      R = UBOUND(ARRAY, DIM=1)
+
+      INDEX = -1
+      IF (VALUE .LT. ARRAY(L) .OR. VALUE .GT. ARRAY(R)) THEN
+         WRITE(*,*) 'Particle out of bounds!'
+         RETURN
+      ELSE IF (R == L+1) THEN
+         INDEX = L
+         RETURN
+      ELSE
+         DO
+            INDEX = (L+R)/2
+            IF (ARRAY(INDEX) .LE. VALUE) THEN
+               IF (ARRAY(INDEX+1) .GT. VALUE) RETURN
+               L = INDEX
+            ELSE
+               IF (ARRAY(INDEX-1) .LE. VALUE) THEN
+                  INDEX = INDEX-1
+                  RETURN
+               END IF
+               R = INDEX
+            END IF
+         END DO
+         RETURN
+      END IF
+
+   END FUNCTION BINARY_SEARCH
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE PROC_FROM_POSITION -> finds the process ID from particle position !!!!!!!!!!!!!!

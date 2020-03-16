@@ -7,6 +7,7 @@ MODULE initialization
    USE mpi_common
    USE tools
    USE grid_and_partition
+   USE mt19937_64
 
    IMPLICIT NONE
 
@@ -64,6 +65,12 @@ MODULE initialization
             CALL READ_WALL_REACTIONS(WALL_REACTIONS_FILENAME)
          END IF
          IF (line=='Number_of_cells:')         READ(in1,*) NX, NY, NZ
+
+         IF (line=='Quadtree_root_cells:') THEN
+            READ(in1,*) NX, NY, NZ
+            GRID_TYPE = QUADTREE
+            CALL INIT_QUADTREE
+         END IF
 
          IF (line=='Grid_file:') THEN
             READ(in1,*) GRID_FILENAME
@@ -864,9 +871,9 @@ MODULE initialization
       READ(in5,*, IOSTAT=ReasonEOF) XCOORD ! Read coords of x cells boundaries
       XMIN = XCOORD(1)
       XMAX = XCOORD(NX+1)
-      ALLOCATE(HX(NX))
+      ALLOCATE(XSIZE(NX))
       DO I = 1, NX
-         HX(I) = XCOORD(I+1)-XCOORD(I)
+         XSIZE(I) = XCOORD(I+1)-XCOORD(I)
       END DO
       IF (ReasonEOF < 0) CALL ERROR_ABORT('Attention, format error in grid definition file! ABORTING.')
 
@@ -876,9 +883,9 @@ MODULE initialization
       READ(in5,*, IOSTAT=ReasonEOF) YCOORD ! Read coords of y cells boundaries
       YMIN = YCOORD(1)
       YMAX = YCOORD(NY+1)
-      ALLOCATE(HY(NY))
+      ALLOCATE(YSIZE(NY))
       DO I = 1, NY
-         HY(I) = YCOORD(I+1)-YCOORD(I)
+         YSIZE(I) = YCOORD(I+1)-YCOORD(I)
       END DO
       IF (ReasonEOF < 0) CALL ERROR_ABORT('Attention, format error in grid definition file! ABORTING.')
 
@@ -890,7 +897,7 @@ MODULE initialization
       ALLOCATE(CELL_VOLUMES(NX*NY))
       DO I = 1, NX
          DO J = 1, NY
-            CELL_VOLUMES(I + NX*(J-1)) = HX(I)*HY(J)*(ZMAX-ZMIN)
+            CELL_VOLUMES(I + NX*(J-1)) = XSIZE(I)*YSIZE(J)*(ZMAX-ZMIN)
          END DO
       END DO
       ! Perform all the checks on these arrays!
@@ -898,6 +905,22 @@ MODULE initialization
 
    END SUBROUTINE READ_GRID_FILE
 
+
+   SUBROUTINE INIT_QUADTREE
+      
+      IMPLICIT NONE
+
+      INTEGER :: JC
+
+      IF (NZ .NE. 1) CALL ERROR_ABORT('Error! Number of cells along Z must be 1.')
+      ALLOCATE(QUADTREE_ROOT(NX*NY))
+      DO JC = 1, NX*NY
+         QUADTREE_ROOT(JC)%LEVEL = 1
+         QUADTREE_ROOT(JC)%ISLEAF = .TRUE.
+         !QUADTREE_ROOT(JC)%PARENT => QUADTREE_ROOT
+      END DO
+
+   END SUBROUTINE INIT_QUADTREE
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE INITIAL_SEED -> seeds particles at the beginning of !!
@@ -1046,9 +1069,6 @@ MODULE initialization
    SUBROUTINE INITVARIOUS 
 
       IMPLICIT NONE
-
-      INTEGER         :: I
-      REAL(KIND=8)    :: dummy
  
       ! ~~~~~~~~ Initial allocation for vector of particles in each process ~~~~~~~~
       NP_PROC = 0
@@ -1059,12 +1079,7 @@ MODULE initialization
       ! Create local seed for RNG (different for each processor)
       RNG_SEED_LOCAL = RNG_SEED_GLOBAL*(PROC_ID + 1) 
 
-      CALL SRAND(RNG_SEED_LOCAL) ! Seed RNG with local quantity
-      ! And call it a number of times, so that initial correlation between the similar seeds 
-      ! is lost (apparently, some nonnegligible correlation is retained!!!!!)
-      DO I = 1,100
-        dummy = RAND()
-      END DO
+      CALL init_genrand64(RNG_SEED_LOCAL) ! Seed Mersenne Twister PRNG with local quantity
 
       ! ~~~~~~~~ Additional variables for MPI domain decomposition ~~~~~~
       IF (DOMPART_TYPE == 1) THEN ! "blocks" domain partition

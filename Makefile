@@ -11,7 +11,7 @@ OPTF = -O3 -Wall -Wextra -fimplicit-none -fbacktrace -ffpe-trap=invalid,zero,ove
 #OPTF = -Ofast -march=native -Wall -Wextra -fimplicit-none -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow -mcmodel=medium # Aggressive optimization options 
 
 # Objects: list of all objects *.o
-OBJS = mpi_common.o  global.o  screen.o  tools.o  initialization.o  timecycle.o  grid_and_partition.o  particle.o  collisions.o  postprocess.o  fields.o  umfpack.o
+OBJS = mpi_common.o  global.o  screen.o  tools.o  initialization.o  timecycle.o  grid_and_partition.o  particle.o  collisions.o  postprocess.o  fields.o  umfpack.o  mt19937.o
 #OBJDSMC = mpi_common.o tools.o screen.o global.o postprocess.o initialization.o timecycle.o
 
 # Executable generation by the linker
@@ -29,7 +29,7 @@ timecycle.o: timecycle.f90  global.o  particle.o  screen.o  collisions.o  postpr
 initialization.o: initialization.f90  global.o  tools.o  grid_and_partition.o
 	$(CMPF) $(OPTF) initialization.f90
 
-tools.o: tools.f90  grid_and_partition.o  mpi_common.o  global.o
+tools.o: tools.f90  grid_and_partition.o  mpi_common.o  global.o  mt19937.o
 	$(CMPF) $(OPTF) tools.f90
 
 grid_and_partition.o: grid_and_partition.f90 mpi_common.o global.o 
@@ -58,6 +58,9 @@ fields.o: fields.f90  umfpack.o
 
 umfpack.o: umfpack.f90
 	$(CMPF) $(OPTF) umfpack.f90
+	
+mt19937.o: mt19937.f90
+	$(CMPF) $(OPTF) mt19937.f90
 	
 # Cleaning command
 clean: 

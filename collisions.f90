@@ -156,8 +156,12 @@
   ! Compute the "worst case scenario" relative velocity
   VRMAX    = SQRT((VXMAX-VXMIN)**2 + (VYMAX-VYMIN)**2 + (VZMAX-VZMIN)**2)
   ! Compute the maximum expected number of collisions
-  NCOLLMAX = 0.5*NPC(JC)*(NPC(JC)-1)*SIGMAMAX*VRMAX*FNUM*DT/CELL_VOLUMES(JC)
-  
+  IF (GRID_TYPE==RECTILINEAR_UNIFORM) THEN
+    NCOLLMAX = 0.5*NPC(JC)*(NPC(JC)-1)*SIGMAMAX*VRMAX*FNUM*DT/CELL_VOL
+  ELSE
+    NCOLLMAX = 0.5*NPC(JC)*(NPC(JC)-1)*SIGMAMAX*VRMAX*FNUM*DT/CELL_VOLUMES(JC)
+  END IF
+
   NCOLLMAX_INT = FLOOR(NCOLLMAX+0.5)
 
   
@@ -235,6 +239,8 @@
      IF (OMEGA .EQ. 0.5) THEN
        COLLPROB = FCORR/(SIGMAMAX*VRMAX)*VR*SIGMA
      ELSE
+       IF (SIGMAMAX*VRMAX .LT. 1e-20) CALL ERROR_ABORT('The product is zero!')
+       IF (VR .LT. 1e-20) CALL ERROR_ABORT('VR is zero!')
        COLLPROB = FCORR/(SIGMAMAX*VRMAX)*VR*SIGMA*(VR/CREF)**(1.-2.*OMEGA)
      END IF
 

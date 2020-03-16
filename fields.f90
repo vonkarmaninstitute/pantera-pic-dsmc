@@ -21,21 +21,19 @@ MODULE fields
       INTEGER :: IC, IS, IW, IN, IE
       INTEGER :: MAXNNZ, SIZE
       TYPE(ST_MATRIX) :: A_ST
-      REAL(KIND=8) :: HX, HY, DX, DY
+      REAL(KIND=8) :: HX, HY
       REAL(KIND=8) :: PI
+      REAL(KIND=8) :: AX, AY, BX, BY, CX, CY, H1X, H2X, H1Y, H2Y
 
       PI   = 3.141593
 
-      HX = (XMAX-XMIN)/DBLE(NX)
-      HY = (YMAX-YMIN)/DBLE(NY)
-      DX = 1./(HX*HX)
-      DY = 1./(HY*HY)
 
       SIZE = NPX*NPY
 
       ALLOCATE(Q_FIELD(0:SIZE-1))
-      ALLOCATE(Q_BC(0:SIZE-1))
-      Q_BC = .FALSE.
+      ALLOCATE(DIRICHLET(0:SIZE-1))
+      ALLOCATE(IS_DIRICHLET(0:SIZE-1))
+      IS_DIRICHLET = .FALSE.
 
       ! Create the matrix in Sparse Triplet format.
       ! Entries can be input in random order, but not duplicated.
@@ -50,25 +48,69 @@ MODULE fields
       ! At this point, populate the matrix
       DO I = 0, NPX-1
          DO J = 0, NPY-1
+
+
             IC = I+(NPX)*J
             IE = I+(NPX)*J+1
             IW = I+(NPX)*J-1
             IN = I+(NPX)*(J+1)
             IS = I+(NPX)*(J-1)
 
+
             ! Simple Dirichlet on the boundary.
             IF (I == 0 .OR. I == NPX-1 .OR. J == 0 .OR. J == NPY-1) THEN
                ! Boundary point
+               !IF (I == 0 .OR. I == NPX-1) THEN
                CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
-               Q_FIELD(IC) = 0.d0
-               Q_BC(IC) = .TRUE.
+               WRITE(*,*) 1.d6*DBLE(I)/(NPX-1)
+               DIRICHLET(IC) = 1.d6*DBLE(I)/(NPX-1)
+               !Q_FIELD(IC) = 0.d0
+               IS_DIRICHLET(IC) = .TRUE.
+               ! ELSE IF (J == 0) THEN
+               !    CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
+               !    CALL ST_MATRIX_SET(A_ST, IC, IN, -1.d0)
+               !    Q_FIELD(IC) = 0.d0
+               !    Q_BC(IC) = .TRUE.
+               ! ELSE IF (J == NPY-1) THEN
+               !    CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
+               !    CALL ST_MATRIX_SET(A_ST, IC, IS, -1.d0)
+               !    Q_FIELD(IC) = 0.d0
+               !    Q_BC(IC) = .TRUE.
+               ! END IF
             ELSE
                ! Interior point
-               CALL ST_MATRIX_SET(A_ST, IC, IC, -2.*DX-2.*DY)
-               CALL ST_MATRIX_SET(A_ST, IC, IN, DY)
-               CALL ST_MATRIX_SET(A_ST, IC, IS, DY)
-               CALL ST_MATRIX_SET(A_ST, IC, IE, DX)
-               CALL ST_MATRIX_SET(A_ST, IC, IW, DX)
+
+               IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
+                  HX = (XMAX-XMIN)/DBLE(NX)
+                  HY = (YMAX-YMIN)/DBLE(NY)
+                  AX = 1./(HX*HX)
+                  CX = AX
+                  BX = -AX-CX
+                  AY = 1./(HY*HY)
+                  CY = AY
+                  BY = -AY-CY
+               ELSE
+                  H1X = XSIZE(I)
+                  H2X = XSIZE(I+1)
+                  H1Y = YSIZE(J)
+                  H2Y = YSIZE(J+1)
+
+                  AX = 2./(H1X*(H1X+H2X))
+                  CX = 2./(H2X*(H1X+H2X))
+                  BX = -AX-CX
+
+                  AY = 2./(H1Y*(H1Y+H2Y))
+                  CY = 2./(H2Y*(H1Y+H2Y))
+                  BY = -AY-CY
+               END IF
+   
+               
+
+               CALL ST_MATRIX_SET(A_ST, IC, IC, BX+BY)
+               CALL ST_MATRIX_SET(A_ST, IC, IN, CY)
+               CALL ST_MATRIX_SET(A_ST, IC, IS, AY)
+               CALL ST_MATRIX_SET(A_ST, IC, IE, CX)
+               CALL ST_MATRIX_SET(A_ST, IC, IW, AX)
             END IF
 
             ! Example with different BCs.
@@ -172,17 +214,23 @@ MODULE fields
       DO I = 0, NPX-1
          DO J = 0, NPY-1
             IF (I == 0) THEN
+               IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(1)
                E_FIELD(I,J,1) = (PHI_FIELD(I+1,J+1)-PHI_FIELD(I+2,J+1))/HX
             ELSE IF (I == NPX-1) THEN
+               IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(NPX-1)
                E_FIELD(I,J,1) = (PHI_FIELD(I,J+1)-PHI_FIELD(I+1,J+1))/HX
             ELSE
+               IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = 0.5*(XSIZE(I)+XSIZE(I+1))
                E_FIELD(I,J,1) = 0.5*(PHI_FIELD(I,J+1)-PHI_FIELD(I+2,J+1))/HX
             END IF
             IF (J == 0) THEN
+               IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(1)
                E_FIELD(I,J,2) = (PHI_FIELD(I+1,J+1)-PHI_FIELD(I+1,J+2))/HY
             ELSE IF (J == NPY-1) THEN
+               IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(NPY-1)
                E_FIELD(I,J,2) = (PHI_FIELD(I+1,J)-PHI_FIELD(I+1,J+1))/HY
             ELSE
+               IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = 0.5*(YSIZE(J)+YSIZE(J+1))
                E_FIELD(I,J,2) = 0.5*(PHI_FIELD(I+1,J)-PHI_FIELD(I+1,J+2))/HY
             END IF
             E_FIELD(I,J,3) = 0.d0
@@ -200,48 +248,50 @@ MODULE fields
       
       IMPLICIT NONE
 
-      INTEGER :: JP
+      INTEGER :: JP, I
 
       REAL(KIND=8) :: K, RHO_Q, CHARGE
-      REAL(KIND=8) :: HX, HY
+      REAL(KIND=8) :: VOL
       REAL(KIND=8), DIMENSION(4) :: WEIGHTS
       INTEGER, DIMENSION(4) :: INDICES, INDI, INDJ
 
       K = 1.8095128E-8 ! [V m] Elementary charge / Dielectric constant of vacuum
 
-      HX = (XMAX-XMIN)/DBLE(NX)
-      HY = (YMAX-YMIN)/DBLE(NY)
-
-      Q_FIELD = 0
+      Q_FIELD = 0.d0
 
       DO JP = 1, NP_PROC
          CHARGE = SPECIES(particles(JP)%S_ID)%CHARGE
          IF (CHARGE .EQ. 0.d0) CYCLE
 
          CALL COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)
-         RHO_Q = -K*CHARGE*FNUM/(HX*HY)
 
-         IF (Q_BC(INDICES(3)) .EQV. .FALSE.) THEN
-            Q_FIELD(INDICES(3)) = Q_FIELD(INDICES(3)) + RHO_Q * WEIGHTS(3)
+         IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
+            VOL = CELL_VOL
+         ELSE IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) THEN
+            VOL = CELL_VOLUMES(particles(JP)%IC)
          END IF
-         IF (Q_BC(INDICES(4)) .EQV. .FALSE.) THEN
-            Q_FIELD(INDICES(4)) = Q_FIELD(INDICES(4)) + RHO_Q * WEIGHTS(4)
-         END IF
-         IF (Q_BC(INDICES(2)) .EQV. .FALSE.) THEN
-            Q_FIELD(INDICES(2)) = Q_FIELD(INDICES(2)) + RHO_Q * WEIGHTS(2)
-         END IF
-         IF (Q_BC(INDICES(1)) .EQV. .FALSE.) THEN
-            Q_FIELD(INDICES(1)) = Q_FIELD(INDICES(1)) + RHO_Q * WEIGHTS(1)
-         END IF
+         
+         RHO_Q = -K*CHARGE*FNUM/VOL
+
+         
+         Q_FIELD(INDICES(3)) = Q_FIELD(INDICES(3)) + RHO_Q * WEIGHTS(3)
+         Q_FIELD(INDICES(4)) = Q_FIELD(INDICES(4)) + RHO_Q * WEIGHTS(4)
+         Q_FIELD(INDICES(2)) = Q_FIELD(INDICES(2)) + RHO_Q * WEIGHTS(2)
+         Q_FIELD(INDICES(1)) = Q_FIELD(INDICES(1)) + RHO_Q * WEIGHTS(1)
+         
 
       END DO
-
 
       IF (PROC_ID .EQ. 0) THEN
          CALL MPI_REDUCE(MPI_IN_PLACE, Q_FIELD, NPX*NPY, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
       ELSE
          CALL MPI_REDUCE(Q_FIELD,      Q_FIELD, NPX*NPY, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
       END IF
+
+      DO I = 0, NPX*NPY-1
+         IF (IS_DIRICHLET(I)) Q_FIELD(I)=DIRICHLET(I)
+      END DO
+
 
       ! Q_FIELD = 0
       ! ALLOCATE(Q_TEMP(NPX,NPY))
@@ -271,15 +321,23 @@ MODULE fields
       ! This is where we need the cell properties based on particle position
       ! With rectilinear non-uniform grid this has to be changed.
       IC = particles(JP)%IC
-      HX = (XMAX-XMIN)/DBLE(NX)
-      HY = (YMAX-YMIN)/DBLE(NY)
-      JROW = MOD(IC-1, NX)
-      JCOL = (IC-1)/NX
-      CELL_XMIN = JROW * HX + XMIN
-      CELL_YMIN = JCOL * HY + YMIN
+      IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
+         HX = (XMAX-XMIN)/DBLE(NX)
+         HY = (YMAX-YMIN)/DBLE(NY)
+         JROW = MOD(IC-1, NX)
+         JCOL = (IC-1)/NX
+         CELL_XMIN = JROW * HX + XMIN
+         CELL_YMIN = JCOL * HY + YMIN
+      ELSE
+         JROW = MOD(IC-1, NX)
+         JCOL = (IC-1)/NX
+         HX = XSIZE(JROW)
+         HY = YSIZE(JCOL)
+         CELL_XMIN = XCOORD(JROW)
+         CELL_YMIN = YCOORD(JCOL)
+      END IF
       FX = (particles(JP)%X - CELL_XMIN)/HX
       FY = (particles(JP)%Y - CELL_YMIN)/HY
-
 
       ! Row and column indices, starting from 0
       INDI(1) = JROW

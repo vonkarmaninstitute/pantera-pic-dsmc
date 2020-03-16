@@ -4,6 +4,8 @@
 
   USE screen
 
+  USE grid_and_partition
+
   IMPLICIT NONE
 
   CONTAINS
@@ -264,8 +266,9 @@
 
 
     INTEGER                            :: NCELLS, NSPECIES
-    INTEGER                            :: i, JS, FIRST, LAST
+    INTEGER                            :: i, JS, FIRST, LAST, JPROC
 
+    INTEGER, DIMENSION(:), ALLOCATABLE :: CELL_PROC_ID
 
 
     NCELLS = NX*NY
@@ -286,6 +289,13 @@
         XNODES = XCOORD
         YNODES = YCOORD
       END IF
+
+      ALLOCATE(CELL_PROC_ID(NCELLS))
+      DO i = 0, NCELLS
+        CALL PROC_FROM_CELL(i, JPROC)
+        CELL_PROC_ID(i) = JPROC
+      END DO
+
       ! DSMC flowfield file
 
       WRITE(file_name,'(A, I0, A)') 'dsmc_flowfield_', tID, '.vtk'
@@ -308,10 +318,14 @@
       WRITE(54321,*) 0.
 
       WRITE(54321,'(A,I10)') 'CELL_DATA', NCELLS
-      WRITE(54321,'(A,I10)') 'FIELD FieldData', 11*NSPECIES
+      WRITE(54321,'(A,I10)') 'FIELD FieldData', 11*NSPECIES+1
 
 
+      ! Write per-cell value
+      WRITE(54321,'(A,I10,I10,A7)') 'PROC_ID', 1, NCELLS, 'integer'
+      WRITE(54321,*) CELL_PROC_ID
 
+      ! Write per-cell, per-species values
       DO JS = 1, NSPECIES
         FIRST = 1 + (JS-1)*NCELLS
         LAST  = JS*NCELLS
@@ -323,9 +337,9 @@
         WRITE(string, *) 'nrho_mean_', SPECIES(JS)%NAME
         WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
         IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) THEN
-          WRITE(54321,*) AVG_NP(FIRST:LAST)/CELL_VOLUMES
+          WRITE(54321,*) FNUM*AVG_NP(FIRST:LAST)/CELL_VOLUMES
         ELSE IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
-          WRITE(54321,*) AVG_NP(FIRST:LAST)/CELL_VOL
+          WRITE(54321,*) FNUM*AVG_NP(FIRST:LAST)/CELL_VOL
         END IF
 
         WRITE(string, *) 'vx_mean_', SPECIES(JS)%NAME

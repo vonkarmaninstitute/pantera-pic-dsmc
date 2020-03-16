@@ -94,6 +94,62 @@ MODULE grid_and_partition
 
    END FUNCTION BINARY_SEARCH
 
+
+
+   SUBROUTINE PROC_FROM_CELL(IDCELL, IDPROC)
+
+      ! Note: processes go from 0 (usually termed the Master) to MPI_N_THREADS - 1
+      ! If the number of MPI processes is only 1, then IDPROC is 0, the one and only process.
+      ! Otherwise, check the partition style (variable "DOMPART_TYPE")
+
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN)     :: IDCELL
+      INTEGER, INTENT(OUT)     :: IDPROC
+
+      INTEGER :: NCELLSPP
+      
+      IF (N_MPI_THREADS == 1) THEN ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ Serial operation
+
+        IDPROC = 0      
+
+      ELSE IF (DOMPART_TYPE == 0) THEN ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ S T R I P S
+      !
+      ! Domain partition type: strips
+      !
+      ! This domain partition assigns the same number of grid cells to every process.
+      ! The domain partition is thus in strips along the "x" axis, as the cells are assumed 
+      ! to be numbered along x.
+         NCELLSPP = CEILING(REAL(NX*NY)/REAL(N_MPI_THREADS))
+
+         ! 3) Here is the process ID 
+         IDPROC   = INT((IDCELL-1)/NCELLSPP) ! Before was giving wrong result for peculiar combinations of NCELLS and NCELLSPP
+         IF (IDPROC .GT. N_MPI_THREADS-1 .OR. IDPROC .LT. 0) THEN
+            WRITE(*,*) 'Error! PROC_FROM_POSITION returned proc:', IDPROC
+         END IF
+
+
+      ELSE IF (DOMPART_TYPE == 1) THEN ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ B L O C K S
+      !
+      ! Domain partition type: blocks
+      !
+      ! This domain partition style divides the domain into blocks
+      ! Note that blocks in this definition are independent from cells! IT IS POSSIBLE TO
+      ! GENERALIZE IT (and we could and should.. but for PIC I don't really care).
+
+         IDPROC = -1 ! Fix this!
+
+      ELSE ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ E R R O R
+
+         WRITE(*,*) 'ATTENTION! Value for variable DOMPART_TYPE = ', DOMPART_TYPE
+         WRITE(*,*) ' not recognized! Check input file!! In: PROC_FROM_POSITION() ABORTING!'
+         STOP
+
+      END IF
+
+   END SUBROUTINE PROC_FROM_CELL
+
+
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE PROC_FROM_POSITION -> finds the process ID from particle position !!!!!!!!!!!!!!
    ! Note this depends on the parallelization strategy !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

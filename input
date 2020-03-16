@@ -15,53 +15,50 @@
 Axial_symmetry_bool:
     .FALSE.
 Domain_limits:
-    0  2.      -0.5  0.5      -0.5  0.5
+    -1.0  1.0      0.0  1.0      -0.5  0.5
 
 Domain_periodicity:
     .FALSE.   .FALSE.   .TRUE.
 Domain_specular:
-    .FALSE.    .FALSE.    .FALSE.    .FALSE.
+    .FALSE.    .FALSE.    .TRUE.    .FALSE.
 Domain_diffuse:
-    .TRUE.    .TRUE.    .TRUE.    .TRUE.
+    .FALSE.    .FALSE.    .FALSE.    .FALSE.
 Domain_react:
-    .TRUE.    .TRUE.    .TRUE.    .TRUE.
+    .FALSE.    .FALSE.    .FALSE.    .FALSE.
 
 Boundary_temperature:
     300.0
 
-!Number_of_cells:
-!    200  100  1
+Number_of_cells:
+    400  200  1
 
-Grid_file:
-    demogrid1.grid
 Bool_PIC:
     .FALSE.
 
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0E12
+    1.0E13
 Timestep:
-    1e-5
+    1e-6
 Number_of_timesteps:
-    10000
-!200000
+    100000
 Stats_every:
     1
 
 RNG_seed:
     65344
 Dump_part_every:
-    10001
+    100001
 
 Dump_grid_start:
-    0
+    2000
     
 Dump_grid_avgevery:
     1
 
 Dump_grid_numavgs:
-    10
+    4000
 
 Perform_checks:
     .FALSE.
@@ -69,16 +66,10 @@ Perform_checks:
 ! ========= Multispecies ==============================
 
 Species_file:
-    air.species
+    air5.species
     
 Def_mixture:
-    Pos N2+ 1.0
-    
-Def_mixture:
-    Neg e 1.0
-    
-Def_mixture:
-    Both N2+ 0.5 e 0.5
+    Air N2 0.79 O2 0.21
     
 ! ========= Collisions ==============================
 
@@ -94,9 +85,9 @@ MCC_species: ! NOT IMPLEMENTED YET!
 ! DSMC VHS collisions  ! NOT IMPLEMENTED YET!
 
 DSMC_collisions_mixture:
-    Pos
+    Air
 VSS_parameters_file:
-    air.vss
+    air5.vss
 
 Thermal_bath_bool:
     .FALSE.
@@ -106,10 +97,10 @@ Thermal_bath_Ttr:
 
 ! ========= Reactions ==============================
 Reactions_file:
-    air.react
+    air5.react
     
-Wall_reactions_file:
-    air.wall
+!Wall_reactions_file:
+!    air.wall
 
 
 ! ========= Initial particle seed ===================
@@ -149,35 +140,46 @@ Boundaries_inject_mixture:
 
 
 !   center       length        density  velocity xyz         Ttr      Trot   mix
-!Linesource:
-!    -0.5    0.0    0.0    0.2    1.e18    10000.0    0.0    0.0    273.0    0.0    Pos
-!Linesource:
-!    0.5    0.0    0.0    -1.0    2.8e20    0.0    0.0    0.0    273.0    0.0    Helium
-
-!Linesource:
-!    0.0    -0.5    -1.0    0.0    1.0e19    6000.0    -2000.0    3000.0    1000.0    0.0    aria
-!Linesource:
-!    0.0    0.5    1.0    0.0    1.0e19    6000.0    -2000.0    3000.0    1000.0    0.0    aria
-
+Linesource:
+    -1.0   0.5    0.0    1.0    1.699e19    7208.0    0.0    0.0    200.0    200.0    Air
+Linesource:
+    1.0    0.5    0.0   -1.0    1.699e19    7208.0    0.0    0.0    200.0    200.0    Air
 
 Linesource:
-    0.2     0.0     0.0    0.01   1.0e19    1000.0    0.0    0.0    2000.0    2000.0    Pos
+    0.0    1.0    2.0    0.0    1.699e19    7208.0    0.0    0.0    200.0    200.0    Air
 
 
 Wall:
-    0.15   -0.05    0.1    0.0    300.    .FALSE.    .TRUE.    .FALSE.    0.    .TRUE.
+    0.150734847175916    0.015842870840313   -0.003330305648168   0.031685741680627   1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
 Wall:
-    0.2     0.0     0.0    0.1    300.    .FALSE.    .TRUE.    .FALSE.    0.    .TRUE.
+    0.144147011048282    0.046836203042689   -0.0098453666071     0.030300922724126   1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
 Wall:
-    0.15    0.05   -0.1    0.0    300.    .FALSE.    .TRUE.    .FALSE.    0.    .TRUE.  
+    0.131259258843737    0.075782568427063   -0.01593013780199    0.027591808044621   1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
 Wall:
-    0.1     0.0     0.0   -0.1    300.    .FALSE.    .TRUE.    .FALSE.    0.    .TRUE.
+    0.112634847175916    0.101416871926064   -0.021318685533652   0.023676798953382   1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
+Wall:
+    0.089087752204545    0.122618771469752   -0.02577550440909    0.018727000133994   1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
+Wall:
+    0.061647094971371    0.138461642310065   -0.029105810057258   0.012958741546633   1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
+Wall:
+    0.031512163872366    0.148253074968753   -0.031164052140752   0.006624123770743   1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
+Wall:
+    0.0                  0.151565136854125   -0.031860275603981   0.0                 1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
+Wall:
+    -0.031512163872366   0.148253074968753   -0.031164052140752   -0.006624123770743  1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
+Wall:
+    -0.061647094971371   0.138461642310065   -0.029105810057258   -0.012958741546633  1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
+Wall:
+    -0.089087752204545   0.122618771469752   -0.02577550440909    -0.018727000133994  1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
+Wall:
+    -0.112634847175916   0.101416871926064   -0.021318685533652   -0.023676798953382  1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
+Wall:
+    -0.131259258843737   0.075782568427063   -0.015930137801991   -0.027591808044621  1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
+Wall:
+    -0.144147011048282   0.046836203042689   -0.0098453666071     -0.030300922724125  1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
+Wall:
+    -0.150734847175916   0.015842870840313   -0.003330305648168   -0.031685741680627  1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
 
-Wall:
-    1.99    0.0     0.0   -0.2    300.    .FALSE.    .TRUE.    .TRUE.     0.3   .TRUE.
-    
-Wall:
-    1.2    -0.49   -0.6    0.0    300.    .FALSE.    .TRUE.    .TRUE.     0.8   .TRUE.
     
     
 ! ========= MPI parallelization =====================

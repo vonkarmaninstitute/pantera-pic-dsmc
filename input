@@ -66,10 +66,10 @@ Perform_checks:
 ! ========= Multispecies ==============================
 
 Species_file:
-    air5.species
+    ar.species
     
 Def_mixture:
-    Air N2 0.79 O2 0.21
+    Argon Ar 1.0
     
 ! ========= Collisions ==============================
 
@@ -85,9 +85,9 @@ MCC_species: ! NOT IMPLEMENTED YET!
 ! DSMC VHS collisions  ! NOT IMPLEMENTED YET!
 
 DSMC_collisions_mixture:
-    Air
+    Argon
 VSS_parameters_file:
-    air5.vss
+    arlofthouse.vss
 
 Thermal_bath_bool:
     .FALSE.
@@ -96,8 +96,8 @@ Thermal_bath_Ttr:
 
 
 ! ========= Reactions ==============================
-Reactions_file:
-    air5.react
+!Reactions_file:
+!    air.react
     
 !Wall_reactions_file:
 !    air.wall
@@ -141,12 +141,12 @@ Boundaries_inject_mixture:
 
 !   center       length        density  velocity xyz         Ttr      Trot   mix
 Linesource:
-    -1.0   0.5    0.0    1.0    1.699e19    7208.0    0.0    0.0    200.0    200.0    Air
+    -1.0   0.5    0.0    1.0    1.699e19    6585.0    0.0    0.0    200.0    0.0    Argon
 Linesource:
-    1.0    0.5    0.0   -1.0    1.699e19    7208.0    0.0    0.0    200.0    200.0    Air
+    1.0    0.5    0.0   -1.0    1.699e19    6585.0    0.0    0.0    200.0    0.0    Argon
 
 Linesource:
-    0.0    1.0    2.0    0.0    1.699e19    7208.0    0.0    0.0    200.0    200.0    Air
+    0.0    1.0    2.0    0.0    1.699e19    6585.0    0.0    0.0    200.0    0.0    Argon
 
 
 Wall:

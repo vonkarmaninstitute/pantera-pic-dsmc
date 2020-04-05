@@ -58,13 +58,13 @@ MODULE fields
 
 
             ! Simple Dirichlet on the boundary.
-            IF (I == 0 .OR. I == NPX-1 .OR. J == 0 .OR. J == NPY-1) THEN
+            IF (I == 0) THEN
                ! Boundary point
                !IF (I == 0 .OR. I == NPX-1) THEN
                CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
-               WRITE(*,*) 1.d6*DBLE(I)/(NPX-1)
-               DIRICHLET(IC) = 1.d6*DBLE(I)/(NPX-1)
-               !Q_FIELD(IC) = 0.d0
+               !WRITE(*,*) 1.d6*DBLE(I)/(NPX-1)
+               !DIRICHLET(IC) = 1.d6*DBLE(I)/(NPX-1)
+               DIRICHLET(IC) = 0.d0
                IS_DIRICHLET(IC) = .TRUE.
                ! ELSE IF (J == 0) THEN
                !    CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
@@ -77,6 +77,18 @@ MODULE fields
                !    Q_FIELD(IC) = 0.d0
                !    Q_BC(IC) = .TRUE.
                ! END IF
+            ELSE IF (J == 0) THEN
+               CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
+               CALL ST_MATRIX_SET(A_ST, IC, IN, -1.d0)
+               IS_DIRICHLET(IC) = .TRUE.
+            ELSE IF (J == NPY-1) THEN
+               CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
+               CALL ST_MATRIX_SET(A_ST, IC, IS, -1.d0)
+               IS_DIRICHLET(IC) = .TRUE.
+            ELSE IF (I == NPX-1) THEN
+               CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
+               CALL ST_MATRIX_SET(A_ST, IC, IE, -1.d0)
+               IS_DIRICHLET(IC) = .TRUE.
             ELSE
                ! Interior point
 

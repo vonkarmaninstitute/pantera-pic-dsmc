@@ -313,6 +313,8 @@ MODULE global
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_TVIB
 
    INTEGER                                 :: AVG_CUMULATED
+   INTEGER, DIMENSION(:), ALLOCATABLE      :: AVG_CUMULATED_INTENSIVE_ONE
+   INTEGER, DIMENSION(:), ALLOCATABLE      :: AVG_CUMULATED_INTENSIVE_TWO
 
 
    CONTAINS  ! @@@@@@@@@@@@@@@@@@@@@ SUBROUTINES @@@@@@@@@@@@@@@@@@@@@@@@

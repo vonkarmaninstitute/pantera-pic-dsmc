@@ -56,16 +56,18 @@ MODULE fields
             IN = I+(NPX)*(J+1)
             IS = I+(NPX)*(J-1)
 
-
-            ! Simple Dirichlet on the boundary.
+            HX = (XMAX-XMIN)/DBLE(NX)
+            AX = 1./(HX*HX)
+            ! For the 2d ambi exp
             IF (I == 0) THEN
                ! Boundary point
                !IF (I == 0 .OR. I == NPX-1) THEN
-               CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
+               CALL ST_MATRIX_SET(A_ST, IC, IC, -2.0*AX)
+               CALL ST_MATRIX_SET(A_ST, IC, IE,  2.0*AX)
                !WRITE(*,*) 1.d6*DBLE(I)/(NPX-1)
                !DIRICHLET(IC) = 1.d6*DBLE(I)/(NPX-1)
-               DIRICHLET(IC) = 0.d0
-               IS_DIRICHLET(IC) = .TRUE.
+               !DIRICHLET(IC) = 0.d0
+               IS_DIRICHLET(IC) = .FALSE.
                ! ELSE IF (J == 0) THEN
                !    CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
                !    CALL ST_MATRIX_SET(A_ST, IC, IN, -1.d0)
@@ -77,17 +79,21 @@ MODULE fields
                !    Q_FIELD(IC) = 0.d0
                !    Q_BC(IC) = .TRUE.
                ! END IF
-            ELSE IF (J == 0) THEN
-               CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
-               CALL ST_MATRIX_SET(A_ST, IC, IN, -1.d0)
-               IS_DIRICHLET(IC) = .TRUE.
-            ELSE IF (J == NPY-1) THEN
-               CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
-               CALL ST_MATRIX_SET(A_ST, IC, IS, -1.d0)
-               IS_DIRICHLET(IC) = .TRUE.
+            !ELSE IF (J == 0) THEN
+            !   CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
+            !   DIRICHLET(IC) = 0.d0
+            !   !CALL ST_MATRIX_SET(A_ST, IC, IN, -1.d0)
+            !   IS_DIRICHLET(IC) = .TRUE.
+            !ELSE IF (J == NPY-1) THEN
+            !   CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
+            !   DIRICHLET(IC) = 0.d0
+            !   !CALL ST_MATRIX_SET(A_ST, IC, IS, -1.d0)
+            !   IS_DIRICHLET(IC) = .TRUE.
             ELSE IF (I == NPX-1) THEN
                CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
-               CALL ST_MATRIX_SET(A_ST, IC, IE, -1.d0)
+               !CALL ST_MATRIX_SET(A_ST, IC, IW,  AX)
+               !CALL ST_MATRIX_SET(A_ST, IC, IW, -1.d0)
+               DIRICHLET(IC) = 0.d0
                IS_DIRICHLET(IC) = .TRUE.
             ELSE
                ! Interior point
@@ -117,12 +123,17 @@ MODULE fields
                END IF
    
                
-
-               CALL ST_MATRIX_SET(A_ST, IC, IC, BX+BY)
-               CALL ST_MATRIX_SET(A_ST, IC, IN, CY)
-               CALL ST_MATRIX_SET(A_ST, IC, IS, AY)
-               CALL ST_MATRIX_SET(A_ST, IC, IE, CX)
-               CALL ST_MATRIX_SET(A_ST, IC, IW, AX)
+               IF (DIMS == 2) THEN
+                  CALL ST_MATRIX_SET(A_ST, IC, IC, BX+BY)
+                  CALL ST_MATRIX_SET(A_ST, IC, IN, CY)
+                  CALL ST_MATRIX_SET(A_ST, IC, IS, AY)
+                  CALL ST_MATRIX_SET(A_ST, IC, IE, CX)
+                  CALL ST_MATRIX_SET(A_ST, IC, IW, AX)
+               ELSE
+                  CALL ST_MATRIX_SET(A_ST, IC, IC, BX)
+                  CALL ST_MATRIX_SET(A_ST, IC, IE, CX)
+                  CALL ST_MATRIX_SET(A_ST, IC, IW, AX)
+               END IF
             END IF
 
             ! Example with different BCs.
@@ -215,13 +226,13 @@ MODULE fields
          WRITE(*,*) 'Solving poisson'
          CALL S_UMFPACK_SOLVE(UMFPACK_A, A_CC%AP, A_CC%AI, A_CC%AX, X, Q_FIELD)
       END IF
-
+ 
       CALL MPI_BCAST(X, NPX*NPY, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
       
       ! Reshape the linear array into a 2D array
       PHI_FIELD = RESHAPE(X, [NPX, NPY])
       DEALLOCATE(X)
-
+      
 
       DO I = 0, NPX-1
          DO J = 0, NPY-1
@@ -235,20 +246,24 @@ MODULE fields
                IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = 0.5*(XSIZE(I)+XSIZE(I+1))
                E_FIELD(I,J,1) = 0.5*(PHI_FIELD(I,J+1)-PHI_FIELD(I+2,J+1))/HX
             END IF
-            IF (J == 0) THEN
-               IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(1)
-               E_FIELD(I,J,2) = (PHI_FIELD(I+1,J+1)-PHI_FIELD(I+1,J+2))/HY
-            ELSE IF (J == NPY-1) THEN
-               IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(NPY-1)
-               E_FIELD(I,J,2) = (PHI_FIELD(I+1,J)-PHI_FIELD(I+1,J+1))/HY
+            IF (DIMS == 2) THEN
+               IF (J == 0) THEN
+                  IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(1)
+                  E_FIELD(I,J,2) = (PHI_FIELD(I+1,J+1)-PHI_FIELD(I+1,J+2))/HY
+               ELSE IF (J == NPY-1) THEN
+                  IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(NPY-1)
+                  E_FIELD(I,J,2) = (PHI_FIELD(I+1,J)-PHI_FIELD(I+1,J+1))/HY
+               ELSE
+                  IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = 0.5*(YSIZE(J)+YSIZE(J+1))
+                  E_FIELD(I,J,2) = 0.5*(PHI_FIELD(I+1,J)-PHI_FIELD(I+1,J+2))/HY
+               END IF
             ELSE
-               IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = 0.5*(YSIZE(J)+YSIZE(J+1))
-               E_FIELD(I,J,2) = 0.5*(PHI_FIELD(I+1,J)-PHI_FIELD(I+1,J+2))/HY
+               E_FIELD(I,J,2) = 0.d0
             END IF
             E_FIELD(I,J,3) = 0.d0
          END DO
       END DO
-
+      
    END SUBROUTINE SOLVE_POISSON
 
 
@@ -285,12 +300,15 @@ MODULE fields
          
          RHO_Q = -K*CHARGE*FNUM/VOL
 
-         
-         Q_FIELD(INDICES(3)) = Q_FIELD(INDICES(3)) + RHO_Q * WEIGHTS(3)
-         Q_FIELD(INDICES(4)) = Q_FIELD(INDICES(4)) + RHO_Q * WEIGHTS(4)
-         Q_FIELD(INDICES(2)) = Q_FIELD(INDICES(2)) + RHO_Q * WEIGHTS(2)
-         Q_FIELD(INDICES(1)) = Q_FIELD(INDICES(1)) + RHO_Q * WEIGHTS(1)
-         
+         IF (DIMS == 2) THEN
+            Q_FIELD(INDICES(1)) = Q_FIELD(INDICES(1)) + RHO_Q * WEIGHTS(1)
+            Q_FIELD(INDICES(2)) = Q_FIELD(INDICES(2)) + RHO_Q * WEIGHTS(2)
+            Q_FIELD(INDICES(3)) = Q_FIELD(INDICES(3)) + RHO_Q * WEIGHTS(3)
+            Q_FIELD(INDICES(4)) = Q_FIELD(INDICES(4)) + RHO_Q * WEIGHTS(4)            
+         ELSE
+            Q_FIELD(INDICES(1)) = Q_FIELD(INDICES(1)) + RHO_Q * WEIGHTS(1)
+            Q_FIELD(INDICES(2)) = Q_FIELD(INDICES(2)) + RHO_Q * WEIGHTS(2)
+         END IF
 
       END DO
 
@@ -351,29 +369,61 @@ MODULE fields
       FX = (particles(JP)%X - CELL_XMIN)/HX
       FY = (particles(JP)%Y - CELL_YMIN)/HY
 
-      ! Row and column indices, starting from 0
-      INDI(1) = JROW
-      INDI(2) = JROW
-      INDI(3) = JROW + 1
-      INDI(4) = JROW + 1
 
-      INDJ(1) = JCOL
-      INDJ(2) = JCOL
-      INDJ(3) = JCOL + 1
-      INDJ(4) = JCOL + 1
+      ! Nodes numbering
+      !     _________
+      !  3 |         | 4   ^ Y
+      !    |   CELL  |     |
+      !    |    IC   |     |
+      !  1 |_________| 2   |------> X
+      !
 
-      ! CCW starting from SW
-      INDICES(1) = IC+JCOL-1
-      INDICES(2) = INDICES(1) + 1
-      INDICES(4) = INDICES(1) + NX + 1
-      INDICES(3) = INDICES(4) + 1
+      IF (DIMS == 2) THEN
+         ! Row and column indices, starting from 0
+         INDI(1) = JROW
+         INDI(2) = JROW + 1
+         INDI(3) = JROW
+         INDI(4) = JROW + 1
 
-      ! CCW starting from SW
-      WEIGHTS(1) = (1.-FX)*(1.-FY)
-      WEIGHTS(2) = FX*(1.-FY)
-      WEIGHTS(3) = FX*FY
-      WEIGHTS(4) = (1.-FX)*FY
+         INDJ(1) = JCOL
+         INDJ(2) = JCOL
+         INDJ(3) = JCOL + 1
+         INDJ(4) = JCOL + 1
+         
+         INDICES(1) = IC+JCOL-1
+         INDICES(2) = INDICES(1) + 1
+         INDICES(3) = INDICES(1) + NX + 1
+         INDICES(4) = INDICES(3) + 1
 
+         WEIGHTS(1) = (1.-FX)*(1.-FY)
+         WEIGHTS(2) = FX*(1.-FY)
+         WEIGHTS(3) = (1.-FX)*FY
+         WEIGHTS(4) = FX*FY
+
+      ELSE
+         ! Row and column indices, starting from 0
+         INDI(1) = JROW
+         INDI(2) = JROW + 1
+         INDI(3) = -1
+         INDI(4) = -1
+
+         INDJ(1) = 0
+         INDJ(2) = 0
+         INDJ(3) = -1
+         INDJ(4) = -1
+      
+         ! Left, right
+         INDICES(1) = IC
+         INDICES(2) = IC + 1
+         INDICES(4) = -1
+         INDICES(3) = -1
+
+         ! Left, right
+         WEIGHTS(1) = (1.-FX)
+         WEIGHTS(2) = FX
+         WEIGHTS(3) = -1
+         WEIGHTS(4) = -1
+      END IF
    END SUBROUTINE COMPUTE_WEIGHTS
 
 
@@ -387,13 +437,41 @@ MODULE fields
       INTEGER, DIMENSION(4) :: INDICES, INDI, INDJ
 
       CALL COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)
-      E = WEIGHTS(1)*E_FIELD(INDI(1), INDJ(1), :) + &
-      WEIGHTS(2)*E_FIELD(INDI(2), INDJ(2), :) + &
-      WEIGHTS(3)*E_FIELD(INDI(3), INDJ(3), :) + &
-      WEIGHTS(4)*E_FIELD(INDI(4), INDJ(4), :)
-
+      IF (DIMS == 2) THEN
+         E = WEIGHTS(1)*E_FIELD(INDI(1), INDJ(1), :) + &
+         WEIGHTS(2)*E_FIELD(INDI(2), INDJ(2), :) + &
+         WEIGHTS(3)*E_FIELD(INDI(3), INDJ(3), :) + &
+         WEIGHTS(4)*E_FIELD(INDI(4), INDJ(4), :)
+      ELSE
+         E = WEIGHTS(1)*E_FIELD(INDI(1), INDJ(1), :) + &
+         WEIGHTS(2)*E_FIELD(INDI(2), INDJ(2), :)
+      END IF
       
    END SUBROUTINE APPLY_E_FIELD
+
+
+   SUBROUTINE APPLY_POTENTIAL(JP, PHI)
+
+      IMPLICIT NONE
+
+      REAL(KIND=8), INTENT(OUT) :: PHI
+      INTEGER, INTENT(IN) :: JP
+      REAL(KIND=8), DIMENSION(4) :: WEIGHTS
+      INTEGER, DIMENSION(4) :: INDICES, INDI, INDJ
+
+      CALL COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)
+      IF (DIMS == 2) THEN
+         PHI = WEIGHTS(1)*PHI_FIELD(INDI(1)+1, INDJ(1)+1) + &
+         WEIGHTS(2)*PHI_FIELD(INDI(2)+1, INDJ(2)+1) + &
+         WEIGHTS(3)*PHI_FIELD(INDI(3)+1, INDJ(3)+1) + &
+         WEIGHTS(4)*PHI_FIELD(INDI(4)+1, INDJ(4)+1)
+      ELSE
+         PHI = WEIGHTS(1)*PHI_FIELD(INDI(1)+1, INDJ(1)+1) + &
+         WEIGHTS(2)*PHI_FIELD(INDI(2)+1, INDJ(2)+1)
+      END IF
+      
+   END SUBROUTINE APPLY_POTENTIAL
+
 
    SUBROUTINE ST_MATRIX_PRINT(THIS, NROWS, NCOLS)
 

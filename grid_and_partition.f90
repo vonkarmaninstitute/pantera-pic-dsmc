@@ -25,9 +25,11 @@ MODULE grid_and_partition
 
       IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
          ! Cartesian grid with equally spaced cells
+         
          DX = (XMAX - XMIN)/NX
          DY = (YMAX - YMIN)/NY
 
+         !WRITE(*,*) 'XP = ', XP, 'XMIN = ', XMIN, 'DX = ', DX
          XCELL = INT((XP-XMIN)/DX)
          YCELL = INT((YP-YMIN)/DY)
 
@@ -172,7 +174,7 @@ MODULE grid_and_partition
       IF (N_MPI_THREADS == 1) THEN ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ Serial operation
 
         IDPROC = 0      
-
+        
       ELSE IF (DOMPART_TYPE == 0) THEN ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ S T R I P S
       !
       ! Domain partition type: strips

@@ -26,9 +26,19 @@ MODULE timecycle
    ! Init variables
    NP_TOT = 0
    CALL INIT_POSTPROCESS
+
+   ! ########### Compute poisson ##########################################
+
+   IF (BOOL_PIC) THEN
+      CALL DEPOSIT_CHARGE
+      CALL SOLVE_POISSON
+   END IF
    
    ! Dump particles and flowfield before the first time step, but after the initial seeding
-   CALL DUMP_PARTICLES_FILE(0)
+   IF (DUMP_START .EQ. 0) THEN
+      CALL DUMP_PARTICLES_FILE(0)
+   END IF
+
    IF (DUMP_GRID_START .EQ. 0 .AND. DUMP_GRID_N_AVG .EQ. 1) THEN
       CALL GRID_AVG
       CALL GRID_SAVE
@@ -88,9 +98,9 @@ MODULE timecycle
       END IF
 
       ! ########### Dump particles ##############################################
-
-      IF (MOD(tID, DUMP_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
-
+      IF (tID .GT. DUMP_START) THEN
+         IF (MOD(tID-DUMP_START, DUMP_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
+      END IF
       ! ########### Dump flowfield ##############################################
 
       IF (tID .GT. DUMP_GRID_START) THEN
@@ -107,7 +117,7 @@ MODULE timecycle
       ! ~~~~~ Hmm that's it! ~~~~~
 
       ! Perform the conservation checks
-      IF (PERFORM_CHECKS .AND. MOD(tID, 1) .EQ. 0) CALL CHECKS
+      IF (PERFORM_CHECKS .AND. MOD(tID, CHECKS_EVERY) .EQ. 0) CALL CHECKS
 
       tID = tID + 1
    END DO
@@ -402,7 +412,7 @@ MODULE timecycle
 
       IF (BOOL_PIC) THEN
          CALL APPLY_E_FIELD(IP, E)
-         !E = E_FIELD(MOD(IC-1, NX)+1, (IC-1)/NX+1, :)
+         
 
 
          V_OLD(1) = particles(IP)%VX

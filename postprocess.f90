@@ -1,10 +1,9 @@
   MODULE postprocess
 
   USE global
-
   USE screen
-
   USE grid_and_partition
+  USE fields
 
   IMPLICIT NONE
 
@@ -365,7 +364,7 @@
 
 
       ! Write per-cell value
-      WRITE(54321,'(A,I10,I10,A7)') 'PROC_ID', 1, NCELLS, 'integer'
+      WRITE(54321,'(A,I10,I10,A8)') 'PROC_ID', 1, NCELLS, 'integer'
       WRITE(54321,*) CELL_PROC_ID
 
       ! Write per-cell, per-species values
@@ -432,23 +431,43 @@
       END DO
 
       IF (BOOL_PIC) THEN
-        WRITE(54321,'(A,I10)') 'POINT_DATA', (NX+1)*(NY+1)*1
-        WRITE(54321,'(A,I10)') 'FIELD FieldData', 5
-        
-        WRITE(54321,'(A,I10,I10,A7)') 'QRHO', 1, (NX+1)*(NY+1)*1, 'double'
-        WRITE(54321,*) Q_FIELD
+        IF (DIMS == 2) THEN
+          WRITE(54321,'(A,I10)') 'POINT_DATA', (NX+1)*(NY+1)*1
+          WRITE(54321,'(A,I10)') 'FIELD FieldData', 5
+          
+          WRITE(54321,'(A,I10,I10,A7)') 'QRHO', 1, (NX+1)*(NY+1)*1, 'double'
+          WRITE(54321,*) Q_FIELD
 
-        WRITE(54321,'(A,I10,I10,A7)') 'PHI', 1, (NX+1)*(NY+1)*1, 'double'
-        WRITE(54321,*) PHI_FIELD
+          WRITE(54321,'(A,I10,I10,A7)') 'PHI', 1, (NX+1)*(NY+1)*1, 'double'
+          WRITE(54321,*) PHI_FIELD
 
-        WRITE(54321,'(A,I10,I10,A7)') 'E_X', 1, (NX+1)*(NY+1)*1, 'double'
-        WRITE(54321,*) E_FIELD(:,:,1)
+          WRITE(54321,'(A,I10,I10,A7)') 'E_X', 1, (NX+1)*(NY+1)*1, 'double'
+          WRITE(54321,*) E_FIELD(:,:,1)
 
-        WRITE(54321,'(A,I10,I10,A7)') 'E_Y', 1, (NX+1)*(NY+1)*1, 'double'
-        WRITE(54321,*) E_FIELD(:,:,2)
+          WRITE(54321,'(A,I10,I10,A7)') 'E_Y', 1, (NX+1)*(NY+1)*1, 'double'
+          WRITE(54321,*) E_FIELD(:,:,2)
 
-        WRITE(54321,'(A,I10,I10,A7)') 'E_Z', 1, (NX+1)*(NY+1)*1, 'double'
-        WRITE(54321,*) E_FIELD(:,:,3)
+          WRITE(54321,'(A,I10,I10,A7)') 'E_Z', 1, (NX+1)*(NY+1)*1, 'double'
+          WRITE(54321,*) E_FIELD(:,:,3)
+        ELSE
+          WRITE(54321,'(A,I10)') 'POINT_DATA', (NX+1)*(NY+1)*1
+          WRITE(54321,'(A,I10)') 'FIELD FieldData', 5
+          
+          WRITE(54321,'(A,I10,I10,A7)') 'QRHO', 1, (NX+1)*(NY+1)*1, 'double'
+          WRITE(54321,*) Q_FIELD, Q_FIELD
+
+          WRITE(54321,'(A,I10,I10,A7)') 'PHI', 1, (NX+1)*(NY+1)*1, 'double'
+          WRITE(54321,*) PHI_FIELD, PHI_FIELD
+
+          WRITE(54321,'(A,I10,I10,A7)') 'E_X', 1, (NX+1)*(NY+1)*1, 'double'
+          WRITE(54321,*) E_FIELD(:,:,1), E_FIELD(:,:,1)
+
+          WRITE(54321,'(A,I10,I10,A7)') 'E_Y', 1, (NX+1)*(NY+1)*1, 'double'
+          WRITE(54321,*) E_FIELD(:,:,2), E_FIELD(:,:,2)
+
+          WRITE(54321,'(A,I10,I10,A7)') 'E_Z', 1, (NX+1)*(NY+1)*1, 'double'
+          WRITE(54321,*) E_FIELD(:,:,3), E_FIELD(:,:,3)
+        END IF
       END IF
 
       CLOSE(54321)
@@ -548,7 +567,7 @@
     INTEGER                            :: TOT_NUM
 
     REAL(KIND=8), DIMENSION(3)         :: TOT_MOMENTUM
-    REAL(KIND=8)                       :: TOT_KE, TOT_IE, TOT_FE, TOT_EE, HX, HY
+    REAL(KIND=8)                       :: TOT_KE, TOT_IE, TOT_FE, TOT_EE, HX, HY, PHI, CURRENT_TIME
 
 
     TOT_NUM = 0
@@ -557,6 +576,8 @@
     TOT_IE = 0
     TOT_FE = 0
     TOT_EE = 0
+
+    CURRENT_TIME = tID*DT
 
     ! Number of particles
     DO JP = 1, NP_PROC
@@ -573,15 +594,20 @@
       TOT_KE = TOT_KE + 0.5*SPECIES(JS)%MOLECULAR_MASS*(particles(JP)%VX**2+particles(JP)%VY**2+particles(JP)%VZ**2)
       TOT_IE = TOT_IE + particles(JP)%EROT + particles(JP)%EVIB
 
-      IF (JS == 4) THEN
-        TOT_FE = TOT_FE + 15.63e-19/2.
+      !IF (JS == 4) THEN
+      !  TOT_FE = TOT_FE + 15.63e-19/2.
+      !END IF
+      IF (BOOL_PIC) THEN
+        CALL APPLY_POTENTIAL(JP, PHI)
+        TOT_EE  = TOT_EE + PHI*1.602176634e-19*SPECIES(JS)%CHARGE
       END IF
-
+      
     END DO
     TOT_MOMENTUM = TOT_MOMENTUM * FNUM
     TOT_KE = TOT_KE * FNUM
     TOT_IE = TOT_IE * FNUM
-    TOT_FE = TOT_FE * FNUM
+    TOT_EE = TOT_EE * FNUM
+    !TOT_FE = TOT_FE * FNUM
 
 
     ! Collect data from all the processes and print it
@@ -590,11 +616,12 @@
       CALL MPI_REDUCE(MPI_IN_PLACE,  TOT_MOMENTUM, 3, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
       CALL MPI_REDUCE(MPI_IN_PLACE,  TOT_KE,       1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
       CALL MPI_REDUCE(MPI_IN_PLACE,  TOT_IE,       1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-      CALL MPI_REDUCE(MPI_IN_PLACE,  TOT_FE,       1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(MPI_IN_PLACE,  TOT_EE,       1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      !CALL MPI_REDUCE(MPI_IN_PLACE,  TOT_FE,       1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
 
       HX = (XMAX-XMIN)/DBLE(NX)
       HY = (YMAX-YMIN)/DBLE(NY)
-      TOT_EE = -HX*HY*8.8541878128E-12*SUM( Q_FIELD*PACK(PHI_FIELD, .TRUE.) )/FNUM
+      !TOT_EE = -HX*HY*8.8541878128E-12*SUM( Q_FIELD*PACK(PHI_FIELD, .TRUE.) )/FNUM
 
       ! WRITE(*,*) ' '
       ! WRITE(*,*) 'Conservation checks:'
@@ -608,7 +635,7 @@
       ! WRITE(*,*) ' '
 
       OPEN(54331, FILE='conservation_checks', POSITION='append', STATUS='unknown', ACTION='write')
-      WRITE(54331,*) TOT_NUM, TOT_MOMENTUM, TOT_KE, TOT_IE, TOT_FE, TOT_EE
+      WRITE(54331,*) CURRENT_TIME, TOT_NUM, TOT_MOMENTUM, TOT_KE, TOT_IE, TOT_EE !TOT_FE, TOT_EE
       CLOSE(54331)
 
     ELSE
@@ -616,7 +643,8 @@
       CALL MPI_REDUCE(TOT_MOMENTUM,  TOT_MOMENTUM, 3, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
       CALL MPI_REDUCE(TOT_KE,        TOT_KE,       1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
       CALL MPI_REDUCE(TOT_IE,        TOT_IE,       1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-      CALL MPI_REDUCE(TOT_FE,        TOT_FE,       1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      CALL MPI_REDUCE(TOT_EE,        TOT_EE,       1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      !CALL MPI_REDUCE(TOT_FE,        TOT_FE,       1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
     END IF
 
   END SUBROUTINE CHECKS

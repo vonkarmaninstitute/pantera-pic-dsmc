@@ -4,6 +4,7 @@ USE grid_and_partition
 USE mpi_common
 USE mt19937_64
 USE global
+USE screen
 
 CONTAINS 
 
@@ -19,7 +20,7 @@ CONTAINS
       REAL(KIND=8) :: out
 
       out = genrand64_real1() ! From the Mersenne Twister module
-
+      
       RETURN
 
    END FUNCTION rf

@@ -14,13 +14,15 @@
 
 Axial_symmetry_bool:
     .FALSE.
+Dimensions:
+    1
 Domain_limits:
-    -1.0  1.0      0.0  1.0      -0.5  0.5
+    -18e-3  18e-3      0  3e-3      -1.5e-3  1.5e-3
 
 Domain_periodicity:
     .FALSE.   .FALSE.   .TRUE.
 Domain_specular:
-    .FALSE.    .FALSE.    .TRUE.    .FALSE.
+    .TRUE.    .TRUE.    .TRUE.    .TRUE.
 Domain_diffuse:
     .FALSE.    .FALSE.    .FALSE.    .FALSE.
 Domain_react:
@@ -30,51 +32,58 @@ Boundary_temperature:
     300.0
 
 Number_of_cells:
-    400  200  1
+    1800  1  1
 
 Bool_PIC:
-    .FALSE.
+    .TRUE.
 
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0E13
+    2
 Timestep:
-    1e-6
+    1e-10
 Number_of_timesteps:
-    100000
+    30000
 Stats_every:
     1
 
 RNG_seed:
-    65344
+    65345
+
+Dump_part_start:
+    1000001
+
 Dump_part_every:
-    100001
+    1000001
 
 Dump_grid_start:
-    2000
+    0
     
 Dump_grid_avgevery:
-    1
+    250
 
 Dump_grid_numavgs:
-    4000
+    1
 
 Perform_checks:
     .FALSE.
 
+Checks_every:
+    100
+
 ! ========= Multispecies ==============================
 
 Species_file:
-    ar.species
+    proton.species
     
 Def_mixture:
-    Argon Ar 1.0
+    Hydrogen H+ 0.5 e 0.5
     
 ! ========= Collisions ==============================
 
 Collision_type: ! [MCC / DSMC / NONE]
-  DSMC 
+  NONE 
 
 MCC_background_dens:
   1.0e20
@@ -85,9 +94,9 @@ MCC_species: ! NOT IMPLEMENTED YET!
 ! DSMC VHS collisions  ! NOT IMPLEMENTED YET!
 
 DSMC_collisions_mixture:
-    Argon
-VSS_parameters_file:
-    arlofthouse.vss
+    Hydrogen
+!VSS_parameters_file:
+!    air5.vss
 
 Thermal_bath_bool:
     .FALSE.
@@ -97,7 +106,7 @@ Thermal_bath_Ttr:
 
 ! ========= Reactions ==============================
 !Reactions_file:
-!    air.react
+!    air5.react
     
 !Wall_reactions_file:
 !    air.wall
@@ -106,19 +115,19 @@ Thermal_bath_Ttr:
 ! ========= Initial particle seed ===================
 
 Initial_particles_bool:
-    .FALSE.
+    .TRUE.
 Initial_particles_dens:
-    1.e19
+    4.e14
 Initial_particles_vel:
     0.  0.  0.
 Initial_particles_Ttra:
-    600.0 600.0 600.0
+    300.0 300.0 300.0
 Initial_particles_Trot:
-    600.
+    300.
 Initial_particles_Tvib:
-    600. 
+    300. 
 Initial_particles_mixture:
-    Pos
+    Hydrogen
 ! ========== Injection from boundaries ==============
 
 Boundaries_inject_bool:
@@ -136,49 +145,8 @@ Boundaries_inject_Trot:
     0.
 Boundaries_inject_mixture:
     Both
-! ========== Injection from line source =============
 
 
-!   center       length        density  velocity xyz         Ttr      Trot   mix
-Linesource:
-    -1.0   0.5    0.0    1.0    1.699e19    6585.0    0.0    0.0    200.0    0.0    Argon
-Linesource:
-    1.0    0.5    0.0   -1.0    1.699e19    6585.0    0.0    0.0    200.0    0.0    Argon
-
-Linesource:
-    0.0    1.0    2.0    0.0    1.699e19    6585.0    0.0    0.0    200.0    0.0    Argon
-
-
-Wall:
-    0.150734847175916    0.015842870840313   -0.003330305648168   0.031685741680627   1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
-Wall:
-    0.144147011048282    0.046836203042689   -0.0098453666071     0.030300922724126   1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
-Wall:
-    0.131259258843737    0.075782568427063   -0.01593013780199    0.027591808044621   1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
-Wall:
-    0.112634847175916    0.101416871926064   -0.021318685533652   0.023676798953382   1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
-Wall:
-    0.089087752204545    0.122618771469752   -0.02577550440909    0.018727000133994   1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
-Wall:
-    0.061647094971371    0.138461642310065   -0.029105810057258   0.012958741546633   1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
-Wall:
-    0.031512163872366    0.148253074968753   -0.031164052140752   0.006624123770743   1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
-Wall:
-    0.0                  0.151565136854125   -0.031860275603981   0.0                 1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
-Wall:
-    -0.031512163872366   0.148253074968753   -0.031164052140752   -0.006624123770743  1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
-Wall:
-    -0.061647094971371   0.138461642310065   -0.029105810057258   -0.012958741546633  1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
-Wall:
-    -0.089087752204545   0.122618771469752   -0.02577550440909    -0.018727000133994  1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
-Wall:
-    -0.112634847175916   0.101416871926064   -0.021318685533652   -0.023676798953382  1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
-Wall:
-    -0.131259258843737   0.075782568427063   -0.015930137801991   -0.027591808044621  1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
-Wall:
-    -0.144147011048282   0.046836203042689   -0.0098453666071     -0.030300922724125  1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
-Wall:
-    -0.150734847175916   0.015842870840313   -0.003330305648168   -0.031685741680627  1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
 
     
     

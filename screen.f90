@@ -76,7 +76,7 @@ MODULE screen
       REAL(KIND=8), INTENT(IN)      :: num
  
       IF (P_ID .EQ. 0) THEN
-        WRITE(*,'(A60,F10.3)') string, num
+        WRITE(*,'(A60,F15.3)') string, num
       END IF
  
    END SUBROUTINE ONLYMASTERPRINT2

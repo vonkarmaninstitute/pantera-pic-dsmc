@@ -49,6 +49,7 @@ MODULE initialization
          ! ~~~~~~~~~~~~~  Geometry and computational domain  ~~~~~~~~~~~~~~~~~
          IF (line=='Axial_symmetry_bool:')     READ(in1,'(L6)') BOOL_AXI
          IF (line=='Domain_limits:')           READ(in1,*) XMIN, XMAX, YMIN, YMAX, ZMIN, ZMAX
+         IF (line=='Dimensions:')              READ(in1,*) DIMS
          IF (line=='Domain_periodicity:') THEN
             READ(in1,*) BOOL_X_PERIODIC, BOOL_Y_PERIODIC, BOOL_Z_PERIODIC
             BOOL_PERIODIC(1) = BOOL_X_PERIODIC
@@ -83,10 +84,12 @@ MODULE initialization
          IF (line=='Number_of_timesteps:')     READ(in1,*) NT
          IF (line=='RNG_seed:')                READ(in1,*) RNG_SEED_GLOBAL
          IF (line=='Dump_part_every:')         READ(in1,*) DUMP_EVERY
+         IF (line=='Dump_part_start:')         READ(in1,*) DUMP_START
          IF (line=='Dump_grid_avgevery:')      READ(in1,*) DUMP_GRID_AVG_EVERY
          IF (line=='Dump_grid_start:')         READ(in1,*) DUMP_GRID_START
          IF (line=='Dump_grid_numavgs:')       READ(in1,*) DUMP_GRID_N_AVG
          IF (line=='Perform_checks:')          READ(in1,*) PERFORM_CHECKS
+         IF (line=='Checks_every:')            READ(in1,*) CHECKS_EVERY
          IF (line=='Stats_every:')             READ(in1,*) STATS_EVERY
 
          IF (line=='Bool_PIC:')                READ(in1,*) BOOL_PIC
@@ -141,13 +144,13 @@ MODULE initialization
          
 
          ! ~~~~~~~~~~~~~  Particle injection at boundaries ~~~~~~~~~~~
-         IF (line=='Boundaries_inject_bool:')       READ(in1,*)BOOL_BOUNDINJECT
-         IF (line=='Boundaries_inject_which_bool:') READ(in1,*)BOOL_INJ_XMIN,BOOL_INJ_XMAX,BOOL_INJ_YMIN, BOOL_INJ_YMAX
-         IF (line=='Boundaries_inject_dens:')       READ(in1,*)NRHO_BOUNDINJECT
-         IF (line=='Boundaries_inject_vel:')        READ(in1,*)UX_BOUND, UY_BOUND, UZ_BOUND
-         IF (line=='Boundaries_inject_Ttra:')       READ(in1,*)TTRA_BOUND
-         IF (line=='Boundaries_inject_Trot:')       READ(in1,*)TROT_BOUND
-         IF (line=='Boundaries_inject_Tvib:')       READ(in1,*)TVIB_BOUND
+         IF (line=='Boundaries_inject_bool:')       READ(in1,*) BOOL_BOUNDINJECT
+         IF (line=='Boundaries_inject_which_bool:') READ(in1,*) BOOL_INJ_XMIN,BOOL_INJ_XMAX,BOOL_INJ_YMIN, BOOL_INJ_YMAX
+         IF (line=='Boundaries_inject_dens:')       READ(in1,*) NRHO_BOUNDINJECT
+         IF (line=='Boundaries_inject_vel:')        READ(in1,*) UX_BOUND, UY_BOUND, UZ_BOUND
+         IF (line=='Boundaries_inject_Ttra:')       READ(in1,*) TTRA_BOUND
+         IF (line=='Boundaries_inject_Trot:')       READ(in1,*) TROT_BOUND
+         IF (line=='Boundaries_inject_Tvib:')       READ(in1,*) TVIB_BOUND
          IF (line=='Boundaries_inject_mixture:') THEN
             READ(in1,*) MIX_BOUNDINJECT_NAME
             MIX_BOUNDINJECT = MIXTURE_NAME_TO_ID(MIX_BOUNDINJECT_NAME)
@@ -204,6 +207,9 @@ MODULE initialization
 
          ! ~~~~ Geometry and domain ~~~~   
          WRITE(*,*) '  =========== Geometry and domain =================================='
+         string = 'Dimensions of the simulation: '
+         WRITE(*,'(A5, A50,I8)') '     ', string, DIMS
+         
          string = 'Axisymmetric geometry bool [T/F]: '
          WRITE(*,'(A5, A50,L)') '     ', string, BOOL_AXI
  
@@ -940,14 +946,13 @@ MODULE initialization
 
       IMPLICIT NONE
 
-      INTEGER            :: IP, NP_INIT, NPPP_INIT
+      INTEGER            :: IP, NP_INIT, NPPP_INIT, NPPPPS_INIT
       REAL(KIND=8)       :: Xp, Yp, Zp, VXp, VYp, VZp, EROT, EVIB
       INTEGER            :: CID
 
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
       REAL(KIND=8)  :: M
       INTEGER       :: S_ID, i
-      REAL(KIND=8) :: RANVAR
             
       ! Print message 
       CALL ONLYMASTERPRINT1(PROC_ID, '> SEEDING INITIAL PARTICLES IN THE DOMAIN...')
@@ -961,39 +966,49 @@ MODULE initialization
       NPPP_INIT = INT(NP_INIT/N_MPI_THREADS) 
 
       ! Create particles in the domain
-      DO IP = 1, NPPP_INIT
+      DO i = 1, MIXTURES(MIX_INIT)%N_COMPONENTS
+         NPPPPS_INIT = NINT(NPPP_INIT/2.0*MIXTURES(MIX_INIT)%COMPONENTS(i)%MOLFRAC)
+         IF (NPPPPS_INIT == 0) CYCLE
+         S_ID = MIXTURES(MIX_INIT)%COMPONENTS(i)%ID
+         DO IP = 1, NPPPPS_INIT
 
-         ! Create particle position randomly in the domain
-         XP = XMIN + (XMAX-XMIN)*rf()
-         YP = YMIN + (YMAX-YMIN)*rf()
-         ZP = ZMIN + (ZMAX-ZMIN)*rf()
+            ! Create particle position randomly in the domain
+            XP = XMIN + 0.5*(XMAX-XMIN)*rf()
+            !IF (XP .GT. 0.) CYCLE
+            YP = YMIN + (YMAX-YMIN)*rf()
+            ZP = ZMIN + (ZMAX-ZMIN)*rf()
 
-         ! Chose particle species based on mixture specifications
-         RANVAR = rf()
-         DO i = 1, MIXTURES(MIX_INIT)%N_COMPONENTS
-            RANVAR = RANVAR - MIXTURES(MIX_INIT)%COMPONENTS(i)%MOLFRAC
-            IF (RANVAR < 0.) THEN
-               S_ID = MIXTURES(MIX_INIT)%COMPONENTS(i)%ID
-               EXIT
+            ! Chose particle species based on mixture specifications
+            ! RANVAR = rf()
+            ! DO i = 1, MIXTURES(MIX_INIT)%N_COMPONENTS
+            !    RANVAR = RANVAR - MIXTURES(MIX_INIT)%COMPONENTS(i)%MOLFRAC
+            !    IF (RANVAR < 0.) THEN
+            !       S_ID = MIXTURES(MIX_INIT)%COMPONENTS(i)%ID
+            !       EXIT
+            !    END IF
+            ! END DO
+         
+            ! Assign velocity and energy following a Boltzmann distribution
+            M = SPECIES(S_ID)%MOLECULAR_MASS
+            IF (S_ID == 15) THEN
+               CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
+                        3.d-2, 3.d-2, 3.d-2, &
+                        VXP, VYP, VZP, M)
+            ELSE
+               CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
+                           TTRAX_INIT, TTRAY_INIT, TTRAZ_INIT, &
+                           VXP, VYP, VZP, M)
             END IF
+
+            CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, TROT_INIT, EROT)
+            CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, TVIB_INIT, EVIB)
+
+            CALL CELL_FROM_POSITION(XP,YP,  CID) ! Find cell containing particle
+
+            CALL INIT_PARTICLE(XP,YP,ZP,VXP,VYP,VZP,EROT,EVIB,S_ID,CID,DT, particleNOW) ! Save in particle
+            CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
          END DO
-      
-         ! Assign velocity and energy following a Boltzmann distribution
-         M = SPECIES(S_ID)%MOLECULAR_MASS
-         CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
-                      TTRAX_INIT, TTRAY_INIT, TTRAZ_INIT, &
-                      VXP, VYP, VZP, M)
-
-
-         CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, TROT_INIT, EROT)
-         CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, TVIB_INIT, EVIB)
-
-         CALL CELL_FROM_POSITION(XP,YP,  CID) ! Find cell containing particle
-
-         CALL INIT_PARTICLE(XP,YP,ZP,VXP,VYP,VZP,EROT,EVIB,S_ID,CID,DT, particleNOW) ! Save in particle
-         CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
       END DO
-
       ! ~~~~~~ At this point, exchange particles among processes ~~~~~~
       CALL EXCHANGE
 
@@ -1016,6 +1031,9 @@ MODULE initialization
          CALL ERROR_ABORT('ERROR! Number of cells along Z different than 1 is not supported. ABORTING!')
       END IF 
      
+      IF (DIMS == 1 .AND. NY /= 1) THEN
+         CALL ERROR_ABORT('ERROR! Number of cells along Y different than 1 for a 2d simulation. ABORTING!')
+      END IF
       ! ------------ Check geometrical symmetries and flags ------
       ! For axisymmetric simulations, Y cannot be periodic (YMIN is the symmetry axis)
       IF (BOOL_AXI) THEN 
@@ -1098,7 +1116,11 @@ MODULE initialization
       IMPLICIT NONE
 
       NPX = NX + 1
-      NPY = NY + 1
+      IF (DIMS == 2) THEN
+         NPY = NY + 1
+      ELSE
+         NPY = 1
+      END IF
       ALLOCATE(E_FIELD(0:NPX-1, 0:NPY-1, 3))
 
    END SUBROUTINE INITFIELDS

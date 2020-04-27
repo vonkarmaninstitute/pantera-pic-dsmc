@@ -18,6 +18,7 @@ MODULE global
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    LOGICAL      :: BOOL_AXI = .FALSE. ! Assign default value!
+   INTEGER      :: DIMS = 2
    INTEGER      :: NX, NY, NZ
    REAL(KIND=8) :: XMIN, XMAX, YMIN, YMAX, ZMIN, ZMAX
    REAL(KIND=8) :: CELL_VOL
@@ -97,11 +98,13 @@ MODULE global
    INTEGER      :: NT, tID
    REAL(KIND=8) :: FNUM, DT, START_CPU_TIME
    INTEGER(KIND=8) :: RNG_SEED_GLOBAL, RNG_SEED_LOCAL
-   INTEGER      :: DUMP_EVERY
-   INTEGER      :: DUMP_GRID_AVG_EVERY
-   INTEGER      :: DUMP_GRID_START
-   INTEGER      :: DUMP_GRID_N_AVG
+   INTEGER      :: DUMP_EVERY = 1
+   INTEGER      :: DUMP_START = 0
+   INTEGER      :: DUMP_GRID_AVG_EVERY = 1
+   INTEGER      :: DUMP_GRID_START = 0
+   INTEGER      :: DUMP_GRID_N_AVG = 1
    LOGICAL      :: PERFORM_CHECKS = .FALSE.
+   INTEGER      :: CHECKS_EVERY = 1
    INTEGER      :: STATS_EVERY = 1
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

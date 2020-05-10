@@ -301,7 +301,7 @@
     
     IMPLICIT NONE
 
-    CHARACTER*30                       :: string, file_name
+    CHARACTER*80                       :: string, file_name
 
     REAL(KIND=8), DIMENSION(NX+1)        :: XNODES
     REAL(KIND=8), DIMENSION(NY+1)        :: YNODES
@@ -340,7 +340,7 @@
 
       ! DSMC flowfield file
 
-      WRITE(file_name,'(A, I0, A)') 'dsmc_flowfield_', tID, '.vtk'
+      WRITE(file_name,'(A, I0, A)') '/media/pietro/Storage/panteradumps/dsmc_flowfield_', tID, '.vtk'
 
       OPEN(54321, FILE=file_name, ACCESS='SEQUENTIAL', FORM='formatted', STATUS='new')
 
@@ -601,7 +601,7 @@
         CALL APPLY_POTENTIAL(JP, PHI)
         TOT_EE  = TOT_EE + PHI*1.602176634e-19*SPECIES(JS)%CHARGE
       END IF
-      
+
     END DO
     TOT_MOMENTUM = TOT_MOMENTUM * FNUM
     TOT_KE = TOT_KE * FNUM

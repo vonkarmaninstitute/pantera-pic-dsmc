@@ -50,7 +50,7 @@ particle.o: particle.f90
 collisions.o: collisions.f90
 	$(CMPF) $(OPTF) collisions.f90
 	
-postprocess.o: postprocess.f90
+postprocess.o: postprocess.f90 fields.o
 	$(CMPF) $(OPTF) postprocess.f90
 
 fields.o: fields.f90  umfpack.o

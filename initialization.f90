@@ -668,7 +668,7 @@ MODULE initialization
       INTEGER            :: ReasonEOF
 
       CHARACTER(LEN=80)   :: DEFINITION
-      INTEGER :: N_STR
+      INTEGER :: N_STR, index
       CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
       TYPE(REACTIONS_DATA_STRUCTURE) :: NEW_REACTION
       
@@ -748,12 +748,23 @@ MODULE initialization
       
       CLOSE(in3) ! Close input file
 
-      !DO index = 1, N_REACTIONS
-      !   WRITE(*,*) 'Reaction ', index, 'Has 2 reactants with ids:', REACTIONS(index)%R1_SP_ID, ' and ', REACTIONS(index)%R2_SP_ID
-      !   WRITE(*,*) REACTIONS(index)%N_PROD, 'products with ids:',  REACTIONS(index)%P1_SP_ID, ' and ', REACTIONS(index)%P2_SP_ID, &
-      !   ' and ', REACTIONS(index)%P3_SP_ID
-      !   WRITE(*,*) 'Parameters:', REACTIONS(index)%A, REACTIONS(index)%N, REACTIONS(index)%EA
-      !END DO
+      IF (PROC_ID == 0) THEN
+         DO index = 1, N_REACTIONS
+            IF (REACTIONS(index)%N_PROD == 2) THEN
+               WRITE(*,*) 'Reaction ', index, 'Has 2 reactants with ids:', REACTIONS(index)%R1_SP_ID, ' and ', & 
+               REACTIONS(index)%R2_SP_ID
+               WRITE(*,*) REACTIONS(index)%N_PROD, 'products with ids:',  REACTIONS(index)%P1_SP_ID, ' and ', &
+               REACTIONS(index)%P2_SP_ID
+               WRITE(*,*) 'Parameters:', REACTIONS(index)%A, REACTIONS(index)%N, REACTIONS(index)%EA
+            ELSE IF (REACTIONS(index)%N_PROD == 3) THEN
+               WRITE(*,*) 'Reaction ', index, 'Has 2 reactants with ids:', REACTIONS(index)%R1_SP_ID, ' and ', &
+               REACTIONS(index)%R2_SP_ID
+               WRITE(*,*) REACTIONS(index)%N_PROD, 'products with ids:',  REACTIONS(index)%P1_SP_ID, ', ', &
+               REACTIONS(index)%P2_SP_ID, ' and ', REACTIONS(index)%P3_SP_ID
+               WRITE(*,*) 'Parameters:', REACTIONS(index)%A, REACTIONS(index)%N, REACTIONS(index)%EA
+            END IF
+         END DO
+      END IF
 
    END SUBROUTINE READ_REACTIONS
 
@@ -967,13 +978,14 @@ MODULE initialization
 
       ! Create particles in the domain
       DO i = 1, MIXTURES(MIX_INIT)%N_COMPONENTS
-         NPPPPS_INIT = NINT(NPPP_INIT/2.0*MIXTURES(MIX_INIT)%COMPONENTS(i)%MOLFRAC)
+         NPPPPS_INIT = NINT(NPPP_INIT*MIXTURES(MIX_INIT)%COMPONENTS(i)%MOLFRAC)
          IF (NPPPPS_INIT == 0) CYCLE
          S_ID = MIXTURES(MIX_INIT)%COMPONENTS(i)%ID
          DO IP = 1, NPPPPS_INIT
 
             ! Create particle position randomly in the domain
-            XP = XMIN + 0.5*(XMAX-XMIN)*rf()
+            XP = XMIN + (XMAX-XMIN)*rf()
+            !XP = XMIN + 0.5*(XMAX-XMIN)*rf()
             !IF (XP .GT. 0.) CYCLE
             YP = YMIN + (YMAX-YMIN)*rf()
             ZP = ZMIN + (ZMAX-ZMIN)*rf()

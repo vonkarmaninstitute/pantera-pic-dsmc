@@ -291,7 +291,7 @@
             TOTDOF = 3. + SPECIES(P2_SP_ID)%ROTDOF + SPECIES(P2_SP_ID)%VIBDOF + &
                     SPECIES(P1_SP_ID)%ROTDOF
             IF (REACTIONS(JR)%N_PROD == 3) THEN
-              P3_SP_ID = REACTIONS(JR)%P2_SP_ID
+              P3_SP_ID = REACTIONS(JR)%P3_SP_ID
               TOTDOF = TOTDOF + 3. + SPECIES(P3_SP_ID)%ROTDOF + SPECIES(P3_SP_ID)%VIBDOF
             END IF
 
@@ -354,6 +354,7 @@
 
               CALL INIT_PARTICLE(particles(JP2)%X,particles(JP2)%Y,particles(JP2)%Z, &
               C2(1),C2(2),C2(3),EROT,EVIB,P3_SP_ID,JC,1.d0, NEWparticle)
+              !WRITE(*,*) 'Should be adding particle!'
               CALL ADD_PARTICLE_ARRAY(NEWparticle, NP_PROC, particles)
             END IF
 

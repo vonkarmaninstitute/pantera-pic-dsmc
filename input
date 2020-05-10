@@ -15,24 +15,28 @@
 Axial_symmetry_bool:
     .FALSE.
 Dimensions:
-    1
-Domain_limits:
-    -18e-3  18e-3      0  3e-3      -1.5e-3  1.5e-3
+    2
+!Domain_limits:
+!    0.0  0.9      -0.3  0.3      -0.5  0.5
 
 Domain_periodicity:
     .FALSE.   .FALSE.   .TRUE.
 Domain_specular:
-    .TRUE.    .TRUE.    .TRUE.    .TRUE.
+    .FALSE.    .FALSE.    .FALSE.    .FALSE.
 Domain_diffuse:
-    .FALSE.    .FALSE.    .FALSE.    .FALSE.
+    .TRUE.    .TRUE.    .TRUE.    .TRUE.
 Domain_react:
-    .FALSE.    .FALSE.    .FALSE.    .FALSE.
+    .TRUE.    .TRUE.    .TRUE.    .TRUE.
 
 Boundary_temperature:
     300.0
 
-Number_of_cells:
-    1800  1  1
+!Number_of_cells:
+!    300  200  1
+
+
+Grid_file:
+    chamcoarse.grid
 
 Bool_PIC:
     .TRUE.
@@ -40,11 +44,11 @@ Bool_PIC:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    2
+    1e5
 Timestep:
-    1e-10
+    1e-9
 Number_of_timesteps:
-    30000
+   270000
 Stats_every:
     1
 
@@ -61,10 +65,10 @@ Dump_grid_start:
     0
     
 Dump_grid_avgevery:
-    250
+    1
 
 Dump_grid_numavgs:
-    1
+    5000
 
 Perform_checks:
     .FALSE.
@@ -75,10 +79,17 @@ Checks_every:
 ! ========= Multispecies ==============================
 
 Species_file:
-    proton.species
+    ar.species
     
 Def_mixture:
-    Hydrogen H+ 0.5 e 0.5
+    Ions Ar+ 1.0
+    
+Def_mixture:
+    Electrons e 1.0
+
+Def_mixture:
+    All Ar+ 0.5 e 0.5
+
     
 ! ========= Collisions ==============================
 
@@ -94,9 +105,9 @@ MCC_species: ! NOT IMPLEMENTED YET!
 ! DSMC VHS collisions  ! NOT IMPLEMENTED YET!
 
 DSMC_collisions_mixture:
-    Hydrogen
-!VSS_parameters_file:
-!    air5.vss
+    All
+VSS_parameters_file:
+    ar.vss
 
 Thermal_bath_bool:
     .FALSE.
@@ -106,18 +117,18 @@ Thermal_bath_Ttr:
 
 ! ========= Reactions ==============================
 !Reactions_file:
-!    air5.react
+!    plasma.tce
     
-!Wall_reactions_file:
-!    air.wall
+Wall_reactions_file:
+    ar.wall
 
 
 ! ========= Initial particle seed ===================
 
 Initial_particles_bool:
-    .TRUE.
+    .FALSE.
 Initial_particles_dens:
-    4.e14
+    1.e9
 Initial_particles_vel:
     0.  0.  0.
 Initial_particles_Ttra:
@@ -127,7 +138,7 @@ Initial_particles_Trot:
 Initial_particles_Tvib:
     300. 
 Initial_particles_mixture:
-    Hydrogen
+    Ions
 ! ========== Injection from boundaries ==============
 
 Boundaries_inject_bool:
@@ -147,7 +158,30 @@ Boundaries_inject_mixture:
     Both
 
 
+!   center       length        density  velocity xyz                     Ttr      Trot   mix
+Linesource:
+    0.2   0.0    0.0    0.01    7.502e12    6585.0    0.0    0.0       1500.0    0.0    Ions
 
+Linesource:
+    0.2   0.0    0.0    0.01    7.502e12    0.0    0.0    0.0    5802.26    0.0    Electrons
+    
+    
+Wall:
+    0.45    -0.299   -0.25   0.0   300.   .FALSE.    .TRUE.    .TRUE.    0.08    .TRUE.
+
+
+
+Wall:
+    0.2    0.0     0.0   0.1    300.   .FALSE.    .TRUE.    .FALSE.    0.0    .TRUE.
+
+Wall:
+    0.15   0.05   -0.1   0.0    300.   .FALSE.    .TRUE.    .FALSE.    0.0    .TRUE.
+    
+Wall:
+    0.1    0.0     0.0   -0.1   300.   .FALSE.    .TRUE.    .FALSE.    0.0    .TRUE.
+
+Wall:
+    0.15   -0.05   0.1   0.0    300.   .FALSE.    .TRUE.    .FALSE.    0.0    .TRUE.
     
     
 ! ========= MPI parallelization =====================

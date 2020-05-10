@@ -59,15 +59,16 @@ MODULE fields
             HX = (XMAX-XMIN)/DBLE(NX)
             AX = 1./(HX*HX)
             ! For the 2d ambi exp
-            IF (I == 0) THEN
+            IF ((I == 0) .OR. (I == NPX-1) .OR. (J == 0) .OR. (J == NPY-1) .OR. &
+            ((I .GE. 10) .AND. (I .LE. 50) .AND. (J .GE. 50) .AND. (J .LE. 150)) ) THEN
                ! Boundary point
                !IF (I == 0 .OR. I == NPX-1) THEN
-               CALL ST_MATRIX_SET(A_ST, IC, IC, -2.0*AX)
-               CALL ST_MATRIX_SET(A_ST, IC, IE,  2.0*AX)
+               CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
+               !CALL ST_MATRIX_SET(A_ST, IC, IE,  2.0*AX)
                !WRITE(*,*) 1.d6*DBLE(I)/(NPX-1)
                !DIRICHLET(IC) = 1.d6*DBLE(I)/(NPX-1)
-               !DIRICHLET(IC) = 0.d0
-               IS_DIRICHLET(IC) = .FALSE.
+               DIRICHLET(IC) = 0.d0
+               IS_DIRICHLET(IC) = .TRUE.
                ! ELSE IF (J == 0) THEN
                !    CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
                !    CALL ST_MATRIX_SET(A_ST, IC, IN, -1.d0)
@@ -89,12 +90,12 @@ MODULE fields
             !   DIRICHLET(IC) = 0.d0
             !   !CALL ST_MATRIX_SET(A_ST, IC, IS, -1.d0)
             !   IS_DIRICHLET(IC) = .TRUE.
-            ELSE IF (I == NPX-1) THEN
-               CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
+            !ELSE IF (I == NPX-1) THEN
+            !   CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
                !CALL ST_MATRIX_SET(A_ST, IC, IW,  AX)
                !CALL ST_MATRIX_SET(A_ST, IC, IW, -1.d0)
-               DIRICHLET(IC) = 0.d0
-               IS_DIRICHLET(IC) = .TRUE.
+            !   DIRICHLET(IC) = 0.d0
+            !   IS_DIRICHLET(IC) = .TRUE.
             ELSE
                ! Interior point
 
@@ -233,27 +234,39 @@ MODULE fields
       PHI_FIELD = RESHAPE(X, [NPX, NPY])
       DEALLOCATE(X)
       
-
+      ! Compute the electric field at grid points
       DO I = 0, NPX-1
          DO J = 0, NPY-1
-            IF (I == 0) THEN
+            IF (I == 0) THEN ! Left boundary
                IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(1)
                E_FIELD(I,J,1) = (PHI_FIELD(I+1,J+1)-PHI_FIELD(I+2,J+1))/HX
-            ELSE IF (I == NPX-1) THEN
+            ELSE IF (I == 50 .AND. ((J .GE. 50) .AND. (J .LE. 150))) THEN ! Right side of PFG
+               IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(I+1)
+               E_FIELD(I,J,1) = (PHI_FIELD(I+1,J+1)-PHI_FIELD(I+2,J+1))/HX
+            ELSE IF (I == NPX-1) THEN ! Right boundary
                IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(NPX-1)
                E_FIELD(I,J,1) = (PHI_FIELD(I,J+1)-PHI_FIELD(I+1,J+1))/HX
-            ELSE
+            ELSE IF (I == 10 .AND. ((J .GE. 50) .AND. (J .LE. 150))) THEN ! Left side of PFG
+               IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(I)
+               E_FIELD(I,J,1) = (PHI_FIELD(I,J+1)-PHI_FIELD(I+1,J+1))/HX
+            ELSE ! Interior point
                IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = 0.5*(XSIZE(I)+XSIZE(I+1))
                E_FIELD(I,J,1) = 0.5*(PHI_FIELD(I,J+1)-PHI_FIELD(I+2,J+1))/HX
             END IF
             IF (DIMS == 2) THEN
-               IF (J == 0) THEN
+               IF (J == 0) THEN ! Bottom boundary
                   IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(1)
                   E_FIELD(I,J,2) = (PHI_FIELD(I+1,J+1)-PHI_FIELD(I+1,J+2))/HY
-               ELSE IF (J == NPY-1) THEN
+               ELSE IF (J == 150 .AND. ((I.GE. 10) .AND. (I .LE. 50))) THEN ! Top side of PFG
+                  IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(J+1)
+                  E_FIELD(I,J,2) = (PHI_FIELD(I+1,J+1)-PHI_FIELD(I+1,J+2))/HY
+               ELSE IF (J == NPY-1) THEN ! Top boundary
                   IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(NPY-1)
                   E_FIELD(I,J,2) = (PHI_FIELD(I+1,J)-PHI_FIELD(I+1,J+1))/HY
-               ELSE
+               ELSE IF (J == 50 .AND. ((I.GE. 10) .AND. (I .LE. 50))) THEN ! Bottom side of PFG
+                  IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(J)
+                  E_FIELD(I,J,2) = (PHI_FIELD(I+1,J)-PHI_FIELD(I+1,J+1))/HY
+               ELSE ! Interior point
                   IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = 0.5*(YSIZE(J)+YSIZE(J+1))
                   E_FIELD(I,J,2) = 0.5*(PHI_FIELD(I+1,J)-PHI_FIELD(I+1,J+2))/HY
                END IF
@@ -344,7 +357,7 @@ MODULE fields
       REAL(KIND=8), DIMENSION(4), INTENT(OUT) :: WEIGHTS
       INTEGER, DIMENSION(4), INTENT(OUT) :: INDICES, INDI, INDJ
       REAL(KIND=8) :: XP, YP, CELL_XMIN, CELL_YMIN, FX, FY, HX, HY
-      INTEGER :: IC, JCOL, JROW
+      INTEGER :: IC, I, J
 
       XP = particles(JP)%X
       YP = particles(JP)%Y
@@ -354,21 +367,23 @@ MODULE fields
       IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
          HX = (XMAX-XMIN)/DBLE(NX)
          HY = (YMAX-YMIN)/DBLE(NY)
-         JROW = MOD(IC-1, NX)
-         JCOL = (IC-1)/NX
-         CELL_XMIN = JROW * HX + XMIN
-         CELL_YMIN = JCOL * HY + YMIN
+         I = MOD(IC-1, NX)
+         J = (IC-1)/NX
+         CELL_XMIN = I * HX + XMIN
+         CELL_YMIN = J * HY + YMIN
       ELSE
-         JROW = MOD(IC-1, NX)
-         JCOL = (IC-1)/NX
-         HX = XSIZE(JROW)
-         HY = YSIZE(JCOL)
-         CELL_XMIN = XCOORD(JROW)
-         CELL_YMIN = YCOORD(JCOL)
+         I = MOD(IC-1, NX)
+         J = (IC-1)/NX
+         HX = XSIZE(I+1)
+         HY = YSIZE(J+1)
+         CELL_XMIN = XCOORD(I+1)
+         CELL_YMIN = YCOORD(J+1)
       END IF
       FX = (particles(JP)%X - CELL_XMIN)/HX
       FY = (particles(JP)%Y - CELL_YMIN)/HY
 
+      !WRITE(*,*) 'FX=', FX, ', FY=', FY ! DBDBDBDBDBDBDBDDBDBDBDBD
+      !IF ((FX .LT. 0.) .OR. (FX .GT. 1.) .OR. (FY .LT. 0.) .OR. (FY .GT. 1.)) WRITE(*,*) 'Whoops!'
 
       ! Nodes numbering
       !     _________
@@ -380,17 +395,17 @@ MODULE fields
 
       IF (DIMS == 2) THEN
          ! Row and column indices, starting from 0
-         INDI(1) = JROW
-         INDI(2) = JROW + 1
-         INDI(3) = JROW
-         INDI(4) = JROW + 1
+         INDI(1) = I
+         INDI(2) = I + 1
+         INDI(3) = I
+         INDI(4) = I + 1
 
-         INDJ(1) = JCOL
-         INDJ(2) = JCOL
-         INDJ(3) = JCOL + 1
-         INDJ(4) = JCOL + 1
+         INDJ(1) = J
+         INDJ(2) = J
+         INDJ(3) = J + 1
+         INDJ(4) = J + 1
          
-         INDICES(1) = IC+JCOL-1
+         INDICES(1) = IC+J-1
          INDICES(2) = INDICES(1) + 1
          INDICES(3) = INDICES(1) + NX + 1
          INDICES(4) = INDICES(3) + 1
@@ -402,8 +417,8 @@ MODULE fields
 
       ELSE
          ! Row and column indices, starting from 0
-         INDI(1) = JROW
-         INDI(2) = JROW + 1
+         INDI(1) = I
+         INDI(2) = I + 1
          INDI(3) = -1
          INDI(4) = -1
 

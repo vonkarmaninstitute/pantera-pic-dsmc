@@ -35,24 +35,41 @@ MODULE grid_and_partition
 
          IF (XCELL .GT. (NX-1)) THEN 
             XCELL = NX-1
-            !WRITE(*,*) 'Particle out of bound xhi!'
+            WRITE(*,*) 'Particle out of bound xhi!'
          ELSE IF (XCELL .LT. 0) THEN
             XCELL = 0
-            !WRITE(*,*) 'Particle out of bound xlo!'
+            WRITE(*,*) 'Particle out of bound xlo!'
          END IF
 
          IF (YCELL .GT. (NY-1)) THEN 
             YCELL = NY-1
-            !WRITE(*,*) 'Particle out of bound yhi!'
+            WRITE(*,*) 'Particle out of bound yhi!'
          ELSE IF (YCELL .LT. 0) THEN
             YCELL = 0
-            !WRITE(*,*) 'Particle out of bound ylo!'
+            WRITE(*,*) 'Particle out of bound ylo!'
          END IF
 
          IDCELL = XCELL + NX*YCELL + 1
       ELSE IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) THEN
          XCELL = BINARY_SEARCH(XP, XCOORD)
          YCELL = BINARY_SEARCH(YP, YCOORD)
+
+         IF (XCELL .GT. (NX)) THEN 
+            XCELL = NX
+            WRITE(*,*) 'Particle out of bound xhi!', XCELL, NX
+         ELSE IF (XCELL .LT. 1) THEN
+            XCELL = 1
+            WRITE(*,*) 'Particle out of bound xlo!'
+         END IF
+
+         IF (YCELL .GT. (NY)) THEN 
+            YCELL = NY
+            WRITE(*,*) 'Particle out of bound yhi!'
+         ELSE IF (YCELL .LT. 1) THEN
+            YCELL = 1
+            WRITE(*,*) 'Particle out of bound ylo!'
+         END IF
+
          IDCELL = XCELL + NX*(YCELL-1)
       END IF
    END SUBROUTINE CELL_FROM_POSITION
@@ -174,7 +191,7 @@ MODULE grid_and_partition
       IF (N_MPI_THREADS == 1) THEN ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ Serial operation
 
         IDPROC = 0      
-        
+
       ELSE IF (DOMPART_TYPE == 0) THEN ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ S T R I P S
       !
       ! Domain partition type: strips

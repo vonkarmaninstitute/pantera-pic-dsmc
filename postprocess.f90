@@ -586,28 +586,25 @@
       JS = particles(JP)%S_ID
 
       ! Momentum
-      TOT_MOMENTUM(1) = TOT_MOMENTUM(1) + SPECIES(JS)%MOLECULAR_MASS*particles(JP)%VX
-      TOT_MOMENTUM(2) = TOT_MOMENTUM(2) + SPECIES(JS)%MOLECULAR_MASS*particles(JP)%VY
-      TOT_MOMENTUM(3) = TOT_MOMENTUM(3) + SPECIES(JS)%MOLECULAR_MASS*particles(JP)%VZ
+      TOT_MOMENTUM(1) = TOT_MOMENTUM(1) + SPECIES(JS)%MOLECULAR_MASS*particles(JP)%VX* FNUM
+      TOT_MOMENTUM(2) = TOT_MOMENTUM(2) + SPECIES(JS)%MOLECULAR_MASS*particles(JP)%VY* FNUM
+      TOT_MOMENTUM(3) = TOT_MOMENTUM(3) + SPECIES(JS)%MOLECULAR_MASS*particles(JP)%VZ* FNUM
+      
 
       ! Kinietic energy
-      TOT_KE = TOT_KE + 0.5*SPECIES(JS)%MOLECULAR_MASS*(particles(JP)%VX**2+particles(JP)%VY**2+particles(JP)%VZ**2)
-      TOT_IE = TOT_IE + particles(JP)%EROT + particles(JP)%EVIB
+      TOT_KE = TOT_KE + 0.5*SPECIES(JS)%MOLECULAR_MASS*(particles(JP)%VX**2+particles(JP)%VY**2+particles(JP)%VZ**2) &
+               * FNUM
+      TOT_IE = TOT_IE + (particles(JP)%EROT + particles(JP)%EVIB) * FNUM
 
       !IF (JS == 4) THEN
       !  TOT_FE = TOT_FE + 15.63e-19/2.
       !END IF
       IF (BOOL_PIC) THEN
         CALL APPLY_POTENTIAL(JP, PHI)
-        TOT_EE  = TOT_EE + PHI*1.602176634e-19*SPECIES(JS)%CHARGE
+        TOT_EE  = TOT_EE + PHI*1.602176634e-19*SPECIES(JS)%CHARGE * FNUM
       END IF
 
     END DO
-    TOT_MOMENTUM = TOT_MOMENTUM * FNUM
-    TOT_KE = TOT_KE * FNUM
-    TOT_IE = TOT_IE * FNUM
-    TOT_EE = TOT_EE * FNUM
-    !TOT_FE = TOT_FE * FNUM
 
 
     ! Collect data from all the processes and print it

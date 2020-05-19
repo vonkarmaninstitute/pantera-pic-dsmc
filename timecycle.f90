@@ -378,7 +378,7 @@ MODULE timecycle
 
    INTEGER      :: IP, IC, i
    INTEGER      :: BOUNDCOLL, WALLCOLL
-   REAL(KIND=8) :: DTCOLL, TOTDTCOLL, CANDIDATE_DTCOLL
+   REAL(KIND=8) :: DTCOLL, TOTDTCOLL, CANDIDATE_DTCOLL, rfp
    REAL(KIND=8), DIMENSION(4) :: NORMX, NORMY, XW, YW, ZW
    ! REAL(KIND=8) :: XCOLL, YCOLL, ZCOLL
    REAL(KIND=8) :: VN, DX
@@ -561,8 +561,8 @@ MODULE timecycle
             ! Collision with a wall
 
             IF (WALLS(WALLCOLL)%SPECULAR) THEN
-
-               IF (WALLS(WALLCOLL)%POROUS .AND. rf() .LE. WALLS(WALLCOLL)%TRANSMISSIVITY) THEN
+               rfp = rf()
+               IF (WALLS(WALLCOLL)%POROUS .AND. rfp .LE. WALLS(WALLCOLL)%TRANSMISSIVITY) THEN
 
                   REMOVE_PART(IP) = .TRUE.
                   particles(IP)%DTRIM = 0.
@@ -582,8 +582,8 @@ MODULE timecycle
 
                END IF
             ELSE IF (WALLS(WALLCOLL)%DIFFUSE) THEN
-
-               IF (WALLS(WALLCOLL)%POROUS .AND. rf() .LE. WALLS(WALLCOLL)%TRANSMISSIVITY) THEN
+               rfp = rf()
+               IF (WALLS(WALLCOLL)%POROUS .AND. rfp .LE. WALLS(WALLCOLL)%TRANSMISSIVITY) THEN
 
                   REMOVE_PART(IP) = .TRUE.
                   particles(IP)%DTRIM = 0.
@@ -822,36 +822,288 @@ MODULE timecycle
    
    IMPLICIT NONE
 
-   INTEGER      :: IP
-   REAL(KIND=8) :: V_NOW, P_COLL, CHI, COS_TH, SIN_TH
+   INTEGER      :: JP1, JP2, JR, I, J, SP_ID1, SP_ID2, P1_SP_ID, P2_SP_ID, P3_SP_ID
+   REAL(KIND=8) :: P_COLL, PTCE, rfp
+   REAL(KIND=8) :: SIGMA, OMEGA, CREF, ALPHA, FRAC
    REAL(KIND=8) :: PI,PI2
+   REAL(KIND=8), DIMENSION(3) :: C1, C2, GREL, W
+   REAL(KIND=8) :: GX, GY, GZ, G
+   REAL(KIND=8) :: COSCHI, SINCHI, THETA, COSTHETA, SINTHETA
+   REAL(KIND=8) :: VR2, VR, MRED, M1, M2, COSA, SINA, BB
+   REAL(KIND=8) :: TRDOF, PROT1, PROT2, PVIB1, PVIB2, EI, ETR, ECOLL, TOTDOF, EA, EROT, EVIB
+   LOGICAL :: SKIP
+   TYPE(PARTICLE_DATA_STRUCTURE) :: NEWparticle
 
    PI  = 3.141593
    PI2 = 2*PI
 
-   DO IP = 1,NP_PROC
+   DO JP1 = 1,NP_PROC
+      SP_ID1 = particles(JP1)%S_ID
 
-      ! particle velocity
-      V_NOW = SQRT(particles(IP)%VX**2 + particles(IP)%VY**2+particles(IP)%VZ**2)
+      DO J = 1, MIXTURES(MCC_BG_MIX)%N_COMPONENTS
+         SP_ID2 = MIXTURES(MCC_BG_MIX)%COMPONENTS(J)%ID
+         
+         SIGMA = PI * (0.5 * (SPECIES(SP_ID1)%DIAM + SPECIES(SP_ID2)%DIAM))**2
+         OMEGA = 0.5 * (SPECIES(SP_ID1)%OMEGA + SPECIES(SP_ID2)%OMEGA)
+         CREF = GREFS(SP_ID1, SP_ID2)
+         ALPHA = 0.5 * (SPECIES(SP_ID1)%ALPHA + SPECIES(SP_ID2)%ALPHA)
+         
+         ! Sample the velocity of second collision partner, that would be in the MCC backgorund
+         CALL MAXWELL(0.d0, 0.d0, 0.d0, &
+         MCC_BG_TTRA, MCC_BG_TTRA, MCC_BG_TTRA, &
+         C2(1), C2(2), C2(3), SPECIES(SP_ID2)%MOLECULAR_MASS)
 
-      ! Compute collision probability
-      P_COLL = 1 - exp(-DT*MCC_BG_DENS*MCC_SIGMA*V_NOW)
+         ! Compute the real relative velocity
+         VR2 = (C2(1) - particles(JP1)%VX)**2 + &
+         (C2(2) - particles(JP1)%VY)**2 + &
+         (C2(3) - particles(JP1)%VZ)**2 
 
-      ! Try the collision
-      IF (rf() < P_COLL) THEN ! Collision happens
+         VR = SQRT(VR2)
 
-         ! Sample angles randomly (uniform distribution on a sphere)
-         CHI    = PI2*rf()
-         COS_TH = 2*rf() - 1
-         SIN_TH = SQRT(1 - COS_TH**2)
+         ! Compute collision probability
+         FRAC = MIXTURES(MCC_BG_MIX)%COMPONENTS(J)%MOLFRAC
+         P_COLL = 1 - exp(-DT*MCC_BG_DENS*FRAC*VR*SIGMA*(VR/CREF)**(1.-2.*OMEGA))
 
-         ! And compute new velocity (this should be in the center-of-mass frame, but m_electron << m_neutral)
-         particles(IP)%VX = V_NOW*SIN_TH*COS(CHI)
-         particles(IP)%VY = V_NOW*SIN_TH*SIN(CHI)
-         particles(IP)%VZ = V_NOW*COS_TH
+         ! Try the collision
+         IF (rf() < P_COLL) THEN ! Collision happens
 
-      END IF
+            ! Rimuovere commento per avere avviso
+            IF (P_COLL .GT. 1.) THEN
+               WRITE(*,*) 'Attention => this was a bad MCC collision!!!'
+            END IF
 
+            ! Actually create the second collision partner
+            CALL INTERNAL_ENERGY(SPECIES(SP_ID2)%ROTDOF, MCC_BG_TTRA, EROT)
+            CALL INTERNAL_ENERGY(SPECIES(SP_ID2)%VIBDOF, MCC_BG_TTRA, EVIB)
+            CALL INIT_PARTICLE(particles(JP1)%X,particles(JP1)%Y,particles(JP1)%Z, &
+            C2(1),C2(2),C2(3),EROT,EVIB,SP_ID2,particles(JP1)%IC,1.d0, NEWparticle)
+            !WRITE(*,*) 'Should be adding particle!'
+            CALL ADD_PARTICLE_ARRAY(NEWparticle, NP_PROC, particles)
+            ! DBDBDBDBDBDBDBDBD maybe we should exchange between procs here.
+            JP2 = NP_PROC
+
+            M1    = SPECIES(SP_ID1)%MOLECULAR_MASS
+            M2    = SPECIES(SP_ID2)%MOLECULAR_MASS
+            MRED  = M1*M2/(M1+M2)
+   
+            ETR = 0.5*MRED*VR2
+
+            ! Test for chemical reaction with TCE model
+            ECOLL = ETR + particles(JP1)%EROT + particles(JP2)%EROT + &
+            particles(JP1)%EVIB + particles(JP2)%EVIB
+            DO JR = 1, N_REACTIONS
+               ! Check if species in collision belong to this reaction.
+               ! If they don't, check the next reaction.
+               ! Not very efficient with many reactions
+               IF (REACTIONS(JR)%R1_SP_ID .NE. SP_ID1) THEN
+                  IF (REACTIONS(JR)%R1_SP_ID .NE. SP_ID2) THEN
+                  CYCLE
+               ELSE
+                  IF (REACTIONS(JR)%R2_SP_ID .NE. SP_ID1) CYCLE
+               END IF
+               ELSE
+                   IF (REACTIONS(JR)%R2_SP_ID .NE. SP_ID2) CYCLE
+               END IF
+    
+               EA = REACTIONS(JR)%EA
+               IF (ECOLL .LE. EA) CYCLE
+               rfp = rf()
+               PTCE = REACTIONS(JR)%C1 * (ECOLL-EA)**REACTIONS(JR)%C2 * (1.-EA/ECOLL)**REACTIONS(JR)%C3
+               ! Here we suppose that the probability is so low that we can test sequentially with acceptable error
+               IF (rfp .LT. PTCE) THEN
+                  SKIP = .TRUE.
+                  ! React
+                  ECOLL = ECOLL - EA
+
+                  ! Use R1 as P1 and assign internal energy to it.
+                  ! Use R2 as P2 (or P2+P3) (Set R2 as the molecule that dissociates in P2+P3)
+                  P1_SP_ID = REACTIONS(JR)%P1_SP_ID
+                  P2_SP_ID = REACTIONS(JR)%P2_SP_ID
+
+                  particles(JP1)%S_ID = REACTIONS(JR)%P1_SP_ID
+                  particles(JP2)%S_ID = REACTIONS(JR)%P2_SP_ID
+
+    
+                  TOTDOF = 3. + SPECIES(P2_SP_ID)%ROTDOF + SPECIES(P2_SP_ID)%VIBDOF + &
+                        SPECIES(P1_SP_ID)%ROTDOF
+                  IF (REACTIONS(JR)%N_PROD == 3) THEN
+                     P3_SP_ID = REACTIONS(JR)%P3_SP_ID
+                     TOTDOF = TOTDOF + 3. + SPECIES(P3_SP_ID)%ROTDOF + SPECIES(P3_SP_ID)%VIBDOF
+                  END IF
+    
+                  EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P1_SP_ID)%VIBDOF)
+                  particles(JP1)%EVIB = EI
+                  ECOLL = ECOLL - EI
+    
+                  TOTDOF = TOTDOF - SPECIES(P1_SP_ID)%ROTDOF
+                  EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P1_SP_ID)%ROTDOF)
+                  particles(JP1)%EROT = EI
+                  ECOLL = ECOLL - EI
+    
+                  TOTDOF = TOTDOF - SPECIES(P2_SP_ID)%VIBDOF
+                  EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P2_SP_ID)%VIBDOF)
+                  particles(JP2)%EVIB = EI
+                  ECOLL = ECOLL - EI
+    
+                  TOTDOF = TOTDOF - SPECIES(P2_SP_ID)%ROTDOF
+                  EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P2_SP_ID)%ROTDOF)
+                  particles(JP2)%EROT = EI
+                  ECOLL = ECOLL - EI
+    
+                  M1 = SPECIES(P1_SP_ID)%MOLECULAR_MASS
+                  IF (REACTIONS(JR)%N_PROD == 2) THEN
+                     M2 = SPECIES(P2_SP_ID)%MOLECULAR_MASS
+                  ELSE IF (REACTIONS(JR)%N_PROD == 3) THEN
+                     M2 = SPECIES(P2_SP_ID)%MOLECULAR_MASS + SPECIES(P3_SP_ID)%MOLECULAR_MASS
+                  END IF
+                  TOTDOF = TOTDOF - 3.
+                  EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, 3)
+                  CALL HS_SCATTER(EI, M1, M2, C1, C2)
+                  ECOLL = ECOLL - EI
+    
+                  particles(JP1)%VX = C1(1)
+                  particles(JP1)%VY = C1(2)
+                  particles(JP1)%VZ = C1(3)
+
+    
+                  IF (REACTIONS(JR)%N_PROD == 2) THEN
+                     particles(JP2)%VX = C2(1)
+                     particles(JP2)%VY = C2(2)
+                     particles(JP2)%VZ = C2(3)
+                  ELSE IF (REACTIONS(JR)%N_PROD == 3) THEN
+                     TOTDOF = TOTDOF - SPECIES(P3_SP_ID)%VIBDOF
+                     EVIB = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P3_SP_ID)%VIBDOF)
+                     ECOLL = ECOLL - EVIB
+         
+                     TOTDOF = TOTDOF - SPECIES(P3_SP_ID)%ROTDOF
+                     EROT = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P3_SP_ID)%ROTDOF)
+                     ECOLL = ECOLL - EROT
+      
+                     M1 = SPECIES(P2_SP_ID)%MOLECULAR_MASS
+                     M2 = SPECIES(P3_SP_ID)%MOLECULAR_MASS
+                     C1 = C2
+                     
+                     CALL HS_SCATTER(ECOLL, M1, M2, C1, C2)
+                           
+                     particles(JP2)%VX = C1(1)
+                     particles(JP2)%VY = C1(2)
+                     particles(JP2)%VZ = C1(3)
+                           
+                     
+                     CALL INIT_PARTICLE(particles(JP2)%X,particles(JP2)%Y,particles(JP2)%Z, &
+                     C2(1),C2(2),C2(3),EROT,EVIB,P3_SP_ID,particles(JP2)%IC,1.d0, NEWparticle)
+                     !WRITE(*,*) 'Should be adding particle!'
+                     CALL ADD_PARTICLE_ARRAY(NEWparticle, NP_PROC, particles)
+                     
+                  
+                  END IF
+    
+                  EXIT
+
+               END IF
+            END DO
+    
+            IF (SKIP) CYCLE
+            ! Perform elastic/inelastic collision
+            ! Test for inelastic collision and TR/TV exchange
+            TRDOF = 3.
+    
+            !TRDOF = 5. -2.*OMEGA why not?
+    
+            PROT1 = (TRDOF + SPECIES(SP_ID1)%ROTDOF)/TRDOF * SPECIES(SP_ID1)%ROTREL
+            PROT2 = (TRDOF + SPECIES(SP_ID2)%ROTDOF)/TRDOF * SPECIES(SP_ID2)%ROTREL
+            PVIB1 = (TRDOF + SPECIES(SP_ID1)%VIBDOF)/TRDOF * SPECIES(SP_ID1)%VIBREL
+            PVIB2 = (TRDOF + SPECIES(SP_ID2)%VIBDOF)/TRDOF * SPECIES(SP_ID2)%VIBREL
+    
+            TRDOF = 5. -2.*OMEGA
+    
+            IF (rfp .LT. PROT1) THEN
+               ! Particle 1 selected for rotational energy exchange
+               ECOLL = ETR + particles(JP1)%EROT
+               particles(JP1)%EROT = COLL_INTERNAL_ENERGY(ECOLL, TRDOF, SPECIES(SP_ID1)%ROTDOF)
+               ETR = ECOLL - particles(JP1)%EROT
+    
+            ELSE IF (rfp .LT. PROT1 + PROT2) THEN
+               ! Particle 2 selected for rotational energy exchange
+               ECOLL = ETR + particles(JP2)%EROT
+               particles(JP2)%EROT = COLL_INTERNAL_ENERGY(ECOLL, TRDOF, SPECIES(SP_ID2)%ROTDOF)
+               ETR = ECOLL - particles(JP2)%EROT
+    
+            ELSE IF (rfp .LT. PROT1 + PROT2 + PVIB1) THEN
+               ! Particle 1 selected for vibrational energy exchange
+               ECOLL = ETR + particles(JP1)%EVIB
+               particles(JP1)%EVIB = COLL_INTERNAL_ENERGY(ECOLL, TRDOF, SPECIES(SP_ID1)%VIBDOF)
+               ETR = ECOLL - particles(JP1)%EVIB
+    
+            ELSE IF (rfp .LT. PROT1 + PROT2 + PVIB1 + PVIB2) THEN
+               ! Particle 2 selected for vibrational energy exchange
+               ECOLL = ETR + particles(JP2)%EVIB
+               particles(JP2)%EVIB = COLL_INTERNAL_ENERGY(ECOLL, TRDOF, SPECIES(SP_ID2)%VIBDOF)
+               ETR = ECOLL - particles(JP2)%EVIB
+    
+            END IF
+    
+            ! Compute post-collision velocities
+            ! VSS Collisions
+    
+            COSCHI = 2.*rf()**(1./ALPHA) - 1.
+            SINCHI = SQRT(1.-COSCHI*COSCHI)
+            THETA = PI2*rf()
+            COSTHETA = COS(THETA)
+            SINTHETA = SIN(THETA)
+    
+    
+            IF (rfp .LT. PROT1 + PROT2 + PVIB1 + PVIB2) THEN
+    
+               ! Inelastic collision occurred => Randomize relative velocity vector
+               G = SQRT(2.*ETR/MRED)
+               
+               COSA = 2.*rf()-1.0
+               SINA = SQRT(1-COSA*COSA)
+               BB = PI2 * rf()
+    
+               GX = G*SINA*COS(BB)
+               GY = G*SINA*SIN(BB)
+               GZ = G*COSA
+             
+            ELSE
+    
+               ! No inelastic collision occured => Take actual velocity vector
+               GX = C1(1) - C2(1)
+               GY = C1(2) - C2(2)
+               GZ = C1(3) - C2(3)
+               G = SQRT(GX*GX + GY*GY + GZ*GZ)
+    
+            END IF
+    
+            ! Compute post-collision velocities
+    
+            GREL(1) = GX*COSCHI + SQRT(GY*GY+GZ*GZ)*SINTHETA*SINCHI
+            GREL(2) = GY*COSCHI + (G*GZ*COSTHETA - GX*GY*SINTHETA)/SQRT(GY*GY+GZ*GZ)*SINCHI
+            GREL(3) = GZ*COSCHI - (G*GY*COSTHETA + GX*GZ*SINTHETA)/SQRT(GY*GY+GZ*GZ)*SINCHI
+    
+            ! Compute center of mass velocity vector
+            DO I = 1, 3
+               W(I) = M1/(M1+M2)*C1(I) + M2/(M1+M2)*C2(I)
+            END DO
+    
+            ! Compute absolute velocity vector of the two particles
+            DO I = 1, 3
+               C1(I) = W(I) + M2/(M1+M2)*GREL(I)
+               C2(I) = W(I) - M1/(M1+M2)*GREL(I)
+            END DO
+    
+            
+            particles(JP1)%VX = C1(1)
+            particles(JP1)%VY = C1(2)
+            particles(JP1)%VZ = C1(3)
+                        
+            particles(JP2)%VX = C2(1)
+            particles(JP2)%VY = C2(2)
+            particles(JP2)%VZ = C2(3)
+
+         END IF
+      END DO
    END DO
 
    END SUBROUTINE MCC_COLLISIONS

@@ -27,7 +27,7 @@ MODULE initialization
       INTEGER            :: ReasonEOF
 
       CHARACTER*512      :: MIXTURE_DEFINITION, VSS_PARAMS_FILENAME, LINESOURCE_DEFINITION, WALL_DEFINITION
-      CHARACTER*64       :: MIX_INIT_NAME, MIX_BOUNDINJECT_NAME, DSMC_COLL_MIX_NAME
+      CHARACTER*64       :: MIX_INIT_NAME, MIX_BOUNDINJECT_NAME, DSMC_COLL_MIX_NAME, MCC_BG_MIX_NAME
 
       ! Open input file for reading
       OPEN(UNIT=in1,FILE='input', STATUS='old',IOSTAT=ios)
@@ -109,7 +109,11 @@ MODULE initialization
          ! ~~~~~~~~~~~~~  Collision type  ~~~~~~~~~~~~~~~~~
          IF (line=='Collision_type:')          READ(in1,*) COLLISION_TYPE
          IF (line=='MCC_background_dens:')     READ(in1,*) MCC_BG_DENS
-         IF (line=='MCC_cross_section:')       READ(in1,*) MCC_SIGMA
+         IF (line=='MCC_background_Ttra:')     READ(in1,*) MCC_BG_TTRA
+         IF (line=='MCC_background_mixture:') THEN
+            READ(in1,*) MCC_BG_MIX_NAME
+            MCC_BG_MIX = MIXTURE_NAME_TO_ID(MCC_BG_MIX_NAME)
+         END IF
          IF (line=='VSS_parameters_file:')     THEN
             READ(in1,*) VSS_PARAMS_FILENAME
             CALL READ_VSS(VSS_PARAMS_FILENAME)
@@ -250,8 +254,8 @@ MODULE initialization
             string = 'Background number density [1/m^3]:'
             WRITE(*,'(A5,A50,ES14.3)') '     ', string, MCC_BG_DENS
 
-            string = 'Collision cross-section [m^2]:'
-            WRITE(*,'(A5,A50,ES14.3)') '     ', string, MCC_SIGMA 
+            string = 'Background translational temperature [K]::'
+            WRITE(*,'(A5,A50,ES14.3)') '     ', string, MCC_BG_TTRA
 
          END IF
 
@@ -425,8 +429,13 @@ MODULE initialization
          SPECIES(N_SPECIES)%VIBREL = VIBREL
          SPECIES(N_SPECIES)%VIBTEMP = VIBTEMP
          SPECIES(N_SPECIES)%SPWT = SPWT
+         SPECIES(N_SPECIES)%INVSPWT = 1./SPWT
          SPECIES(N_SPECIES)%CHARGE = CHARGE
-         
+
+         IF (SPWT .LT. 1.d0) THEN
+            CALL ERROR_ABORT('Attention, Species specific particle weight must be >= 1! ABORTING.')
+         ENDIF
+
       END DO
 
       CLOSE(in2) ! Close input file
@@ -491,7 +500,7 @@ MODULE initialization
          SPECIES(SP_ID)%NU    = OMEGA - 0.5
 
 
-         IF (OMEGA .EQ. 0.5) THEN
+         IF (ABS(OMEGA-0.5) .LT. 1.d-6) THEN
             SPECIES(SP_ID)%CREF  = (4.*KB*TREF/SPECIES(SP_ID)%MOLECULAR_MASS)**0.5 * 1.2354
          ELSE
             SPECIES(SP_ID)%CREF  = (4.*KB*TREF/SPECIES(SP_ID)%MOLECULAR_MASS)**0.5 * (GAMMA(2.5-OMEGA))**(-0.5/(OMEGA-0.5))
@@ -511,7 +520,7 @@ MODULE initialization
             OMEGA    = 0.5 * (SPECIES(IS)%OMEGA + SPECIES(JS)%OMEGA)
             TREF = 0.5 * (SPECIES(IS)%TREF + SPECIES(JS)%TREF)
             
-            IF (OMEGA .EQ. 0.5) THEN
+            IF (ABS(OMEGA-0.5) .LT. 1.d-6) THEN
                GREFS(IS, JS) = (2.*KB*TREF/MRED)**0.5 * 1.2354
             ELSE
                GREFS(IS, JS) = (2.*KB*TREF/MRED)**0.5 * (GAMMA(2.5-OMEGA))**(-0.5/(OMEGA-0.5))
@@ -957,7 +966,7 @@ MODULE initialization
 
       IMPLICIT NONE
 
-      INTEGER            :: IP, NP_INIT, NPPP_INIT, NPPPPS_INIT
+      INTEGER            :: IP, NP_INIT
       REAL(KIND=8)       :: Xp, Yp, Zp, VXp, VYp, VZp, EROT, EVIB
       INTEGER            :: CID
 
@@ -969,19 +978,22 @@ MODULE initialization
       CALL ONLYMASTERPRINT1(PROC_ID, '> SEEDING INITIAL PARTICLES IN THE DOMAIN...')
      
       ! Compute number of particles to be seeded
-      NP_INIT = NINT(NRHO_INIT/FNUM*(XMAX-XMIN)*(YMAX-YMIN)*(ZMAX-ZMIN))
+      !NP_INIT = NINT(NRHO_INIT/FNUM*(XMAX-XMIN)*(YMAX-YMIN)*(ZMAX-ZMIN))
 
-      CALL ONLYMASTERPRINT2(PROC_ID, '   Particles to be seeded', REAL(NP_INIT, KIND=8))
+      !CALL ONLYMASTERPRINT2(PROC_ID, '   Particles to be seeded', REAL(NP_INIT, KIND=8))
  
       ! Compute number of particles to be seeded by every process
-      NPPP_INIT = INT(NP_INIT/N_MPI_THREADS) 
+      !NPPP_INIT = INT(NP_INIT/N_MPI_THREADS) 
 
       ! Create particles in the domain
       DO i = 1, MIXTURES(MIX_INIT)%N_COMPONENTS
-         NPPPPS_INIT = NINT(NPPP_INIT*MIXTURES(MIX_INIT)%COMPONENTS(i)%MOLFRAC)
-         IF (NPPPPS_INIT == 0) CYCLE
+         
          S_ID = MIXTURES(MIX_INIT)%COMPONENTS(i)%ID
-         DO IP = 1, NPPPPS_INIT
+         ! Compute number of particles of this species per process to be created.
+         NP_INIT = NINT(NRHO_INIT/(FNUM*SPECIES(S_ID)%SPWT)*(XMAX-XMIN)*(YMAX-YMIN)*(ZMAX-ZMIN)* &
+                       MIXTURES(MIX_INIT)%COMPONENTS(i)%MOLFRAC/N_MPI_THREADS)
+         IF (NP_INIT == 0) CYCLE
+         DO IP = 1, NP_INIT
 
             ! Create particle position randomly in the domain
             XP = XMIN + (XMAX-XMIN)*rf()
@@ -1206,7 +1218,7 @@ MODULE initialization
 
                FLUXBOUND = NRHO_BOUNDINJECT*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) & 
                                        + SQRT(PI)*Snow*(1.+ERF1(Snow)))    ! Tot number flux emitted [1/(s m^2)]
-               NtotINJECT = FLUXBOUND*(YMAX-YMIN)*(ZMAX-ZMIN)*DT/FNUM        ! Tot num of particles to be injected
+               NtotINJECT = FLUXBOUND*(YMAX-YMIN)*(ZMAX-ZMIN)*DT/(FNUM*SPECIES(S_ID)%SPWT)        ! Tot num of particles to be injected
                nfs_XMIN(IS) = NtotINJECT/REAL(N_MPI_THREADS,KIND=8)  ! Particles injected by each proc
                WRITE(*,*)'ON XLO ', nfs_XMIN(1)
                !ACCA = SQRT(Snow**2+2.)                                       ! Tmp variable
@@ -1228,7 +1240,7 @@ MODULE initialization
 
                FLUXBOUND   = NRHO_BOUNDINJECT*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) &
                                        + SQRT(PI)*Snow*(1.+ERF1(Snow)))      ! Tot number flux emitted 
-               NtotINJECT  = FLUXBOUND*(YMAX-YMIN)*(ZMAX-ZMIN)*DT/FNUM         ! Tot num of particles to be injected
+               NtotINJECT  = FLUXBOUND*(YMAX-YMIN)*(ZMAX-ZMIN)*DT/(FNUM*SPECIES(S_ID)%SPWT)         ! Tot num of particles to be injected
                nfs_XMAX(IS)    = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
                WRITE(*,*)'ON XHI ', nfs_XMAX(1)
                !ACCA        = SQRT(Snow**2+2.)                                  ! Tmp variable
@@ -1251,7 +1263,7 @@ MODULE initialization
 
                FLUXBOUND   = NRHO_BOUNDINJECT*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) &
                                        + SQRT(PI)*Snow*(1.+ERF1(Snow)))      ! Tot number flux emitted
-               NtotINJECT  = FLUXBOUND*(XMAX-XMIN)*(ZMAX-ZMIN)*DT/FNUM         ! Tot num of particles to be injected
+               NtotINJECT  = FLUXBOUND*(XMAX-XMIN)*(ZMAX-ZMIN)*DT/(FNUM*SPECIES(S_ID)%SPWT)         ! Tot num of particles to be injected
                nfs_YMIN(IS)    = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
                WRITE(*,*)'ON YLO ', nfs_YMIN(1)
                !ACCA        = SQRT(Snow**2+2.)                                  ! Tmp variable
@@ -1273,7 +1285,7 @@ MODULE initialization
 
                FLUXBOUND   = NRHO_BOUNDINJECT*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) &
                                        + SQRT(PI)*Snow*(1.+ERF1(Snow)))      ! Tot number flux emitted 
-               NtotINJECT  = FLUXBOUND*(XMAX-XMIN)*(ZMAX-ZMIN)*DT/FNUM         ! Tot num of particles to be injected
+               NtotINJECT  = FLUXBOUND*(XMAX-XMIN)*(ZMAX-ZMIN)*DT/(FNUM*SPECIES(S_ID)%SPWT)         ! Tot num of particles to be injected
                nfs_YMAX(IS)    = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
                WRITE(*,*)'ON YHI ', nfs_YMAX(1)
                !ACCA        = SQRT(Snow**2+2.)                                  ! Tmp variable
@@ -1320,7 +1332,7 @@ MODULE initialization
 
             FLUXLINESOURCE   = LINESOURCES(ILINE)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) &
                                     + SQRT(PI)*Snow*(1.+ERF1(Snow)))      ! Tot number flux emitted 
-            NtotINJECT  = FLUXLINESOURCE*LINELENGTH*(ZMAX-ZMIN)*DT/FNUM         ! Tot num of particles to be injected
+            NtotINJECT  = FLUXLINESOURCE*LINELENGTH*(ZMAX-ZMIN)*DT/(FNUM*SPECIES(S_ID)%SPWT)         ! Tot num of particles to be injected
 
             nfs_LINE(IS)    = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
             

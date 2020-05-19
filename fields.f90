@@ -67,7 +67,11 @@ MODULE fields
                !CALL ST_MATRIX_SET(A_ST, IC, IE,  2.0*AX)
                !WRITE(*,*) 1.d6*DBLE(I)/(NPX-1)
                !DIRICHLET(IC) = 1.d6*DBLE(I)/(NPX-1)
-               DIRICHLET(IC) = 0.d0
+               IF ((I == 50) .AND. (J .GE. 84) .AND. (J .LE. 116)) THEN
+                  DIRICHLET(IC) = 4.7d0
+               ELSE
+                  DIRICHLET(IC) = 0.d0
+               END IF
                IS_DIRICHLET(IC) = .TRUE.
                ! ELSE IF (J == 0) THEN
                !    CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
@@ -301,13 +305,13 @@ MODULE fields
 
       DO JP = 1, NP_PROC
          CHARGE = SPECIES(particles(JP)%S_ID)%CHARGE
-         IF (CHARGE .EQ. 0.d0) CYCLE
+         IF (ABS(CHARGE) .LT. 1.d-6) CYCLE
 
          CALL COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)
 
          IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
             VOL = CELL_VOL
-         ELSE IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) THEN
+         ELSE
             VOL = CELL_VOLUMES(particles(JP)%IC)
          END IF
          

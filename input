@@ -14,66 +14,40 @@
 
 Axial_symmetry_bool:
     .FALSE.
-Dimensions:
-    2
-!Domain_limits:
-!    0.0  0.9      -0.3  0.3      -0.5  0.5
-
+Domain_limits:
+    -0.5  0.5      -0.5  0.5      -0.5  0.5
 Domain_periodicity:
     .FALSE.   .FALSE.   .TRUE.
 Domain_specular:
-    .FALSE.    .FALSE.    .FALSE.    .FALSE.
-Domain_diffuse:
     .TRUE.    .TRUE.    .TRUE.    .TRUE.
-Domain_react:
-    .TRUE.    .TRUE.    .TRUE.    .TRUE.
-
-Boundary_temperature:
-    300.0
-
-!Number_of_cells:
-!    300  200  1
-
-
-Grid_file:
-    chamcoarse.grid
-
-Bool_PIC:
-    .TRUE.
-
+Number_of_cells:
+    1  1  1
+Dimensions:
+    2
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1e5
+    1.0E13
 Timestep:
-    1e-9
+    1.E-4
 Number_of_timesteps:
-   270000
+    10000
+!200000
 Stats_every:
     1
 
 RNG_seed:
-    65345
-
-Dump_part_start:
-    1000001
-
+    12343
 Dump_part_every:
-    1000001
+    10001
 
 Dump_grid_start:
-    0
+    0  
     
 Dump_grid_avgevery:
-    1
+    1    
 
 Dump_grid_numavgs:
-    5000
-
-Perform_checks:
-    .FALSE.
-
-Checks_every:
     100
 
 ! ========= Multispecies ==============================
@@ -82,19 +56,13 @@ Species_file:
     ar.species
     
 Def_mixture:
-    Ions Ar+ 1.0
+    Argon Ar 1.0
     
-Def_mixture:
-    Electrons e 1.0
-
-Def_mixture:
-    All Ar+ 0.5 e 0.5
-
     
 ! ========= Collisions ==============================
 
 Collision_type: ! [MCC / DSMC / NONE]
-  NONE 
+  DSMC 
 
 MCC_background_dens:
   1.0e20
@@ -105,40 +73,24 @@ MCC_species: ! NOT IMPLEMENTED YET!
 ! DSMC VHS collisions  ! NOT IMPLEMENTED YET!
 
 DSMC_collisions_mixture:
-    All
+    Argon
 VSS_parameters_file:
     ar.vss
-
-Thermal_bath_bool:
-    .FALSE.
-Thermal_bath_Ttr:
-    20000.0
-
-
-! ========= Reactions ==============================
-!Reactions_file:
-!    plasma.tce
-    
-Wall_reactions_file:
-    ar.wall
-
 
 ! ========= Initial particle seed ===================
 
 Initial_particles_bool:
-    .FALSE.
+    .TRUE.
 Initial_particles_dens:
-    1.e9
+    1.0e17
 Initial_particles_vel:
     0.  0.  0.
 Initial_particles_Ttra:
-    300.0 300.0 300.0
+    10000.0 1000.0 1000.0
 Initial_particles_Trot:
-    300.
-Initial_particles_Tvib:
-    300. 
+    0. 
 Initial_particles_mixture:
-    Ions
+    Argon
 ! ========== Injection from boundaries ==============
 
 Boundaries_inject_bool:
@@ -155,35 +107,35 @@ Boundaries_inject_Ttra:
 Boundaries_inject_Trot:
     0.
 Boundaries_inject_mixture:
-    Both
+    Argon1
+! ========== Injection from line source =============
 
+Linesource_bool:
+    .FALSE.
+Linesource_center:
+    0.5   0.
+Linesource_length_y:
+    0.2
+Linesource_dens:
+    1.e24
+Linesource_vel:
+    200.  0. 0.
+Linesource_Ttra:
+    0.0001
+Linesource_Trot:
+    0.
 
-!   center       length        density  velocity xyz                     Ttr      Trot   mix
-Linesource:
-    0.2   0.0    0.0    0.01    7.502e12    6585.0    0.0    0.0       1500.0    0.0    Ions
+!   center       length        density  velocity xyz         Ttr      Trot   mix
+!Linesource:
+!    -0.5    0.0    0.0    1.0    2.8e20    0.0    0.0    0.0    273.0    0.0    Argon
+!Linesource:
+!    0.5    0.0    0.0    -1.0    2.8e20    0.0    0.0    0.0    273.0    0.0    Helium
 
-Linesource:
-    0.2   0.0    0.0    0.01    7.502e12    0.0    0.0    0.0    5802.26    0.0    Electrons
-    
-    
-Wall:
-    0.45    -0.299   -0.25   0.0   300.   .FALSE.    .TRUE.    .TRUE.    0.08    .TRUE.
+!Linesource:
+!    0.0    -0.5    -1.0    0.0    1.0e19    6000.0    -2000.0    3000.0    1000.0    0.0    aria
+!Linesource:
+!    0.0    0.5    1.0    0.0    1.0e19    6000.0    -2000.0    3000.0    1000.0    0.0    aria
 
-
-
-Wall:
-    0.2    0.0     0.0   0.1    300.   .FALSE.    .TRUE.    .FALSE.    0.0    .TRUE.
-
-Wall:
-    0.15   0.05   -0.1   0.0    300.   .FALSE.    .TRUE.    .FALSE.    0.0    .TRUE.
-    
-Wall:
-    0.1    0.0     0.0   -0.1   300.   .FALSE.    .TRUE.    .FALSE.    0.0    .TRUE.
-
-Wall:
-    0.15   -0.05   0.1   0.0    300.   .FALSE.    .TRUE.    .FALSE.    0.0    .TRUE.
-    
-    
 ! ========= MPI parallelization =====================
 ! == Style for MPI domain partition can be:
 ! ==

@@ -113,7 +113,8 @@ MODULE global
 
    CHARACTER(LEN=64) :: COLLISION_TYPE
    LOGICAL           :: BOOL_MCC = .FALSE., BOOL_DSMC = .FALSE.
-   REAL(KIND=8)      :: MCC_BG_DENS, MCC_SIGMA
+   REAL(KIND=8)      :: MCC_BG_DENS, MCC_BG_TTRA
+   INTEGER           :: MCC_BG_MIX
    INTEGER           :: DSMC_COLL_MIX
    INTEGER           :: TIMESTEP_COLL
    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: GREFS ! Matrix of reference relative velocities for VSS
@@ -225,6 +226,7 @@ MODULE global
       REAL(KIND=8) :: VIBREL
       REAL(KIND=8) :: VIBTEMP
       REAL(KIND=8) :: SPWT
+      REAL(KIND=8) :: INVSPWT
       REAL(KIND=8) :: CHARGE
       REAL(KIND=8) :: DIAM
       REAL(KIND=8) :: OMEGA

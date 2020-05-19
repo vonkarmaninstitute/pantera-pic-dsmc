@@ -188,68 +188,68 @@
   ! Step 3. Perform the collision => actual probability correct via FCORR
 
   DO JCOL = 1, NCOLL
-     SKIP = .FALSE.
-     ! Select first collision partner randomly
+    SKIP = .FALSE.
+    ! Select first collision partner randomly
 
-     JP1 = IOFJ + INT(NPCJ*rf())
-     JP1 = IND(JP1)
+    JP1 = IOFJ + INT(NPCJ*rf())
+    JP1 = IND(JP1)
 
-     ! Select second collision partner randomly (shouldn't be JP1)
-     JP2 = JP1
-     DO WHILE (JP2 == JP1)
+    ! Select second collision partner randomly (shouldn't be JP1)
+    JP2 = JP1
+    DO WHILE (JP2 == JP1)
       JP2 = IOFJ + INT(NPCJ*rf())
       JP2 = IND(JP2)
-     END DO
+    END DO
 
-     ! Compute the relative velocity
-        VR2 = (particles(JP2)%VX - particles(JP1)%VX)**2 + &
-           (particles(JP2)%VY - particles(JP1)%VY)**2 + &
-           (particles(JP2)%VZ - particles(JP1)%VZ)**2 
+    ! Compute the relative velocity
+    VR2 = (particles(JP2)%VX - particles(JP1)%VX)**2 + &
+          (particles(JP2)%VY - particles(JP1)%VY)**2 + &
+          (particles(JP2)%VZ - particles(JP1)%VZ)**2 
 
-     VR = SQRT(VR2)
+    VR = SQRT(VR2)
 
-     ! Get actual collision parameters for seleced pair
-     SP_ID1 = particles(JP1)%S_ID
-     SP_ID2 = particles(JP2)%S_ID
+    ! Get actual collision parameters for seleced pair
+    SP_ID1 = particles(JP1)%S_ID
+    SP_ID2 = particles(JP2)%S_ID
 
-     SIGMA = PI * (0.5 * (SPECIES(SP_ID1)%DIAM + SPECIES(SP_ID2)%DIAM))**2
-     OMEGA    = 0.5 * (SPECIES(SP_ID1)%OMEGA + SPECIES(SP_ID2)%OMEGA)
-     TREF = 0.5 * (SPECIES(SP_ID1)%TREF + SPECIES(SP_ID2)%TREF)
-     CREF = GREFS(SP_ID1, SP_ID2)
+    SIGMA = PI * (0.5 * (SPECIES(SP_ID1)%DIAM + SPECIES(SP_ID2)%DIAM))**2
+    OMEGA    = 0.5 * (SPECIES(SP_ID1)%OMEGA + SPECIES(SP_ID2)%OMEGA)
+    TREF = 0.5 * (SPECIES(SP_ID1)%TREF + SPECIES(SP_ID2)%TREF)
+    CREF = GREFS(SP_ID1, SP_ID2)
      
-     ALPHA = 0.5 * (SPECIES(SP_ID1)%ALPHA + SPECIES(SP_ID2)%ALPHA)
-     M1    = SPECIES(SP_ID1)%MOLECULAR_MASS
-     M2    = SPECIES(SP_ID2)%MOLECULAR_MASS
-     MRED  = M1*M2/(M1+M2)
+    ALPHA = 0.5 * (SPECIES(SP_ID1)%ALPHA + SPECIES(SP_ID2)%ALPHA)
+    M1    = SPECIES(SP_ID1)%MOLECULAR_MASS
+    M2    = SPECIES(SP_ID2)%MOLECULAR_MASS
+    MRED  = M1*M2/(M1+M2)
 
-     ETR = 0.5*MRED*VR2
-     
-     C1(1) = particles(JP1)%VX
-     C1(2) = particles(JP1)%VY
-     C1(3) = particles(JP1)%VZ
+    ETR = 0.5*MRED*VR2
+    
+    C1(1) = particles(JP1)%VX
+    C1(2) = particles(JP1)%VY
+    C1(3) = particles(JP1)%VZ
 
-     C2(1) = particles(JP2)%VX
-     C2(2) = particles(JP2)%VY
-     C2(3) = particles(JP2)%VZ
+    C2(1) = particles(JP2)%VX
+    C2(2) = particles(JP2)%VY
+    C2(3) = particles(JP2)%VZ
 
-     ! Check if collision happens
-     rfp = rf()
+    ! Check if collision happens
+    rfp = rf()
 
-     ! Compute (simulated) collision probability
-     IF (OMEGA .EQ. 0.5) THEN
-       COLLPROB = FCORR/(SIGMAMAX*VRMAX)*VR*SIGMA
-     ELSE
-       IF (SIGMAMAX*VRMAX .LT. 1e-20) CALL ERROR_ABORT('The product is zero!')
-       IF (VR .LT. 1e-20) CALL ERROR_ABORT('VR is zero!')
-       COLLPROB = FCORR/(SIGMAMAX*VRMAX)*VR*SIGMA*(VR/CREF)**(1.-2.*OMEGA)
-     END IF
+    ! Compute (simulated) collision probability
+    IF (ABS(OMEGA-0.5) .LT. 1.d-6) THEN
+      COLLPROB = FCORR/(SIGMAMAX*VRMAX)*VR*SIGMA
+    ELSE
+      IF (SIGMAMAX*VRMAX .LT. 1e-20) CALL ERROR_ABORT('The product is zero!')
+      IF (VR .LT. 1e-20) CALL ERROR_ABORT('VR is zero!')
+      COLLPROB = FCORR/(SIGMAMAX*VRMAX)*VR*SIGMA*(VR/CREF)**(1.-2.*OMEGA)
+    END IF
 
 
-     IF ( rfp .LT. COLLPROB ) THEN
+      IF ( rfp .LT. COLLPROB ) THEN
 
         ! Rimuovere commento per avere avviso
         IF (COLLPROB .GT. 1.) THEN
-           WRITE(*,*) 'Attention => this was a bad collision!!!'
+           WRITE(*,*) 'Attention => this was a bad DSMC collision!!!'
         END IF
 
         NCOLLREAL = NCOLLREAL + 1
@@ -286,8 +286,10 @@
             ! Use R2 as P2 (or P2+P3) (Set R2 as the molecule that dissociates in P2+P3)
             P1_SP_ID = REACTIONS(JR)%P1_SP_ID
             P2_SP_ID = REACTIONS(JR)%P2_SP_ID
+
             particles(JP1)%S_ID = REACTIONS(JR)%P1_SP_ID
             particles(JP2)%S_ID = REACTIONS(JR)%P2_SP_ID
+
             TOTDOF = 3. + SPECIES(P2_SP_ID)%ROTDOF + SPECIES(P2_SP_ID)%VIBDOF + &
                     SPECIES(P1_SP_ID)%ROTDOF
             IF (REACTIONS(JR)%N_PROD == 3) THEN
@@ -325,15 +327,16 @@
             CALL HS_SCATTER(EI, M1, M2, C1, C2)
             ECOLL = ECOLL - EI
 
+            
             particles(JP1)%VX = C1(1)
             particles(JP1)%VY = C1(2)
             particles(JP1)%VZ = C1(3)
 
-            particles(JP2)%VX = C2(1)
-            particles(JP2)%VY = C2(2)
-            particles(JP2)%VZ = C2(3)
-
-            IF (REACTIONS(JR)%N_PROD == 3) THEN
+            IF (REACTIONS(JR)%N_PROD == 2) THEN
+              particles(JP2)%VX = C2(1)
+              particles(JP2)%VY = C2(2)
+              particles(JP2)%VZ = C2(3)
+            ELSE IF (REACTIONS(JR)%N_PROD == 3) THEN
               TOTDOF = TOTDOF - SPECIES(P3_SP_ID)%VIBDOF
               EVIB = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P3_SP_ID)%VIBDOF)
               ECOLL = ECOLL - EVIB
@@ -351,11 +354,13 @@
               particles(JP2)%VX = C1(1)
               particles(JP2)%VY = C1(2)
               particles(JP2)%VZ = C1(3)
+              
 
               CALL INIT_PARTICLE(particles(JP2)%X,particles(JP2)%Y,particles(JP2)%Z, &
               C2(1),C2(2),C2(3),EROT,EVIB,P3_SP_ID,JC,1.d0, NEWparticle)
               !WRITE(*,*) 'Should be adding particle!'
               CALL ADD_PARTICLE_ARRAY(NEWparticle, NP_PROC, particles)
+              
             END IF
 
             EXIT
@@ -375,7 +380,7 @@
         PVIB2 = (TRDOF + SPECIES(SP_ID2)%VIBDOF)/TRDOF * SPECIES(SP_ID2)%VIBREL
 
         TRDOF = 5. -2.*OMEGA
-        rfp = rf()
+
 
         IF (rfp .LT. PROT1) THEN
           ! Particle 1 selected for rotational energy exchange
@@ -400,68 +405,67 @@
           ECOLL = ETR + particles(JP2)%EVIB
           particles(JP2)%EVIB = COLL_INTERNAL_ENERGY(ECOLL, TRDOF, SPECIES(SP_ID2)%VIBDOF)
           ETR = ECOLL - particles(JP2)%EVIB
-          
+
         END IF
 
-         ! Compute post-collision velocities
-         ! VSS Collisions
+        ! Compute post-collision velocities
+        ! VSS Collisions
 
-         COSCHI = 2.*rf()**(1./ALPHA) - 1.
-         SINCHI = SQRT(1.-COSCHI*COSCHI)
-         THETA = PI2*rf()
-         COSTHETA = COS(THETA)
-         SINTHETA = SIN(THETA)
+        COSCHI = 2.*rf()**(1./ALPHA) - 1.
+        SINCHI = SQRT(1.-COSCHI*COSCHI)
+        THETA = PI2*rf()
+        COSTHETA = COS(THETA)
+        SINTHETA = SIN(THETA)
 
 
-         IF (rfp .LT. PROT1 + PROT2 + PVIB1 + PVIB2) THEN
+        IF (rfp .LT. PROT1 + PROT2 + PVIB1 + PVIB2) THEN
+          ! Inelastic collision occurred => Randomize relative velocity vector
+          G = SQRT(2.*ETR/MRED)
 
-            ! Inelastic collision occurred => Randomize relative velocity vector
-            G = SQRT(2.*ETR/MRED)
-            
-            COSA = 2.*rf()-1.0
-            SINA = SQRT(1-COSA*COSA)
-            BB = PI2 * rf()
+          COSA = 2.*rf()-1.0
+          SINA = SQRT(1-COSA*COSA)
+          BB = PI2 * rf()
 
-            GX = G*SINA*COS(BB)
-            GY = G*SINA*SIN(BB)
-            GZ = G*COSA
+          GX = G*SINA*COS(BB)
+          GY = G*SINA*SIN(BB)
+          GZ = G*COSA
          
-         ELSE
+        ELSE
+          ! No inelastic collision occured => Take actual velocity vector
+          GX = C1(1) - C2(1)
+          GY = C1(2) - C2(2)
+          GZ = C1(3) - C2(3)
+          G = SQRT(GX*GX + GY*GY + GZ*GZ)
 
-            ! No inelastic collision occured => Take actual velocity vector
-            GX = C1(1) - C2(1)
-            GY = C1(2) - C2(2)
-            GZ = C1(3) - C2(3)
-            G = SQRT(GX*GX + GY*GY + GZ*GZ)
+        END IF
 
-         END IF
+        ! Compute post-collision velocities
 
-         ! Compute post-collision velocities
+        GREL(1) = GX*COSCHI + SQRT(GY*GY+GZ*GZ)*SINTHETA*SINCHI
+        GREL(2) = GY*COSCHI + (G*GZ*COSTHETA - GX*GY*SINTHETA)/SQRT(GY*GY+GZ*GZ)*SINCHI
+        GREL(3) = GZ*COSCHI - (G*GY*COSTHETA + GX*GZ*SINTHETA)/SQRT(GY*GY+GZ*GZ)*SINCHI
 
-         GREL(1) = GX*COSCHI + SQRT(GY*GY+GZ*GZ)*SINTHETA*SINCHI
-         GREL(2) = GY*COSCHI + (G*GZ*COSTHETA - GX*GY*SINTHETA)/SQRT(GY*GY+GZ*GZ)*SINCHI
-         GREL(3) = GZ*COSCHI - (G*GY*COSTHETA + GX*GZ*SINTHETA)/SQRT(GY*GY+GZ*GZ)*SINCHI
+        ! Compute center of mass velocity vector
+        DO I = 1, 3
+          W(I) = M1/(M1+M2)*C1(I) + M2/(M1+M2)*C2(I)
+        END DO
 
-         ! Compute center of mass velocity vector
-         DO I = 1, 3
-            W(I) = M1/(M1+M2)*C1(I) + M2/(M1+M2)*C2(I)
-         END DO
+        ! Compute absolute velocity vector of the two particles
+        DO I = 1, 3
+          C1(I) = W(I) + M2/(M1+M2)*GREL(I)
+          C2(I) = W(I) - M1/(M1+M2)*GREL(I)
+        END DO
 
-         ! Compute absolute velocity vector of the two particles
-         DO I = 1, 3
-            C1(I) = W(I) + M2/(M1+M2)*GREL(I)
-            C2(I) = W(I) - M1/(M1+M2)*GREL(I)
-         END DO
+        particles(JP1)%VX = C1(1)
+        particles(JP1)%VY = C1(2)
+        particles(JP1)%VZ = C1(3)
+          
+        particles(JP2)%VX = C2(1)
+        particles(JP2)%VY = C2(2)
+        particles(JP2)%VZ = C2(3)
+          
 
-         particles(JP1)%VX = C1(1)
-         particles(JP1)%VY = C1(2)
-         particles(JP1)%VZ = C1(3)
-
-         particles(JP2)%VX = C2(1)
-         particles(JP2)%VY = C2(2)
-         particles(JP2)%VZ = C2(3)
-
-     END IF
+      END IF
 
   END DO  
 
@@ -498,7 +502,7 @@
     REAL(KIND=8), INTENT(IN)  :: ECOLL, TRDOF
     REAL(KIND=8) :: EI, R1, R2
 
-      IF (TRDOF == 0) THEN
+      IF (TRDOF .LT. 1.d-6) THEN
         EI = ECOLL
       ELSE IF (INTDOF == 0) THEN
         EI = 0.d0

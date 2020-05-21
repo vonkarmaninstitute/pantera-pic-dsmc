@@ -117,7 +117,11 @@ MODULE global
    INTEGER           :: MCC_BG_MIX
    INTEGER           :: DSMC_COLL_MIX
    INTEGER           :: TIMESTEP_COLL
-   REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: GREFS ! Matrix of reference relative velocities for VSS
+   REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: VSS_GREFS ! Matrix of reference relative velocities for VSS
+   REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: VSS_SIGMAS ! Matrix of reference cross sections for VSS
+   REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: VSS_ALPHAS ! Matrix of reference scattering coeff. for VSS
+   REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: VSS_OMEGAS ! Matrix of reference temperature exponent for VSS
+   REAL(KIND=8) :: SIGMAMAX
 
    LOGICAL           :: BOOL_THERMAL_BATH = .FALSE.
    REAL(KIND=8)      :: TBATH
@@ -275,6 +279,7 @@ MODULE global
       REAL(KIND=8) :: A, N, EA
       REAL(KIND=8) :: C1, C2, C3
       INTEGER :: N_PROD
+      LOGICAL :: IS_CEX
    END TYPE REACTIONS_DATA_STRUCTURE
 
    TYPE(REACTIONS_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: REACTIONS, TEMP_REACTIONS

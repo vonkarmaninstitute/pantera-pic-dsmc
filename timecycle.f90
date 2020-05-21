@@ -837,16 +837,21 @@ MODULE timecycle
    PI  = 3.141593
    PI2 = 2*PI
 
+   TIMESTEP_COLL = 0
+
    DO JP1 = 1,NP_PROC
       SP_ID1 = particles(JP1)%S_ID
 
       DO J = 1, MIXTURES(MCC_BG_MIX)%N_COMPONENTS
          SP_ID2 = MIXTURES(MCC_BG_MIX)%COMPONENTS(J)%ID
          
-         SIGMA = PI * (0.5 * (SPECIES(SP_ID1)%DIAM + SPECIES(SP_ID2)%DIAM))**2
-         OMEGA = 0.5 * (SPECIES(SP_ID1)%OMEGA + SPECIES(SP_ID2)%OMEGA)
-         CREF = GREFS(SP_ID1, SP_ID2)
-         ALPHA = 0.5 * (SPECIES(SP_ID1)%ALPHA + SPECIES(SP_ID2)%ALPHA)
+         !SIGMA = PI * (0.5 * (SPECIES(SP_ID1)%DIAM + SPECIES(SP_ID2)%DIAM))**2
+         !OMEGA = 0.5 * (SPECIES(SP_ID1)%OMEGA + SPECIES(SP_ID2)%OMEGA)
+         CREF = VSS_GREFS(SP_ID1, SP_ID2)
+         !ALPHA = 0.5 * (SPECIES(SP_ID1)%ALPHA + SPECIES(SP_ID2)%ALPHA)
+         SIGMA = VSS_SIGMAS(SP_ID1, SP_ID2)
+         OMEGA = VSS_OMEGAS(SP_ID1, SP_ID2)
+         ALPHA = VSS_ALPHAS(SP_ID1, SP_ID2)
          
          ! Sample the velocity of second collision partner, that would be in the MCC backgorund
          CALL MAXWELL(0.d0, 0.d0, 0.d0, &
@@ -866,6 +871,8 @@ MODULE timecycle
 
          ! Try the collision
          IF (rf() < P_COLL) THEN ! Collision happens
+
+            TIMESTEP_COLL = TIMESTEP_COLL + 1
 
             ! Rimuovere commento per avere avviso
             IF (P_COLL .GT. 1.) THEN
@@ -923,81 +930,84 @@ MODULE timecycle
                   particles(JP1)%S_ID = REACTIONS(JR)%P1_SP_ID
                   particles(JP2)%S_ID = REACTIONS(JR)%P2_SP_ID
 
-    
-                  TOTDOF = 3. + SPECIES(P2_SP_ID)%ROTDOF + SPECIES(P2_SP_ID)%VIBDOF + &
-                        SPECIES(P1_SP_ID)%ROTDOF
-                  IF (REACTIONS(JR)%N_PROD == 3) THEN
-                     P3_SP_ID = REACTIONS(JR)%P3_SP_ID
-                     TOTDOF = TOTDOF + 3. + SPECIES(P3_SP_ID)%ROTDOF + SPECIES(P3_SP_ID)%VIBDOF
-                  END IF
-    
-                  EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P1_SP_ID)%VIBDOF)
-                  particles(JP1)%EVIB = EI
-                  ECOLL = ECOLL - EI
-    
-                  TOTDOF = TOTDOF - SPECIES(P1_SP_ID)%ROTDOF
-                  EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P1_SP_ID)%ROTDOF)
-                  particles(JP1)%EROT = EI
-                  ECOLL = ECOLL - EI
-    
-                  TOTDOF = TOTDOF - SPECIES(P2_SP_ID)%VIBDOF
-                  EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P2_SP_ID)%VIBDOF)
-                  particles(JP2)%EVIB = EI
-                  ECOLL = ECOLL - EI
-    
-                  TOTDOF = TOTDOF - SPECIES(P2_SP_ID)%ROTDOF
-                  EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P2_SP_ID)%ROTDOF)
-                  particles(JP2)%EROT = EI
-                  ECOLL = ECOLL - EI
-    
-                  M1 = SPECIES(P1_SP_ID)%MOLECULAR_MASS
-                  IF (REACTIONS(JR)%N_PROD == 2) THEN
-                     M2 = SPECIES(P2_SP_ID)%MOLECULAR_MASS
-                  ELSE IF (REACTIONS(JR)%N_PROD == 3) THEN
-                     M2 = SPECIES(P2_SP_ID)%MOLECULAR_MASS + SPECIES(P3_SP_ID)%MOLECULAR_MASS
-                  END IF
-                  TOTDOF = TOTDOF - 3.
-                  EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, 3)
-                  CALL HS_SCATTER(EI, M1, M2, C1, C2)
-                  ECOLL = ECOLL - EI
-    
-                  particles(JP1)%VX = C1(1)
-                  particles(JP1)%VY = C1(2)
-                  particles(JP1)%VZ = C1(3)
-
-    
-                  IF (REACTIONS(JR)%N_PROD == 2) THEN
-                     particles(JP2)%VX = C2(1)
-                     particles(JP2)%VY = C2(2)
-                     particles(JP2)%VZ = C2(3)
-                  ELSE IF (REACTIONS(JR)%N_PROD == 3) THEN
-                     TOTDOF = TOTDOF - SPECIES(P3_SP_ID)%VIBDOF
-                     EVIB = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P3_SP_ID)%VIBDOF)
-                     ECOLL = ECOLL - EVIB
-         
-                     TOTDOF = TOTDOF - SPECIES(P3_SP_ID)%ROTDOF
-                     EROT = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P3_SP_ID)%ROTDOF)
-                     ECOLL = ECOLL - EROT
+                  IF (.NOT. REACTIONS(JR)%IS_CEX) THEN
       
-                     M1 = SPECIES(P2_SP_ID)%MOLECULAR_MASS
-                     M2 = SPECIES(P3_SP_ID)%MOLECULAR_MASS
-                     C1 = C2
+                     TOTDOF = 3. + SPECIES(P2_SP_ID)%ROTDOF + SPECIES(P2_SP_ID)%VIBDOF + &
+                           SPECIES(P1_SP_ID)%ROTDOF
+                     IF (REACTIONS(JR)%N_PROD == 3) THEN
+                        P3_SP_ID = REACTIONS(JR)%P3_SP_ID
+                        TOTDOF = TOTDOF + 3. + SPECIES(P3_SP_ID)%ROTDOF + SPECIES(P3_SP_ID)%VIBDOF
+                     END IF
+      
+                     EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P1_SP_ID)%VIBDOF)
+                     particles(JP1)%EVIB = EI
+                     ECOLL = ECOLL - EI
+      
+                     TOTDOF = TOTDOF - SPECIES(P1_SP_ID)%ROTDOF
+                     EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P1_SP_ID)%ROTDOF)
+                     particles(JP1)%EROT = EI
+                     ECOLL = ECOLL - EI
+      
+                     TOTDOF = TOTDOF - SPECIES(P2_SP_ID)%VIBDOF
+                     EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P2_SP_ID)%VIBDOF)
+                     particles(JP2)%EVIB = EI
+                     ECOLL = ECOLL - EI
+      
+                     TOTDOF = TOTDOF - SPECIES(P2_SP_ID)%ROTDOF
+                     EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P2_SP_ID)%ROTDOF)
+                     particles(JP2)%EROT = EI
+                     ECOLL = ECOLL - EI
+      
+                     M1 = SPECIES(P1_SP_ID)%MOLECULAR_MASS
+                     IF (REACTIONS(JR)%N_PROD == 2) THEN
+                        M2 = SPECIES(P2_SP_ID)%MOLECULAR_MASS
+                     ELSE IF (REACTIONS(JR)%N_PROD == 3) THEN
+                        M2 = SPECIES(P2_SP_ID)%MOLECULAR_MASS + SPECIES(P3_SP_ID)%MOLECULAR_MASS
+                     END IF
+                     TOTDOF = TOTDOF - 3.
+                     EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, 3)
+                     CALL HS_SCATTER(EI, M1, M2, C1, C2)
+                     ECOLL = ECOLL - EI
+      
+                     particles(JP1)%VX = C1(1)
+                     particles(JP1)%VY = C1(2)
+                     particles(JP1)%VZ = C1(3)
+
+      
+                     IF (REACTIONS(JR)%N_PROD == 2) THEN
+                        particles(JP2)%VX = C2(1)
+                        particles(JP2)%VY = C2(2)
+                        particles(JP2)%VZ = C2(3)
+                     ELSE IF (REACTIONS(JR)%N_PROD == 3) THEN
+                        TOTDOF = TOTDOF - SPECIES(P3_SP_ID)%VIBDOF
+                        EVIB = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P3_SP_ID)%VIBDOF)
+                        ECOLL = ECOLL - EVIB
+            
+                        TOTDOF = TOTDOF - SPECIES(P3_SP_ID)%ROTDOF
+                        EROT = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P3_SP_ID)%ROTDOF)
+                        ECOLL = ECOLL - EROT
+         
+                        M1 = SPECIES(P2_SP_ID)%MOLECULAR_MASS
+                        M2 = SPECIES(P3_SP_ID)%MOLECULAR_MASS
+                        C1 = C2
+                        
+                        CALL HS_SCATTER(ECOLL, M1, M2, C1, C2)
+                              
+                        particles(JP2)%VX = C1(1)
+                        particles(JP2)%VY = C1(2)
+                        particles(JP2)%VZ = C1(3)
+                              
+                        
+                        CALL INIT_PARTICLE(particles(JP2)%X,particles(JP2)%Y,particles(JP2)%Z, &
+                        C2(1),C2(2),C2(3),EROT,EVIB,P3_SP_ID,particles(JP2)%IC,1.d0, NEWparticle)
+                        !WRITE(*,*) 'Should be adding particle!'
+                        CALL ADD_PARTICLE_ARRAY(NEWparticle, NP_PROC, particles)
+                        
                      
-                     CALL HS_SCATTER(ECOLL, M1, M2, C1, C2)
-                           
-                     particles(JP2)%VX = C1(1)
-                     particles(JP2)%VY = C1(2)
-                     particles(JP2)%VZ = C1(3)
-                           
-                     
-                     CALL INIT_PARTICLE(particles(JP2)%X,particles(JP2)%Y,particles(JP2)%Z, &
-                     C2(1),C2(2),C2(3),EROT,EVIB,P3_SP_ID,particles(JP2)%IC,1.d0, NEWparticle)
-                     !WRITE(*,*) 'Should be adding particle!'
-                     CALL ADD_PARTICLE_ARRAY(NEWparticle, NP_PROC, particles)
-                     
-                  
+                     END IF
                   END IF
-    
+
+                  ! If this pair had a chemical reaction, exit and don't test any other reaction.
                   EXIT
 
                END IF

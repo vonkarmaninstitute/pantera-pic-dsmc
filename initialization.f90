@@ -511,7 +511,13 @@ MODULE initialization
          
       END DO
 
-      ALLOCATE(GREFS(N_SPECIES, N_SPECIES))
+      ALLOCATE(VSS_GREFS(N_SPECIES, N_SPECIES))
+      ALLOCATE(VSS_SIGMAS(N_SPECIES, N_SPECIES))
+      ALLOCATE(VSS_ALPHAS(N_SPECIES, N_SPECIES))
+      ALLOCATE(VSS_OMEGAS(N_SPECIES, N_SPECIES))
+
+
+      SIGMAMAX = 0
       DO IS = 1, N_SPECIES
          DO JS = 1, N_SPECIES
             M1    = SPECIES(IS)%MOLECULAR_MASS
@@ -521,10 +527,16 @@ MODULE initialization
             TREF = 0.5 * (SPECIES(IS)%TREF + SPECIES(JS)%TREF)
             
             IF (ABS(OMEGA-0.5) .LT. 1.d-6) THEN
-               GREFS(IS, JS) = (2.*KB*TREF/MRED)**0.5 * 1.2354
+               VSS_GREFS(IS, JS) = (2.*KB*TREF/MRED)**0.5 * 1.2354
             ELSE
-               GREFS(IS, JS) = (2.*KB*TREF/MRED)**0.5 * (GAMMA(2.5-OMEGA))**(-0.5/(OMEGA-0.5))
+               VSS_GREFS(IS, JS) = (2.*KB*TREF/MRED)**0.5 * (GAMMA(2.5-OMEGA))**(-0.5/(OMEGA-0.5))
             END IF
+
+            VSS_SIGMAS(IS, JS) = PI * (0.5 * (SPECIES(IS)%DIAM + SPECIES(JS)%DIAM))**2
+            VSS_ALPHAS(IS, JS) = 0.5 * (SPECIES(IS)%ALPHA + SPECIES(JS)%ALPHA)
+            VSS_OMEGAS(IS, JS) = 0.5 * (SPECIES(IS)%OMEGA + SPECIES(JS)%OMEGA)
+
+            IF (VSS_SIGMAS(IS, JS) .GT. SIGMAMAX) SIGMAMAX = VSS_SIGMAS(IS, JS)
          END DO
       END DO
 
@@ -532,6 +544,175 @@ MODULE initialization
 
 
    END SUBROUTINE READ_VSS
+
+
+
+
+   SUBROUTINE READ_VSS_BINARY(FILENAME)
+
+      IMPLICIT NONE
+
+      CHARACTER*64, INTENT(IN) :: FILENAME
+      
+      INTEGER, PARAMETER :: in2 = 457
+      INTEGER            :: ios
+      CHARACTER*512      :: line
+      INTEGER            :: ReasonEOF
+
+      INTEGER :: N_STR
+      CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
+
+      INTEGER, ALLOCATABLE :: SP_IDS(:)
+      REAL(KIND=8) :: OMEGA
+      REAL(KIND=8) :: TREF
+      REAL(KIND=8) :: PI, KB
+      REAL(KIND=8) :: READ_VALUE
+
+      INTEGER      :: IS, JS
+      REAL(KIND=8) :: M1, M2, MRED
+
+      PI   = 3.141593
+      KB = 1.38064852E-23
+
+      ALLOCATE(VSS_GREFS(N_SPECIES, N_SPECIES))
+      ALLOCATE(VSS_SIGMAS(N_SPECIES, N_SPECIES))
+      ALLOCATE(VSS_ALPHAS(N_SPECIES, N_SPECIES))
+      ALLOCATE(VSS_OMEGAS(N_SPECIES, N_SPECIES))
+
+      ! Open input file for reading
+      OPEN(UNIT=in2,FILE=FILENAME, STATUS='old',IOSTAT=ios)
+
+      IF (ios.NE.0) THEN
+         CALL ERROR_ABORT('Attention, VSS parameters definition file not found! ABORTING.')
+      ENDIF
+
+      ! Read Tref
+      DO
+         line = '' ! Init empty
+         READ(in2,'(A)', IOSTAT=ReasonEOF) line ! Read line         
+         CALL STRIP_COMMENTS(line, '!')         ! Remove comments from line
+
+         IF (ReasonEOF < 0) THEN
+            CALL ERROR_ABORT('Attention, VSS definition reading failed! ABORTING.')
+         END IF
+
+         IF (line == '') CYCLE
+         READ(line,*) TREF
+      END DO
+
+      ! Read species ordering
+      N_STR = 0
+      DO WHILE (N_STR == 0)
+         line = '' ! Init empty
+         READ(in2,'(A)', IOSTAT=ReasonEOF) line ! Read line         
+         CALL STRIP_COMMENTS(line, '!')         ! Remove comments from line
+
+         IF (ReasonEOF < 0) THEN
+            CALL ERROR_ABORT('Attention, VSS definition reading failed! ABORTING.')
+         END IF
+
+         CALL SPLIT_STR(line, ' ', STRARRAY, N_STR)
+      END DO
+
+      IF (N_STR .NE. N_STR) CALL ERROR_ABORT('Attention, incorrect number of species in VSS definition! ABORTING.')
+
+      ALLOCATE(SP_IDS(N_SPECIES))
+      DO IS = 1, N_SPECIES
+         SP_IDS(IS) = SPECIES_NAME_TO_ID(STRARRAY(IS))
+      END DO
+
+
+      ! Read molecular diameters
+      DO JS = 1, N_SPECIES
+         N_STR = 0
+         DO WHILE (N_STR == 0)
+            line = '' ! Init empty
+            READ(in2,'(A)', IOSTAT=ReasonEOF) line ! Read line         
+            CALL STRIP_COMMENTS(line, '!')         ! Remove comments from line
+
+            IF (ReasonEOF < 0) THEN
+               CALL ERROR_ABORT('Attention, VSS definition reading failed! ABORTING.')
+            END IF
+
+            CALL SPLIT_STR(line, ' ', STRARRAY, N_STR)
+         END DO
+
+         DO IS = 1, N_SPECIES+1-JS
+            READ(STRARRAY(IS),*) READ_VALUE
+            VSS_SIGMAS(SP_IDS(IS), SP_IDS(JS)) = PI*READ_VALUE**2
+            VSS_SIGMAS(SP_IDS(JS), SP_IDS(IS)) = VSS_SIGMAS(SP_IDS(IS), SP_IDS(JS))
+         END DO
+      END DO
+         
+
+      ! Read omegas
+      DO JS = 1, N_SPECIES
+         N_STR = 0
+         DO WHILE (N_STR == 0)
+            line = '' ! Init empty
+            READ(in2,'(A)', IOSTAT=ReasonEOF) line ! Read line         
+            CALL STRIP_COMMENTS(line, '!')         ! Remove comments from line
+
+            IF (ReasonEOF < 0) THEN
+               CALL ERROR_ABORT('Attention, VSS definition reading failed! ABORTING.')
+            END IF
+
+            CALL SPLIT_STR(line, ' ', STRARRAY, N_STR)
+         END DO
+
+         DO IS = 1, N_SPECIES+1-JS
+            READ(STRARRAY(IS),*) READ_VALUE
+            VSS_OMEGAS(SP_IDS(IS), SP_IDS(JS)) = READ_VALUE
+            VSS_OMEGAS(SP_IDS(JS), SP_IDS(IS)) = VSS_OMEGAS(SP_IDS(IS), SP_IDS(JS))
+         END DO
+      END DO
+
+
+      ! Read alphas
+      DO JS = 1, N_SPECIES
+         N_STR = 0
+         DO WHILE (N_STR == 0)
+            line = '' ! Init empty
+            READ(in2,'(A)', IOSTAT=ReasonEOF) line ! Read line         
+            CALL STRIP_COMMENTS(line, '!')         ! Remove comments from line
+
+            IF (ReasonEOF < 0) THEN
+               CALL ERROR_ABORT('Attention, VSS definition reading failed! ABORTING.')
+            END IF
+
+            CALL SPLIT_STR(line, ' ', STRARRAY, N_STR)
+         END DO
+
+         DO IS = 1, N_SPECIES+1-JS
+            READ(STRARRAY(IS),*) READ_VALUE
+            VSS_ALPHAS(SP_IDS(IS), SP_IDS(JS)) = READ_VALUE
+            VSS_ALPHAS(SP_IDS(JS), SP_IDS(IS)) = VSS_ALPHAS(SP_IDS(IS), SP_IDS(JS))
+         END DO
+      END DO
+ 
+
+      SIGMAMAX = 0
+      DO IS = 1, N_SPECIES
+         DO JS = 1, N_SPECIES
+            M1    = SPECIES(IS)%MOLECULAR_MASS
+            M2    = SPECIES(JS)%MOLECULAR_MASS
+            MRED  = M1*M2/(M1+M2)
+            OMEGA = VSS_OMEGAS(IS, JS)
+                        
+            IF (ABS(OMEGA-0.5) .LT. 1.d-6) THEN
+               VSS_GREFS(IS, JS) = (2.*KB*TREF/MRED)**0.5 * 1.2354
+            ELSE
+               VSS_GREFS(IS, JS) = (2.*KB*TREF/MRED)**0.5 * (GAMMA(2.5-OMEGA))**(-0.5/(OMEGA-0.5))
+            END IF
+
+            IF (VSS_SIGMAS(IS, JS) .GT. SIGMAMAX) SIGMAMAX = VSS_SIGMAS(IS, JS)
+         END DO
+      END DO
+
+      CLOSE(in2) ! Close input file
+
+
+   END SUBROUTINE READ_VSS_BINARY
 
 
    SUBROUTINE DEF_MIXTURE(DEFINITION)
@@ -717,7 +898,7 @@ MODULE initialization
          CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
 
          IF (N_STR == 0) CYCLE ! This is an empty line
-         IF (STRARRAY(2) .NE. '+' .OR. STRARRAY(4) .NE. '-->' .OR. STRARRAY(6) .NE. '+') THEN
+         IF (STRARRAY(2) .NE. '+' .OR. (STRARRAY(4) .NE. '-->' .AND. STRARRAY(4) .NE. '-CEX->') .OR. STRARRAY(6) .NE. '+') THEN
             CALL ERROR_ABORT('Attention, format is not respected in reactions file.')
          END IF
 
@@ -737,11 +918,20 @@ MODULE initialization
             NEW_REACTION%P3_SP_ID = REACTION_SPECIES_NAME_TO_ID(STRARRAY(9))
          END IF
       
+
          READ(in3,'(A)', IOSTAT=ReasonEOF) DEFINITION ! Read reaction parameters line
          CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
-         READ(STRARRAY(1), '(ES14.3)') NEW_REACTION%A
-         READ(STRARRAY(2), '(ES14.3)') NEW_REACTION%N
-         READ(STRARRAY(3), '(ES14.3)') NEW_REACTION%EA
+         IF (STRARRAY(4) == '-CEX->') THEN
+            NEW_REACTION%IS_CEX = .TRUE.
+            NEW_REACTION%EA = 0.d0
+            READ(STRARRAY(1), '(ES14.3)') NEW_REACTION%C1
+            READ(STRARRAY(2), '(ES14.3)') NEW_REACTION%C2
+         ELSE
+            NEW_REACTION%IS_CEX = .FALSE.
+            READ(STRARRAY(1), '(ES14.3)') NEW_REACTION%A
+            READ(STRARRAY(2), '(ES14.3)') NEW_REACTION%N
+            READ(STRARRAY(3), '(ES14.3)') NEW_REACTION%EA
+         END IF
 
          IF (ReasonEOF < 0) EXIT ! End of file reached
          
@@ -765,6 +955,7 @@ MODULE initialization
                WRITE(*,*) REACTIONS(index)%N_PROD, 'products with ids:',  REACTIONS(index)%P1_SP_ID, ' and ', &
                REACTIONS(index)%P2_SP_ID
                WRITE(*,*) 'Parameters:', REACTIONS(index)%A, REACTIONS(index)%N, REACTIONS(index)%EA
+               IF (REACTIONS(index)%IS_CEX) WRITE(*,*) 'This is a CEX reaction'
             ELSE IF (REACTIONS(index)%N_PROD == 3) THEN
                WRITE(*,*) 'Reaction ', index, 'Has 2 reactants with ids:', REACTIONS(index)%R1_SP_ID, ' and ', &
                REACTIONS(index)%R2_SP_ID
@@ -1394,34 +1585,36 @@ MODULE initialization
       KB = 1.38064852E-23
 
       DO JR = 1, N_REACTIONS
-         R1_SP_ID = REACTIONS(JR)%R1_SP_ID
-         R2_SP_ID = REACTIONS(JR)%R2_SP_ID
+         IF (.NOT. REACTIONS(JR)%IS_CEX) THEN
+            R1_SP_ID = REACTIONS(JR)%R1_SP_ID
+            R2_SP_ID = REACTIONS(JR)%R2_SP_ID
 
-         ZETA  = 0.5*(3. + SPECIES(R1_SP_ID)%VIBDOF + 3. + SPECIES(R2_SP_ID)%VIBDOF)
-         OMEGA = 0.5*(SPECIES(R1_SP_ID)%OMEGA + SPECIES(R2_SP_ID)%OMEGA)
-         SIGMA = 0.25*PI*(SPECIES(R1_SP_ID)%DIAM + SPECIES(R2_SP_ID)%DIAM)**2
-         TREF  = 0.5*(SPECIES(R1_SP_ID)%TREF + SPECIES(R2_SP_ID)%TREF)
-         M1 = SPECIES(R1_SP_ID)%MOLECULAR_MASS
-         M2 = SPECIES(R2_SP_ID)%MOLECULAR_MASS
-         MR    = M1*M2/(M1+M2)
-         LAMBDA = REACTIONS(JR)%A
-         ETA = REACTIONS(JR)%N
-         EA = REACTIONS(JR)%EA
+            ZETA  = 0.5*(3. + SPECIES(R1_SP_ID)%VIBDOF + 3. + SPECIES(R2_SP_ID)%VIBDOF)
+            OMEGA = 0.5*(SPECIES(R1_SP_ID)%OMEGA + SPECIES(R2_SP_ID)%OMEGA)
+            SIGMA = 0.25*PI*(SPECIES(R1_SP_ID)%DIAM + SPECIES(R2_SP_ID)%DIAM)**2
+            TREF  = 0.5*(SPECIES(R1_SP_ID)%TREF + SPECIES(R2_SP_ID)%TREF)
+            M1 = SPECIES(R1_SP_ID)%MOLECULAR_MASS
+            M2 = SPECIES(R2_SP_ID)%MOLECULAR_MASS
+            MR    = M1*M2/(M1+M2)
+            LAMBDA = REACTIONS(JR)%A
+            ETA = REACTIONS(JR)%N
+            EA = REACTIONS(JR)%EA
 
-         IF (R1_SP_ID == R1_SP_ID) THEN
-            EPS = 2.
-         ELSE
-            EPS = 1.
+            IF (R1_SP_ID == R1_SP_ID) THEN
+               EPS = 2.
+            ELSE
+               EPS = 1.
+            END IF
+
+            C1 = SQRT(PI)*EPS*LAMBDA/(2.*SIGMA) * GAMMA(ZETA+2.5-OMEGA)/GAMMA(ZETA+ETA+1.5) &
+               * SQRT(MR/(2.*KB*TREF)) * TREF**(1.-OMEGA) / KB**(ETA-1.+OMEGA)
+            C2 = ETA - 1. + OMEGA
+            C3 = ZETA + 1.5 - OMEGA
+
+            REACTIONS(JR)%C1 = C1
+            REACTIONS(JR)%C2 = C2
+            REACTIONS(JR)%C3 = C3
          END IF
-
-         C1 = SQRT(PI)*EPS*LAMBDA/(2.*SIGMA) * GAMMA(ZETA+2.5-OMEGA)/GAMMA(ZETA+ETA+1.5) &
-              * SQRT(MR/(2.*KB*TREF)) * TREF**(1.-OMEGA) / KB**(ETA-1.+OMEGA)
-         C2 = ETA - 1. + OMEGA
-         C3 = ZETA + 1.5 - OMEGA
-
-         REACTIONS(JR)%C1 = C1
-         REACTIONS(JR)%C2 = C2
-         REACTIONS(JR)%C3 = C3
       END DO
 
    END SUBROUTINE INITREACTIONS

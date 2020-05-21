@@ -237,7 +237,7 @@ MODULE global
       REAL(KIND=8) :: TREF
       REAL(KIND=8) :: ALPHA
       REAL(KIND=8) :: SIGMA
-      REAL(KIND=8) :: NU
+      !REAL(KIND=8) :: NU
       REAL(KIND=8) :: CREF
       
    END TYPE SPECIES_DATA_STRUCTURE

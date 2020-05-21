@@ -118,6 +118,10 @@ MODULE initialization
             READ(in1,*) VSS_PARAMS_FILENAME
             CALL READ_VSS(VSS_PARAMS_FILENAME)
          END IF
+         IF (line=='VSS_parameters_binary_file:')     THEN
+            READ(in1,*) VSS_PARAMS_FILENAME
+            CALL READ_VSS_BINARY(VSS_PARAMS_FILENAME)
+         END IF
          IF (line=='DSMC_collisions_mixture:') THEN
             READ(in1,*) DSMC_COLL_MIX_NAME
             DSMC_COLL_MIX = MIXTURE_NAME_TO_ID(DSMC_COLL_MIX_NAME)
@@ -497,7 +501,6 @@ MODULE initialization
          SPECIES(SP_ID)%ALPHA = ALPHA
 
          SPECIES(SP_ID)%SIGMA = PI*DIAM**2
-         SPECIES(SP_ID)%NU    = OMEGA - 0.5
 
 
          IF (ABS(OMEGA-0.5) .LT. 1.d-6) THEN

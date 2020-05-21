@@ -590,18 +590,19 @@ MODULE initialization
       ENDIF
 
       ! Read Tref
-      DO
-         line = '' ! Init empty
+      line = '' ! Init empty
+      DO WHILE (line == '')
+         
          READ(in2,'(A)', IOSTAT=ReasonEOF) line ! Read line         
          CALL STRIP_COMMENTS(line, '!')         ! Remove comments from line
 
          IF (ReasonEOF < 0) THEN
             CALL ERROR_ABORT('Attention, VSS definition reading failed! ABORTING.')
          END IF
-
-         IF (line == '') CYCLE
-         READ(line,*) TREF
+         
       END DO
+
+      READ(line,*) TREF
 
       ! Read species ordering
       N_STR = 0
@@ -640,7 +641,7 @@ MODULE initialization
             CALL SPLIT_STR(line, ' ', STRARRAY, N_STR)
          END DO
 
-         DO IS = 1, N_SPECIES+1-JS
+         DO IS = JS, N_SPECIES
             READ(STRARRAY(IS),*) READ_VALUE
             VSS_SIGMAS(SP_IDS(IS), SP_IDS(JS)) = PI*READ_VALUE**2
             VSS_SIGMAS(SP_IDS(JS), SP_IDS(IS)) = VSS_SIGMAS(SP_IDS(IS), SP_IDS(JS))
@@ -663,7 +664,7 @@ MODULE initialization
             CALL SPLIT_STR(line, ' ', STRARRAY, N_STR)
          END DO
 
-         DO IS = 1, N_SPECIES+1-JS
+         DO IS = JS, N_SPECIES
             READ(STRARRAY(IS),*) READ_VALUE
             VSS_OMEGAS(SP_IDS(IS), SP_IDS(JS)) = READ_VALUE
             VSS_OMEGAS(SP_IDS(JS), SP_IDS(IS)) = VSS_OMEGAS(SP_IDS(IS), SP_IDS(JS))
@@ -686,7 +687,7 @@ MODULE initialization
             CALL SPLIT_STR(line, ' ', STRARRAY, N_STR)
          END DO
 
-         DO IS = 1, N_SPECIES+1-JS
+         DO IS = JS, N_SPECIES
             READ(STRARRAY(IS),*) READ_VALUE
             VSS_ALPHAS(SP_IDS(IS), SP_IDS(JS)) = READ_VALUE
             VSS_ALPHAS(SP_IDS(JS), SP_IDS(IS)) = VSS_ALPHAS(SP_IDS(IS), SP_IDS(JS))
@@ -714,6 +715,25 @@ MODULE initialization
 
       CLOSE(in2) ! Close input file
 
+   
+
+      WRITE(*,*) 'Tref = ', TREF
+      WRITE(*,*) 'sigma = '
+      DO IS = 1, N_SPECIES
+         WRITE(*,*) VSS_SIGMAS(IS,:)
+      END DO
+      WRITE(*,*) 'omega = '
+      DO IS = 1, N_SPECIES
+         WRITE(*,*) VSS_OMEGAS(IS,:)
+      END DO
+      WRITE(*,*) 'alpha = '
+      DO IS = 1, N_SPECIES
+         WRITE(*,*) VSS_ALPHAS(IS,:)
+      END DO
+      WRITE(*,*) 'gref = '
+      DO IS = 1, N_SPECIES
+         WRITE(*,*) VSS_GREFS(IS,:)
+      END DO
 
    END SUBROUTINE READ_VSS_BINARY
 

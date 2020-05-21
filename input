@@ -74,8 +74,8 @@ MCC_species: ! NOT IMPLEMENTED YET!
 
 DSMC_collisions_mixture:
     Argon
-VSS_parameters_file:
-    ar.vss
+VSS_parameters_binary_file:
+    ar.vssbin
 
 ! ========= Initial particle seed ===================
 

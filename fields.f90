@@ -68,7 +68,7 @@ MODULE fields
                !WRITE(*,*) 1.d6*DBLE(I)/(NPX-1)
                !DIRICHLET(IC) = 1.d6*DBLE(I)/(NPX-1)
                IF ((I == 50) .AND. (J .GE. 84) .AND. (J .LE. 116)) THEN
-                  DIRICHLET(IC) = 4.7d0
+                  DIRICHLET(IC) = 2.35d0
                ELSE
                   DIRICHLET(IC) = 0.d0
                END IF

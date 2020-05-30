@@ -1612,7 +1612,7 @@ MODULE initialization
             R1_SP_ID = REACTIONS(JR)%R1_SP_ID
             R2_SP_ID = REACTIONS(JR)%R2_SP_ID
 
-            ZETA  = 0.5*(3. + SPECIES(R1_SP_ID)%VIBDOF + 3. + SPECIES(R2_SP_ID)%VIBDOF)
+            ZETA  = 0.5*(SPECIES(R1_SP_ID)%ROTDOF + SPECIES(R1_SP_ID)%VIBDOF + SPECIES(R2_SP_ID)%ROTDOF + SPECIES(R2_SP_ID)%VIBDOF)
             OMEGA = 0.5*(SPECIES(R1_SP_ID)%OMEGA + SPECIES(R2_SP_ID)%OMEGA)
             SIGMA = 0.25*PI*(SPECIES(R1_SP_ID)%DIAM + SPECIES(R2_SP_ID)%DIAM)**2
             TREF  = 0.5*(SPECIES(R1_SP_ID)%TREF + SPECIES(R2_SP_ID)%TREF)
@@ -1623,7 +1623,7 @@ MODULE initialization
             ETA = REACTIONS(JR)%N
             EA = REACTIONS(JR)%EA
 
-            IF (R1_SP_ID == R1_SP_ID) THEN
+            IF (R1_SP_ID == R2_SP_ID) THEN
                EPS = 2.
             ELSE
                EPS = 1.

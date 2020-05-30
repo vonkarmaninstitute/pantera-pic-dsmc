@@ -357,7 +357,7 @@ CONTAINS
 
    IMPLICIT NONE
 
-   REAL(KIND=8)             :: VXP, VYP, VZP, M
+   REAL(KIND=8)             :: VXP, VYP, VZP, EROT, EVIB, M
    INTEGER                  :: S_ID, JP
 
    DO JP = 1, NP_PROC
@@ -367,9 +367,13 @@ CONTAINS
                    TBATH, TBATH, TBATH, &
                    VXP, VYP, VZP, M)
       
+      CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, TBATH, EROT)
+      CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, TBATH, EVIB)
       particles(JP)%VX = VXP
       particles(JP)%VY = VYP
       particles(JP)%VZ = VZP
+      particles(JP)%EROT = EROT
+      particles(JP)%EVIB = EVIB
    END DO
 
   END SUBROUTINE THERMAL_BATH

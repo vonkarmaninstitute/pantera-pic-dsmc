@@ -22,14 +22,15 @@ Domain_specular:
     .TRUE.    .TRUE.    .TRUE.    .TRUE.
 Number_of_cells:
     1  1  1
-Dimensions:
-    2
+Bool_PIC:
+    .TRUE.
+
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0E13
+    5.0E18
 Timestep:
-    1.E-4
+    1.0e-10
 Number_of_timesteps:
     10000
 !200000
@@ -37,26 +38,32 @@ Stats_every:
     1
 
 RNG_seed:
-    12343
+    65646
 Dump_part_every:
     10001
 
 Dump_grid_start:
-    0  
+    0
     
 Dump_grid_avgevery:
-    1    
+    100   
 
 Dump_grid_numavgs:
-    100
+    1
+
+Perform_checks:
+    .FALSE.
 
 ! ========= Multispecies ==============================
 
 Species_file:
-    ar.species
+    air.species
     
 Def_mixture:
-    Argon Ar 1.0
+    Aria N2 0.8 O2 0.2
+    
+Def_mixture:
+    collmix N2 0.1 O2 0.1 N 0.1 O 0.1 NO 0.1 N2+ 0.1 O2+ 0.1 N+ 0.1 O+ 0.1 NO+ 0.05 e 0.05
     
     
 ! ========= Collisions ==============================
@@ -73,24 +80,37 @@ MCC_species: ! NOT IMPLEMENTED YET!
 ! DSMC VHS collisions  ! NOT IMPLEMENTED YET!
 
 DSMC_collisions_mixture:
-    Argon
-VSS_parameters_binary_file:
-    ar.vssbin
+    collmix
+VSS_parameters_file:
+    air.vss
+
+Thermal_bath_bool:
+    .TRUE.
+Thermal_bath_Ttr:
+    10000.0
+
+
+! ========= Reactions ==============================
+Reactions_file:
+    air.tce
+
 
 ! ========= Initial particle seed ===================
 
 Initial_particles_bool:
     .TRUE.
 Initial_particles_dens:
-    1.0e17
+    5.e23
 Initial_particles_vel:
     0.  0.  0.
 Initial_particles_Ttra:
-    10000.0 1000.0 1000.0
+    10000.0 10000.0 10000.0
 Initial_particles_Trot:
-    0. 
+    10000.
+Initial_particles_Tvib:
+    10000. 
 Initial_particles_mixture:
-    Argon
+    Aria
 ! ========== Injection from boundaries ==============
 
 Boundaries_inject_bool:
@@ -107,7 +127,7 @@ Boundaries_inject_Ttra:
 Boundaries_inject_Trot:
     0.
 Boundaries_inject_mixture:
-    Argon1
+    Aria
 ! ========== Injection from line source =============
 
 Linesource_bool:

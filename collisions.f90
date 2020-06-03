@@ -359,7 +359,7 @@
               
 
               CALL INIT_PARTICLE(particles(JP2)%X,particles(JP2)%Y,particles(JP2)%Z, &
-              C2(1),C2(2),C2(3),EROT,EVIB,P3_SP_ID,JC,1.d0, NEWparticle)
+              C2(1),C2(2),C2(3),EROT,EVIB,P3_SP_ID,JC,DT, NEWparticle)
               !WRITE(*,*) 'Should be adding particle!'
               CALL ADD_PARTICLE_ARRAY(NEWparticle, NP_PROC, particles)
               
@@ -383,7 +383,7 @@
 
         TRDOF = 5. -2.*OMEGA
 
-
+        rfp = rf()
         IF (rfp .LT. PROT1) THEN
           ! Particle 1 selected for rotational energy exchange
           ECOLL = ETR + particles(JP1)%EROT

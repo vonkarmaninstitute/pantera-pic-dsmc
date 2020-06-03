@@ -822,7 +822,7 @@ MODULE timecycle
    
    IMPLICIT NONE
 
-   INTEGER      :: JP1, JP2, JR, I, J, SP_ID1, SP_ID2, P1_SP_ID, P2_SP_ID, P3_SP_ID
+   INTEGER      :: JP1, JP2, JR, I, J, SP_ID1, SP_ID2, P1_SP_ID, P2_SP_ID, P3_SP_ID, NP_PROC_INITIAL
    REAL(KIND=8) :: P_COLL, PTCE, rfp
    REAL(KIND=8) :: SIGMA, OMEGA, CREF, ALPHA, FRAC
    REAL(KIND=8) :: PI,PI2
@@ -839,7 +839,8 @@ MODULE timecycle
 
    TIMESTEP_COLL = 0
 
-   DO JP1 = 1,NP_PROC
+   NP_PROC_INITIAL = NP_PROC
+   DO JP1 = 1,NP_PROC_INITIAL
       SP_ID1 = particles(JP1)%S_ID
 
       DO J = 1, MIXTURES(MCC_BG_MIX)%N_COMPONENTS
@@ -854,6 +855,7 @@ MODULE timecycle
          ALPHA = VSS_ALPHAS(SP_ID1, SP_ID2)
          
          ! Sample the velocity of second collision partner, that would be in the MCC backgorund
+         ! This may bias collisions towards higher temperatures of particle 2!
          CALL MAXWELL(0.d0, 0.d0, 0.d0, &
          MCC_BG_TTRA, MCC_BG_TTRA, MCC_BG_TTRA, &
          C2(1), C2(2), C2(3), SPECIES(SP_ID2)%MOLECULAR_MASS)
@@ -864,6 +866,7 @@ MODULE timecycle
          (C2(3) - particles(JP1)%VZ)**2 
 
          VR = SQRT(VR2)
+         
 
          ! Compute collision probability
          FRAC = MIXTURES(MCC_BG_MIX)%COMPONENTS(J)%MOLFRAC
@@ -879,11 +882,15 @@ MODULE timecycle
                WRITE(*,*) 'Attention => this was a bad MCC collision!!!'
             END IF
 
+            C1(1) = particles(JP1)%VX
+            C1(2) = particles(JP1)%VY
+            C1(3) = particles(JP1)%VZ
+
             ! Actually create the second collision partner
             CALL INTERNAL_ENERGY(SPECIES(SP_ID2)%ROTDOF, MCC_BG_TTRA, EROT)
             CALL INTERNAL_ENERGY(SPECIES(SP_ID2)%VIBDOF, MCC_BG_TTRA, EVIB)
             CALL INIT_PARTICLE(particles(JP1)%X,particles(JP1)%Y,particles(JP1)%Z, &
-            C2(1),C2(2),C2(3),EROT,EVIB,SP_ID2,particles(JP1)%IC,1.d0, NEWparticle)
+            C2(1),C2(2),C2(3),EROT,EVIB,SP_ID2,particles(JP1)%IC,DT, NEWparticle)
             !WRITE(*,*) 'Should be adding particle!'
             CALL ADD_PARTICLE_ARRAY(NEWparticle, NP_PROC, particles)
             ! DBDBDBDBDBDBDBDBD maybe we should exchange between procs here.
@@ -898,18 +905,19 @@ MODULE timecycle
             ! Test for chemical reaction with TCE model
             ECOLL = ETR + particles(JP1)%EROT + particles(JP2)%EROT + &
             particles(JP1)%EVIB + particles(JP2)%EVIB
+            SKIP = .FALSE.
             DO JR = 1, N_REACTIONS
                ! Check if species in collision belong to this reaction.
                ! If they don't, check the next reaction.
                ! Not very efficient with many reactions
                IF (REACTIONS(JR)%R1_SP_ID .NE. SP_ID1) THEN
                   IF (REACTIONS(JR)%R1_SP_ID .NE. SP_ID2) THEN
-                  CYCLE
+                     CYCLE
+                  ELSE
+                     IF (REACTIONS(JR)%R2_SP_ID .NE. SP_ID1) CYCLE
+                  END IF
                ELSE
-                  IF (REACTIONS(JR)%R2_SP_ID .NE. SP_ID1) CYCLE
-               END IF
-               ELSE
-                   IF (REACTIONS(JR)%R2_SP_ID .NE. SP_ID2) CYCLE
+                  IF (REACTIONS(JR)%R2_SP_ID .NE. SP_ID2) CYCLE
                END IF
     
                EA = REACTIONS(JR)%EA
@@ -999,7 +1007,7 @@ MODULE timecycle
                               
                         
                         CALL INIT_PARTICLE(particles(JP2)%X,particles(JP2)%Y,particles(JP2)%Z, &
-                        C2(1),C2(2),C2(3),EROT,EVIB,P3_SP_ID,particles(JP2)%IC,1.d0, NEWparticle)
+                        C2(1),C2(2),C2(3),EROT,EVIB,P3_SP_ID,particles(JP2)%IC,DT, NEWparticle)
                         !WRITE(*,*) 'Should be adding particle!'
                         CALL ADD_PARTICLE_ARRAY(NEWparticle, NP_PROC, particles)
                         
@@ -1027,6 +1035,7 @@ MODULE timecycle
     
             TRDOF = 5. -2.*OMEGA
     
+            rfp = rf()
             IF (rfp .LT. PROT1) THEN
                ! Particle 1 selected for rotational energy exchange
                ECOLL = ETR + particles(JP1)%EROT
@@ -1111,7 +1120,7 @@ MODULE timecycle
             particles(JP2)%VX = C2(1)
             particles(JP2)%VY = C2(2)
             particles(JP2)%VZ = C2(3)
-
+            
          END IF
       END DO
    END DO

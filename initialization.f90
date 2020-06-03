@@ -603,7 +603,7 @@ MODULE initialization
       END DO
 
       READ(line,*) TREF
-
+      
       ! Read species ordering
       N_STR = 0
       DO WHILE (N_STR == 0)
@@ -618,7 +618,7 @@ MODULE initialization
          CALL SPLIT_STR(line, ' ', STRARRAY, N_STR)
       END DO
 
-      IF (N_STR .NE. N_STR) CALL ERROR_ABORT('Attention, incorrect number of species in VSS definition! ABORTING.')
+      IF (N_STR .NE. N_SPECIES) CALL ERROR_ABORT('Attention, incorrect number of species in VSS definition! ABORTING.')
 
       ALLOCATE(SP_IDS(N_SPECIES))
       DO IS = 1, N_SPECIES
@@ -640,9 +640,12 @@ MODULE initialization
 
             CALL SPLIT_STR(line, ' ', STRARRAY, N_STR)
          END DO
+         
+         IF (N_STR .NE. N_SPECIES+1-JS) CALL ERROR_ABORT('Attention, VSS params matrix format wrong! ABORTING.')
+         
 
          DO IS = JS, N_SPECIES
-            READ(STRARRAY(IS),*) READ_VALUE
+            READ(STRARRAY(1+IS-JS),*) READ_VALUE
             VSS_SIGMAS(SP_IDS(IS), SP_IDS(JS)) = PI*READ_VALUE**2
             VSS_SIGMAS(SP_IDS(JS), SP_IDS(IS)) = VSS_SIGMAS(SP_IDS(IS), SP_IDS(JS))
          END DO
@@ -665,7 +668,7 @@ MODULE initialization
          END DO
 
          DO IS = JS, N_SPECIES
-            READ(STRARRAY(IS),*) READ_VALUE
+            READ(STRARRAY(1+IS-JS),*) READ_VALUE
             VSS_OMEGAS(SP_IDS(IS), SP_IDS(JS)) = READ_VALUE
             VSS_OMEGAS(SP_IDS(JS), SP_IDS(IS)) = VSS_OMEGAS(SP_IDS(IS), SP_IDS(JS))
          END DO
@@ -688,7 +691,7 @@ MODULE initialization
          END DO
 
          DO IS = JS, N_SPECIES
-            READ(STRARRAY(IS),*) READ_VALUE
+            READ(STRARRAY(1+IS-JS),*) READ_VALUE
             VSS_ALPHAS(SP_IDS(IS), SP_IDS(JS)) = READ_VALUE
             VSS_ALPHAS(SP_IDS(JS), SP_IDS(IS)) = VSS_ALPHAS(SP_IDS(IS), SP_IDS(JS))
          END DO

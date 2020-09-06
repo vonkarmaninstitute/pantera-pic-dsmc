@@ -11,42 +11,42 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 ! ========= Computational domain and grid ===========
-
-Axial_symmetry_bool:
-    .FALSE.
+Dimensions:
+    2
+Axisymmetric:
+    .TRUE.
 Domain_limits:
-    -0.5  0.5      -0.5  0.5      -0.5  0.5
+    -0.5  0.5      0  0.5      0  6.28
 Domain_periodicity:
     .FALSE.   .FALSE.   .TRUE.
 Domain_specular:
-    .TRUE.    .TRUE.    .TRUE.    .TRUE.
+    .FALSE.    .FALSE.    .TRUE.    .FALSE.
 Number_of_cells:
-    1  1  1
+    100  50  1
 Bool_PIC:
-    .TRUE.
+    .FALSE.
 
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    5.0E18
+    1.E9
 Timestep:
-    1.0e-10
+    1.0e-5
 Number_of_timesteps:
-    10000
-!200000
+    200
 Stats_every:
     1
 
 RNG_seed:
-    65646
+    65645
 Dump_part_every:
-    10001
+    1000
 
 Dump_grid_start:
     0
     
 Dump_grid_avgevery:
-    100   
+    10
 
 Dump_grid_numavgs:
     1
@@ -60,16 +60,16 @@ Species_file:
     air.species
     
 Def_mixture:
-    Aria N2 0.8 O2 0.2
+    Aria N2 1.0
     
 Def_mixture:
-    collmix N2 0.1 O2 0.1 N 0.1 O 0.1 NO 0.1 N2+ 0.1 O2+ 0.1 N+ 0.1 O+ 0.1 NO+ 0.05 e 0.05
+    collmix N2 1.0
     
     
 ! ========= Collisions ==============================
 
 Collision_type: ! [MCC / DSMC / NONE]
-  DSMC 
+  NONE 
 
 MCC_background_dens:
   1.0e20
@@ -85,30 +85,30 @@ VSS_parameters_file:
     air.vss
 
 Thermal_bath_bool:
-    .TRUE.
+    .FALSE.
 Thermal_bath_Ttr:
     10000.0
 
 
 ! ========= Reactions ==============================
-Reactions_file:
-    air.tce
+!Reactions_file:
+!    air.tce
 
 
 ! ========= Initial particle seed ===================
 
 Initial_particles_bool:
-    .TRUE.
+    .FALSE.
 Initial_particles_dens:
-    5.e23
+    1.e15
 Initial_particles_vel:
     0.  0.  0.
 Initial_particles_Ttra:
-    10000.0 10000.0 10000.0
+    300.0 300.0 300.0
 Initial_particles_Trot:
-    10000.
+    300.
 Initial_particles_Tvib:
-    10000. 
+    300. 
 Initial_particles_mixture:
     Aria
 ! ========== Injection from boundaries ==============
@@ -156,6 +156,18 @@ Linesource_Trot:
 !Linesource:
 !    0.0    0.5    1.0    0.0    1.0e19    6000.0    -2000.0    3000.0    1000.0    0.0    aria
 
+Linesource:
+    -0.5    0.0    -0.5    0.5    1.0e15    2000.0    0.0    0.0    300.0    300.0    Aria
+
+Wall:
+    0.3    0.4    0.2    0.1    300.0    .TRUE.    .FALSE.    .FALSE.    0.0    .FALSE.
+
+!Wall:
+!    0.2    0.1    0.0    0.0    300.0    .TRUE.    .FALSE.    .FALSE.    0.0    .FALSE.
+   
+
+    
+    
 ! ========= MPI parallelization =====================
 ! == Style for MPI domain partition can be:
 ! ==

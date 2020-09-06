@@ -47,7 +47,7 @@ MODULE initialization
          IF (ReasonEOF < 0) EXIT ! End of file reached
 
          ! ~~~~~~~~~~~~~  Geometry and computational domain  ~~~~~~~~~~~~~~~~~
-         IF (line=='Axial_symmetry_bool:')     READ(in1,'(L6)') BOOL_AXI
+         IF (line=='Axisymmetric:')     READ(in1,*) AXI
          IF (line=='Domain_limits:')           READ(in1,*) XMIN, XMAX, YMIN, YMAX, ZMIN, ZMAX
          IF (line=='Dimensions:')              READ(in1,*) DIMS
          IF (line=='Domain_periodicity:') THEN
@@ -219,7 +219,7 @@ MODULE initialization
          WRITE(*,'(A5, A50,I8)') '     ', string, DIMS
          
          string = 'Axisymmetric geometry bool [T/F]: '
-         WRITE(*,'(A5, A50,L)') '     ', string, BOOL_AXI
+         WRITE(*,'(A5, A50,L)') '     ', string, AXI
  
          string = 'Domain limits:'
          WRITE(*,'(A5,A50)') '    ', string
@@ -811,10 +811,10 @@ MODULE initialization
 
       CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
 
-      READ(STRARRAY(1), '(ES14.3)') LINESOURCES(N_LINESOURCES)%CX
-      READ(STRARRAY(2), '(ES14.3)') LINESOURCES(N_LINESOURCES)%CY
-      READ(STRARRAY(3), '(ES14.3)') LINESOURCES(N_LINESOURCES)%DX
-      READ(STRARRAY(4), '(ES14.3)') LINESOURCES(N_LINESOURCES)%DY
+      READ(STRARRAY(1), '(ES14.3)') LINESOURCES(N_LINESOURCES)%X1
+      READ(STRARRAY(2), '(ES14.3)') LINESOURCES(N_LINESOURCES)%Y1
+      READ(STRARRAY(3), '(ES14.3)') LINESOURCES(N_LINESOURCES)%X2
+      READ(STRARRAY(4), '(ES14.3)') LINESOURCES(N_LINESOURCES)%Y2
       READ(STRARRAY(5), '(ES14.3)') LINESOURCES(N_LINESOURCES)%NRHO
       READ(STRARRAY(6), '(ES14.3)') LINESOURCES(N_LINESOURCES)%UX
       READ(STRARRAY(7), '(ES14.3)') LINESOURCES(N_LINESOURCES)%UY
@@ -853,10 +853,10 @@ MODULE initialization
 
       CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
 
-      READ(STRARRAY(1), '(ES14.3)') WALLS(N_WALLS)%CX
-      READ(STRARRAY(2), '(ES14.3)') WALLS(N_WALLS)%CY
-      READ(STRARRAY(3), '(ES14.3)') WALLS(N_WALLS)%DX
-      READ(STRARRAY(4), '(ES14.3)') WALLS(N_WALLS)%DY
+      READ(STRARRAY(1), '(ES14.3)') WALLS(N_WALLS)%X1
+      READ(STRARRAY(2), '(ES14.3)') WALLS(N_WALLS)%Y1
+      READ(STRARRAY(3), '(ES14.3)') WALLS(N_WALLS)%X2
+      READ(STRARRAY(4), '(ES14.3)') WALLS(N_WALLS)%Y2
       READ(STRARRAY(5), '(ES14.3)') WALLS(N_WALLS)%TEMP
       READ(STRARRAY(6), *) WALLS(N_WALLS)%SPECULAR
       READ(STRARRAY(7), *) WALLS(N_WALLS)%DIFFUSE
@@ -864,10 +864,10 @@ MODULE initialization
       READ(STRARRAY(9), '(ES14.3)') WALLS(N_WALLS)%TRANSMISSIVITY
       READ(STRARRAY(10), *) WALLS(N_WALLS)%REACT
 
-      LENGTH = SQRT(WALLS(N_WALLS)%DX**2 + WALLS(N_WALLS)%DY**2)
+      LENGTH = SQRT((WALLS(N_WALLS)%X2 - WALLS(N_WALLS)%X1)**2 + (WALLS(N_WALLS)%Y2 - WALLS(N_WALLS)%Y1)**2)
 
-      WALLS(N_WALLS)%NORMX = WALLS(N_WALLS)%DY/LENGTH
-      WALLS(N_WALLS)%NORMY = - WALLS(N_WALLS)%DX/LENGTH
+      WALLS(N_WALLS)%NORMX = (WALLS(N_WALLS)%Y2 - WALLS(N_WALLS)%Y1)/LENGTH
+      WALLS(N_WALLS)%NORMY = - (WALLS(N_WALLS)%X2 - WALLS(N_WALLS)%X1)/LENGTH
 
    END SUBROUTINE DEF_WALL
 
@@ -1140,7 +1140,12 @@ MODULE initialization
       ALLOCATE(CELL_VOLUMES(NX*NY))
       DO I = 1, NX
          DO J = 1, NY
-            CELL_VOLUMES(I + NX*(J-1)) = XSIZE(I)*YSIZE(J)*(ZMAX-ZMIN)
+            IF (DIMS == 2 .AND. .NOT. AXI) THEN
+               CELL_VOLUMES(I + NX*(J-1)) = XSIZE(I)*YSIZE(J)*(ZMAX-ZMIN)
+            ELSE IF (DIMS == 2 .AND. AXI) THEN
+               ! 2D Axisymmetric geometry: volume is a cylindrical annulus. Coordinate Z is in radians.
+               CELL_VOLUMES(I + NX*(J-1)) = 0.5*XSIZE(I)*(YCOORD(J+1)**2 - YCOORD(J)**2)*(ZMAX-ZMIN)
+            END IF
          END DO
       END DO
       ! Perform all the checks on these arrays!
@@ -1184,13 +1189,15 @@ MODULE initialization
       IMPLICIT NONE
 
       INTEGER            :: IP, NP_INIT
-      REAL(KIND=8)       :: Xp, Yp, Zp, VXp, VYp, VZp, EROT, EVIB
+      REAL(KIND=8)       :: Xp, Yp, Zp, VXp, VYp, VZp, EROT, EVIB, DOMAIN_VOLUME, PI
       INTEGER            :: CID
 
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
       REAL(KIND=8)  :: M
       INTEGER       :: S_ID, i
             
+      PI   = 3.141593
+
       ! Print message 
       CALL ONLYMASTERPRINT1(PROC_ID, '> SEEDING INITIAL PARTICLES IN THE DOMAIN...')
      
@@ -1207,7 +1214,12 @@ MODULE initialization
          
          S_ID = MIXTURES(MIX_INIT)%COMPONENTS(i)%ID
          ! Compute number of particles of this species per process to be created.
-         NP_INIT = NINT(NRHO_INIT/(FNUM*SPECIES(S_ID)%SPWT)*(XMAX-XMIN)*(YMAX-YMIN)*(ZMAX-ZMIN)* &
+         IF (AXI) THEN
+            DOMAIN_VOLUME = 0.5*(XMAX-XMIN)*(YMAX**2-YMIN**2)*(ZMAX-ZMIN)
+         ELSE
+            DOMAIN_VOLUME = (XMAX-XMIN)*(YMAX-YMIN)*(ZMAX-ZMIN)
+         END IF
+         NP_INIT = NINT(NRHO_INIT/(FNUM*SPECIES(S_ID)%SPWT)*DOMAIN_VOLUME* &
                        MIXTURES(MIX_INIT)%COMPONENTS(i)%MOLFRAC/N_MPI_THREADS)
          IF (NP_INIT == 0) CYCLE
          DO IP = 1, NP_INIT
@@ -1216,7 +1228,11 @@ MODULE initialization
             XP = XMIN + (XMAX-XMIN)*rf()
             !XP = XMIN + 0.5*(XMAX-XMIN)*rf()
             !IF (XP .GT. 0.) CYCLE
-            YP = YMIN + (YMAX-YMIN)*rf()
+            IF (AXI) THEN
+               YP = SQRT(YMIN*YMIN + rf()*(YMAX*YMAX - YMIN*YMIN))
+            ELSE
+               YP = YMIN + (YMAX-YMIN)*rf()
+            END IF
             ZP = ZMIN + (ZMAX-ZMIN)*rf()
 
             ! Chose particle species based on mixture specifications
@@ -1277,9 +1293,18 @@ MODULE initialization
       END IF
       ! ------------ Check geometrical symmetries and flags ------
       ! For axisymmetric simulations, Y cannot be periodic (YMIN is the symmetry axis)
-      IF (BOOL_AXI) THEN 
-         IF (BOOL_Y_PERIODIC) THEN
+      IF (AXI) THEN 
+         IF (BOOL_PERIODIC(3)) THEN
             CALL ERROR_ABORT('ERROR! For axisymmetric simulations, Y cannot be periodic.')
+         END IF
+         IF (YMIN /= 0) THEN
+            CALL ERROR_ABORT('ERROR! For axisymmetric simulations, YMIN must be 0.')
+         END IF
+         IF (.NOT. BOOL_SPECULAR(3) .OR. BOOL_DIFFUSE(3)) THEN
+            CALL ERROR_ABORT('ERROR! For axisymmetric simulations, YMIN must have specular B.C.')
+         END IF
+         IF (BOOL_REACT(3)) THEN
+            CALL ERROR_ABORT('ERROR! For axisymmetric simulations, YMIN cannot be reacting.')
          END IF
       END IF
 
@@ -1329,6 +1354,9 @@ MODULE initialization
 
       IMPLICIT NONE
  
+      INTEGER :: I, J
+      REAL(KIND=8) :: CELL_YMIN, CELL_YMAX
+
       ! ~~~~~~~~ Initial allocation for vector of particles in each process ~~~~~~~~
       NP_PROC = 0
       ALLOCATE(particles(0))
@@ -1348,6 +1376,17 @@ MODULE initialization
       END IF
 
       CELL_VOL = (XMAX-XMIN)*(YMAX-YMIN)*(ZMAX-ZMIN)/(NX*NY)
+
+      IF (GRID_TYPE == RECTILINEAR_UNIFORM .AND. AXI) THEN
+         ALLOCATE(CELL_VOLUMES(NX*NY))
+         DO I = 1, NX
+            DO J = 1, NY
+               CELL_YMIN = YMIN + (J-1)*(YMAX-YMIN)/NY
+               CELL_YMAX = YMIN + J*(YMAX-YMIN)/NY
+               CELL_VOLUMES(I + NX*(J-1)) = 0.5*(XMAX-XMIN)/NX*(CELL_YMAX**2 - CELL_YMIN**2)*(ZMAX-ZMIN)
+            END DO
+         END DO
+      END IF
 
    END SUBROUTINE INITVARIOUS
 
@@ -1399,7 +1438,7 @@ MODULE initialization
       IMPLICIT NONE
 
       REAL(KIND=8) :: BETA, FLUXBOUND, NtotINJECT, Snow
-      REAL(KIND=8) :: U_NORM, S_NORM, FLUXLINESOURCE, LINELENGTH, NORMX, NORMY
+      REAL(KIND=8) :: U_NORM, S_NORM, FLUXLINESOURCE, LINELENGTH, NORMX, NORMY, RMIN, RMAX
       REAL(KIND=8) :: PI, PI2  
 
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: nfs_LINE
@@ -1521,6 +1560,7 @@ MODULE initialization
       ! =====================================================
       ! Injection from line sources
       ! Can have multiple ones and can be used as boundary injection
+      ! More compact than one for each boundary, try to use this.
 
       DO ILINE = 1, N_LINESOURCES ! Loop on line sources
          
@@ -1535,11 +1575,11 @@ MODULE initialization
             FRAC = MIXTURES(LINESOURCES(ILINE)%MIX_ID)%COMPONENTS(IS)%MOLFRAC
             BETA = 1./SQRT(2.*KB/M*LINESOURCES(ILINE)%TTRA) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
          
-            LINELENGTH = SQRT(LINESOURCES(ILINE)%DX**2 + LINESOURCES(ILINE)%DY**2)
+            LINELENGTH = SQRT((LINESOURCES(ILINE)%X2-LINESOURCES(ILINE)%X1)**2 + (LINESOURCES(ILINE)%Y2-LINESOURCES(ILINE)%Y1)**2)
 
-            NORMX = LINESOURCES(ILINE)%DY/LINELENGTH
+            NORMX = (LINESOURCES(ILINE)%Y2 - LINESOURCES(ILINE)%Y1)/LINELENGTH
             LINESOURCES(ILINE)%NORMX = NORMX
-            NORMY = - LINESOURCES(ILINE)%DX/LINELENGTH
+            NORMY = - (LINESOURCES(ILINE)%X2 - LINESOURCES(ILINE)%X1)/LINELENGTH
             LINESOURCES(ILINE)%NORMY = NORMY
 
             U_NORM = LINESOURCES(ILINE)%UX*NORMX + LINESOURCES(ILINE)%UY*NORMY ! Molecular speed ratio normal to boundary
@@ -1548,8 +1588,15 @@ MODULE initialization
             Snow   = S_NORM     ! temp variable
 
             FLUXLINESOURCE   = LINESOURCES(ILINE)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) &
-                                    + SQRT(PI)*Snow*(1.+ERF1(Snow)))      ! Tot number flux emitted 
-            NtotINJECT  = FLUXLINESOURCE*LINELENGTH*(ZMAX-ZMIN)*DT/(FNUM*SPECIES(S_ID)%SPWT)         ! Tot num of particles to be injected
+                                    + SQRT(PI)*Snow*(1.+ERF1(Snow)))      ! Tot number flux emitted
+
+            IF (AXI) THEN
+               RMIN = MIN(LINESOURCES(ILINE)%Y1, LINESOURCES(ILINE)%Y2)
+               RMAX = MAX(LINESOURCES(ILINE)%Y1, LINESOURCES(ILINE)%Y2)
+               NtotINJECT  = FLUXLINESOURCE*0.5*(RMAX**2-RMIN**2)*(ZMAX-ZMIN)*DT/(FNUM*SPECIES(S_ID)%SPWT)         ! Tot num of particles to be injected
+            ELSE
+               NtotINJECT  = FLUXLINESOURCE*LINELENGTH*(ZMAX-ZMIN)*DT/(FNUM*SPECIES(S_ID)%SPWT)         ! Tot num of particles to be injected
+            END IF
 
             nfs_LINE(IS)    = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
             

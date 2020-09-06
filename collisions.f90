@@ -156,7 +156,7 @@
   ! Compute the "worst case scenario" relative velocity
   VRMAX    = SQRT((VXMAX-VXMIN)**2 + (VYMAX-VYMIN)**2 + (VZMAX-VZMIN)**2)
   ! Compute the maximum expected number of collisions
-  IF (GRID_TYPE==RECTILINEAR_UNIFORM) THEN
+  IF (GRID_TYPE == RECTILINEAR_UNIFORM .AND. DIMS == 2) THEN
     NCOLLMAX = 0.5*NPC(JC)*(NPC(JC)-1)*SIGMAMAX*VRMAX*FNUM*DT/CELL_VOL
   ELSE
     NCOLLMAX = 0.5*NPC(JC)*(NPC(JC)-1)*SIGMAMAX*VRMAX*FNUM*DT/CELL_VOLUMES(JC)

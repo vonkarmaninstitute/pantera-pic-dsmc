@@ -273,7 +273,7 @@ CONTAINS
      CHARACTER(LEN=512)  :: filename
      INTEGER :: IP
 
-     WRITE(filename, "(A13,I0.5,A6,I0.8)") "./dumps/proc_", PROC_ID, "_time_", TIMESTEP ! Compose filename
+     WRITE(filename, "(A,I0.5,A6,I0.8)") "/media/pietro/Storage/panteradumps/partdumps/proc_", PROC_ID, "_time_", TIMESTEP ! Compose filename
 
      ! Open file for writing
      OPEN(10, FILE=filename )

@@ -98,7 +98,7 @@ MODULE timecycle
       END IF
 
       ! ########### Dump particles ##############################################
-      IF (tID .GT. DUMP_START) THEN
+      IF (tID .GE. DUMP_START) THEN
          IF (MOD(tID-DUMP_START, DUMP_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
       END IF
       ! ########### Dump flowfield ##############################################
@@ -131,7 +131,7 @@ MODULE timecycle
       IMPLICIT NONE
    
       INTEGER      :: IP, IC, IS, NFS, ILINE
-      REAL(KIND=8) :: DTFRAC, Vdummy, V_NORM, V_PERP, POS
+      REAL(KIND=8) :: DTFRAC, Vdummy, V_NORM, V_PERP, X1, X2, Y1, Y2, R
       REAL(KIND=8) :: X, Y, Z, VX, VY, VZ, EROT, EVIB 
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
    
@@ -167,10 +167,35 @@ MODULE timecycle
                VZ = VZ + LINESOURCES(ILINE)%UZ
 
                DTFRAC = rf()*DT
-               POS = rf()
-               X = LINESOURCES(ILINE)%CX + (0.5-POS)*LINESOURCES(ILINE)%DX
-               Y = LINESOURCES(ILINE)%CY + (0.5-POS)*LINESOURCES(ILINE)%DY
-               Z = ZMIN + (ZMAX-ZMIN)*rf()
+
+               R = rf()
+               IF (DIMS == 2 .AND. AXI) THEN
+                  ! Correct but not really robust when Y1 \approx Y2
+                  IF (LINESOURCES(ILINE)%Y1 == LINESOURCES(ILINE)%Y2) THEN
+                     Y = LINESOURCES(ILINE)%Y1
+                     X = LINESOURCES(ILINE)%X1 + R*(LINESOURCES(ILINE)%X2-LINESOURCES(ILINE)%X1)
+                     Z = ZMIN
+                  ELSE
+                     IF (LINESOURCES(ILINE)%Y1 < LINESOURCES(ILINE)%Y2) THEN
+                        Y1 = LINESOURCES(ILINE)%Y1
+                        Y2 = LINESOURCES(ILINE)%Y2
+                        X1 = LINESOURCES(ILINE)%X1
+                        X2 = LINESOURCES(ILINE)%X2
+                     ELSE
+                        Y1 = LINESOURCES(ILINE)%Y2
+                        Y2 = LINESOURCES(ILINE)%Y1
+                        X1 = LINESOURCES(ILINE)%X2
+                        X2 = LINESOURCES(ILINE)%X1
+                     END IF
+                     Y = SQRT(Y1*Y1 + R*(Y2*Y2 - Y1*Y1))
+                     X = X1 + (Y-Y1)/(Y2-Y1)*(X2-X1)
+                     Z = ZMIN
+                  END IF
+               ELSE
+                  X = LINESOURCES(ILINE)%X1 + R*(LINESOURCES(ILINE)%X2-LINESOURCES(ILINE)%X1)
+                  Y = LINESOURCES(ILINE)%Y1 + R*(LINESOURCES(ILINE)%Y2-LINESOURCES(ILINE)%Y1)
+                  Z = ZMIN + (ZMAX-ZMIN)*rf()
+               END IF
    
                CALL CELL_FROM_POSITION(X,Y,  IC)
    
@@ -379,7 +404,8 @@ MODULE timecycle
    INTEGER      :: IP, IC, i
    INTEGER      :: BOUNDCOLL, WALLCOLL
    REAL(KIND=8) :: DTCOLL, TOTDTCOLL, CANDIDATE_DTCOLL, rfp
-   REAL(KIND=8), DIMENSION(4) :: NORMX, NORMY, XW, YW, ZW
+   REAL(KIND=8) :: COEFA, COEFB, COEFC, DELTA, SOL, ALPHA, BETA
+   REAL(KIND=8), DIMENSION(4) :: NORMX, NORMY, XW, YW, ZW, BOUNDPOS
    ! REAL(KIND=8) :: XCOLL, YCOLL, ZCOLL
    REAL(KIND=8) :: VN, DX
    LOGICAL, DIMENSION(:), ALLOCATABLE :: REMOVE_PART
@@ -389,6 +415,10 @@ MODULE timecycle
    INTEGER :: S_ID
    LOGICAL :: HASCOLLIDED
    REAL(KIND=8) :: XCOLL, YCOLL, COLLDIST
+
+   REAL(KIND=8) :: TOL
+
+   TOL = 1e-15
 
    !E = [0.d0, 0.d0, 0.d0]
    B = [0.d0, 0.d0, 0.d0]
@@ -401,12 +431,14 @@ MODULE timecycle
    YW = [ YMAX, YMIN, YMIN, YMAX ]
    ZW = [ 0., 0., 0., 0. ]
 
+   BOUNDPOS = [ XMIN, XMAX, YMIN, YMAX ]
+
    ALLOCATE(REMOVE_PART(NP_PROC))
 
    DO IP = 1, NP_PROC
       REMOVE_PART(IP) = .FALSE.
 
-
+      IF (particles(IP)%VX > 1e20) WRITE(*,*) "Overspeed detected! particle id", IP 
       ! Update velocity
       IC = particles(IP)%IC
 
@@ -441,49 +473,137 @@ MODULE timecycle
          ! ______ ADVECTION ______
          BOUNDCOLL = -1
          DO i = 1, 4 ! Check collisions with boundaries (xmin, xmax, ymin, ymax)
-            ! Compute the velocity normal to the boundary
-            VN = -(particles(IP)%VX * NORMX(i) + particles(IP)%VY * NORMY(i))
-            ! Compute the distance from the boundary
-            DX = (particles(IP)%X - XW(i)) * NORMX(i) + (particles(IP)%Y - YW(i)) * NORMY(i)
-            ! Check if a collision happens (sooner than previously calculated)
-            IF (VN .GE. 0. .AND. VN * DTCOLL .GT. DX) THEN
+            IF (AXI) THEN
+               ! We are axisymmetric. Check is more complicated.
+               CANDIDATE_DTCOLL = DTCOLL
                
-               ! Find candidate collision point (don't need this for boundaries)
-               ! XCOLL = particles(IP)%X + particles(IP)%VX * DTCOLL 
-               ! YCOLL = particles(IP)%Y + particles(IP)%VY * DTCOLL
-               ! ZCOLL = particles(IP)%Z + particles(IP)%VZ * DTCOLL
+               IF (i==1 .OR. i==2) THEN
+                  ! Vertical boundary
+                  SOL = (BOUNDPOS(i)-particles(IP)%X)/particles(IP)%VX
+                  IF (SOL .GT. TOL) CANDIDATE_DTCOLL = SOL
+               ELSE
+                  ! Horizontal boundary
+                  COEFA = particles(IP)%VY**2 + particles(IP)%VZ**2
+                  COEFB = particles(IP)%Y * particles(IP)%VY
+                  COEFC = particles(IP)%Y**2 - BOUNDPOS(i)**2
+                  DELTA = COEFB*COEFB-COEFA*COEFC
+                  IF (DELTA .GE. 0) THEN
+                     ! Try the smaller solution
+                     SOL = (-COEFB - SQRT(DELTA))/COEFA
+                     IF (SOL .GT. TOL) THEN
+                        CANDIDATE_DTCOLL = SOL
+                     ELSE
+                        ! Try the larger solution
+                        SOL = (-COEFB + SQRT(DELTA))/COEFA
+                        IF (SOL .GT. TOL) CANDIDATE_DTCOLL = SOL
+                     END IF
+                  END IF
+               END IF
 
-               DTCOLL = DX/VN
-               BOUNDCOLL = i    
-               TOTDTCOLL = TOTDTCOLL + DTCOLL  
-               HASCOLLIDED = .TRUE.               
+               IF (CANDIDATE_DTCOLL .LT. DTCOLL) THEN
+                  !WRITE(*,*) "Found collision! time: ", CANDIDATE_DTCOLL, " boundary: ", i
+                  !CALL SLEEP(1)
+                  DTCOLL = CANDIDATE_DTCOLL
+                  BOUNDCOLL = i    
+                  TOTDTCOLL = TOTDTCOLL + DTCOLL  
+                  HASCOLLIDED = .TRUE.
+               END IF
+            ELSE
+               ! We are not axisymmetric.
+               ! Compute the velocity normal to the boundary
+               VN = -(particles(IP)%VX * NORMX(i) + particles(IP)%VY * NORMY(i))
+               ! Compute the distance from the boundary
+               DX = (particles(IP)%X - XW(i)) * NORMX(i) + (particles(IP)%Y - YW(i)) * NORMY(i)
+               ! Check if a collision happens (sooner than previously calculated)
+               IF (VN .GE. 0. .AND. VN * DTCOLL .GT. DX) THEN
+                  
+                  ! Find candidate collision point (don't need this for boundaries)
+                  ! XCOLL = particles(IP)%X + particles(IP)%VX * DTCOLL 
+                  ! YCOLL = particles(IP)%Y + particles(IP)%VY * DTCOLL
+                  ! ZCOLL = particles(IP)%Z + particles(IP)%VZ * DTCOLL
 
+                  DTCOLL = DX/VN
+                  BOUNDCOLL = i    
+                  TOTDTCOLL = TOTDTCOLL + DTCOLL  
+                  HASCOLLIDED = .TRUE.               
+
+               END IF
             END IF
          END DO
 
+         
 
          ! Check collisions with surfaces
          ! If earlier than dtcoll remember to set BOUNDCOLL to -1 and the new dtcoll
          WALLCOLL = -1
          DO i = 1, N_WALLS
-            ! Compute the velocity normal to the surface
-            VN = -(particles(IP)%VX * WALLS(i)%NORMX + particles(IP)%VY * WALLS(i)%NORMY)
-            ! Compute the distance from the boundary
-            DX = (particles(IP)%X - WALLS(i)%CX) * WALLS(i)%NORMX + (particles(IP)%Y - WALLS(i)%CY) * WALLS(i)%NORMY
-            ! Check if a collision happens (sooner than previously calculated)
-            IF (DX .GE. 0. .AND. VN * DTCOLL .GE. DX) THEN
-               
-               CANDIDATE_DTCOLL = DX/VN
-               ! Find candidate collision point
-               XCOLL = particles(IP)%X + particles(IP)%VX * CANDIDATE_DTCOLL 
-               YCOLL = particles(IP)%Y + particles(IP)%VY * CANDIDATE_DTCOLL
-               COLLDIST = (XCOLL-WALLS(i)%CX)**2+(YCOLL-WALLS(i)%CY)**2
-               IF (COLLDIST .LE. (WALLS(i)%DX**2+WALLS(i)%DY**2)/4.) THEN
-                  BOUNDCOLL = -1
-                  WALLCOLL = i
-                  DTCOLL = CANDIDATE_DTCOLL
-                  TOTDTCOLL = TOTDTCOLL + DTCOLL
-                  HASCOLLIDED = .TRUE.
+            IF (AXI) THEN
+               ! We are axisymmetric
+               CANDIDATE_DTCOLL = DTCOLL
+               ! Compute auxiliary parameters
+               IF (WALLS(i)%X1 == WALLS(i)%X2) THEN
+                  ! Vertical wall
+                  SOL = (WALLS(i)%X1-particles(IP)%X)/particles(IP)%VX
+                  IF (SOL .GT. TOL) CANDIDATE_DTCOLL = SOL
+               ELSE
+                  ! Non-vertical wall
+                  ALPHA = (WALLS(i)%Y2-WALLS(i)%Y1)/(WALLS(i)%X2-WALLS(i)%X1)
+                  BETA  = (particles(IP)%X - WALLS(i)%X1)*ALPHA
+
+                  COEFA = particles(IP)%VY**2 + particles(IP)%VZ**2 - ALPHA*ALPHA*particles(IP)%VX**2
+                  COEFB = particles(IP)%Y * particles(IP)%VY - (BETA + WALLS(i)%Y1)*ALPHA*particles(IP)%VX
+                  COEFC = particles(IP)%Y**2 - (BETA + WALLS(i)%Y1)**2
+                  DELTA = COEFB*COEFB-COEFA*COEFC
+                  IF (DELTA .GE. 0) THEN
+                     ! Try the smaller solution
+                     SOL = (-COEFB - SQRT(DELTA))/COEFA
+                     IF (SOL .GT. TOL) THEN
+                        CANDIDATE_DTCOLL = SOL
+                     ELSE
+                        ! Try the larger solution
+                        SOL = (-COEFB + SQRT(DELTA))/COEFA
+                        IF (SOL .GT. TOL) CANDIDATE_DTCOLL = SOL
+                     END IF
+                     
+                  END IF
+               END IF
+
+               IF (CANDIDATE_DTCOLL .LT. DTCOLL) THEN
+                  XCOLL = particles(IP)%X + particles(IP)%VX * CANDIDATE_DTCOLL 
+                  YCOLL = SQRT((particles(IP)%Y + particles(IP)%VY*CANDIDATE_DTCOLL)**2 + (particles(IP)%VZ*CANDIDATE_DTCOLL)**2)
+                  COLLDIST = ((XCOLL-WALLS(i)%X1)*(WALLS(i)%X2-WALLS(i)%X1)+(YCOLL-WALLS(i)%Y1)*(WALLS(i)%Y2-WALLS(i)%Y1))/ &
+                  ((WALLS(i)%X2-WALLS(i)%X1)**2 + (WALLS(i)%Y2-WALLS(i)%Y1)**2)
+                  IF ((COLLDIST .GE. 0) .AND. (COLLDIST .LE. 1)) THEN
+                     BOUNDCOLL = -1
+                     WALLCOLL = i
+                     DTCOLL = CANDIDATE_DTCOLL
+                     TOTDTCOLL = TOTDTCOLL + DTCOLL
+                     HASCOLLIDED = .TRUE.
+                  END IF
+               END IF
+
+            ELSE
+               ! We are not axisymmetric
+               ! Compute the velocity normal to the surface
+               VN = -(particles(IP)%VX * WALLS(i)%NORMX + particles(IP)%VY * WALLS(i)%NORMY)
+               ! Compute the distance from the boundary
+               DX = (particles(IP)%X - WALLS(i)%X1) * WALLS(i)%NORMX + (particles(IP)%Y - WALLS(i)%Y1) * WALLS(i)%NORMY
+               ! Check if a collision happens (sooner than previously calculated)
+               IF (DX .GE. 0. .AND. VN * DTCOLL .GE. DX) THEN
+                  
+                  CANDIDATE_DTCOLL = DX/VN
+                  ! Find candidate collision point
+                  XCOLL = particles(IP)%X + particles(IP)%VX * CANDIDATE_DTCOLL 
+                  YCOLL = particles(IP)%Y + particles(IP)%VY * CANDIDATE_DTCOLL
+                  COLLDIST = ((XCOLL-WALLS(i)%X1)*(WALLS(i)%X2-WALLS(i)%X1)+(YCOLL-WALLS(i)%Y1)*(WALLS(i)%Y2-WALLS(i)%Y1))/ &
+                  ((WALLS(i)%X2-WALLS(i)%X1)**2 + (WALLS(i)%Y2-WALLS(i)%Y1)**2)
+                  IF ((COLLDIST .GE. 0) .AND. (COLLDIST .LE. 1)) THEN
+                     BOUNDCOLL = -1
+                     WALLCOLL = i
+                     DTCOLL = CANDIDATE_DTCOLL
+                     TOTDTCOLL = TOTDTCOLL + DTCOLL
+                     HASCOLLIDED = .TRUE.
+                  END IF
                END IF
             END IF
          END DO
@@ -570,10 +690,12 @@ MODULE timecycle
                ELSE
 
                   CALL MOVE_PARTICLE(IP, DTCOLL)
+                  !WRITE(*,*) "Specular reflection! Velocity before: ",  particles(IP)%VX, ", ", particles(IP)%VY
                   VDOTN = particles(IP)%VX*WALLS(WALLCOLL)%NORMX+particles(IP)%VY*WALLS(WALLCOLL)%NORMY
-                  particles(IP)%VX = particles(IP)%VX + 2.*VDOTN*WALLS(WALLCOLL)%NORMX
-                  particles(IP)%VY = particles(IP)%VY + 2.*VDOTN*WALLS(WALLCOLL)%NORMY
-                  
+                  particles(IP)%VX = particles(IP)%VX - 2.*VDOTN*WALLS(WALLCOLL)%NORMX
+                  particles(IP)%VY = particles(IP)%VY - 2.*VDOTN*WALLS(WALLCOLL)%NORMY
+                  !WRITE(*,*) "Normal:  ",  WALLS(WALLCOLL)%NORMX, ", ", WALLS(WALLCOLL)%NORMY
+                  !WRITE(*,*) "Specular reflection! Velocity after:  ",  particles(IP)%VX, ", ", particles(IP)%VY
                   particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
 
                   IF (WALLS(WALLCOLL)%REACT) THEN
@@ -630,14 +752,7 @@ MODULE timecycle
          END IF
 
 
-      
-
-         ! Axisymmetric domain
-         IF (BOOL_AXI .eqv. .TRUE.) THEN 
-   
-            ! Transform position, velocities etc
-   
-         END IF
+         ! Axisymmetric velocity rotation already performed in MOVE_PARTICLE()
 
    
          ! _______ CHECK WHERE PARTICLE ENDED UP _______
@@ -758,10 +873,26 @@ MODULE timecycle
 
       INTEGER, INTENT(IN)      :: IP
       REAL(KIND=8), INTENT(IN) :: TIME
+      REAL(KIND=8)             :: SINTHETA, COSTHETA, VZ, VY
 
-      particles(IP)%X = particles(IP)%X + particles(IP)%VX * TIME
-      particles(IP)%Y = particles(IP)%Y + particles(IP)%VY * TIME
-      particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ * TIME
+      ! WRITE(*,*) "Moving particle ", IP, " for time interval ", TIME
+
+      IF (AXI) THEN
+         particles(IP)%X = particles(IP)%X + particles(IP)%VX * TIME
+         particles(IP)%Y = SQRT((particles(IP)%Y + particles(IP)%VY*TIME)**2 + (particles(IP)%VZ*TIME)**2)
+         particles(IP)%Z = 0.d0
+         ! Rotate velocity vector back to x-y plane.
+         SINTHETA = particles(IP)%VZ*TIME / particles(IP)%Y
+         COSTHETA = SIGN(SQRT(1.-SINTHETA*SINTHETA), particles(IP)%Y + particles(IP)%VY*TIME)
+         VZ = particles(IP)%VZ
+         VY = particles(IP)%VY
+         particles(IP)%VZ = COSTHETA*VZ - SINTHETA*VY
+         particles(IP)%VY = SINTHETA*VZ + COSTHETA*VY
+      ELSE
+         particles(IP)%X = particles(IP)%X + particles(IP)%VX * TIME
+         particles(IP)%Y = particles(IP)%Y + particles(IP)%VY * TIME
+         particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ * TIME
+      END IF
 
    END SUBROUTINE MOVE_PARTICLE
 
@@ -813,13 +944,12 @@ MODULE timecycle
    SUBROUTINE MCC_COLLISIONS
 
    ! Performs MCC collisions: for each particle in the current process ID, computes the probability of 
-   ! colliding with a background species, and (in case) performs the collision.
-   ! Collisions are isotropic in the center of mass frame, and assume that the current particle 
-   ! collides with a much heavier one (electron-neutral collisions). 
+   ! colliding with a background species, and (in case) performs the collision. 
    ! 
    ! There is no need to consider cells for these collisions. The neutrals density is for the
    ! moment uniform in space. In the future, we may associate it to the cells...
-   
+   ! NOTE: Eventually this procedure could be merged with similar procedures in collisions.f90
+
    IMPLICIT NONE
 
    INTEGER      :: JP1, JP2, JR, I, J, SP_ID1, SP_ID2, P1_SP_ID, P2_SP_ID, P3_SP_ID, NP_PROC_INITIAL

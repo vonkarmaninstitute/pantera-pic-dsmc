@@ -400,10 +400,11 @@ MODULE timecycle
 
    IMPLICIT NONE
 
-   INTEGER      :: IP, IC, i
-   INTEGER      :: BOUNDCOLL, WALLCOLL
+   INTEGER      :: IP, IC, i, SOL
+   INTEGER      :: BOUNDCOLL, WALLCOLL, GOODSOL
    REAL(KIND=8) :: DTCOLL, TOTDTCOLL, CANDIDATE_DTCOLL, rfp
    REAL(KIND=8) :: COEFA, COEFB, COEFC, DELTA, SOL1, SOL2, ALPHA, BETA
+   REAL(KIND=8), DIMENSION(2) :: TEST
    REAL(KIND=8), DIMENSION(4) :: NORMX, NORMY, XW, YW, ZW, BOUNDPOS
    ! REAL(KIND=8) :: XCOLL, YCOLL, ZCOLL
    REAL(KIND=8) :: VN, DX
@@ -477,9 +478,14 @@ MODULE timecycle
                CANDIDATE_DTCOLL = DTCOLL
                
                IF (i==1 .OR. i==2) THEN
-                  ! Vertical boundary
-                  SOL1 = (BOUNDPOS(i)-particles(IP)%X)/particles(IP)%VX
-                  IF (SOL1 .GT. TOL) CANDIDATE_DTCOLL = SOL1
+                  ! Vertical wall
+                  SOL1 = (WALLS(i)%X1-particles(IP)%X)/particles(IP)%VX
+                  IF (SOL1 >= 0 .AND. SOL1 < DTCOLL) THEN
+                     GOODSOL = 1
+                     TEST(1) = SOL1
+                  ELSE
+                     GOODSOL = 0
+                  END IF
                ELSE
                   ! Horizontal boundary
                   COEFA = particles(IP)%VY**2 + particles(IP)%VZ**2
@@ -487,27 +493,63 @@ MODULE timecycle
                   COEFC = particles(IP)%Y**2 - BOUNDPOS(i)**2
                   DELTA = COEFB*COEFB-COEFA*COEFC
                   IF (DELTA .GE. 0) THEN
+                  ! Compute the solutions, check if they are any good and, in case, order them to be checked further.
                      SOL1 = (-COEFB - SQRT(DELTA))/COEFA
                      SOL2 = (-COEFB + SQRT(DELTA))/COEFA
-                     IF ((SOL1 .GT. TOL) .AND. (SOL2 .GT. TOL)) THEN
-                        CANDIDATE_DTCOLL = MIN(SOL1, SOL2)
-                     ELSE IF (SOL1 .LE. TOL .AND. SOL2 .GT. TOL) THEN
-                        CANDIDATE_DTCOLL = SOL2
-                     ELSE IF (SOL1 .GT. TOL .AND. SOL2 .LE. TOL) THEN
-                        CANDIDATE_DTCOLL = SOL1
+                     IF (SOL1 >= 0 .AND. SOL1 < DTCOLL) THEN
+                        IF (SOL2 >= 0 .AND. SOL2 < DTCOLL) THEN
+                           GOODSOL = 2
+                           IF (SOL1 <= SOL2) THEN
+                              TEST(1) = SOL1
+                              TEST(2) = SOL2
+                           ELSE
+                              TEST(1) = SOL2
+                              TEST(2) = SOL1
+                           END IF
+                        ELSE
+                           GOODSOL = 1
+                           TEST(1) = SOL1
+                        ENDIF
+                     ELSE
+                        IF (SOL2 >= 0 .AND. SOL2 < DTCOLL) THEN
+                           GOODSOL = 1
+                           TEST(1) = SOL2
+                        ELSE
+                           GOODSOL = 0
+                        END IF 
                      END IF
+                  ELSE
+                     GOODSOL = 0
                   END IF
                END IF
 
-               IF (CANDIDATE_DTCOLL .LT. DTCOLL) THEN
-                  !WRITE(*,*) "Found collision! time: ", CANDIDATE_DTCOLL, " boundary: ", i
-                  !CALL SLEEP(1)
-                  DTCOLL = CANDIDATE_DTCOLL
-                  BOUNDCOLL = i    
-                  TOTDTCOLL = TOTDTCOLL + DTCOLL  
-                  HASCOLLIDED = .TRUE.
-                  IF (BOUNDCOLL == 3) WRITE(*,*) "Collision with axis!"
+               ! Now further checks for each of the good solutions:
+               ! - if the velocity at collision time is actually towards the surface
+               ! - if the collision point is within the extremes of the segment
+               ! Note: this requires moving the particle to the collision point and then moving back.
+               IF (GOODSOL /= 0) THEN
+                  DO SOL = 1, GOODSOL
+                     CALL MOVE_PARTICLE(IP, TEST(SOL))
+                     IF ((particles(IP)%VX*WALLS(i)%NORMX + particles(IP)%VY*WALLS(i)%NORMY) < 0) THEN
+
+                        COLLDIST = ((particles(IP)%X-WALLS(i)%X1)*(WALLS(i)%X2-WALLS(i)%X1) &
+                                  + (particles(IP)%Y-WALLS(i)%Y1)*(WALLS(i)%Y2-WALLS(i)%Y1)) &
+                                  / ((WALLS(i)%X2-WALLS(i)%X1)**2 + (WALLS(i)%Y2-WALLS(i)%Y1)**2)
+                        IF ((COLLDIST .GE. 0) .AND. (COLLDIST .LE. 1)) THEN
+                           ! Collision happens!
+                           DTCOLL = TEST(SOL)
+                           BOUNDCOLL = i    
+                           TOTDTCOLL = TOTDTCOLL + DTCOLL  
+                           HASCOLLIDED = .TRUE.
+                           IF (BOUNDCOLL == 3) WRITE(*,*) "Collision with axis!"
+                        END IF
+                     END IF
+                     CALL MOVE_PARTICLE(IP, -TEST(SOL))
+                  END DO
                END IF
+
+               
+
             ELSE
                ! We are not axisymmetric.
                ! Compute the velocity normal to the boundary
@@ -544,9 +586,13 @@ MODULE timecycle
                IF (WALLS(i)%X1 == WALLS(i)%X2) THEN
                   ! Vertical wall
                   SOL1 = (WALLS(i)%X1-particles(IP)%X)/particles(IP)%VX
-                  IF (SOL1 .GT. TOL) CANDIDATE_DTCOLL = SOL1
+                  IF (SOL1 >= 0 .AND. SOL1 < DTCOLL) THEN
+                     GOODSOL = 1
+                     TEST(1) = SOL1
+                  ELSE
+                     GOODSOL = 0
+                  END IF
                ELSE
-                  !WRITE(*,*) "WALL NORMAL: NORMX: ", WALLS(i)%NORMX, " NORMY: ", WALLS(i)%NORMY
                   ! Non-vertical wall
                   ALPHA = (WALLS(i)%Y2-WALLS(i)%Y1)/(WALLS(i)%X2-WALLS(i)%X1)
                   BETA  = (particles(IP)%X - WALLS(i)%X1)*ALPHA
@@ -556,46 +602,61 @@ MODULE timecycle
                   COEFC = particles(IP)%Y**2 - (BETA + WALLS(i)%Y1)**2
                   DELTA = COEFB*COEFB-COEFA*COEFC
                   IF (DELTA .GE. 0) THEN
+                     ! Compute the solutions, check if they are any good and, in case, order them to be checked further.
                      SOL1 = (-COEFB - SQRT(DELTA))/COEFA
                      SOL2 = (-COEFB + SQRT(DELTA))/COEFA
-                     IF ((SOL1 .GT. TOL) .AND. (SOL2 .GT. TOL)) THEN
-                        CANDIDATE_DTCOLL = MIN(SOL1, SOL2)
-                     ELSE IF (SOL1 .LT. TOL .AND. SOL2 .GE. TOL) THEN
-                        CANDIDATE_DTCOLL = SOL2
-                     ELSE IF (SOL1 .GE. TOL .AND. SOL2 .LT. TOL) THEN
-                        CANDIDATE_DTCOLL = SOL1
+                     IF (SOL1 >= 0 .AND. SOL1 < DTCOLL) THEN
+                        IF (SOL2 >= 0 .AND. SOL2 < DTCOLL) THEN
+                           GOODSOL = 2
+                           IF (SOL1 <= SOL2) THEN
+                              TEST(1) = SOL1
+                              TEST(2) = SOL2
+                           ELSE
+                              TEST(1) = SOL2
+                              TEST(2) = SOL1
+                           END IF
+                        ELSE
+                           GOODSOL = 1
+                           TEST(1) = SOL1
+                        ENDIF
+                     ELSE
+                        IF (SOL2 >= 0 .AND. SOL2 < DTCOLL) THEN
+                           GOODSOL = 1
+                           TEST(1) = SOL2
+                        ELSE
+                           GOODSOL = 0
+                        END IF 
                      END IF
-                  END IF
-               END IF
-
-               IF (CANDIDATE_DTCOLL .LT. DTCOLL) THEN
-                  ! XCOLL = particles(IP)%X + particles(IP)%VX * CANDIDATE_DTCOLL 
-                  ! YCOLL = SQRT((particles(IP)%Y + particles(IP)%VY*CANDIDATE_DTCOLL)**2 + (particles(IP)%VZ*CANDIDATE_DTCOLL)**2)
-                  ! COLLDIST = ((XCOLL-WALLS(i)%X1)*(WALLS(i)%X2-WALLS(i)%X1)+(YCOLL-WALLS(i)%Y1)*(WALLS(i)%Y2-WALLS(i)%Y1))/ &
-                  ! ((WALLS(i)%X2-WALLS(i)%X1)**2 + (WALLS(i)%Y2-WALLS(i)%Y1)**2)
-                  IF (WALLS(i)%X1 == WALLS(i)%X2) THEN
-                     YCOLL = SQRT((particles(IP)%Y + particles(IP)%VY*CANDIDATE_DTCOLL)**2 + (particles(IP)%VZ*CANDIDATE_DTCOLL)**2)
-                     COLLDIST = (YCOLL - WALLS(i)%Y1) / (WALLS(i)%Y2-WALLS(i)%Y1)
                   ELSE
-                     XCOLL = particles(IP)%X + particles(IP)%VX * CANDIDATE_DTCOLL
-                     COLLDIST = (XCOLL - WALLS(i)%X1) / (WALLS(i)%X2-WALLS(i)%X1)
-                  END IF
-                  !WRITE(*,*) "Maybe found a solution: ", COLLDIST
-                  IF ((COLLDIST .GE. 0) .AND. (COLLDIST .LE. 1)) THEN
-                     BOUNDCOLL = -1
-                     WALLCOLL = i
-                     DTCOLL = CANDIDATE_DTCOLL
-                     TOTDTCOLL = TOTDTCOLL + DTCOLL
-                     HASCOLLIDED = .TRUE.
-                     !IF (particles(IP)%Y < 0.05) THEN
-                     !   WRITE(*,*) "Collision with who knows what. ID: ", WALLCOLL
-                     !   WRITE(*,*) "Delta: ", DELTA, " COEFFS: ", COEFA, ", ", COEFB, ", ", COEFC
-                     !   WRITE(*,*) "SOL1: ", (-COEFB - SQRT(DELTA))/COEFA, " SOL2: ", (-COEFB + SQRT(DELTA))/COEFA,&
-                     !    " Chosen: ", CANDIDATE_DTCOLL
-                     !END IF
-
+                     GOODSOL = 0
                   END IF
                END IF
+
+               ! Now further checks for each of the good solutions:
+               ! - if the velocity at collision time is actually towards the surface
+               ! - if the collision point is within the extremes of the segment
+               ! Note: this requires moving the particle to the collision point and then moving back.
+               IF (GOODSOL /= 0) THEN
+                  DO SOL = 1, GOODSOL
+                     CALL MOVE_PARTICLE(IP, TEST(SOL))
+                     IF ((particles(IP)%VX*WALLS(i)%NORMX + particles(IP)%VY*WALLS(i)%NORMY) < 0) THEN
+
+                        COLLDIST = ((particles(IP)%X-WALLS(i)%X1)*(WALLS(i)%X2-WALLS(i)%X1) &
+                                  + (particles(IP)%Y-WALLS(i)%Y1)*(WALLS(i)%Y2-WALLS(i)%Y1)) &
+                                  / ((WALLS(i)%X2-WALLS(i)%X1)**2 + (WALLS(i)%Y2-WALLS(i)%Y1)**2)
+                        IF ((COLLDIST .GE. 0) .AND. (COLLDIST .LE. 1)) THEN
+                           ! Collision happens!
+                           DTCOLL = TEST(SOL)
+                           BOUNDCOLL = -1
+                           WALLCOLL = i   
+                           TOTDTCOLL = TOTDTCOLL + DTCOLL  
+                           HASCOLLIDED = .TRUE.
+                        END IF
+                     END IF
+                     CALL MOVE_PARTICLE(IP, -TEST(SOL))
+                  END DO
+               END IF
+
 
             ELSE
                ! We are not axisymmetric

@@ -306,7 +306,7 @@
     
     IMPLICIT NONE
 
-    CHARACTER*80                       :: string, file_name
+    CHARACTER*256                       :: string, file_name
 
     REAL(KIND=8), DIMENSION(NX+1)        :: XNODES
     REAL(KIND=8), DIMENSION(NY+1)        :: YNODES

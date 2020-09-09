@@ -32,11 +32,11 @@ Bool_PIC:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1
+    100
 Timestep:
-    1.0e-8
+    1.0e-9
 Number_of_timesteps:
-    10000
+    400000
 Stats_every:
     1
 
@@ -46,13 +46,13 @@ Dump_part_every:
     100000
 
 Dump_grid_start:
-    100
+    300000
     
 Dump_grid_avgevery:
-    100
+    10
 
 Dump_grid_numavgs:
-    1
+    5000
 
 Perform_checks:
     .FALSE.
@@ -154,11 +154,11 @@ Linesource_Ttra:
 Linesource_Trot:
     0.
 
-!   center       length        density  velocity xyz         Ttr      Trot   mix
+!   x1        y1     x2        y2       n         vx        vy     vz     Ttr       Trot   mix
 Linesource:
-    0.2001    0.0    0.2001    0.015    1e14    7500.0    0.0    0.0    1500.0    0.0    Ions
+    0.2001    0.0    0.2001    0.015    7.9e12    7608.0    0.0    0.0    1500.0    0.0    Ions
 Linesource:
-    0.2001    0.0    0.2001    0.015    1e14    0.0    0.0    0.0       5000.0    0.0    Electrons
+    0.2001    0.0    0.2001    0.015    7.9e12    0.0       0.0    0.0    5802.0    0.0    Electrons
 
 
 

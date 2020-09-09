@@ -141,7 +141,7 @@ MODULE timecycle
    
       ! Linesource
       DO ILINE = 1, N_LINESOURCES
-   
+         
          DO IS = 1, MIXTURES(LINESOURCES(ILINE)%MIX_ID)%N_COMPONENTS ! Loop on mixture components
 
             S_ID = MIXTURES(LINESOURCES(ILINE)%MIX_ID)%COMPONENTS(IS)%ID
@@ -150,9 +150,8 @@ MODULE timecycle
             IF (LINESOURCES(ILINE)%nfs(IS)-REAL(NFS, KIND=8) .GE. rf()) THEN ! Same as SPARTA's perspeciess
                NFS = NFS + 1
             END IF
-   
             DO IP = 1, NFS ! Loop on particles to be injected
-   
+               
                CALL MAXWELL(0.d0, 0.d0, 0.d0, &
                             LINESOURCES(ILINE)%TTRA, LINESOURCES(ILINE)%TTRA, LINESOURCES(ILINE)%TTRA, &
                             Vdummy, V_PERP, VZ, M)
@@ -174,7 +173,7 @@ MODULE timecycle
                   IF (LINESOURCES(ILINE)%Y1 == LINESOURCES(ILINE)%Y2) THEN
                      Y = LINESOURCES(ILINE)%Y1
                      X = LINESOURCES(ILINE)%X1 + R*(LINESOURCES(ILINE)%X2-LINESOURCES(ILINE)%X1)
-                     Z = ZMIN
+                     Z = 0
                   ELSE
                      IF (LINESOURCES(ILINE)%Y1 < LINESOURCES(ILINE)%Y2) THEN
                         Y1 = LINESOURCES(ILINE)%Y1
@@ -189,7 +188,7 @@ MODULE timecycle
                      END IF
                      Y = SQRT(Y1*Y1 + R*(Y2*Y2 - Y1*Y1))
                      X = X1 + (Y-Y1)/(Y2-Y1)*(X2-X1)
-                     Z = ZMIN
+                     Z = 0
                   END IF
                ELSE
                   X = LINESOURCES(ILINE)%X1 + R*(LINESOURCES(ILINE)%X2-LINESOURCES(ILINE)%X1)
@@ -404,7 +403,7 @@ MODULE timecycle
    INTEGER      :: IP, IC, i
    INTEGER      :: BOUNDCOLL, WALLCOLL
    REAL(KIND=8) :: DTCOLL, TOTDTCOLL, CANDIDATE_DTCOLL, rfp
-   REAL(KIND=8) :: COEFA, COEFB, COEFC, DELTA, SOL, ALPHA, BETA
+   REAL(KIND=8) :: COEFA, COEFB, COEFC, DELTA, SOL1, SOL2, ALPHA, BETA
    REAL(KIND=8), DIMENSION(4) :: NORMX, NORMY, XW, YW, ZW, BOUNDPOS
    ! REAL(KIND=8) :: XCOLL, YCOLL, ZCOLL
    REAL(KIND=8) :: VN, DX
@@ -438,7 +437,7 @@ MODULE timecycle
    DO IP = 1, NP_PROC
       REMOVE_PART(IP) = .FALSE.
 
-      IF (particles(IP)%VX > 1e20) WRITE(*,*) "Overspeed detected! particle id", IP 
+      IF (particles(IP)%Z /= 0) WRITE(*,*) "Particle Z coord is not zero!" 
       ! Update velocity
       IC = particles(IP)%IC
 
@@ -479,8 +478,8 @@ MODULE timecycle
                
                IF (i==1 .OR. i==2) THEN
                   ! Vertical boundary
-                  SOL = (BOUNDPOS(i)-particles(IP)%X)/particles(IP)%VX
-                  IF (SOL .GT. TOL) CANDIDATE_DTCOLL = SOL
+                  SOL1 = (BOUNDPOS(i)-particles(IP)%X)/particles(IP)%VX
+                  IF (SOL1 .GT. TOL) CANDIDATE_DTCOLL = SOL1
                ELSE
                   ! Horizontal boundary
                   COEFA = particles(IP)%VY**2 + particles(IP)%VZ**2
@@ -488,14 +487,14 @@ MODULE timecycle
                   COEFC = particles(IP)%Y**2 - BOUNDPOS(i)**2
                   DELTA = COEFB*COEFB-COEFA*COEFC
                   IF (DELTA .GE. 0) THEN
-                     ! Try the smaller solution
-                     SOL = (-COEFB - SQRT(DELTA))/COEFA
-                     IF (SOL .GT. TOL) THEN
-                        CANDIDATE_DTCOLL = SOL
-                     ELSE
-                        ! Try the larger solution
-                        SOL = (-COEFB + SQRT(DELTA))/COEFA
-                        IF (SOL .GT. TOL) CANDIDATE_DTCOLL = SOL
+                     SOL1 = (-COEFB - SQRT(DELTA))/COEFA
+                     SOL2 = (-COEFB + SQRT(DELTA))/COEFA
+                     IF ((SOL1 .GT. TOL) .AND. (SOL2 .GT. TOL)) THEN
+                        CANDIDATE_DTCOLL = MIN(SOL1, SOL2)
+                     ELSE IF (SOL1 .LE. TOL .AND. SOL2 .GT. TOL) THEN
+                        CANDIDATE_DTCOLL = SOL2
+                     ELSE IF (SOL1 .GT. TOL .AND. SOL2 .LE. TOL) THEN
+                        CANDIDATE_DTCOLL = SOL1
                      END IF
                   END IF
                END IF
@@ -507,6 +506,7 @@ MODULE timecycle
                   BOUNDCOLL = i    
                   TOTDTCOLL = TOTDTCOLL + DTCOLL  
                   HASCOLLIDED = .TRUE.
+                  IF (BOUNDCOLL == 3) WRITE(*,*) "Collision with axis!"
                END IF
             ELSE
                ! We are not axisymmetric.
@@ -543,9 +543,10 @@ MODULE timecycle
                ! Compute auxiliary parameters
                IF (WALLS(i)%X1 == WALLS(i)%X2) THEN
                   ! Vertical wall
-                  SOL = (WALLS(i)%X1-particles(IP)%X)/particles(IP)%VX
-                  IF (SOL .GT. TOL) CANDIDATE_DTCOLL = SOL
+                  SOL1 = (WALLS(i)%X1-particles(IP)%X)/particles(IP)%VX
+                  IF (SOL1 .GT. TOL) CANDIDATE_DTCOLL = SOL1
                ELSE
+                  !WRITE(*,*) "WALL NORMAL: NORMX: ", WALLS(i)%NORMX, " NORMY: ", WALLS(i)%NORMY
                   ! Non-vertical wall
                   ALPHA = (WALLS(i)%Y2-WALLS(i)%Y1)/(WALLS(i)%X2-WALLS(i)%X1)
                   BETA  = (particles(IP)%X - WALLS(i)%X1)*ALPHA
@@ -555,30 +556,44 @@ MODULE timecycle
                   COEFC = particles(IP)%Y**2 - (BETA + WALLS(i)%Y1)**2
                   DELTA = COEFB*COEFB-COEFA*COEFC
                   IF (DELTA .GE. 0) THEN
-                     ! Try the smaller solution
-                     SOL = (-COEFB - SQRT(DELTA))/COEFA
-                     IF (SOL .GT. TOL) THEN
-                        CANDIDATE_DTCOLL = SOL
-                     ELSE
-                        ! Try the larger solution
-                        SOL = (-COEFB + SQRT(DELTA))/COEFA
-                        IF (SOL .GT. TOL) CANDIDATE_DTCOLL = SOL
+                     SOL1 = (-COEFB - SQRT(DELTA))/COEFA
+                     SOL2 = (-COEFB + SQRT(DELTA))/COEFA
+                     IF ((SOL1 .GT. TOL) .AND. (SOL2 .GT. TOL)) THEN
+                        CANDIDATE_DTCOLL = MIN(SOL1, SOL2)
+                     ELSE IF (SOL1 .LT. TOL .AND. SOL2 .GE. TOL) THEN
+                        CANDIDATE_DTCOLL = SOL2
+                     ELSE IF (SOL1 .GE. TOL .AND. SOL2 .LT. TOL) THEN
+                        CANDIDATE_DTCOLL = SOL1
                      END IF
-                     
                   END IF
                END IF
 
                IF (CANDIDATE_DTCOLL .LT. DTCOLL) THEN
-                  XCOLL = particles(IP)%X + particles(IP)%VX * CANDIDATE_DTCOLL 
-                  YCOLL = SQRT((particles(IP)%Y + particles(IP)%VY*CANDIDATE_DTCOLL)**2 + (particles(IP)%VZ*CANDIDATE_DTCOLL)**2)
-                  COLLDIST = ((XCOLL-WALLS(i)%X1)*(WALLS(i)%X2-WALLS(i)%X1)+(YCOLL-WALLS(i)%Y1)*(WALLS(i)%Y2-WALLS(i)%Y1))/ &
-                  ((WALLS(i)%X2-WALLS(i)%X1)**2 + (WALLS(i)%Y2-WALLS(i)%Y1)**2)
+                  ! XCOLL = particles(IP)%X + particles(IP)%VX * CANDIDATE_DTCOLL 
+                  ! YCOLL = SQRT((particles(IP)%Y + particles(IP)%VY*CANDIDATE_DTCOLL)**2 + (particles(IP)%VZ*CANDIDATE_DTCOLL)**2)
+                  ! COLLDIST = ((XCOLL-WALLS(i)%X1)*(WALLS(i)%X2-WALLS(i)%X1)+(YCOLL-WALLS(i)%Y1)*(WALLS(i)%Y2-WALLS(i)%Y1))/ &
+                  ! ((WALLS(i)%X2-WALLS(i)%X1)**2 + (WALLS(i)%Y2-WALLS(i)%Y1)**2)
+                  IF (WALLS(i)%X1 == WALLS(i)%X2) THEN
+                     YCOLL = SQRT((particles(IP)%Y + particles(IP)%VY*CANDIDATE_DTCOLL)**2 + (particles(IP)%VZ*CANDIDATE_DTCOLL)**2)
+                     COLLDIST = (YCOLL - WALLS(i)%Y1) / (WALLS(i)%Y2-WALLS(i)%Y1)
+                  ELSE
+                     XCOLL = particles(IP)%X + particles(IP)%VX * CANDIDATE_DTCOLL
+                     COLLDIST = (XCOLL - WALLS(i)%X1) / (WALLS(i)%X2-WALLS(i)%X1)
+                  END IF
+                  !WRITE(*,*) "Maybe found a solution: ", COLLDIST
                   IF ((COLLDIST .GE. 0) .AND. (COLLDIST .LE. 1)) THEN
                      BOUNDCOLL = -1
                      WALLCOLL = i
                      DTCOLL = CANDIDATE_DTCOLL
                      TOTDTCOLL = TOTDTCOLL + DTCOLL
                      HASCOLLIDED = .TRUE.
+                     !IF (particles(IP)%Y < 0.05) THEN
+                     !   WRITE(*,*) "Collision with who knows what. ID: ", WALLCOLL
+                     !   WRITE(*,*) "Delta: ", DELTA, " COEFFS: ", COEFA, ", ", COEFB, ", ", COEFC
+                     !   WRITE(*,*) "SOL1: ", (-COEFB - SQRT(DELTA))/COEFA, " SOL2: ", (-COEFB + SQRT(DELTA))/COEFA,&
+                     !    " Chosen: ", CANDIDATE_DTCOLL
+                     !END IF
+
                   END IF
                END IF
 
@@ -873,17 +888,19 @@ MODULE timecycle
 
       INTEGER, INTENT(IN)      :: IP
       REAL(KIND=8), INTENT(IN) :: TIME
-      REAL(KIND=8)             :: SINTHETA, COSTHETA, VZ, VY
+      REAL(KIND=8)             :: SINTHETA, COSTHETA, VZ, VY, R
 
       ! WRITE(*,*) "Moving particle ", IP, " for time interval ", TIME
 
       IF (AXI) THEN
          particles(IP)%X = particles(IP)%X + particles(IP)%VX * TIME
-         particles(IP)%Y = SQRT((particles(IP)%Y + particles(IP)%VY*TIME)**2 + (particles(IP)%VZ*TIME)**2)
          particles(IP)%Z = 0.d0
+         R = SQRT((particles(IP)%Y + particles(IP)%VY*TIME)**2 + (particles(IP)%VZ*TIME)**2)
          ! Rotate velocity vector back to x-y plane.
-         SINTHETA = particles(IP)%VZ*TIME / particles(IP)%Y
+         SINTHETA = particles(IP)%VZ*TIME / R
          COSTHETA = SIGN(SQRT(1.-SINTHETA*SINTHETA), particles(IP)%Y + particles(IP)%VY*TIME)
+         particles(IP)%Y = R
+
          VZ = particles(IP)%VZ
          VY = particles(IP)%VY
          particles(IP)%VZ = COSTHETA*VZ - SINTHETA*VY

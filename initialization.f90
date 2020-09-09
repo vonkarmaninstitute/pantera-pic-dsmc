@@ -823,7 +823,7 @@ MODULE initialization
       READ(STRARRAY(10),'(ES14.3)') LINESOURCES(N_LINESOURCES)%TROT
       READ(STRARRAY(10),'(ES14.3)') LINESOURCES(N_LINESOURCES)%TVIB
       READ(STRARRAY(11),'(A10)') MIX_NAME
-
+      
       MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
       LINESOURCES(N_LINESOURCES)%MIX_ID = MIX_ID
 
@@ -1230,10 +1230,11 @@ MODULE initialization
             !IF (XP .GT. 0.) CYCLE
             IF (AXI) THEN
                YP = SQRT(YMIN*YMIN + rf()*(YMAX*YMAX - YMIN*YMIN))
+               ZP = 0
             ELSE
                YP = YMIN + (YMAX-YMIN)*rf()
+               ZP = ZMIN + (ZMAX-ZMIN)*rf()
             END IF
-            ZP = ZMIN + (ZMAX-ZMIN)*rf()
 
             ! Chose particle species based on mixture specifications
             ! RANVAR = rf()
@@ -1438,7 +1439,7 @@ MODULE initialization
       IMPLICIT NONE
 
       REAL(KIND=8) :: BETA, FLUXBOUND, NtotINJECT, Snow
-      REAL(KIND=8) :: U_NORM, S_NORM, FLUXLINESOURCE, LINELENGTH, NORMX, NORMY, RMIN, RMAX
+      REAL(KIND=8) :: U_NORM, S_NORM, FLUXLINESOURCE, LINELENGTH, NORMX, NORMY, AREA
       REAL(KIND=8) :: PI, PI2  
 
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: nfs_LINE
@@ -1591,12 +1592,12 @@ MODULE initialization
                                     + SQRT(PI)*Snow*(1.+ERF1(Snow)))      ! Tot number flux emitted
 
             IF (AXI) THEN
-               RMIN = MIN(LINESOURCES(ILINE)%Y1, LINESOURCES(ILINE)%Y2)
-               RMAX = MAX(LINESOURCES(ILINE)%Y1, LINESOURCES(ILINE)%Y2)
-               NtotINJECT  = FLUXLINESOURCE*0.5*(RMAX**2-RMIN**2)*(ZMAX-ZMIN)*DT/(FNUM*SPECIES(S_ID)%SPWT)         ! Tot num of particles to be injected
+               AREA = 0.5*(ZMAX-ZMIN)*LINELENGTH*(LINESOURCES(ILINE)%Y1+LINESOURCES(ILINE)%Y2)
             ELSE
-               NtotINJECT  = FLUXLINESOURCE*LINELENGTH*(ZMAX-ZMIN)*DT/(FNUM*SPECIES(S_ID)%SPWT)         ! Tot num of particles to be injected
+               AREA  = LINELENGTH*(ZMAX-ZMIN)
             END IF
+
+            NtotINJECT  = FLUXLINESOURCE*AREA*DT/(FNUM*SPECIES(S_ID)%SPWT)         ! Tot num of particles to be injected
 
             nfs_LINE(IS)    = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
             

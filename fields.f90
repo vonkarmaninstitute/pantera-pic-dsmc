@@ -23,7 +23,7 @@ MODULE fields
       TYPE(ST_MATRIX) :: A_ST
       REAL(KIND=8) :: HX, HY
       REAL(KIND=8) :: PI
-      REAL(KIND=8) :: AX, AY, BX, BY, CX, CY, H1X, H2X, H1Y, H2Y
+      REAL(KIND=8) :: AX, AY, BX, BY, CX, CY, H1X, H2X, H1Y, H2Y, R
 
       PI   = 3.141593
 
@@ -44,7 +44,6 @@ MODULE fields
       MAXNNZ = 5*SIZE
       CALL ST_MATRIX_ALLOCATE(A_ST, MAXNNZ)
 
-
       ! At this point, populate the matrix
       DO I = 0, NPX-1
          DO J = 0, NPY-1
@@ -58,50 +57,60 @@ MODULE fields
 
             HX = (XMAX-XMIN)/DBLE(NX)
             AX = 1./(HX*HX)
-            ! For the 2d ambi exp
-            IF ((I == 0) .OR. (I == NPX-1) .OR. (J == 0) .OR. (J == NPY-1) .OR. &
-            ((I .GE. 10) .AND. (I .LE. 50) .AND. (J .GE. 50) .AND. (J .LE. 150)) ) THEN
-               ! Boundary point
-               !IF (I == 0 .OR. I == NPX-1) THEN
+
+
+            ! Various configurations go here.
+            
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! Plume 2d cartesian, full domain !
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! IF ((I == 0) .OR. (I == NPX-1) .OR. (J == 0) .OR. (J == NPY-1) .OR. &
+            ! ((I .GE. 10) .AND. (I .LE. 50) .AND. (J .GE. 50) .AND. (J .LE. 150)) ) THEN
+            !    ! Boundary point
+            !    CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
+
+            !    IF ((I == 50) .AND. (J .GE. 84) .AND. (J .LE. 116)) THEN
+            !       ! On the inlet surface.
+            !       DIRICHLET(IC) = 2.35d0
+            !    ELSE
+            !       ! On the boundary or on the rest of the PFG.
+            !       DIRICHLET(IC) = 0.d0
+            !    END IF
+            !    IS_DIRICHLET(IC) = .TRUE.
+            ! ELSE
+
+
+
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! Plume 2d axisymmetric (half domain) !
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+            IF (J == 0) THEN
+               ! Axis: zero radial gradient.
                CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
-               !CALL ST_MATRIX_SET(A_ST, IC, IE,  2.0*AX)
-               !WRITE(*,*) 1.d6*DBLE(I)/(NPX-1)
-               !DIRICHLET(IC) = 1.d6*DBLE(I)/(NPX-1)
-               IF ((I == 50) .AND. (J .GE. 84) .AND. (J .LE. 116)) THEN
+               DIRICHLET(IC) = 0.d0
+               CALL ST_MATRIX_SET(A_ST, IC, IN, -1.d0)
+               IS_DIRICHLET(IC) = .TRUE.
+            ELSE IF ((I == 0) .OR. (I == NPX-1) .OR. (J == NPY-1) .OR. &
+               ((I .GE. 10) .AND. (I .LE. 30) .AND. (J .LE. 100)) ) THEN
+               ! Boundary point.
+               CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
+               IF ((I == 30) .AND. (J .LE. 50)) THEN
+               ! On the inlet surface.
                   DIRICHLET(IC) = 2.35d0
                ELSE
+                  ! On the boundary or on the rest of the PFG.
                   DIRICHLET(IC) = 0.d0
                END IF
                IS_DIRICHLET(IC) = .TRUE.
-               ! ELSE IF (J == 0) THEN
-               !    CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
-               !    CALL ST_MATRIX_SET(A_ST, IC, IN, -1.d0)
-               !    Q_FIELD(IC) = 0.d0
-               !    Q_BC(IC) = .TRUE.
-               ! ELSE IF (J == NPY-1) THEN
-               !    CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
-               !    CALL ST_MATRIX_SET(A_ST, IC, IS, -1.d0)
-               !    Q_FIELD(IC) = 0.d0
-               !    Q_BC(IC) = .TRUE.
-               ! END IF
-            !ELSE IF (J == 0) THEN
-            !   CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
-            !   DIRICHLET(IC) = 0.d0
-            !   !CALL ST_MATRIX_SET(A_ST, IC, IN, -1.d0)
-            !   IS_DIRICHLET(IC) = .TRUE.
-            !ELSE IF (J == NPY-1) THEN
-            !   CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
-            !   DIRICHLET(IC) = 0.d0
-            !   !CALL ST_MATRIX_SET(A_ST, IC, IS, -1.d0)
-            !   IS_DIRICHLET(IC) = .TRUE.
-            !ELSE IF (I == NPX-1) THEN
-            !   CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
-               !CALL ST_MATRIX_SET(A_ST, IC, IW,  AX)
-               !CALL ST_MATRIX_SET(A_ST, IC, IW, -1.d0)
-            !   DIRICHLET(IC) = 0.d0
-            !   IS_DIRICHLET(IC) = .TRUE.
+
+
+
+
+
+
             ELSE
-               ! Interior point
+               ! Interior point.
 
                IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
                   HX = (XMAX-XMIN)/DBLE(NX)
@@ -127,6 +136,15 @@ MODULE fields
                   BY = -AY-CY
                END IF
    
+               IF (AXI) THEN
+                  IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
+                     R = YMIN + J*(YMAX-YMIN)/DBLE(NY)
+                  ELSE
+                     R = YCOORD(J+1)
+                  END IF
+                  AY = AY - 1./(R*(H1Y+H2Y))
+                  CY = CY + 1./(R*(H1Y+H2Y))
+               END IF
                
                IF (DIMS == 2) THEN
                   CALL ST_MATRIX_SET(A_ST, IC, IC, BX+BY)
@@ -141,59 +159,7 @@ MODULE fields
                END IF
             END IF
 
-            ! Example with different BCs.
-            ! IF (I == 0) THEN
-            !    ! IF (J == NPY-1) THEN
-            !    !    CALL ST_MATRIX_SET(A_ST, IC, IC, -1.d0)
-            !    !    CALL ST_MATRIX_SET(A_ST, IC, IE, -0.d5)
-            !    !    CALL ST_MATRIX_SET(A_ST, IC, IS, -0.d5)
-            !    !    B(IC) = -HX*10.
-            !    ! ELSE IF (J == 0) THEN
-            !    !    CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
-            !    !    CALL ST_MATRIX_SET(A_ST, IC, IE, -0.d5)
-            !    !    CALL ST_MATRIX_SET(A_ST, IC, IN, -0.d5)
-            !    !    B(IC) = -HX*10.
-            !    ! ELSE
-            !    !    CALL ST_MATRIX_SET(A_ST, IC, IC, 2.d0)
-            !    !    CALL ST_MATRIX_SET(A_ST, IC, IE, -1.d0)
-            !    !    CALL ST_MATRIX_SET(A_ST, IC, IN, -0.d5)
-            !    !    CALL ST_MATRIX_SET(A_ST, IC, IS, -0.d5)
-            !    !    B(IC) = -HX*10. ! This is O(h**2)
-            !    ! END IF
-            
-            !    CALL ST_MATRIX_SET(A_ST, IC, IC, -1.d0)
-            !    CALL ST_MATRIX_SET(A_ST, IC, IE, 1.d0)
-            !    B(IC) = HX*10.
 
-            ! ELSE IF (I == NPX-1) THEN
-            !    ! Example of Dirichlet on boundary  
-            !    CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
-            !    B(IC) = 2*SIN(J/(NPY-1.)*2.*PI)
-            ! ELSE IF (J == 0) THEN
-            !    ! Example of Dirichlet on boundary
-            !    CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
-            !    B(IC) = SIN(I/(NPX-1.)*PI)
-            ! ELSE IF (J == NPY-1) THEN
-            !    ! Example of Dirichlet on boundary
-            !    CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
-            !    B(IC) = SIN(I/(NPX-1.)*5.*PI)
-            ! ELSE IF ((I-NPX/2.)**2.+(J-3.*NPY/4.)**2 .LT. NPX/4.) THEN
-            !    ! Example of Dirichlet in interior
-            !    CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
-            !    B(IC) = 3.
-            ! ELSE
-            !    ! Interior point
-            !    CALL ST_MATRIX_SET(A_ST, IC, IC, 4.d0)
-               
-            !    IF (J < NPY) CALL ST_MATRIX_SET(A_ST, IC, IN, -1.d0)
-            !    IF (I < NPX) CALL ST_MATRIX_SET(A_ST, IC, IE, -1.d0)
-            !    IF (J > 0)   CALL ST_MATRIX_SET(A_ST, IC, IS, -1.d0)
-            !    IF (I > 0)   CALL ST_MATRIX_SET(A_ST, IC, IW, -1.d0)
-   
-            ! END IF
-            ! ! Source (RHS) in interior
-            ! IF ((I-NPX/2.)**2+(J-NPY/4.)**2 .LT. NPX/4.) B(IC) = -0.1
-            ! IF ((I-NPX/2.)**2+(J-NPY/4.)**2 .LT. NPX/4.) B(IC) = -0.1
          END DO
       END DO
 
@@ -244,15 +210,15 @@ MODULE fields
             IF (I == 0) THEN ! Left boundary
                IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(1)
                E_FIELD(I,J,1) = (PHI_FIELD(I+1,J+1)-PHI_FIELD(I+2,J+1))/HX
-            ELSE IF (I == 50 .AND. ((J .GE. 50) .AND. (J .LE. 150))) THEN ! Right side of PFG
-               IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(I+1)
-               E_FIELD(I,J,1) = (PHI_FIELD(I+1,J+1)-PHI_FIELD(I+2,J+1))/HX
+            ! ELSE IF (I == 50 .AND. ((J .GE. 50) .AND. (J .LE. 150))) THEN ! Right side of PFG
+            !    IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(I+1)
+            !    E_FIELD(I,J,1) = (PHI_FIELD(I+1,J+1)-PHI_FIELD(I+2,J+1))/HX
             ELSE IF (I == NPX-1) THEN ! Right boundary
                IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(NPX-1)
                E_FIELD(I,J,1) = (PHI_FIELD(I,J+1)-PHI_FIELD(I+1,J+1))/HX
-            ELSE IF (I == 10 .AND. ((J .GE. 50) .AND. (J .LE. 150))) THEN ! Left side of PFG
-               IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(I)
-               E_FIELD(I,J,1) = (PHI_FIELD(I,J+1)-PHI_FIELD(I+1,J+1))/HX
+            ! ELSE IF (I == 10 .AND. ((J .GE. 50) .AND. (J .LE. 150))) THEN ! Left side of PFG
+            !    IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(I)
+            !    E_FIELD(I,J,1) = (PHI_FIELD(I,J+1)-PHI_FIELD(I+1,J+1))/HX
             ELSE ! Interior point
                IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = 0.5*(XSIZE(I)+XSIZE(I+1))
                E_FIELD(I,J,1) = 0.5*(PHI_FIELD(I,J+1)-PHI_FIELD(I+2,J+1))/HX
@@ -261,15 +227,15 @@ MODULE fields
                IF (J == 0) THEN ! Bottom boundary
                   IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(1)
                   E_FIELD(I,J,2) = (PHI_FIELD(I+1,J+1)-PHI_FIELD(I+1,J+2))/HY
-               ELSE IF (J == 150 .AND. ((I.GE. 10) .AND. (I .LE. 50))) THEN ! Top side of PFG
-                  IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(J+1)
-                  E_FIELD(I,J,2) = (PHI_FIELD(I+1,J+1)-PHI_FIELD(I+1,J+2))/HY
+               ! ELSE IF (J == 150 .AND. ((I.GE. 10) .AND. (I .LE. 50))) THEN ! Top side of PFG
+               !    IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(J+1)
+               !    E_FIELD(I,J,2) = (PHI_FIELD(I+1,J+1)-PHI_FIELD(I+1,J+2))/HY
                ELSE IF (J == NPY-1) THEN ! Top boundary
                   IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(NPY-1)
                   E_FIELD(I,J,2) = (PHI_FIELD(I+1,J)-PHI_FIELD(I+1,J+1))/HY
-               ELSE IF (J == 50 .AND. ((I.GE. 10) .AND. (I .LE. 50))) THEN ! Bottom side of PFG
-                  IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(J)
-                  E_FIELD(I,J,2) = (PHI_FIELD(I+1,J)-PHI_FIELD(I+1,J+1))/HY
+               ! ELSE IF (J == 50 .AND. ((I.GE. 10) .AND. (I .LE. 50))) THEN ! Bottom side of PFG
+               !    IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(J)
+               !    E_FIELD(I,J,2) = (PHI_FIELD(I+1,J)-PHI_FIELD(I+1,J+1))/HY
                ELSE ! Interior point
                   IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = 0.5*(YSIZE(J)+YSIZE(J+1))
                   E_FIELD(I,J,2) = 0.5*(PHI_FIELD(I+1,J)-PHI_FIELD(I+1,J+2))/HY

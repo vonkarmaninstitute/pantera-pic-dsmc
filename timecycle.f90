@@ -438,7 +438,6 @@ MODULE timecycle
    DO IP = 1, NP_PROC
       REMOVE_PART(IP) = .FALSE.
 
-      IF (particles(IP)%Z /= 0) WRITE(*,*) "Particle Z coord is not zero!" 
       ! Update velocity
       IC = particles(IP)%IC
 
@@ -465,6 +464,32 @@ MODULE timecycle
       END IF
 
 
+
+      ! Forced electric field
+      E = [3000.d0, 0.d0, 0.d0]
+         
+
+
+      V_OLD(1) = particles(IP)%VX
+      V_OLD(2) = particles(IP)%VY
+      V_OLD(3) = particles(IP)%VZ
+
+      CALL UPDATE_VELOCITY_BORIS(DT, V_OLD, V_NEW, &
+      SPECIES(particles(IP)%S_ID)%CHARGE, SPECIES(particles(IP)%S_ID)%MOLECULAR_MASS, &
+      E, B)
+
+      ! Assign v^n to the particle, for simplicity
+      !particles(IP)%VX = 0.5*(V_OLD(1) + V_NEW(1))
+      !particles(IP)%VY = 0.5*(V_OLD(2) + V_NEW(2))
+      !particles(IP)%VZ = 0.5*(V_OLD(3) + V_NEW(3))
+      particles(IP)%VX = V_NEW(1)
+      particles(IP)%VY = V_NEW(2)
+      particles(IP)%VZ = V_NEW(3)
+
+      ! End forced electric field.
+
+
+
       HASCOLLIDED = .FALSE.
       TOTDTCOLL = 0.
       DO WHILE (particles(IP)%DTRIM .GT. 0.) ! Repeat the procedure until step is done
@@ -479,7 +504,7 @@ MODULE timecycle
                
                IF (i==1 .OR. i==2) THEN
                   ! Vertical wall
-                  SOL1 = (WALLS(i)%X1-particles(IP)%X)/particles(IP)%VX
+                  SOL1 = (BOUNDPOS(i)-particles(IP)%X)/particles(IP)%VX
                   IF (SOL1 >= 0 .AND. SOL1 < DTCOLL) THEN
                      GOODSOL = 1
                      TEST(1) = SOL1
@@ -530,19 +555,13 @@ MODULE timecycle
                IF (GOODSOL /= 0) THEN
                   DO SOL = 1, GOODSOL
                      CALL MOVE_PARTICLE(IP, TEST(SOL))
-                     IF ((particles(IP)%VX*WALLS(i)%NORMX + particles(IP)%VY*WALLS(i)%NORMY) < 0) THEN
-
-                        COLLDIST = ((particles(IP)%X-WALLS(i)%X1)*(WALLS(i)%X2-WALLS(i)%X1) &
-                                  + (particles(IP)%Y-WALLS(i)%Y1)*(WALLS(i)%Y2-WALLS(i)%Y1)) &
-                                  / ((WALLS(i)%X2-WALLS(i)%X1)**2 + (WALLS(i)%Y2-WALLS(i)%Y1)**2)
-                        IF ((COLLDIST .GE. 0) .AND. (COLLDIST .LE. 1)) THEN
-                           ! Collision happens!
-                           DTCOLL = TEST(SOL)
-                           BOUNDCOLL = i    
-                           TOTDTCOLL = TOTDTCOLL + DTCOLL  
-                           HASCOLLIDED = .TRUE.
-                           IF (BOUNDCOLL == 3) WRITE(*,*) "Collision with axis!"
-                        END IF
+                     IF ((particles(IP)%VX*NORMX(i) + particles(IP)%VY*NORMY(i)) < 0) THEN
+                        ! Collision happens!
+                        DTCOLL = TEST(SOL)
+                        BOUNDCOLL = i    
+                        TOTDTCOLL = TOTDTCOLL + DTCOLL  
+                        HASCOLLIDED = .TRUE.
+                        IF (BOUNDCOLL == 3) WRITE(*,*) "Collision with axis!"
                      END IF
                      CALL MOVE_PARTICLE(IP, -TEST(SOL))
                   END DO

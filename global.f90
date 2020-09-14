@@ -327,6 +327,8 @@ MODULE global
    INTEGER, DIMENSION(:), ALLOCATABLE      :: AVG_CUMULATED_INTENSIVE_ONE
    INTEGER, DIMENSION(:), ALLOCATABLE      :: AVG_CUMULATED_INTENSIVE_TWO
 
+   REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: AVG_MOMENTS
+   LOGICAL                                   :: BOOL_DUMP_MOMENTS = .FALSE.
 
    CONTAINS  ! @@@@@@@@@@@@@@@@@@@@@ SUBROUTINES @@@@@@@@@@@@@@@@@@@@@@@@
 

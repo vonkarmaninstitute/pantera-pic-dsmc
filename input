@@ -12,44 +12,48 @@
 
 ! ========= Computational domain and grid ===========
 Dimensions:
-    2
+    1
 Axisymmetric:
-    .TRUE.
-Grid_file:
-    axicoarse.grid
+    .FALSE.
+Number_of_cells:
+    100    1    1
+Domain_limits:
+    0.0    0.1    0.0    1.0    0.0    1.0
 Domain_periodicity:
-    .FALSE.   .FALSE.   .TRUE.
+    .FALSE.   .TRUE.   .TRUE.
 Domain_specular:
-    .FALSE.    .FALSE.    .TRUE.    .FALSE.
+    .FALSE.    .FALSE.    .FALSE.    .FALSE.
 Domain_diffuse:
     .FALSE.    .FALSE.    .FALSE.   .FALSE.
 Boundary_temperature:
     300.0
     
 Bool_PIC:
-    .TRUE.
+    .FALSE.
 
+Bool_dump_moments:
+    .TRUE.
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    100
+    1.e3
 Timestep:
-    1.0e-9
+    1.0e-11
 Number_of_timesteps:
-    400000
+    105000
 Stats_every:
     1
 
 RNG_seed:
     65645
 Dump_part_every:
-    100000
+    1000000
 
 Dump_grid_start:
-    300000
+    5000
     
 Dump_grid_avgevery:
-    10
+    20
 
 Dump_grid_numavgs:
     5000
@@ -60,16 +64,16 @@ Perform_checks:
 ! ========= Multispecies ==============================
 
 Species_file:
-    ar.species
+    electron.species
     
-Def_mixture:
-    Ions Ar+ 1.0
+!Def_mixture:
+!    Ions Ar+ 1.0
     
 Def_mixture:
     Electrons e 1.0
     
 Def_mixture:
-    collmix Ar 1.0
+    collmix e 1.0
     
     
 ! ========= Collisions ==============================
@@ -87,8 +91,8 @@ MCC_species: ! NOT IMPLEMENTED YET!
 
 DSMC_collisions_mixture:
     collmix
-VSS_parameters_file:
-    ar.vss
+!VSS_parameters_file:
+!    ar.vss
 
 Thermal_bath_bool:
     .FALSE.
@@ -100,8 +104,8 @@ Thermal_bath_Ttr:
 !Reactions_file:
 !    air.tce
 
-Wall_reactions_file:
-    ar.wall
+!Wall_reactions_file:
+!    ar.wall
 
 
 ! ========= Initial particle seed ===================
@@ -109,17 +113,17 @@ Wall_reactions_file:
 Initial_particles_bool:
     .FALSE.
 Initial_particles_dens:
-    1.e15
+    1.e10
 Initial_particles_vel:
     0.  0.  0.
 Initial_particles_Ttra:
-    300.0 300.0 300.0
+    5500.0 5500.0 5500.0
 Initial_particles_Trot:
-    300.
+    0.
 Initial_particles_Tvib:
-    300. 
+    0. 
 Initial_particles_mixture:
-    Aria
+    Electrons
 ! ========== Injection from boundaries ==============
 
 Boundaries_inject_bool:
@@ -156,9 +160,9 @@ Linesource_Trot:
 
 !   x1        y1     x2        y2       n         vx        vy     vz     Ttr       Trot   mix
 Linesource:
-    0.2001    0.0    0.2001    0.015    7.9e12    7608.0    0.0    0.0    1500.0    0.0    Ions
-Linesource:
-    0.2001    0.0    0.2001    0.015    7.9e12    0.0       0.0    0.0    5802.0    0.0    Electrons
+    0.099999  1     0.099999   0        1e10      -5e6      0.0    0.0    5500.0    0.0   Electrons
+!Linesource:
+!    0.2001    0.0    0.2001    0.015    7.9e12    0.0       0.0    0.0    5802.0    0.0    Electrons
 
 
 
@@ -174,14 +178,14 @@ Linesource:
 
 
 !   x1     y1     x2     y2      T        specular   diffuse    porous     tau    react
-Wall:
-    0.2    0.0    0.2    0.05    300.0    .FALSE.    .FALSE.    .FALSE.    0.0    .TRUE.
+!Wall:
+!    0.2    0.0    0.2    0.05    300.0    .FALSE.    .FALSE.    .FALSE.    0.0    .TRUE.
 
-Wall:
-    0.2    0.05   0.1    0.05    300.0    .FALSE.    .FALSE.    .FALSE.    0.0    .TRUE.
+!Wall:
+!    0.2    0.05   0.1    0.05    300.0    .FALSE.    .FALSE.    .FALSE.    0.0    .TRUE.
    
-Wall:
-    0.1    0.05   0.1    0.0     300.0    .FALSE.    .FALSE.    .FALSE.    0.0    .TRUE.
+!Wall:
+!    0.1    0.05   0.1    0.0     300.0    .FALSE.    .FALSE.    .FALSE.    0.0    .TRUE.
    
 
     

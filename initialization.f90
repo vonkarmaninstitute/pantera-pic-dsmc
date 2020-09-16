@@ -1628,14 +1628,22 @@ MODULE initialization
       IF (COLLISION_TYPE == "NONE") THEN
          BOOL_DSMC = .FALSE.
          BOOL_MCC  = .FALSE.
+         BOOL_BGK  = .FALSE.
 
       ELSE IF (COLLISION_TYPE == "DSMC") THEN
          BOOL_DSMC = .TRUE.
          BOOL_MCC  = .FALSE.
+         BOOL_BGK  = .FALSE.
 
       ELSE IF (COLLISION_TYPE == "MCC") THEN
          BOOL_DSMC = .FALSE.
          BOOL_MCC  = .TRUE.
+         BOOL_BGK  = .FALSE.
+
+      ELSE IF (COLLISION_TYPE == "BGK") THEN
+         BOOL_DSMC = .FALSE.
+         BOOL_MCC  = .FALSE.
+         BOOL_BGK  = .TRUE.
 
       ELSE ! ERROR!
          CALL ONLYMASTERPRINT1(PROC_ID, '$$$ ATTENTION! Collision type in input file not recognized! ABORTING!')

@@ -38,9 +38,9 @@ Bool_dump_moments:
 Fnum:  ! Ratio of real-to-simulated particles
     1.e3
 Timestep:
-    1.0e-11
+    1.0e-12
 Number_of_timesteps:
-    105000
+    90000
 Stats_every:
     1
 
@@ -50,13 +50,13 @@ Dump_part_every:
     1000000
 
 Dump_grid_start:
-    5000
+    30000
     
 Dump_grid_avgevery:
     20
 
 Dump_grid_numavgs:
-    5000
+    1000
 
 Perform_checks:
     .FALSE.

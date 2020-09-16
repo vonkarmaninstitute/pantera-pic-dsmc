@@ -113,7 +113,7 @@ MODULE global
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    CHARACTER(LEN=64) :: COLLISION_TYPE
-   LOGICAL           :: BOOL_MCC = .FALSE., BOOL_DSMC = .FALSE.
+   LOGICAL           :: BOOL_MCC = .FALSE., BOOL_DSMC = .FALSE., BOOL_BGK = .FALSE.
    REAL(KIND=8)      :: MCC_BG_DENS, MCC_BG_TTRA
    INTEGER           :: MCC_BG_MIX
    INTEGER           :: DSMC_COLL_MIX
@@ -126,6 +126,10 @@ MODULE global
 
    LOGICAL           :: BOOL_THERMAL_BATH = .FALSE.
    REAL(KIND=8)      :: TBATH
+
+   INTEGER           :: BGK_MODEL_TYPE_INT = 2
+   REAL(KIND=8)      :: BGK_BG_DENS, BGK_SIGMA, BGK_BG_MASS
+
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Initial particles seed !!!!!!!!!!!!!!!!!!!!!!!!!!!!!

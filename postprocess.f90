@@ -228,11 +228,11 @@
 
           ! rho
           TIMESTEP_MOMENTS(INDEX,1) = MASS*FNUM/VOL*TIMESTEP_NP(INDEX)
-          ! rhoUx, rhoUy, rhoUz
+          ! Ux, Uy, Uz
           TIMESTEP_MOMENTS(INDEX,2) = TIMESTEP_VX(INDEX)
           TIMESTEP_MOMENTS(INDEX,3) = TIMESTEP_VY(INDEX)
           TIMESTEP_MOMENTS(INDEX,4) = TIMESTEP_VZ(INDEX)
-
+          ! Higher order moments
           TIMESTEP_MOMENTS(INDEX,5:33) = TIMESTEP_MOMENTS(INDEX,5:33)*MASS*FNUM/VOL
         END DO
       END DO

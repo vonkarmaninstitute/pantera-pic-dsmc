@@ -1,7 +1,8 @@
 
 +++++++++++++ README FOR PANTERA +++++++++++++++++
 
-! Main developers: S. Boccelli  - stefano.boccelli@polimi.it   - Politecnico di Milano / VKI
+! Main developers: P. Parodi    - pietro.parodi@vki.ac.be      - VKI
+!                  S. Boccelli  - stefano.boccelli@polimi.it   - Politecnico di Milano / VKI
 !                  F. Bariselli - federico.bariselli@polimi.it - Politecnico di Milano / VKI
 ! 
 ! Original code by: A. Frezzotti - Politecnico di Milano
@@ -17,6 +18,7 @@ This will read the Makefile and create the "pantera.exe" executable.
 If it doesn't run, make sure that:
 > you have a compiler installed (gcc)
 > you have MPI installed (in Debian/Ubuntu, packages "openmpi-common" and "libopenmpi-dev").
+> you have the UMFPACK library installed (in Debian/Ubuntu: "sudo apt-get install libsuitesparse-dev")
 
 After compiling, run PANTERA with:
 

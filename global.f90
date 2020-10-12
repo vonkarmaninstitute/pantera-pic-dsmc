@@ -5,6 +5,18 @@ MODULE global
    USE particle
    USE mpi_common
 
+
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! Constants !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+   REAL(KIND=8) :: PI   = 3.1415926535897932d0           ! https://dlmf.nist.gov/3.12
+   REAL(KIND=8) :: EPS0 = 8.8541878128d-12               ! https://physics.nist.gov/cgi-bin/cuu/Value?ep0
+   REAL(KIND=8) :: KB   = 1.380649d-23                   ! https://physics.nist.gov/cgi-bin/cuu/Value?k
+   REAL(KIND=8) :: QE   = 1.602176634d-19                ! https://physics.nist.gov/cgi-bin/cuu/Value?e
+
+   REAL(KIND=8) :: EPS_SCALING = 1.d0
+   
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! Particle variables and arrays !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -12,6 +24,7 @@ MODULE global
    INTEGER :: NP_PROC ! Number of particles in local MPI process
    INTEGER :: MPI_PARTICLE_DATA_STRUCTURE ! We need this for MPI
    TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: particles
+   CHARACTER*256 :: PARTDUMP_SAVE_PATH
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Geometry, domain and grid !!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -23,6 +36,8 @@ MODULE global
    REAL(KIND=8) :: XMIN, XMAX, YMIN, YMAX, ZMIN, ZMAX
    REAL(KIND=8) :: CELL_VOL
    LOGICAL      :: AXI = .FALSE.
+   LOGICAL      :: BOOL_SPEED_LIMIT = .FALSE.
+   REAL(KIND=8) :: SPEED_LIMIT = 1.d3
    LOGICAL      :: BOOL_X_PERIODIC = .FALSE. ! Assign default value!
    LOGICAL      :: BOOL_Y_PERIODIC = .FALSE.
    LOGICAL      :: BOOL_Z_PERIODIC = .FALSE.
@@ -310,6 +325,8 @@ MODULE global
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Average flowfield !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   
+   CHARACTER*256                           :: FLOWFIELD_SAVE_PATH
 
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_N
 

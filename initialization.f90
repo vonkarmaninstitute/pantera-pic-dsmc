@@ -93,7 +93,12 @@ MODULE initialization
          IF (line=='Stats_every:')             READ(in1,*) STATS_EVERY
          IF (line=='Bool_dump_moments:')       READ(in1,*) BOOL_DUMP_MOMENTS
          IF (line=='Bool_PIC:')                READ(in1,*) BOOL_PIC
+         IF (line=='Epsilon_scaling:')         READ(in1,*) EPS_SCALING
 
+         ! ~~~~~~~~~~~~~  File output ~~~~~~~~~~~~~~~
+
+         IF (line=='Flowfield_output:')        READ(in1,*) FLOWFIELD_SAVE_PATH
+         IF (line=='Particle_dump_output:')    READ(in1,*) PARTDUMP_SAVE_PATH
 
          ! ~~~~~~~~~~~~~  Multispecies ~~~~~~~~~~~~~~~
          IF (line=='Species_file:') THEN
@@ -463,13 +468,9 @@ MODULE initialization
       REAL(KIND=8) :: OMEGA
       REAL(KIND=8) :: TREF
       REAL(KIND=8) :: ALPHA
-      REAL(KIND=8) :: PI, KB
 
       INTEGER      :: IS, JS
       REAL(KIND=8) :: M1, M2, MRED
-
-      PI   = 3.141593
-      KB = 1.38064852E-23
 
       ! Open input file for reading
       OPEN(UNIT=in2,FILE=FILENAME, STATUS='old',IOSTAT=ios)
@@ -568,14 +569,10 @@ MODULE initialization
       INTEGER, ALLOCATABLE :: SP_IDS(:)
       REAL(KIND=8) :: OMEGA
       REAL(KIND=8) :: TREF
-      REAL(KIND=8) :: PI, KB
       REAL(KIND=8) :: READ_VALUE
 
       INTEGER      :: IS, JS
       REAL(KIND=8) :: M1, M2, MRED
-
-      PI   = 3.141593
-      KB = 1.38064852E-23
 
       ALLOCATE(VSS_GREFS(N_SPECIES, N_SPECIES))
       ALLOCATE(VSS_SIGMAS(N_SPECIES, N_SPECIES))
@@ -854,15 +851,15 @@ MODULE initialization
 
       CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
 
-      READ(STRARRAY(1), '(ES14.3)') WALLS(N_WALLS)%X1
-      READ(STRARRAY(2), '(ES14.3)') WALLS(N_WALLS)%Y1
-      READ(STRARRAY(3), '(ES14.3)') WALLS(N_WALLS)%X2
-      READ(STRARRAY(4), '(ES14.3)') WALLS(N_WALLS)%Y2
-      READ(STRARRAY(5), '(ES14.3)') WALLS(N_WALLS)%TEMP
+      READ(STRARRAY(1), '(ES14.0)') WALLS(N_WALLS)%X1
+      READ(STRARRAY(2), '(ES14.0)') WALLS(N_WALLS)%Y1
+      READ(STRARRAY(3), '(ES14.0)') WALLS(N_WALLS)%X2
+      READ(STRARRAY(4), '(ES14.0)') WALLS(N_WALLS)%Y2
+      READ(STRARRAY(5), '(ES14.0)') WALLS(N_WALLS)%TEMP
       READ(STRARRAY(6), *) WALLS(N_WALLS)%SPECULAR
       READ(STRARRAY(7), *) WALLS(N_WALLS)%DIFFUSE
       READ(STRARRAY(8), *) WALLS(N_WALLS)%POROUS
-      READ(STRARRAY(9), '(ES14.3)') WALLS(N_WALLS)%TRANSMISSIVITY
+      READ(STRARRAY(9), '(ES14.0)') WALLS(N_WALLS)%TRANSMISSIVITY
       READ(STRARRAY(10), *) WALLS(N_WALLS)%REACT
 
       LENGTH = SQRT((WALLS(N_WALLS)%X2 - WALLS(N_WALLS)%X1)**2 + (WALLS(N_WALLS)%Y2 - WALLS(N_WALLS)%Y1)**2)
@@ -895,13 +892,10 @@ MODULE initialization
       !REAL(KIND=8) :: OMEGA
       !REAL(KIND=8) :: TREF
       !REAL(KIND=8) :: ALPHA
-      !REAL(KIND=8) :: PI, KB
 
       !INTEGER      :: IS, JS
       !REAL(KIND=8) :: M1, M2, MRED
 
-      !PI   = 3.141593
-      !KB = 1.38064852E-23
 
       ! Open input file for reading
       OPEN(UNIT=in3,FILE=FILENAME, STATUS='old',IOSTAT=ios)
@@ -951,13 +945,13 @@ MODULE initialization
          IF (STRARRAY(4) == '-CEX->') THEN
             NEW_REACTION%IS_CEX = .TRUE.
             NEW_REACTION%EA = 0.d0
-            READ(STRARRAY(1), '(ES14.3)') NEW_REACTION%C1
-            READ(STRARRAY(2), '(ES14.3)') NEW_REACTION%C2
+            READ(STRARRAY(1), '(ES14.0)') NEW_REACTION%C1
+            READ(STRARRAY(2), '(ES14.0)') NEW_REACTION%C2
          ELSE
             NEW_REACTION%IS_CEX = .FALSE.
-            READ(STRARRAY(1), '(ES14.3)') NEW_REACTION%A
-            READ(STRARRAY(2), '(ES14.3)') NEW_REACTION%N
-            READ(STRARRAY(3), '(ES14.3)') NEW_REACTION%EA
+            READ(STRARRAY(1), '(ES14.0)') NEW_REACTION%A
+            READ(STRARRAY(2), '(ES14.0)') NEW_REACTION%N
+            READ(STRARRAY(3), '(ES14.0)') NEW_REACTION%EA
          END IF
 
          IF (ReasonEOF < 0) EXIT ! End of file reached
@@ -1064,7 +1058,7 @@ MODULE initialization
       
          READ(in4,'(A)', IOSTAT=ReasonEOF) DEFINITION ! Read reaction parameters line
          CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
-         READ(STRARRAY(1), '(ES14.3)') NEW_REACTION%PROB
+         READ(STRARRAY(1), '(ES14.0)') NEW_REACTION%PROB
 
          IF (ReasonEOF < 0) EXIT ! End of file reached
          
@@ -1190,14 +1184,12 @@ MODULE initialization
       IMPLICIT NONE
 
       INTEGER            :: IP, NP_INIT
-      REAL(KIND=8)       :: Xp, Yp, Zp, VXp, VYp, VZp, EROT, EVIB, DOMAIN_VOLUME, PI
+      REAL(KIND=8)       :: Xp, Yp, Zp, VXp, VYp, VZp, EROT, EVIB, DOMAIN_VOLUME
       INTEGER            :: CID
 
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
       REAL(KIND=8)  :: M
       INTEGER       :: S_ID, i
-            
-      PI   = 3.141593
 
       ! Print message 
       CALL ONLYMASTERPRINT1(PROC_ID, '> SEEDING INITIAL PARTICLES IN THE DOMAIN...')
@@ -1441,17 +1433,14 @@ MODULE initialization
 
       REAL(KIND=8) :: BETA, FLUXBOUND, NtotINJECT, Snow
       REAL(KIND=8) :: U_NORM, S_NORM, FLUXLINESOURCE, LINELENGTH, NORMX, NORMY, AREA
-      REAL(KIND=8) :: PI, PI2  
+      REAL(KIND=8) :: PI2  
 
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: nfs_LINE
  
-      REAL(KIND=8)  :: M, FRAC, KB
+      REAL(KIND=8)  :: M, FRAC
       INTEGER :: N_COMP, IS, S_ID, ILINE
     
-      PI   = 3.141593
       PI2  = 2.*PI
-
-      KB = 1.38064852E-23
 
       ! Injection from boundaries
       IF (BOOL_BOUNDINJECT) THEN 
@@ -1661,11 +1650,8 @@ MODULE initialization
 
       REAL(KIND=8) :: OMEGA, TREF, SIGMA, ZETA, ETA, LAMBDA, EPS, MR, EA, M1, M2
       REAL(KIND=8) :: C1, C2, C3
-      REAL(KIND=8) :: PI, KB
       INTEGER      :: JR, R1_SP_ID, R2_SP_ID
 
-      PI   = 3.141593
-      KB = 1.38064852E-23
 
       DO JR = 1, N_REACTIONS
          IF (.NOT. REACTIONS(JR)%IS_CEX) THEN

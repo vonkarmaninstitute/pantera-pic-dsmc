@@ -120,14 +120,11 @@ CONTAINS
   REAL(KIND=8), INTENT(INOUT) :: VX, VY, VZ
 
   INTEGER                     :: I
-  REAL(KIND=8)                :: PI, PI2, KB
+  REAL(KIND=8)                :: PI2
   REAL(KIND=8)                :: R, R1, RO, TETA, BETA
   REAL(KIND=8), DIMENSION(3)  :: VEL, TT
 
-  PI   = 3.141593
   PI2  = 2.*PI
-
-  KB = 1.38064852E-23
 
   TT(1) = TX
   TT(2) = TY
@@ -176,9 +173,7 @@ CONTAINS
    INTEGER, INTENT(IN)       :: DOF
    REAL(KIND=8), INTENT(IN)  :: TEMP
    REAL(KIND=8), INTENT(OUT) :: EI
-   REAL(KIND=8)              :: KB, R, X, PARAM
-
-   KB = 1.38064852E-23
+   REAL(KIND=8)              :: R, X, PARAM
 
    IF (DOF .EQ. 0) THEN
 
@@ -273,7 +268,7 @@ CONTAINS
      CHARACTER(LEN=512)  :: filename
      INTEGER :: IP
 
-     WRITE(filename, "(A,I0.5,A6,I0.8)") "/media/pietro/Storage/panteradumps/partdumps/proc_", PROC_ID, "_time_", TIMESTEP ! Compose filename
+     WRITE(filename, "(A,A,I0.5,A6,I0.8)") TRIM(ADJUSTL(PARTDUMP_SAVE_PATH)), "proc_", PROC_ID, "_time_", TIMESTEP ! Compose filename
 
      ! Open file for writing
      OPEN(10, FILE=filename )
@@ -322,9 +317,8 @@ CONTAINS
   REAL(KIND=8), INTENT(IN) :: SN,TINF,M
   REAL(KIND=8) :: OUT
   REAL(KIND=8) :: R1,R2
-  REAL(KIND=8) :: y,fM,BETA,KB, KAPPA, ACCA
+  REAL(KIND=8) :: y,fM,BETA, KAPPA, ACCA
 
-  KB = 1.38064852E-23
   BETA = 1./SQRT(2.*KB/M*TINF)
 
   ACCA = SQRT(SN**2+2.)                              ! Tmp variable

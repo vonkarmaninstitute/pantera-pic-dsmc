@@ -19,7 +19,7 @@ MODULE timecycle
    IMPLICIT NONE
  
    INTEGER :: NP_TOT, NCOLL_TOT
-   REAL(KIND=8) :: CURRENT_TIME, CURRENT_CPU_TIME
+   REAL(KIND=8) :: CURRENT_TIME, CURRENT_CPU_TIME, EST_TIME
 
    CHARACTER(len=512) :: stringTMP
 
@@ -55,14 +55,16 @@ MODULE timecycle
       CURRENT_TIME = tID*DT
       CALL CPU_TIME(CURRENT_CPU_TIME)
       CURRENT_CPU_TIME = CURRENT_CPU_TIME - START_CPU_TIME 
+      EST_TIME = DBLE(NT-tID)/tID*CURRENT_CPU_TIME/3600.d0
 
       IF (MOD(tID, STATS_EVERY) .EQ. 0) THEN
          CALL MPI_REDUCE(NP_PROC, NP_TOT, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
          CALL MPI_REDUCE(TIMESTEP_COLL, NCOLL_TOT, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
 
-         WRITE(stringTMP, '(A13,I8,A4,I8,A9,ES14.3,A17,F10.1,A28,I10,A25,I10)') '   Timestep: ', tID, ' of ', NT, &
+         WRITE(stringTMP, '(A13,I8,A4,I8,A9,ES14.3,A17,F10.1,A27,F10.1,A28,I10,A25,I10)') '   Timestep: ', tID, ' of ', NT, &
                           ' - time: ', CURRENT_TIME, ' [s] - CPU time: ', CURRENT_CPU_TIME, &
-                          ' [s] - number of particles: ', NP_TOT, &
+                          ' [s] - est. time required: ', EST_TIME, &
+                          ' [h] - number of particles: ', NP_TOT, &
                           ' - number of collisions: ', NCOLL_TOT
 
          CALL ONLYMASTERPRINT1(PROC_ID, TRIM(stringTMP))
@@ -410,7 +412,8 @@ MODULE timecycle
    ! REAL(KIND=8) :: XCOLL, YCOLL, ZCOLL
    REAL(KIND=8) :: VN, DX
    LOGICAL, DIMENSION(:), ALLOCATABLE :: REMOVE_PART
-   REAL(KIND=8), DIMENSION(3) :: V_OLD, V_NEW
+   REAL(KIND=8) :: BETA_FACTOR
+   REAL(KIND=8), DIMENSION(3) :: V_OLD, V_NEW, V_LIMITED
    REAL(KIND=8), DIMENSION(3) :: E, B
    REAL(KIND=8) :: V_NORM, V_PERP, VZ, VDUMMY, EROT, EVIB, VDOTN
    INTEGER :: S_ID
@@ -442,6 +445,10 @@ MODULE timecycle
       ! Update velocity
       IC = particles(IP)%IC
 
+      V_NEW(1) = particles(IP)%VX
+      V_NEW(2) = particles(IP)%VY
+      V_NEW(3) = particles(IP)%VZ
+
       IF (BOOL_PIC) THEN
          CALL APPLY_E_FIELD(IP, E)
          
@@ -466,34 +473,39 @@ MODULE timecycle
 
 
 
-      ! Forced electric field
-      E = [3000.d0, 0.d0, 0.d0]
+      ! ! Forced electric field
+      ! E = [3000.d0, 0.d0, 0.d0]
          
 
 
-      V_OLD(1) = particles(IP)%VX
-      V_OLD(2) = particles(IP)%VY
-      V_OLD(3) = particles(IP)%VZ
+      ! V_OLD(1) = particles(IP)%VX
+      ! V_OLD(2) = particles(IP)%VY
+      ! V_OLD(3) = particles(IP)%VZ
 
-      CALL UPDATE_VELOCITY_BORIS(DT, V_OLD, V_NEW, &
-      SPECIES(particles(IP)%S_ID)%CHARGE, SPECIES(particles(IP)%S_ID)%MOLECULAR_MASS, &
-      E, B)
+      ! CALL UPDATE_VELOCITY_BORIS(DT, V_OLD, V_NEW, &
+      ! SPECIES(particles(IP)%S_ID)%CHARGE, SPECIES(particles(IP)%S_ID)%MOLECULAR_MASS, &
+      ! E, B)
 
-      ! Assign v^n to the particle, for simplicity
-      !particles(IP)%VX = 0.5*(V_OLD(1) + V_NEW(1))
-      !particles(IP)%VY = 0.5*(V_OLD(2) + V_NEW(2))
-      !particles(IP)%VZ = 0.5*(V_OLD(3) + V_NEW(3))
-      particles(IP)%VX = V_NEW(1)
-      particles(IP)%VY = V_NEW(2)
-      particles(IP)%VZ = V_NEW(3)
+      ! ! Assign v^n to the particle, for simplicity
+      ! !particles(IP)%VX = 0.5*(V_OLD(1) + V_NEW(1))
+      ! !particles(IP)%VY = 0.5*(V_OLD(2) + V_NEW(2))
+      ! !particles(IP)%VZ = 0.5*(V_OLD(3) + V_NEW(3))
+      ! particles(IP)%VX = V_NEW(1)
+      ! particles(IP)%VY = V_NEW(2)
+      ! particles(IP)%VZ = V_NEW(3)
 
-      ! End forced electric field.
+      ! ! End forced electric field.
 
 
 
       HASCOLLIDED = .FALSE.
       TOTDTCOLL = 0.
       DO WHILE (particles(IP)%DTRIM .GT. 0.) ! Repeat the procedure until step is done
+
+         BETA_FACTOR = BETA_LIMITING_FUNCTION(SQRT(particles(IP)%VX**2 + particles(IP)%VY**2 + particles(IP)%VZ**2))
+         V_LIMITED(1) = BETA_FACTOR * particles(IP)%VX
+         V_LIMITED(2) = BETA_FACTOR * particles(IP)%VY
+         V_LIMITED(3) = BETA_FACTOR * particles(IP)%VZ
 
          DTCOLL = particles(IP)%DTRIM ! Looking for collisions within the remaining time
          ! ______ ADVECTION ______
@@ -505,7 +517,7 @@ MODULE timecycle
                
                IF (i==1 .OR. i==2) THEN
                   ! Vertical wall
-                  SOL1 = (BOUNDPOS(i)-particles(IP)%X)/particles(IP)%VX
+                  SOL1 = (BOUNDPOS(i)-particles(IP)%X)/V_LIMITED(1)
                   IF (SOL1 >= 0 .AND. SOL1 < DTCOLL) THEN
                      GOODSOL = 1
                      TEST(1) = SOL1
@@ -514,8 +526,8 @@ MODULE timecycle
                   END IF
                ELSE
                   ! Horizontal boundary
-                  COEFA = particles(IP)%VY**2 + particles(IP)%VZ**2
-                  COEFB = particles(IP)%Y * particles(IP)%VY
+                  COEFA = V_LIMITED(2)**2 + V_LIMITED(3)**2
+                  COEFB = particles(IP)%Y * V_LIMITED(2)
                   COEFC = particles(IP)%Y**2 - BOUNDPOS(i)**2
                   DELTA = COEFB*COEFB-COEFA*COEFC
                   IF (DELTA .GE. 0) THEN
@@ -556,7 +568,7 @@ MODULE timecycle
                IF (GOODSOL /= 0) THEN
                   DO SOL = 1, GOODSOL
                      CALL MOVE_PARTICLE(IP, TEST(SOL))
-                     IF ((particles(IP)%VX*NORMX(i) + particles(IP)%VY*NORMY(i)) < 0) THEN
+                     IF ((V_LIMITED(1)*NORMX(i) + V_LIMITED(2)*NORMY(i)) < 0) THEN
                         ! Collision happens!
                         DTCOLL = TEST(SOL)
                         BOUNDCOLL = i    
@@ -573,7 +585,7 @@ MODULE timecycle
             ELSE
                ! We are not axisymmetric.
                ! Compute the velocity normal to the boundary
-               VN = -(particles(IP)%VX * NORMX(i) + particles(IP)%VY * NORMY(i))
+               VN = -(V_LIMITED(1) * NORMX(i) + V_LIMITED(2) * NORMY(i))
                ! Compute the distance from the boundary
                DX = (particles(IP)%X - XW(i)) * NORMX(i) + (particles(IP)%Y - YW(i)) * NORMY(i)
                ! Check if a collision happens (sooner than previously calculated)
@@ -605,7 +617,7 @@ MODULE timecycle
                ! Compute auxiliary parameters
                IF (WALLS(i)%X1 == WALLS(i)%X2) THEN
                   ! Vertical wall
-                  SOL1 = (WALLS(i)%X1-particles(IP)%X)/particles(IP)%VX
+                  SOL1 = (WALLS(i)%X1-particles(IP)%X)/V_LIMITED(1)
                   IF (SOL1 >= 0 .AND. SOL1 < DTCOLL) THEN
                      GOODSOL = 1
                      TEST(1) = SOL1
@@ -617,8 +629,8 @@ MODULE timecycle
                   ALPHA = (WALLS(i)%Y2-WALLS(i)%Y1)/(WALLS(i)%X2-WALLS(i)%X1)
                   BETA  = (particles(IP)%X - WALLS(i)%X1)*ALPHA
 
-                  COEFA = particles(IP)%VY**2 + particles(IP)%VZ**2 - ALPHA*ALPHA*particles(IP)%VX**2
-                  COEFB = particles(IP)%Y * particles(IP)%VY - (BETA + WALLS(i)%Y1)*ALPHA*particles(IP)%VX
+                  COEFA = V_LIMITED(2)**2 + V_LIMITED(3)**2 - ALPHA*ALPHA*V_LIMITED(1)**2
+                  COEFB = particles(IP)%Y * V_LIMITED(2) - (BETA + WALLS(i)%Y1)*ALPHA*V_LIMITED(1)
                   COEFC = particles(IP)%Y**2 - (BETA + WALLS(i)%Y1)**2
                   DELTA = COEFB*COEFB-COEFA*COEFC
                   IF (DELTA .GE. 0) THEN
@@ -659,7 +671,7 @@ MODULE timecycle
                IF (GOODSOL /= 0) THEN
                   DO SOL = 1, GOODSOL
                      CALL MOVE_PARTICLE(IP, TEST(SOL))
-                     IF ((particles(IP)%VX*WALLS(i)%NORMX + particles(IP)%VY*WALLS(i)%NORMY) < 0) THEN
+                     IF ((V_LIMITED(1)*WALLS(i)%NORMX + V_LIMITED(2)*WALLS(i)%NORMY) < 0) THEN
 
                         COLLDIST = ((particles(IP)%X-WALLS(i)%X1)*(WALLS(i)%X2-WALLS(i)%X1) &
                                   + (particles(IP)%Y-WALLS(i)%Y1)*(WALLS(i)%Y2-WALLS(i)%Y1)) &
@@ -681,7 +693,7 @@ MODULE timecycle
             ELSE
                ! We are not axisymmetric
                ! Compute the velocity normal to the surface
-               VN = -(particles(IP)%VX * WALLS(i)%NORMX + particles(IP)%VY * WALLS(i)%NORMY)
+               VN = -(V_LIMITED(1) * WALLS(i)%NORMX + V_LIMITED(2) * WALLS(i)%NORMY)
                ! Compute the distance from the boundary
                DX = (particles(IP)%X - WALLS(i)%X1) * WALLS(i)%NORMX + (particles(IP)%Y - WALLS(i)%Y1) * WALLS(i)%NORMY
                ! Check if a collision happens (sooner than previously calculated)
@@ -689,8 +701,8 @@ MODULE timecycle
                   
                   CANDIDATE_DTCOLL = DX/VN
                   ! Find candidate collision point
-                  XCOLL = particles(IP)%X + particles(IP)%VX * CANDIDATE_DTCOLL 
-                  YCOLL = particles(IP)%Y + particles(IP)%VY * CANDIDATE_DTCOLL
+                  XCOLL = particles(IP)%X + V_LIMITED(1) * CANDIDATE_DTCOLL 
+                  YCOLL = particles(IP)%Y + V_LIMITED(2) * CANDIDATE_DTCOLL
                   COLLDIST = ((XCOLL-WALLS(i)%X1)*(WALLS(i)%X2-WALLS(i)%X1)+(YCOLL-WALLS(i)%Y1)*(WALLS(i)%Y2-WALLS(i)%Y1))/ &
                   ((WALLS(i)%X2-WALLS(i)%X1)**2 + (WALLS(i)%Y2-WALLS(i)%Y1)**2)
                   IF ((COLLDIST .GE. 0) .AND. (COLLDIST .LE. 1)) THEN
@@ -942,17 +954,19 @@ MODULE timecycle
       REAL(KIND=8), DIMENSION(3), INTENT(IN) :: V_OLD, E, B
       REAL(KIND=8), DIMENSION(3) :: V_MINUS, V_PLUS, V_PRIME, T, S
       REAL(KIND=8), INTENT(IN) :: DT, CHARGE, MASS
-      REAL(KIND=8) :: COULOMBCHARGE
+      REAL(KIND=8) :: COULOMBCHARGE, BETA_FACTOR
 
-      COULOMBCHARGE = CHARGE * 1.602176634e-19
-      V_MINUS = V_OLD + 0.5*COULOMBCHARGE*E/MASS*DT
+      BETA_FACTOR = BETA_LIMITING_FUNCTION(SQRT(V_OLD(1)**2 + V_OLD(2)**2 + V_OLD(3)**2))
 
-      T = 0.5*COULOMBCHARGE*B/MASS*DT
+      COULOMBCHARGE = CHARGE * QE
+      V_MINUS = V_OLD + 0.5*COULOMBCHARGE*E/MASS*DT*BETA_FACTOR
+
+      T = 0.5*COULOMBCHARGE*B/MASS*DT*BETA_FACTOR
       V_PRIME = V_MINUS + CROSS(V_MINUS, T)
       S = 2.*T/(1.+( T(1)*T(1) + T(2)*T(2) + T(3)*T(3) ))
       V_PLUS = V_MINUS + CROSS(V_PRIME, S)
 
-      V_NEW = V_PLUS + 0.5*COULOMBCHARGE*E/MASS*DT
+      V_NEW = V_PLUS + 0.5*COULOMBCHARGE*E/MASS*DT*BETA_FACTOR
 
    END SUBROUTINE
 
@@ -969,17 +983,19 @@ MODULE timecycle
 
       INTEGER, INTENT(IN)      :: IP
       REAL(KIND=8), INTENT(IN) :: TIME
-      REAL(KIND=8)             :: SINTHETA, COSTHETA, VZ, VY, R
+      REAL(KIND=8)             :: SINTHETA, COSTHETA, VZ, VY, R, BETA_FACTOR
 
       ! WRITE(*,*) "Moving particle ", IP, " for time interval ", TIME
 
+      BETA_FACTOR = BETA_LIMITING_FUNCTION(SQRT(particles(IP)%VX**2 + particles(IP)%VY**2 + particles(IP)%VZ**2))
+
       IF (AXI) THEN
-         particles(IP)%X = particles(IP)%X + particles(IP)%VX * TIME
+         particles(IP)%X = particles(IP)%X + particles(IP)%VX * TIME * BETA_FACTOR
          particles(IP)%Z = 0.d0
-         R = SQRT((particles(IP)%Y + particles(IP)%VY*TIME)**2 + (particles(IP)%VZ*TIME)**2)
+         R = SQRT((particles(IP)%Y + particles(IP)%VY*TIME*BETA_FACTOR)**2 + (particles(IP)%VZ*TIME*BETA_FACTOR)**2)
          ! Rotate velocity vector back to x-y plane.
-         SINTHETA = particles(IP)%VZ*TIME / R
-         COSTHETA = SIGN(SQRT(1.-SINTHETA*SINTHETA), particles(IP)%Y + particles(IP)%VY*TIME)
+         SINTHETA = particles(IP)%VZ*TIME*BETA_FACTOR / R
+         COSTHETA = SIGN(SQRT(1.-SINTHETA*SINTHETA), particles(IP)%Y + particles(IP)%VY*TIME*BETA_FACTOR)
          particles(IP)%Y = R
 
          VZ = particles(IP)%VZ
@@ -987,9 +1003,9 @@ MODULE timecycle
          particles(IP)%VZ = COSTHETA*VZ - SINTHETA*VY
          particles(IP)%VY = SINTHETA*VZ + COSTHETA*VY
       ELSE
-         particles(IP)%X = particles(IP)%X + particles(IP)%VX * TIME
-         particles(IP)%Y = particles(IP)%Y + particles(IP)%VY * TIME
-         particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ * TIME
+         particles(IP)%X = particles(IP)%X + particles(IP)%VX * TIME * BETA_FACTOR
+         particles(IP)%Y = particles(IP)%Y + particles(IP)%VY * TIME * BETA_FACTOR
+         particles(IP)%Z = particles(IP)%Z + particles(IP)%VZ * TIME * BETA_FACTOR
       END IF
 
    END SUBROUTINE MOVE_PARTICLE
@@ -1053,7 +1069,7 @@ MODULE timecycle
    INTEGER      :: JP1, JP2, JR, I, J, SP_ID1, SP_ID2, P1_SP_ID, P2_SP_ID, P3_SP_ID, NP_PROC_INITIAL
    REAL(KIND=8) :: P_COLL, PTCE, rfp
    REAL(KIND=8) :: SIGMA, OMEGA, CREF, ALPHA, FRAC
-   REAL(KIND=8) :: PI,PI2
+   REAL(KIND=8) :: PI2
    REAL(KIND=8), DIMENSION(3) :: C1, C2, GREL, W
    REAL(KIND=8) :: GX, GY, GZ, G
    REAL(KIND=8) :: COSCHI, SINCHI, THETA, COSTHETA, SINTHETA
@@ -1062,7 +1078,6 @@ MODULE timecycle
    LOGICAL :: SKIP
    TYPE(PARTICLE_DATA_STRUCTURE) :: NEWparticle
 
-   PI  = 3.141593
    PI2 = 2*PI
 
    TIMESTEP_COLL = 0
@@ -1354,5 +1369,26 @@ MODULE timecycle
    END DO
 
    END SUBROUTINE MCC_COLLISIONS
+
+
+   FUNCTION BETA_LIMITING_FUNCTION(VELOCITY) RESULT(BETA_FACTOR)
+      IMPLICIT NONE
+
+      REAL(KIND=8) :: BETA_FACTOR
+      REAL(KIND=8), INTENT(IN) :: VELOCITY
+
+      IF (BOOL_SPEED_LIMIT) THEN
+         IF (VELOCITY <= SPEED_LIMIT) THEN
+            BETA_FACTOR = 1.d0
+         ELSE
+            BETA_FACTOR = SPEED_LIMIT / VELOCITY
+         END IF
+      ELSE
+         BETA_FACTOR = 1.d0
+      END IF
+      
+      RETURN
+
+   END FUNCTION BETA_LIMITING_FUNCTION
 
 END MODULE timecycle

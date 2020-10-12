@@ -20,8 +20,6 @@
     INTEGER                            :: NCELLS, NSPECIES
     INTEGER                            :: JP, JC, JS, INDEX
 
-    REAL(KIND=8)                       :: KB
-
     REAL(KIND=8) :: DBLE_AVG_CUMULATED, NUMPART, SAMPLEDOF
     REAL(KIND=8) :: CX, CY, CZ, C2, MASS, VOL
 
@@ -55,7 +53,6 @@
 
     INTEGER :: LENGTH
 
-    KB = 1.38064852E-23
 
     LENGTH = NX*NY * N_SPECIES
 
@@ -454,7 +451,8 @@
 
       ! DSMC flowfield file
 
-      WRITE(file_name,'(A, I0, A)') '/media/pietro/Storage/panteradumps/dsmc_flowfield_', tID, '.vtk'
+      !WRITE(file_name,'(A, I0, A)') '/media/pietro/Storage/panteradumps/dsmc_flowfield_', tID, '.vtk'
+      WRITE(file_name,'(A, A, I0, A)') TRIM(ADJUSTL(FLOWFIELD_SAVE_PATH)), 'dsmc_flowfield_', tID, '.vtk'
 
       OPEN(54321, FILE=file_name, ACCESS='SEQUENTIAL', FORM='formatted', STATUS='new')
 

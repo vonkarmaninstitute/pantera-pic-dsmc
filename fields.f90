@@ -22,11 +22,7 @@ MODULE fields
       INTEGER :: MAXNNZ, SIZE
       TYPE(ST_MATRIX) :: A_ST
       REAL(KIND=8) :: HX, HY
-      REAL(KIND=8) :: PI
       REAL(KIND=8) :: AX, AY, BX, BY, CX, CY, H1X, H2X, H1Y, H2Y, R
-
-      PI   = 3.141593
-
 
       SIZE = NPX*NPY
 
@@ -210,15 +206,15 @@ MODULE fields
             IF (I == 0) THEN ! Left boundary
                IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(1)
                E_FIELD(I,J,1) = (PHI_FIELD(I+1,J+1)-PHI_FIELD(I+2,J+1))/HX
-            ! ELSE IF (I == 50 .AND. ((J .GE. 50) .AND. (J .LE. 150))) THEN ! Right side of PFG
-            !    IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(I+1)
-            !    E_FIELD(I,J,1) = (PHI_FIELD(I+1,J+1)-PHI_FIELD(I+2,J+1))/HX
+            ELSE IF (I == 30 .AND. (J .LE. 50)) THEN ! Right side of PFG
+               IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(I+1)
+               E_FIELD(I,J,1) = (PHI_FIELD(I+1,J+1)-PHI_FIELD(I+2,J+1))/HX
             ELSE IF (I == NPX-1) THEN ! Right boundary
                IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(NPX-1)
                E_FIELD(I,J,1) = (PHI_FIELD(I,J+1)-PHI_FIELD(I+1,J+1))/HX
-            ! ELSE IF (I == 10 .AND. ((J .GE. 50) .AND. (J .LE. 150))) THEN ! Left side of PFG
-            !    IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(I)
-            !    E_FIELD(I,J,1) = (PHI_FIELD(I,J+1)-PHI_FIELD(I+1,J+1))/HX
+            ELSE IF (I == 10 .AND. (J .LE. 50)) THEN ! Left side of PFG
+               IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(I)
+               E_FIELD(I,J,1) = (PHI_FIELD(I,J+1)-PHI_FIELD(I+1,J+1))/HX
             ELSE ! Interior point
                IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = 0.5*(XSIZE(I)+XSIZE(I+1))
                E_FIELD(I,J,1) = 0.5*(PHI_FIELD(I,J+1)-PHI_FIELD(I+2,J+1))/HX
@@ -227,9 +223,9 @@ MODULE fields
                IF (J == 0) THEN ! Bottom boundary
                   IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(1)
                   E_FIELD(I,J,2) = (PHI_FIELD(I+1,J+1)-PHI_FIELD(I+1,J+2))/HY
-               ! ELSE IF (J == 150 .AND. ((I.GE. 10) .AND. (I .LE. 50))) THEN ! Top side of PFG
-               !    IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(J+1)
-               !    E_FIELD(I,J,2) = (PHI_FIELD(I+1,J+1)-PHI_FIELD(I+1,J+2))/HY
+               ELSE IF (J == 50 .AND. ((I.GE. 10) .AND. (I .LE. 30))) THEN ! Top side of PFG
+                  IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(J+1)
+                  E_FIELD(I,J,2) = (PHI_FIELD(I+1,J+1)-PHI_FIELD(I+1,J+2))/HY
                ELSE IF (J == NPY-1) THEN ! Top boundary
                   IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(NPY-1)
                   E_FIELD(I,J,2) = (PHI_FIELD(I+1,J)-PHI_FIELD(I+1,J+1))/HY
@@ -265,7 +261,7 @@ MODULE fields
       REAL(KIND=8), DIMENSION(4) :: WEIGHTS
       INTEGER, DIMENSION(4) :: INDICES, INDI, INDJ
 
-      K = 1.8095128E-8 ! [V m] Elementary charge / Dielectric constant of vacuum
+      K = QE/(EPS0*EPS_SCALING**2) ! [V m] Elementary charge / Dielectric constant of vacuum
 
       Q_FIELD = 0.d0
 

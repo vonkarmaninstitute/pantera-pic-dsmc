@@ -105,7 +105,7 @@
   REAL(KIND=8) :: TRDOF, PROT1, PROT2, PVIB1, PVIB2, EI, ETR, ECOLL, TOTDOF, EA, EROT, EVIB
   !REAL(KIND=8) :: B,C,EINT,ETOT,ETR,PHI,SITETA,VRX,VRY,VRZ
   REAL(KIND=8) :: VXMAX,VXMIN,VYMAX,VYMIN,VZMAX,VZMIN,VRMAX
-  REAL(KIND=8) :: PI, PI2, KB
+  REAL(KIND=8) :: PI2
   REAL(KIND=8), DIMENSION(3) :: C1, C2, GREL, W
   REAL(KIND=8) :: GX, GY, GZ, G
   REAL(KIND=8) :: COSCHI, SINCHI, THETA, COSTHETA, SINTHETA
@@ -114,11 +114,7 @@
 
   TYPE(PARTICLE_DATA_STRUCTURE) :: NEWparticle
 
-
-  PI   = 3.141593
   PI2  = 2.*PI
-  
-  KB = 1.38064852E-23
 
   IOFJ  = IOF(JC)               ! First particle in the cell
   IOLJ  = IOF(JC) + NPC(JC) - 1 ! Last particle in the cell
@@ -532,7 +528,7 @@
     REAL(KIND=8) :: MRED, G, COSPHI, SINPHI, THETA
     INTEGER :: I
 
-    PI2  = 2.*3.141593
+    PI2  = 2.*PI
 
     MRED  = M1*M2/(M1+M2)
     ! Relative velocity from given translational energy
@@ -623,9 +619,6 @@
      REAL(KIND=8) :: Etot_cell, Etot_tra_cell, Ekin_cell, E_SUM, Etr_SUM
      REAL(KIND=8) :: Q, CHI, COS_TH, SIN_TH, COS_CHI, SIN_CHI
   
-  
-     REAL(KIND=8) :: kB = 1.38064852E-23
-     REAL(KIND=8) :: pi = 2.0*ASIN(1.0d0)
   
      ! Check that the gas is composed by only one species
      IF (SIZE(SPECIES) .NE. 1) THEN ! Print an error 
@@ -746,7 +739,7 @@
               !                 collisions happen only depending on \nu and on a random number, independently
               !                 from the actual particle velocity.
       
-              IF (rf() .LT. (1 - EXP(-nu*DT))) THEN ! PROBABILITY OF COLLISION = 1 - exp(-nu*dt)
+              IF (rf() .LT. (1 - EXP(-nu*particles(IDp)%DTRIM))) THEN ! PROBABILITY OF COLLISION = 1 - exp(-nu*dt)
     
                  IF (BGK_MODEL_TYPE_INT == 0) THEN ! Classical collisions, just pick from a Maxwellian at the  cell equil temp
   

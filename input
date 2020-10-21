@@ -12,15 +12,15 @@
 
 ! ========= Computational domain and grid ===========
 Dimensions:
-    1
+    2
 Axisymmetric:
     .FALSE.
 Number_of_cells:
-    100    1    1
+    20    20    1
 Domain_limits:
-    0.0    0.1    0.0    1.0    0.0    1.0
+    0.0    1.0    0.0    1.0    0.0    1.0
 Domain_periodicity:
-    .FALSE.   .TRUE.   .TRUE.
+    .FALSE.   .FALSE.   .FALSE.
 Domain_specular:
     .FALSE.    .FALSE.    .FALSE.    .FALSE.
 Domain_diffuse:
@@ -32,15 +32,24 @@ Bool_PIC:
     .FALSE.
 
 Bool_dump_moments:
+    .FALSE.
+Bool_dump_fluxes:
     .TRUE.
+    
+Flowfield_output:
+    './dumps/'
+Particle_dump_output:
+    './dumps/'
+Fluxes_dump_output:
+    './dumps/'
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.e3
+    1.e0
 Timestep:
-    1.0e-12
+    1.0e-5
 Number_of_timesteps:
-    90000
+    5000
 Stats_every:
     1
 
@@ -50,7 +59,7 @@ Dump_part_every:
     1000000
 
 Dump_grid_start:
-    30000
+    1000000
     
 Dump_grid_avgevery:
     20
@@ -64,10 +73,10 @@ Perform_checks:
 ! ========= Multispecies ==============================
 
 Species_file:
-    electron.species
+    ar.species
     
-!Def_mixture:
-!    Ions Ar+ 1.0
+Def_mixture:
+    Ions Ar+ 1.0
     
 Def_mixture:
     Electrons e 1.0
@@ -111,19 +120,19 @@ Thermal_bath_Ttr:
 ! ========= Initial particle seed ===================
 
 Initial_particles_bool:
-    .FALSE.
+    .TRUE.
 Initial_particles_dens:
-    1.e10
+    1.e6
 Initial_particles_vel:
     0.  0.  0.
 Initial_particles_Ttra:
-    5500.0 5500.0 5500.0
+    300.0 300.0 300.0
 Initial_particles_Trot:
     0.
 Initial_particles_Tvib:
     0. 
 Initial_particles_mixture:
-    Electrons
+    Ions
 ! ========== Injection from boundaries ==============
 
 Boundaries_inject_bool:
@@ -159,8 +168,8 @@ Linesource_Trot:
     0.
 
 !   x1        y1     x2        y2       n         vx        vy     vz     Ttr       Trot   mix
-Linesource:
-    0.099999  1     0.099999   0        1e10      -5e6      0.0    0.0    5500.0    0.0   Electrons
+!Linesource:
+!    0.099999  1     0.099999   0        1e10      -5e6      0.0    0.0    5500.0    0.0   Electrons
 !Linesource:
 !    0.2001    0.0    0.2001    0.015    7.9e12    0.0       0.0    0.0    5802.0    0.0    Electrons
 

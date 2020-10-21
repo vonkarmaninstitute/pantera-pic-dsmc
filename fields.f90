@@ -11,7 +11,7 @@ MODULE fields
 
    
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   ! SUBROUTINE ASSEMBLE_POISSON -> Prepares the linear system for the solution !!
+   ! SUBROUTINE ASSEMBLE_POISSON -> Prepares the linear system for the solution  !
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    SUBROUTINE ASSEMBLE_POISSON

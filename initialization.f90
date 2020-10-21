@@ -92,6 +92,7 @@ MODULE initialization
          IF (line=='Checks_every:')            READ(in1,*) CHECKS_EVERY
          IF (line=='Stats_every:')             READ(in1,*) STATS_EVERY
          IF (line=='Bool_dump_moments:')       READ(in1,*) BOOL_DUMP_MOMENTS
+         IF (line=='Bool_dump_fluxes:')        READ(in1,*) BOOL_DUMP_FLUXES
          IF (line=='Bool_PIC:')                READ(in1,*) BOOL_PIC
          IF (line=='Epsilon_scaling:')         READ(in1,*) EPS_SCALING
 
@@ -99,6 +100,7 @@ MODULE initialization
 
          IF (line=='Flowfield_output:')        READ(in1,*) FLOWFIELD_SAVE_PATH
          IF (line=='Particle_dump_output:')    READ(in1,*) PARTDUMP_SAVE_PATH
+         IF (line=='Fluxes_dump_output:')    READ(in1,*) FLUXDUMP_SAVE_PATH
 
          ! ~~~~~~~~~~~~~  Multispecies ~~~~~~~~~~~~~~~
          IF (line=='Species_file:') THEN
@@ -1382,6 +1384,15 @@ MODULE initialization
          END DO
       END IF
 
+
+      ! Allocate counters for wall collisions, boundary collisions and particle injection.
+      ALLOCATE(WALL_COLL_COUNT(N_WALLS*N_SPECIES))
+      WALL_COLL_COUNT = 0
+      ALLOCATE(BOUNDARY_COLL_COUNT(4*N_SPECIES))
+      BOUNDARY_COLL_COUNT = 0
+      ALLOCATE(LINE_EMIT_COUNT(N_LINESOURCES*N_SPECIES))
+      LINE_EMIT_COUNT = 0
+
    END SUBROUTINE INITVARIOUS
 
    
@@ -1436,6 +1447,7 @@ MODULE initialization
       REAL(KIND=8) :: PI2  
 
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: nfs_LINE
+      !INTEGER, DIMENSION(:), ALLOCATABLE :: EMIT_COUNT
  
       REAL(KIND=8)  :: M, FRAC
       INTEGER :: N_COMP, IS, S_ID, ILINE
@@ -1599,7 +1611,7 @@ MODULE initialization
          END DO
 
          CALL MOVE_ALLOC(nfs_LINE, LINESOURCES(ILINE)%nfs)
-      
+     
       END DO
 
 

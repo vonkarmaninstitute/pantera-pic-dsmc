@@ -41,22 +41,11 @@ MODULE global
    LOGICAL      :: BOOL_X_PERIODIC = .FALSE. ! Assign default value!
    LOGICAL      :: BOOL_Y_PERIODIC = .FALSE.
    LOGICAL      :: BOOL_Z_PERIODIC = .FALSE.
-   ! LOGICAL      :: BOOL_XMIN_SPECULAR = .FALSE.
-   ! LOGICAL      :: BOOL_XMAX_SPECULAR = .FALSE.
-   ! LOGICAL      :: BOOL_YMIN_SPECULAR = .FALSE.
-   ! LOGICAL      :: BOOL_YMAX_SPECULAR = .FALSE.
-   ! LOGICAL      :: BOOL_XMIN_REACT = .FALSE.
-   ! LOGICAL      :: BOOL_XMAX_REACT = .FALSE.
-   ! LOGICAL      :: BOOL_YMIN_REACT = .FALSE.
-   ! LOGICAL      :: BOOL_YMAX_REACT = .FALSE.
-   ! LOGICAL      :: BOOL_XMIN_DIFFUSE = .FALSE.
-   ! LOGICAL      :: BOOL_XMAX_DIFFUSE = .FALSE.
-   ! LOGICAL      :: BOOL_YMIN_DIFFUSE = .FALSE.
-   ! LOGICAL      :: BOOL_YMAX_DIFFUSE = .FALSE.
    LOGICAL, DIMENSION(4) :: BOOL_PERIODIC = .FALSE.
    LOGICAL, DIMENSION(4) :: BOOL_SPECULAR = .FALSE.
    LOGICAL, DIMENSION(4) :: BOOL_REACT    = .FALSE.
    LOGICAL, DIMENSION(4) :: BOOL_DIFFUSE  = .FALSE.
+   INTEGER, DIMENSION(:), ALLOCATABLE :: BOUNDARY_COLL_COUNT, WALL_COLL_COUNT, LINE_EMIT_COUNT
    REAL(KIND=8) :: BOUNDTEMP
    CHARACTER(LEN=256) :: GRID_FILENAME
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: XCOORD, YCOORD
@@ -169,7 +158,6 @@ MODULE global
    INTEGER      :: MIX_BOUNDINJECT
 
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: nfs_XMIN, nfs_XMAX, nfs_YMIN, nfs_YMAX
-   !INTEGER      :: nfs_XMIN, nfs_XMAX, nfs_YMIN, nfs_YMAX
    REAL(KIND=8) :: KAPPA_XMIN, KAPPA_XMAX, KAPPA_YMIN, KAPPA_YMAX
    REAL(KIND=8) :: S_NORM_XMIN, S_NORM_XMAX, S_NORM_YMIN, S_NORM_YMAX
 
@@ -182,7 +170,7 @@ MODULE global
    REAL(KIND=8) :: X_LINESOURCE, Y_LINESOURCE, L_LINESOURCE
    REAL(KIND=8) :: NRHO_LINESOURCE
    REAL(KIND=8) :: UX_LINESOURCE, UY_LINESOURCE, UZ_LINESOURCE
-   REAL(KIND=8) :: TTRA_LINESOURCE, TROT_LINESOURCE, TVIB_LINESOURCE ! No TTRAX_ TTRAY_ TTRAZ_ for now! IMPLEMENT IT!
+   REAL(KIND=8) :: TTRA_LINESOURCE, TROT_LINESOURCE, TVIB_LINESOURCE
 
    INTEGER      :: nfs_LINESOURCE
    REAL(KIND=8) :: KAPPA_LINESOURCE
@@ -195,7 +183,7 @@ MODULE global
       REAL(KIND=8) :: X1, Y1, X2, Y2
       REAL(KIND=8) :: NRHO
       REAL(KIND=8) :: UX, UY, UZ
-      REAL(KIND=8) :: TTRA, TROT, TVIB ! No TTRAX_ TTRAY_ TTRAZ_ for now! IMPLEMENT IT!
+      REAL(KIND=8) :: TTRA, TROT, TVIB
       INTEGER      :: MIX_ID
 
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: nfs
@@ -205,6 +193,9 @@ MODULE global
    END TYPE LINESOURCE
 
    TYPE(LINESOURCE), DIMENSION(:), ALLOCATABLE :: LINESOURCES
+
+   CHARACTER*256 :: FLUXDUMP_SAVE_PATH
+   LOGICAL :: BOOL_DUMP_FLUXES = .FALSE.
 
    
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -351,11 +342,11 @@ MODULE global
    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: AVG_MOMENTS
    LOGICAL                                   :: BOOL_DUMP_MOMENTS = .FALSE.
 
-   CONTAINS  ! @@@@@@@@@@@@@@@@@@@@@ SUBROUTINES @@@@@@@@@@@@@@@@@@@@@@@@
+CONTAINS  ! @@@@@@@@@@@@@@@@@@@@@ SUBROUTINES @@@@@@@@@@@@@@@@@@@@@@@@
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   ! SUBROUTINE NEWTYPE -> defines a new type needed by MPI !!!!!!!!!!!!!
-   ! to package messages in the "particle" format !!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE NEWTYPE -> defines a new type needed by MPI             !
+   ! to package messages in the "particle" format                       !
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    
    SUBROUTINE NEWTYPE
@@ -382,6 +373,11 @@ MODULE global
    
    END SUBROUTINE NEWTYPE
 
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE ST_MATRIX_ALLOCATE -> Allocates a matrix in the         !
+   ! sparse triplet format. It is necessary to specify the estimated    !
+   ! maximum number of nonzero entries.                                 !
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    SUBROUTINE ST_MATRIX_ALLOCATE(THIS, MAXDIM)
 
@@ -395,6 +391,10 @@ MODULE global
 
    END SUBROUTINE ST_MATRIX_ALLOCATE
 
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE ST_MATRIX_SET -> Sets an element of a previously        !
+   ! allocated sparse triplet matrix: THIS(ROWIDX,COLIDX)=VAL           !
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    SUBROUTINE ST_MATRIX_SET(THIS, ROWIDX, COLIDX, VAL)
 
@@ -410,6 +410,10 @@ MODULE global
 
    END SUBROUTINE ST_MATRIX_SET
 
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE ST_MATRIX_TO_CC -> Converts a sparse triplet matrix to  !
+   ! the compressed column format used by the solver                    !
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    SUBROUTINE ST_MATRIX_TO_CC(THIS, NCOLS, CC)
 

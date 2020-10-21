@@ -8,12 +8,12 @@ MODULE grid_and_partition
    CONTAINS
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   ! SUBROUTINE CELL_FROM_POSITION -> finds the ID of a grid cell from particle position !!!!!!
+   ! SUBROUTINE CELL_FROM_POSITION -> finds the ID of a grid cell from particle position      !
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  
    SUBROUTINE CELL_FROM_POSITION(XP,YP,  IDCELL)
 
-      ! Note: first cell is denoted as 1. changed from before, think it's easier
+      ! Note: first cell index is 1.
 
       IMPLICIT NONE
 
@@ -72,8 +72,13 @@ MODULE grid_and_partition
 
          IDCELL = XCELL + NX*(YCELL-1)
       END IF
+
    END SUBROUTINE CELL_FROM_POSITION
 
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE BINARY_SEARCH -> Finds the INDEX such that                           !
+   ! ARRAY(INDEX) < VALUE < ARRAY(INDEX+1), where ARRAY is monotonically increasing. !
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    FUNCTION BINARY_SEARCH(VALUE, ARRAY) RESULT(INDEX)
 
@@ -113,7 +118,10 @@ MODULE grid_and_partition
 
    END FUNCTION BINARY_SEARCH
 
-
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE PROC_FROM_CELL -> Establishes to which processor IDPROC the cell     !
+   ! IDCELL belongs to. IDCELL starts from 1, IDPROC starts from 0                   !
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    SUBROUTINE PROC_FROM_CELL(IDCELL, IDPROC)
 
@@ -170,8 +178,8 @@ MODULE grid_and_partition
 
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   ! SUBROUTINE PROC_FROM_POSITION -> finds the process ID from particle position !!!!!!!!!!!!!!
-   ! Note this depends on the parallelization strategy !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE PROC_FROM_POSITION -> finds the process ID from particle position              !
+   ! Note this depends on the parallelization strategy                                         !
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    SUBROUTINE PROC_FROM_POSITION(XP,YP,  IDPROC)
@@ -245,40 +253,40 @@ MODULE grid_and_partition
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  
    SUBROUTINE COUNTING_SORT(PARTICLES_ARRAY, PARTICLES_COUNT)
- 
-   TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), INTENT(INOUT) :: PARTICLES_ARRAY ! array
-   INTEGER                      , DIMENSION(:), INTENT(IN)    :: PARTICLES_COUNT ! freq
-   INTEGER                      , DIMENSION(:), ALLOCATABLE   :: disp1
-   TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE   :: sorted
-   INTEGER                                                    :: i1
-   INTEGER                                                    :: IPROC
- 
-   ALLOCATE(sorted(SIZE(PARTICLES_ARRAY)))
-   ALLOCATE(disp1(0:SIZE(PARTICLES_COUNT)-1))
- 
-   disp1 = PARTICLES_COUNT
+   
+      TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), INTENT(INOUT) :: PARTICLES_ARRAY ! array
+      INTEGER                      , DIMENSION(:), INTENT(IN)    :: PARTICLES_COUNT ! freq
+      INTEGER                      , DIMENSION(:), ALLOCATABLE   :: disp1
+      TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE   :: sorted
+      INTEGER                                                    :: i1
+      INTEGER                                                    :: IPROC
+   
+      ALLOCATE(sorted(SIZE(PARTICLES_ARRAY)))
+      ALLOCATE(disp1(0:SIZE(PARTICLES_COUNT)-1))
+   
+      disp1 = PARTICLES_COUNT
 
-   DO i1 = 1, N_MPI_THREADS - 1
-      disp1(i1) = disp1(i1) + disp1(i1-1)
-   END DO
- 
-   DO i1 = SIZE(PARTICLES_ARRAY), 1, -1
- 
-      ! Find position of particle
-      CALL PROC_FROM_POSITION(PARTICLES_ARRAY(i1)%X, PARTICLES_ARRAY(i1)%Y,  IPROC)
- 
-      sorted(disp1(IPROC)) = PARTICLES_ARRAY(i1)
-      disp1(IPROC)         = disp1(IPROC) - 1
- 
-   END DO
- 
-   PARTICLES_ARRAY = sorted
- 
-   DEALLOCATE(sorted)
-   DEALLOCATE(disp1)
- 
-   RETURN
- 
+      DO i1 = 1, N_MPI_THREADS - 1
+         disp1(i1) = disp1(i1) + disp1(i1-1)
+      END DO
+   
+      DO i1 = SIZE(PARTICLES_ARRAY), 1, -1
+   
+         ! Find position of particle
+         CALL PROC_FROM_POSITION(PARTICLES_ARRAY(i1)%X, PARTICLES_ARRAY(i1)%Y,  IPROC)
+   
+         sorted(disp1(IPROC)) = PARTICLES_ARRAY(i1)
+         disp1(IPROC)         = disp1(IPROC) - 1
+   
+      END DO
+   
+      PARTICLES_ARRAY = sorted
+   
+      DEALLOCATE(sorted)
+      DEALLOCATE(disp1)
+   
+      RETURN
+   
    END SUBROUTINE COUNTING_SORT
 
 
@@ -383,43 +391,6 @@ MODULE grid_and_partition
       DEALLOCATE(recvdispl)
       
    END SUBROUTINE EXCHANGE
-
-
-
-
-
- 
-!!! ??????   !      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!! ??????   !      ! SUBROUTINE PARTITION_FROM_CELL_ID -> finds the ID of a grid cell from particle position !!!
-!!! ??????   !      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!! ??????   !    
-!!! ??????   !      SUBROUTINE PARTITION_FROM_CELL_ID(IDCELL, IDPART)
-!!! ??????   !    
-!!! ??????   !         IMPLICIT NONE
-!!! ??????   !   
-!!! ??????   !         INTEGER, INTENT(IN)  :: IDCELL ! ID of cell
-!!! ??????   !         INTEGER, INTENT(OUT) :: IDPART ! ID of processor partition to which the cell belong
-!!! ??????   !   
-!!! ??????   !         INTEGER :: NCELLS, NCELL_PER_PART
-!!! ??????   !   
-!!! ??????   !         ! Check (but remove this in the future)
-!!! ??????   !         IF(NCELLS > N_MPI_THREADS) THEN
-!!! ??????   !            WRITE(*,*) 'ATTENTION! MORE MPI THREADS THAN PARTICLES. THIS IS NOT ALLOWED!'
-!!! ??????   !            EXIT
-!!! ??????   !         END IF
-!!! ??????   !   
-!!! ??????   !         NCELLS         = NX*NY ! Total number of cells
-!!! ??????   !         NCELL_PER_PART = INT(NCELLS/N_MPI_THREADS)
-!!! ??????   !   
-!!! ??????   !         IDPART = INT(IDCELL/NCELLS) + 1
-!!! ??????   !   
-!!! ??????   !   !       INTEGER :: XID, YID
-!!! ??????   !   ! 
-!!! ??????   !   !       ! Partition by rows
-!!! ??????   !   ! 
-!!! ??????   !   !       ! Partition by columns
-!!! ??????   !    
-!!! ??????   !      END SUBROUTINE CELL_ID_FROM_POSITION
 
 
 END MODULE grid_and_partition

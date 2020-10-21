@@ -130,33 +130,4 @@ MODULE particle
 
    END SUBROUTINE REMOVE_PARTICLE_ARRAY
 
-
-! USELESS! JUST DO:  part_new(ii) = part_old(ii)   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! USELESS! JUST DO:  part_new(ii) = part_old(ii)   ! SUBROUTINE COPY_PARTICLE -> copies a particle from PARTICLE_ORIG to PARTICLE_DEST !!!
-! USELESS! JUST DO:  part_new(ii) = part_old(ii)   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! USELESS! JUST DO:  part_new(ii) = part_old(ii)
-! USELESS! JUST DO:  part_new(ii) = part_old(ii)   SUBROUTINE COPY_PARTICLE(PARTICLE_ORIG, PARTICLE_DEST)
-! USELESS! JUST DO:  part_new(ii) = part_old(ii)
-! USELESS! JUST DO:  part_new(ii) = part_old(ii)      IMPLICIT NONE
-! USELESS! JUST DO:  part_new(ii) = part_old(ii)
-! USELESS! JUST DO:  part_new(ii) = part_old(ii)      TYPE(PARTICLE_DATA_STRUCTURE), INTENT(IN)  :: PARTICLE_ORIG
-! USELESS! JUST DO:  part_new(ii) = part_old(ii)      TYPE(PARTICLE_DATA_STRUCTURE), INTENT(OUT) :: PARTICLE_DEST
-! USELESS! JUST DO:  part_new(ii) = part_old(ii)      
-! USELESS! JUST DO:  part_new(ii) = part_old(ii)      PARTICLE_DEST%X    = PARTICLE_ORIG%X
-! USELESS! JUST DO:  part_new(ii) = part_old(ii)      PARTICLE_DEST%Y    = PARTICLE_ORIG%Y
-! USELESS! JUST DO:  part_new(ii) = part_old(ii)      PARTICLE_DEST%Z    = PARTICLE_ORIG%Z
-! USELESS! JUST DO:  part_new(ii) = part_old(ii) 
-! USELESS! JUST DO:  part_new(ii) = part_old(ii)      PARTICLE_DEST%VX   = PARTICLE_ORIG%VX
-! USELESS! JUST DO:  part_new(ii) = part_old(ii)      PARTICLE_DEST%VY   = PARTICLE_ORIG%VY
-! USELESS! JUST DO:  part_new(ii) = part_old(ii)      PARTICLE_DEST%VZ   = PARTICLE_ORIG%VZ
-! USELESS! JUST DO:  part_new(ii) = part_old(ii)
-! USELESS! JUST DO:  part_new(ii) = part_old(ii)      PARTICLE_DEST%EI   = PARTICLE_ORIG%EI
-! USELESS! JUST DO:  part_new(ii) = part_old(ii) 
-! USELESS! JUST DO:  part_new(ii) = part_old(ii)      PARTICLE_DEST%S_ID = PARTICLE_ORIG%S_ID 
-! USELESS! JUST DO:  part_new(ii) = part_old(ii)      PARTICLE_DEST%IC   = PARTICLE_ORIG%IC  
-! USELESS! JUST DO:  part_new(ii) = part_old(ii) 
-! USELESS! JUST DO:  part_new(ii) = part_old(ii)   END SUBROUTINE COPY_PARTICLE
-
-
-
 END MODULE particle

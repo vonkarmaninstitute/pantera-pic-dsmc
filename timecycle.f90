@@ -123,6 +123,9 @@ MODULE timecycle
          ! ########### Dump particle fluxes #######################################
          IF (BOOL_DUMP_FLUXES) CALL DUMP_FLUXES_FILE(tID)
 
+         ! ########### Dump individual particle ###################################
+         CALL DUMP_TRAJECTORY_FILE(tID)
+
          ! ~~~~~ Hmm that's it! ~~~~~
 
          ! Perform the conservation checks
@@ -1182,7 +1185,7 @@ MODULE timecycle
                C2(1),C2(2),C2(3),EROT,EVIB,SP_ID2,particles(JP1)%IC,DT, NEWparticle)
                !WRITE(*,*) 'Should be adding particle!'
                CALL ADD_PARTICLE_ARRAY(NEWparticle, NP_PROC, particles)
-               ! DBDBDBDBDBDBDBDBD maybe we should exchange between procs here.
+               
                JP2 = NP_PROC
 
                M1    = SPECIES(SP_ID1)%MOLECULAR_MASS

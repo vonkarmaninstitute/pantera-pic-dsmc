@@ -281,7 +281,32 @@ CONTAINS
 
    END SUBROUTINE DUMP_PARTICLES_FILE
 
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE DUMP_TRAJECTORY_FILE -> dumps particle trajectory to file !
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+   SUBROUTINE DUMP_TRAJECTORY_FILE(TIMESTEP)
+
+      USE global
+      USE mpi_common
+
+      IMPLICIT NONE
+      
+      INTEGER, INTENT(IN) :: TIMESTEP
+      CHARACTER(LEN=512)  :: filename
+      INTEGER :: IP
+
+      DO IP = 1, NP_PROC
+         IF (ANY(ID_TRAJECTORY_DUMP == particles(IP)%ID)) THEN
+            WRITE(filename, "(A,A,I0.15)") TRIM(ADJUSTL(TRAJDUMP_SAVE_PATH)), "trajectory_", particles(IP)%ID ! Compose filename
+            ! Open file for writing
+            OPEN(1610, FILE=filename )
+            WRITE(1610,*) TIMESTEP, particles(IP)%S_ID, particles(IP)%X, particles(IP)%Y, particles(IP)%Z
+            CLOSE(1610)
+         END IF
+      END DO
+
+   END SUBROUTINE DUMP_TRAJECTORY_FILE
 
    SUBROUTINE DUMP_FLUXES_FILE(TIMESTEP)
 

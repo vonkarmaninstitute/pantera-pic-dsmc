@@ -100,7 +100,8 @@ MODULE initialization
 
          IF (line=='Flowfield_output:')        READ(in1,*) FLOWFIELD_SAVE_PATH
          IF (line=='Particle_dump_output:')    READ(in1,*) PARTDUMP_SAVE_PATH
-         IF (line=='Fluxes_dump_output:')    READ(in1,*) FLUXDUMP_SAVE_PATH
+         IF (line=='Trajectory_dump_output:')  READ(in1,*) TRAJDUMP_SAVE_PATH
+         IF (line=='Fluxes_dump_output:')      READ(in1,*) FLUXDUMP_SAVE_PATH
 
          ! ~~~~~~~~~~~~~  Multispecies ~~~~~~~~~~~~~~~
          IF (line=='Species_file:') THEN
@@ -1392,6 +1393,10 @@ MODULE initialization
       BOUNDARY_COLL_COUNT = 0
       ALLOCATE(LINE_EMIT_COUNT(N_LINESOURCES*N_SPECIES))
       LINE_EMIT_COUNT = 0
+
+
+      ALLOCATE(ID_TRAJECTORY_DUMP(16))
+      ID_TRAJECTORY_DUMP = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
 
    END SUBROUTINE INITVARIOUS
 

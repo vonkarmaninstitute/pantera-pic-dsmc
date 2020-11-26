@@ -24,6 +24,8 @@ MODULE global
    INTEGER :: NP_PROC ! Number of particles in local MPI process
    INTEGER :: MPI_PARTICLE_DATA_STRUCTURE ! We need this for MPI
    TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: particles
+   INTEGER(8), DIMENSION(:), ALLOCATABLE :: ID_TRAJECTORY_DUMP
+   CHARACTER*256 :: TRAJDUMP_SAVE_PATH
    CHARACTER*256 :: PARTDUMP_SAVE_PATH
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

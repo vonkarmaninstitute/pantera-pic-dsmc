@@ -3,17 +3,22 @@
 
 MODULE particle
 
+USE mpi_common
+
    ! Define particle type and arrays !!!!!!!!!!!!!!!!!!!!!!!!!!!!
  
    TYPE PARTICLE_DATA_STRUCTURE
-      REAL(KIND=8) :: X, Y, Z        ! position
-      REAL(KIND=8) :: VX, VY, VZ     ! velocities and internal energy
-      REAL(KIND=8) :: EROT, EVIB     ! internal energies
-      REAL(KIND=8) :: DTRIM          ! Remaining time for advection
-      INTEGER      :: IC             ! Cell index 
-      INTEGER      :: S_ID           ! Species ID
+      REAL(KIND=8)    :: X, Y, Z        ! position
+      REAL(KIND=8)    :: VX, VY, VZ     ! velocities and internal energy
+      REAL(KIND=8)    :: EROT, EVIB     ! internal energies
+      REAL(KIND=8)    :: DTRIM          ! Remaining time for advection
+      INTEGER         :: IC             ! Cell index 
+      INTEGER         :: S_ID           ! Species ID
+      INTEGER(KIND=8) :: ID             ! Particle identifier
    END TYPE PARTICLE_DATA_STRUCTURE
  
+   INTEGER(8) :: PARTICLE_ID_COUNTER = 0
+
    CONTAINS
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -44,7 +49,9 @@ MODULE particle
       
  
       particlept%S_ID = S_ID 
-      particlept%IC   = IC  
+      particlept%IC   = IC
+
+      particlept%ID   = 0
 
       particlept%DTRIM = DTRIM
 
@@ -94,9 +101,12 @@ MODULE particle
 
         DEALLOCATE(COPYARRAY)
       END IF
-
+      
       ! Add particle to array
       particlesARRAY(NP) = particleNOW
+
+      particlesARRAY(NP)%ID = PROC_ID + ISHFT(PARTICLE_ID_COUNTER, 8)
+      PARTICLE_ID_COUNTER = PARTICLE_ID_COUNTER + 1
 
    END SUBROUTINE ADD_PARTICLE_ARRAY
 
@@ -122,7 +132,7 @@ MODULE particle
                          particlesARRAY(NP_ARRAY)%EROT, particlesARRAY(NP_ARRAY)%EVIB, &
                          particlesARRAY(NP_ARRAY)%S_ID, particlesARRAY(NP_ARRAY)%IC, &
                          particlesARRAY(NP_ARRAY)%DTRIM, particlesARRAY(ID_REMOVE))
-
+      particlesARRAY(ID_REMOVE)%ID = particlesARRAY(NP_ARRAY)%ID
       ! Then put the last place to zeros and decrement counter
       CALL INIT_PARTICLE(0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,-1,-1, 0.d0, particlesARRAY(NP_ARRAY)) ! Zero
 

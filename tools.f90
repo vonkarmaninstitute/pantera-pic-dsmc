@@ -291,17 +291,19 @@ CONTAINS
       USE mpi_common
 
       IMPLICIT NONE
-      
+
       INTEGER, INTENT(IN) :: TIMESTEP
       CHARACTER(LEN=512)  :: filename
       INTEGER :: IP
 
       DO IP = 1, NP_PROC
-         IF (ANY(ID_TRAJECTORY_DUMP == particles(IP)%ID)) THEN
+         IF (particles(IP)%DUMP_TRAJ) THEN
+            !WRITE(*,*) 'Writing trajectory file for particle with ID ', particles(IP)%ID
             WRITE(filename, "(A,A,I0.15)") TRIM(ADJUSTL(TRAJDUMP_SAVE_PATH)), "trajectory_", particles(IP)%ID ! Compose filename
             ! Open file for writing
-            OPEN(1610, FILE=filename )
-            WRITE(1610,*) TIMESTEP, particles(IP)%S_ID, particles(IP)%X, particles(IP)%Y, particles(IP)%Z
+            OPEN(1610, FILE=filename, POSITION='APPEND')
+            WRITE(1610,*) TIMESTEP, particles(IP)%S_ID, particles(IP)%X, particles(IP)%Y, particles(IP)%Z, &
+            particles(IP)%VX, particles(IP)%VY, particles(IP)%VZ
             CLOSE(1610)
          END IF
       END DO

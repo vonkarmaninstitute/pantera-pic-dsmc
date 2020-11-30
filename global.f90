@@ -24,7 +24,8 @@ MODULE global
    INTEGER :: NP_PROC ! Number of particles in local MPI process
    INTEGER :: MPI_PARTICLE_DATA_STRUCTURE ! We need this for MPI
    TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: particles
-   INTEGER(8), DIMENSION(:), ALLOCATABLE :: ID_TRAJECTORY_DUMP
+   INTEGER :: TRAJECTORY_DUMP_START = -1
+   INTEGER :: TRAJECTORY_DUMP_NUMBER = 0
    CHARACTER*256 :: TRAJDUMP_SAVE_PATH
    CHARACTER*256 :: PARTDUMP_SAVE_PATH
 
@@ -353,24 +354,30 @@ CONTAINS  ! @@@@@@@@@@@@@@@@@@@@@ SUBROUTINES @@@@@@@@@@@@@@@@@@@@@@@@
    
    SUBROUTINE NEWTYPE
    
-      INTEGER :: ii, extent_dpr, extent_int
-      INTEGER, DIMENSION(11) :: blocklengths, oldtypes, offsets
+      INTEGER :: ii, extent_dpr, extent_int, extent_int8, extent_logical
+      INTEGER, DIMENSION(13) :: blocklengths, oldtypes, offsets
      
-      CALL MPI_TYPE_EXTENT(MPI_DOUBLE_PRECISION, extent_dpr, ierr)  
-      CALL MPI_TYPE_EXTENT(MPI_INTEGER,          extent_int, ierr)
+      CALL MPI_TYPE_EXTENT(MPI_DOUBLE_PRECISION, extent_dpr,  ierr)  
+      CALL MPI_TYPE_EXTENT(MPI_INTEGER,          extent_int,  ierr)
+      CALL MPI_TYPE_EXTENT(MPI_INTEGER8,         extent_int8, ierr)
+      CALL MPI_TYPE_EXTENT(MPI_LOGICAL,         extent_logical, ierr)
            
       blocklengths = 1
      
       oldtypes(1:9) = MPI_DOUBLE_PRECISION  
       oldtypes(10:11) = MPI_INTEGER
+      oldtypes(12) = MPI_INTEGER8
+      oldtypes(13) = MPI_LOGICAL
           
       offsets(1) = 0  
       DO ii = 2, 10
          offsets(ii) = offsets(ii - 1) + extent_dpr * blocklengths(ii - 1)
       END DO
       offsets(11) = offsets(10) + extent_int * blocklengths(10)
+      offsets(12) = offsets(11) + extent_int * blocklengths(11)
+      offsets(13) = offsets(12) + extent_int8 * blocklengths(12)
       
-      CALL MPI_TYPE_STRUCT(11, blocklengths, offsets, oldtypes, MPI_PARTICLE_DATA_STRUCTURE, ierr)  
+      CALL MPI_TYPE_STRUCT(13, blocklengths, offsets, oldtypes, MPI_PARTICLE_DATA_STRUCTURE, ierr)  
       CALL MPI_TYPE_COMMIT(MPI_PARTICLE_DATA_STRUCTURE, ierr)   
    
    END SUBROUTINE NEWTYPE

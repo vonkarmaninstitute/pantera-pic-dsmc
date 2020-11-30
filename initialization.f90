@@ -83,16 +83,9 @@ MODULE initialization
          IF (line=='Timestep:')                READ(in1,*) DT
          IF (line=='Number_of_timesteps:')     READ(in1,*) NT
          IF (line=='RNG_seed:')                READ(in1,*) RNG_SEED_GLOBAL
-         IF (line=='Dump_part_every:')         READ(in1,*) DUMP_EVERY
-         IF (line=='Dump_part_start:')         READ(in1,*) DUMP_START
-         IF (line=='Dump_grid_avgevery:')      READ(in1,*) DUMP_GRID_AVG_EVERY
-         IF (line=='Dump_grid_start:')         READ(in1,*) DUMP_GRID_START
-         IF (line=='Dump_grid_numavgs:')       READ(in1,*) DUMP_GRID_N_AVG
          IF (line=='Perform_checks:')          READ(in1,*) PERFORM_CHECKS
          IF (line=='Checks_every:')            READ(in1,*) CHECKS_EVERY
          IF (line=='Stats_every:')             READ(in1,*) STATS_EVERY
-         IF (line=='Bool_dump_moments:')       READ(in1,*) BOOL_DUMP_MOMENTS
-         IF (line=='Bool_dump_fluxes:')        READ(in1,*) BOOL_DUMP_FLUXES
          IF (line=='Bool_PIC:')                READ(in1,*) BOOL_PIC
          IF (line=='Epsilon_scaling:')         READ(in1,*) EPS_SCALING
 
@@ -102,6 +95,15 @@ MODULE initialization
          IF (line=='Particle_dump_output:')    READ(in1,*) PARTDUMP_SAVE_PATH
          IF (line=='Trajectory_dump_output:')  READ(in1,*) TRAJDUMP_SAVE_PATH
          IF (line=='Fluxes_dump_output:')      READ(in1,*) FLUXDUMP_SAVE_PATH
+         IF (line=='Dump_part_every:')         READ(in1,*) DUMP_EVERY
+         IF (line=='Dump_part_start:')         READ(in1,*) DUMP_START
+         IF (line=='Dump_grid_avgevery:')      READ(in1,*) DUMP_GRID_AVG_EVERY
+         IF (line=='Dump_grid_start:')         READ(in1,*) DUMP_GRID_START
+         IF (line=='Dump_grid_numavgs:')       READ(in1,*) DUMP_GRID_N_AVG
+         IF (line=='Bool_dump_moments:')       READ(in1,*) BOOL_DUMP_MOMENTS
+         IF (line=='Bool_dump_fluxes:')        READ(in1,*) BOOL_DUMP_FLUXES
+         IF (line=='Dump_traj_start:')         READ(in1,*) TRAJECTORY_DUMP_START
+         IF (line=='Dump_traj_number:')        READ(in1,*) TRAJECTORY_DUMP_NUMBER
 
          ! ~~~~~~~~~~~~~  Multispecies ~~~~~~~~~~~~~~~
          IF (line=='Species_file:') THEN
@@ -1393,10 +1395,6 @@ MODULE initialization
       BOUNDARY_COLL_COUNT = 0
       ALLOCATE(LINE_EMIT_COUNT(N_LINESOURCES*N_SPECIES))
       LINE_EMIT_COUNT = 0
-
-
-      ALLOCATE(ID_TRAJECTORY_DUMP(16))
-      ID_TRAJECTORY_DUMP = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
 
    END SUBROUTINE INITVARIOUS
 

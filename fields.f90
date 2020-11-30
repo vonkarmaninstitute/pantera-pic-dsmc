@@ -190,7 +190,7 @@ MODULE fields
 
       ! Solve the linear system
       IF (PROC_ID .EQ. 0) THEN
-         WRITE(*,*) 'Solving poisson'
+         !WRITE(*,*) 'Solving poisson'
          CALL S_UMFPACK_SOLVE(UMFPACK_A, A_CC%AP, A_CC%AI, A_CC%AX, X, Q_FIELD)
       END IF
  

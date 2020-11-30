@@ -142,7 +142,7 @@ MODULE timecycle
   
       IMPLICIT NONE
    
-      INTEGER      :: IP, IC, IS, NFS, ILINE
+      INTEGER      :: IP, IC, IS, NFS, ILINE, DUMP_COUNTER
       REAL(KIND=8) :: DTFRAC, Vdummy, V_NORM, V_PERP, X1, X2, Y1, Y2, R
       REAL(KIND=8) :: X, Y, Z, VX, VY, VZ, EROT, EVIB 
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
@@ -167,6 +167,7 @@ MODULE timecycle
             IF (LINESOURCES(ILINE)%nfs(IS)-REAL(NFS, KIND=8) .GE. rf()) THEN ! Same as SPARTA's perspeciess
                NFS = NFS + 1
             END IF
+            DUMP_COUNTER = 0
             DO IP = 1, NFS ! Loop on particles to be injected
                
                CALL MAXWELL(0.d0, 0.d0, 0.d0, &
@@ -217,6 +218,10 @@ MODULE timecycle
    
                ! Init a particle object and assign it to the local vector of particles
                CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EROT,EVIB,S_ID,IC,DTFRAC,  particleNOW)
+               IF ((tID == TRAJECTORY_DUMP_START) .AND. (DUMP_COUNTER < TRAJECTORY_DUMP_NUMBER)) THEN
+                  particleNOW%DUMP_TRAJ = .TRUE.
+                  DUMP_COUNTER = DUMP_COUNTER + 1
+               END IF
                CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles)
    
             END DO

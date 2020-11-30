@@ -15,6 +15,7 @@ USE mpi_common
       INTEGER         :: IC             ! Cell index 
       INTEGER         :: S_ID           ! Species ID
       INTEGER(KIND=8) :: ID             ! Particle identifier
+      LOGICAL         :: DUMP_TRAJ      ! The trajectory of this particle should be dumped
    END TYPE PARTICLE_DATA_STRUCTURE
  
    INTEGER(8) :: PARTICLE_ID_COUNTER = 0
@@ -51,10 +52,13 @@ USE mpi_common
       particlept%S_ID = S_ID 
       particlept%IC   = IC
 
-      particlept%ID   = 0
-
       particlept%DTRIM = DTRIM
 
+      particlept%ID = PROC_ID + ISHFT(PARTICLE_ID_COUNTER, 8)
+      PARTICLE_ID_COUNTER = PARTICLE_ID_COUNTER + 1
+
+      particlept%DUMP_TRAJ = .FALSE.
+      
    END SUBROUTINE INIT_PARTICLE
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -105,9 +109,6 @@ USE mpi_common
       ! Add particle to array
       particlesARRAY(NP) = particleNOW
 
-      particlesARRAY(NP)%ID = PROC_ID + ISHFT(PARTICLE_ID_COUNTER, 8)
-      PARTICLE_ID_COUNTER = PARTICLE_ID_COUNTER + 1
-
    END SUBROUTINE ADD_PARTICLE_ARRAY
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -127,14 +128,27 @@ USE mpi_common
       TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), INTENT(INOUT)  :: particlesARRAY
  
       ! First, copy the last particle in the place of the particle to be removed
-      CALL INIT_PARTICLE(particlesARRAY(NP_ARRAY)%X,  particlesARRAY(NP_ARRAY)%Y,    particlesARRAY(NP_ARRAY)%Z,  &
-                         particlesARRAY(NP_ARRAY)%VX, particlesARRAY(NP_ARRAY)%VY,   particlesARRAY(NP_ARRAY)%VZ, &
-                         particlesARRAY(NP_ARRAY)%EROT, particlesARRAY(NP_ARRAY)%EVIB, &
-                         particlesARRAY(NP_ARRAY)%S_ID, particlesARRAY(NP_ARRAY)%IC, &
-                         particlesARRAY(NP_ARRAY)%DTRIM, particlesARRAY(ID_REMOVE))
-      particlesARRAY(ID_REMOVE)%ID = particlesARRAY(NP_ARRAY)%ID
+      !CALL INIT_PARTICLE(particlesARRAY(NP_ARRAY)%X,  particlesARRAY(NP_ARRAY)%Y,    particlesARRAY(NP_ARRAY)%Z,  &
+      !                   particlesARRAY(NP_ARRAY)%VX, particlesARRAY(NP_ARRAY)%VY,   particlesARRAY(NP_ARRAY)%VZ, &
+      !                   particlesARRAY(NP_ARRAY)%EROT, particlesARRAY(NP_ARRAY)%EVIB, &
+      !                   particlesARRAY(NP_ARRAY)%S_ID, particlesARRAY(NP_ARRAY)%IC, &
+      !                   particlesARRAY(NP_ARRAY)%DTRIM, particlesARRAY(ID_REMOVE))
+      !particlesARRAY(ID_REMOVE)%ID = particlesARRAY(NP_ARRAY)%ID
+      ! Just do
+      particlesARRAY(ID_REMOVE) = particlesARRAY(NP_ARRAY)
       ! Then put the last place to zeros and decrement counter
-      CALL INIT_PARTICLE(0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,-1,-1, 0.d0, particlesARRAY(NP_ARRAY)) ! Zero
+      !CALL INIT_PARTICLE(0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,-1,-1, 0.d0, particlesARRAY(NP_ARRAY)) ! Zero
+      ! Just use
+      particlesARRAY(NP_ARRAY)%X  = 0.d0
+      particlesARRAY(NP_ARRAY)%Y  = 0.d0
+      particlesARRAY(NP_ARRAY)%Z  = 0.d0
+      particlesARRAY(NP_ARRAY)%VX = 0.d0
+      particlesARRAY(NP_ARRAY)%VY = 0.d0
+      particlesARRAY(NP_ARRAY)%VZ = 0.d0
+      particlesARRAY(NP_ARRAY)%S_ID = -1
+      particlesARRAY(NP_ARRAY)%ID = -1
+      particlesARRAY(NP_ARRAY)%DUMP_TRAJ = .FALSE.
+      
 
       NP_ARRAY = NP_ARRAY - 1
 

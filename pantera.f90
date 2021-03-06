@@ -8,8 +8,6 @@ PROGRAM PANTERA
    USE initialization
    USE timecycle
    USE grid_and_partition
-   USE mUMFPACK
-   USE fields
 
    IMPLICIT NONE
    
@@ -29,9 +27,7 @@ PROGRAM PANTERA
    CALL INITINJECTION      ! Initialize variables for injection
    CALL INITCOLLISIONS     ! Initialize variables for collisions
    CALL INITREACTIONS      ! Initialize variables for reactions
-   CALL INITFIELDS         ! Initialize electromagnetic fields
 
-   IF (BOOL_PIC) CALL ASSEMBLE_POISSON
    ! ========= Initial particles seed ======================
    IF (BOOL_INITIAL_SEED)   CALL INITIAL_SEED
    ! CALL DUMP_PARTICLES_SCREEN

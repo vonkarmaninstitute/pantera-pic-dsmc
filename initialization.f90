@@ -86,8 +86,6 @@ MODULE initialization
          IF (line=='Perform_checks:')          READ(in1,*) PERFORM_CHECKS
          IF (line=='Checks_every:')            READ(in1,*) CHECKS_EVERY
          IF (line=='Stats_every:')             READ(in1,*) STATS_EVERY
-         IF (line=='Bool_PIC:')                READ(in1,*) BOOL_PIC
-         IF (line=='Epsilon_scaling:')         READ(in1,*) EPS_SCALING
 
          ! ~~~~~~~~~~~~~  File output ~~~~~~~~~~~~~~~
 
@@ -825,8 +823,6 @@ MODULE initialization
       READ(STRARRAY(10),'(ES14.0)') LINESOURCES(N_LINESOURCES)%TROT
       READ(STRARRAY(10),'(ES14.0)') LINESOURCES(N_LINESOURCES)%TVIB
       READ(STRARRAY(11),'(A10)') MIX_NAME
-      WRITE(*,*) LINESOURCES(N_LINESOURCES)%UX
-      WRITE(*,*) LINESOURCES(N_LINESOURCES)%NRHO
       MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
       LINESOURCES(N_LINESOURCES)%MIX_ID = MIX_ID
 
@@ -1398,20 +1394,6 @@ MODULE initialization
 
    END SUBROUTINE INITVARIOUS
 
-   
-   SUBROUTINE INITFIELDS
-
-      IMPLICIT NONE
-
-      NPX = NX + 1
-      IF (DIMS == 2) THEN
-         NPY = NY + 1
-      ELSE
-         NPY = 1
-      END IF
-      ALLOCATE(E_FIELD(0:NPX-1, 0:NPY-1, 3))
-
-   END SUBROUTINE INITFIELDS
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE INITINJECTION -> initializes variables for particles injection !!!!!

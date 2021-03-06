@@ -3,7 +3,6 @@ MODULE postprocess
    USE global
    USE screen
    USE grid_and_partition
-   USE fields
 
    IMPLICIT NONE
 
@@ -556,46 +555,6 @@ MODULE postprocess
          
          END DO
 
-         IF (BOOL_PIC) THEN
-            IF (DIMS == 2) THEN
-               WRITE(54321,'(A,I10)') 'POINT_DATA', (NX+1)*(NY+1)*1
-               WRITE(54321,'(A,I10)') 'FIELD FieldData', 5
-               
-               WRITE(54321,'(A,I10,I10,A7)') 'QRHO', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) Q_FIELD
-
-               WRITE(54321,'(A,I10,I10,A7)') 'PHI', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) PHI_FIELD
-
-               WRITE(54321,'(A,I10,I10,A7)') 'E_X', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) E_FIELD(:,:,1)
-
-               WRITE(54321,'(A,I10,I10,A7)') 'E_Y', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) E_FIELD(:,:,2)
-
-               WRITE(54321,'(A,I10,I10,A7)') 'E_Z', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) E_FIELD(:,:,3)
-            ELSE
-               WRITE(54321,'(A,I10)') 'POINT_DATA', (NX+1)*(NY+1)*1
-               WRITE(54321,'(A,I10)') 'FIELD FieldData', 5
-               
-               WRITE(54321,'(A,I10,I10,A7)') 'QRHO', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) Q_FIELD, Q_FIELD
-
-               WRITE(54321,'(A,I10,I10,A7)') 'PHI', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) PHI_FIELD, PHI_FIELD
-
-               WRITE(54321,'(A,I10,I10,A7)') 'E_X', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) E_FIELD(:,:,1), E_FIELD(:,:,1)
-
-               WRITE(54321,'(A,I10,I10,A7)') 'E_Y', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) E_FIELD(:,:,2), E_FIELD(:,:,2)
-
-               WRITE(54321,'(A,I10,I10,A7)') 'E_Z', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) E_FIELD(:,:,3), E_FIELD(:,:,3)
-            END IF
-         END IF
-
          CLOSE(54321)
 
       END IF 
@@ -700,7 +659,7 @@ MODULE postprocess
       INTEGER                            :: TOT_NUM
 
       REAL(KIND=8), DIMENSION(3)         :: TOT_MOMENTUM
-      REAL(KIND=8)                       :: TOT_KE, TOT_IE, TOT_FE, TOT_EE, HX, HY, PHI, CURRENT_TIME
+      REAL(KIND=8)                       :: TOT_KE, TOT_IE, TOT_FE, TOT_EE, HX, HY, CURRENT_TIME
 
 
       TOT_NUM = 0
@@ -732,10 +691,6 @@ MODULE postprocess
          !IF (JS == 4) THEN
          !  TOT_FE = TOT_FE + 15.63e-19/2.
          !END IF
-         IF (BOOL_PIC) THEN
-            CALL APPLY_POTENTIAL(JP, PHI)
-            TOT_EE  = TOT_EE + PHI*1.602176634e-19*SPECIES(JS)%CHARGE * FNUM
-         END IF
 
       END DO
 

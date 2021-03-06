@@ -39,8 +39,6 @@ MODULE global
    REAL(KIND=8) :: XMIN, XMAX, YMIN, YMAX, ZMIN, ZMAX
    REAL(KIND=8) :: CELL_VOL
    LOGICAL      :: AXI = .FALSE.
-   LOGICAL      :: BOOL_SPEED_LIMIT = .FALSE.
-   REAL(KIND=8) :: SPEED_LIMIT = 1.d3
    LOGICAL      :: BOOL_X_PERIODIC = .FALSE. ! Assign default value!
    LOGICAL      :: BOOL_Y_PERIODIC = .FALSE.
    LOGICAL      :: BOOL_Z_PERIODIC = .FALSE.
@@ -71,33 +69,6 @@ MODULE global
 
    TYPE(QUADTREE_CELL), DIMENSION(:), ALLOCATABLE :: QUADTREE_ROOT
 
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   !!!!!!!!! Electromagnetic fields !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-   LOGICAL :: BOOL_PIC = .FALSE.
-
-   INTEGER :: NPX, NPY
-   REAL(KIND=8), DIMENSION(:, :, :), ALLOCATABLE :: E_FIELD
-   REAL(KIND=8), DIMENSION(:, :), ALLOCATABLE :: PHI_FIELD
-   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: Q_FIELD
-   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: DIRICHLET
-   LOGICAL, DIMENSION(:), ALLOCATABLE :: IS_DIRICHLET
-   
-
-   TYPE ST_MATRIX
-      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: VALUE
-      INTEGER, DIMENSION(:), ALLOCATABLE      :: RIDX, CIDX
-      INTEGER :: NNZ
-   END TYPE ST_MATRIX
-
-   TYPE CC_MATRIX
-      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AX
-      INTEGER, DIMENSION(:), ALLOCATABLE      :: AP, AI
-      INTEGER :: NNZ
-   END TYPE CC_MATRIX
-
-   TYPE(CC_MATRIX) :: A_CC
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Numerical settings !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -382,109 +353,6 @@ CONTAINS  ! @@@@@@@@@@@@@@@@@@@@@ SUBROUTINES @@@@@@@@@@@@@@@@@@@@@@@@
    
    END SUBROUTINE NEWTYPE
 
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   ! SUBROUTINE ST_MATRIX_ALLOCATE -> Allocates a matrix in the         !
-   ! sparse triplet format. It is necessary to specify the estimated    !
-   ! maximum number of nonzero entries.                                 !
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-   SUBROUTINE ST_MATRIX_ALLOCATE(THIS, MAXDIM)
-
-      TYPE(ST_MATRIX), INTENT(INOUT) :: THIS
-      INTEGER, INTENT(IN) :: MAXDIM
-
-      ALLOCATE(THIS%RIDX(0:MAXDIM-1))
-      ALLOCATE(THIS%CIDX(0:MAXDIM-1))
-      ALLOCATE(THIS%VALUE(0:MAXDIM-1))
-      THIS%NNZ = 0
-
-   END SUBROUTINE ST_MATRIX_ALLOCATE
-
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   ! SUBROUTINE ST_MATRIX_SET -> Sets an element of a previously        !
-   ! allocated sparse triplet matrix: THIS(ROWIDX,COLIDX)=VAL           !
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-   SUBROUTINE ST_MATRIX_SET(THIS, ROWIDX, COLIDX, VAL)
-
-      TYPE(ST_MATRIX), INTENT(INOUT) :: THIS
-      INTEGER, INTENT(IN) :: ROWIDX, COLIDX
-      REAL(KIND=8), INTENT(IN) :: VAL
-
-      THIS%RIDX(THIS%NNZ) = ROWIDX
-      THIS%CIDX(THIS%NNZ) = COLIDX
-      THIS%VALUE(THIS%NNZ) = VAL
-
-      THIS%NNZ = THIS%NNZ + 1
-
-   END SUBROUTINE ST_MATRIX_SET
-
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   ! SUBROUTINE ST_MATRIX_TO_CC -> Converts a sparse triplet matrix to  !
-   ! the compressed column format used by the solver                    !
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-   SUBROUTINE ST_MATRIX_TO_CC(THIS, NCOLS, CC)
-
-      IMPLICIT NONE
-
-      TYPE(ST_MATRIX), INTENT(IN) :: THIS
-      TYPE(CC_MATRIX), INTENT(OUT) :: CC
-      INTEGER, INTENT(IN) :: NCOLS
-      INTEGER :: NNZ, I, J, K, L
-      INTEGER :: AI_TEMP
-      REAL(KIND=8) :: AX_TEMP
-      INTEGER, DIMENSION(:), ALLOCATABLE :: NPC
-
-      NNZ = THIS%NNZ
-      CC%NNZ = NNZ
-      ALLOCATE(CC%AP(0:NCOLS))
-      ALLOCATE(NPC(0:NCOLS))
-      ALLOCATE(CC%AI(0:NNZ-1))
-      ALLOCATE(CC%AX(0:NNZ-1))
-
-      ! Compute the offsets to the first element of a column
-      ! AP(I) is the offset of column I in rows AI with values AX
-      ! i.e. the matrix entry is a(AI(J), I) = AX(J), with J = AP(I)+K, J<AP(I+1)
-      CC%AP = 0
-      DO I = 0, NNZ-1
-         CC%AP( THIS%CIDX(I)+1 ) = CC%AP( THIS%CIDX(I)+1 ) + 1
-      END DO
-      DO I = 1, NCOLS-1
-         CC%AP(I+1) =  CC%AP(I+1) + CC%AP(I)
-      END DO
-      IF (CC%AP(NCOLS) .NE. NNZ) WRITE(*,*) 'I believe we ve had a problem here.'
-
-      ! Now populate AI and AX at the right offsets (but not sorted!)
-      NPC = 0
-      DO I = 0, NNZ-1
-         J = THIS%CIDX(I)
-         CC%AI(CC%AP(J) + NPC(J)) = THIS%RIDX(I)
-         CC%AX(CC%AP(J) + NPC(J)) = THIS%VALUE(I) 
-         NPC(J) = NPC(J) + 1
-      END DO
-
-      ! Now sort AI and AX by increasing AI in each column
-      DO J = 0, NCOLS-1
-         ! A classic sort routine, within the correct bounds
-         DO K = CC%AP(J), CC%AP(J+1)-2
-            DO L = K+1, CC%AP(J+1)-1
-               IF (CC%AI(K) .GT. CC%AI(L)) THEN
-                  AI_TEMP = CC%AI(K)
-                  AX_TEMP = CC%AX(K)
-                  
-                  CC%AI(K) = CC%AI(L)
-                  CC%AX(K) = CC%AX(L)
-
-                  CC%AI(L) = AI_TEMP
-                  CC%AX(L) = AX_TEMP
-               END IF
-            END DO
-         END DO
-
-      END DO
-
-
-   END SUBROUTINE ST_MATRIX_TO_CC
 
 END MODULE global

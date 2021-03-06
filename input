@@ -9,6 +9,8 @@
 !!!!                                                                       !!!!
 !!!! All units are SI [m, kg, s, ...]                                      !!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Geometry of the CUBRC double-cone experiment
+
 
 ! ========= Computational domain and grid ===========
 Dimensions:
@@ -16,25 +18,23 @@ Dimensions:
 Axisymmetric:
     .FALSE.
 Number_of_cells:
-    20    20    1
+    1000    600    1
 Domain_limits:
-    0.0    1.0    0.0    1.0    0.0    1.0
+    -0.05    0.1937    0.0    0.15    0.0    1.0
 Domain_periodicity:
-    .FALSE.   .FALSE.   .FALSE.
+    .FALSE.   .FALSE.   .TRUE.
 Domain_specular:
-    .FALSE.    .FALSE.    .FALSE.    .FALSE.
+    .FALSE.    .FALSE.    .TRUE.    .FALSE.
 Domain_diffuse:
     .FALSE.    .FALSE.    .FALSE.   .FALSE.
 Boundary_temperature:
     300.0
-    
-Bool_PIC:
-    .FALSE.
+
 
 Bool_dump_moments:
     .FALSE.
 Bool_dump_fluxes:
-    .TRUE.
+    .FALSE.
     
 Flowfield_output:
     './dumps/'
@@ -45,11 +45,11 @@ Fluxes_dump_output:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.e0
+    5.e13
 Timestep:
-    1.0e-5
+    1.0e-8
 Number_of_timesteps:
-    5000
+    100000
 Stats_every:
     1
 
@@ -59,13 +59,13 @@ Dump_part_every:
     1000000
 
 Dump_grid_start:
-    1000000
+    0
     
 Dump_grid_avgevery:
-    20
+    100
 
 Dump_grid_numavgs:
-    1000
+    100
 
 Perform_checks:
     .FALSE.
@@ -76,19 +76,13 @@ Species_file:
     ar.species
     
 Def_mixture:
-    Ions Ar+ 1.0
-    
-Def_mixture:
-    Electrons e 1.0
-    
-Def_mixture:
-    collmix e 1.0
+    argon Ar 1.0
     
     
 ! ========= Collisions ==============================
 
 Collision_type: ! [MCC / DSMC / NONE]
-  NONE 
+  DSMC 
 
 MCC_background_dens:
   1.0e20
@@ -96,12 +90,10 @@ MCC_cross_section:
   1.0e-18
 MCC_species: ! NOT IMPLEMENTED YET!
 
-! DSMC VHS collisions  ! NOT IMPLEMENTED YET!
-
 DSMC_collisions_mixture:
-    collmix
-!VSS_parameters_file:
-!    ar.vss
+    argon
+VSS_parameters_file:
+    ar.vss
 
 Thermal_bath_bool:
     .FALSE.
@@ -120,7 +112,7 @@ Thermal_bath_Ttr:
 ! ========= Initial particle seed ===================
 
 Initial_particles_bool:
-    .TRUE.
+    .FALSE.
 Initial_particles_dens:
     1.e6
 Initial_particles_vel:
@@ -132,69 +124,28 @@ Initial_particles_Trot:
 Initial_particles_Tvib:
     0. 
 Initial_particles_mixture:
-    Ions
-! ========== Injection from boundaries ==============
+    argon
 
-Boundaries_inject_bool:
-    .FALSE.
-
-Boundaries_inject_which_bool:        ! From which boundary you want to inject particles
-    .FALSE.  .FALSE.  .FALSE.  .FALSE. 
-Boundaries_inject_dens:
-    1.0e19
-Boundaries_inject_vel:
-    0. 0. 0.
-Boundaries_inject_Ttra:
-    273.0
-Boundaries_inject_Trot:
-    0.
-Boundaries_inject_mixture:
-    Aria
-! ========== Injection from line source =============
-
-Linesource_bool:
-    .FALSE.
-Linesource_center:
-    0.5   0.
-Linesource_length_y:
-    0.2
-Linesource_dens:
-    1.e24
-Linesource_vel:
-    200.  0. 0.
-Linesource_Ttra:
-    0.0001
-Linesource_Trot:
-    0.
+! ========== Injection from line sources =============
 
 !   x1        y1     x2        y2       n         vx        vy     vz     Ttr       Trot   mix
-!Linesource:
-!    0.099999  1     0.099999   0        1e10      -5e6      0.0    0.0    5500.0    0.0   Electrons
-!Linesource:
-!    0.2001    0.0    0.2001    0.015    7.9e12    0.0       0.0    0.0    5802.0    0.0    Electrons
+Linesource:
+    -0.05     0.0   -0.05     0.1499    1e21      5000.0      0.0    0.0    300.0    0.0   argon
+Linesource:
+    -0.05    0.1499  0.1937   0.1499    1e21      5000.0      0.0    0.0    300.0    0.0   argon
 
+! ========== Walls =============
 
+    x1       y1      x2       y2        T        specular   diffuse    porous     tau    react
 
-! Bordo
-!Linesource:
-!    -0.5    0.0    -0.5    0.5    1.0e15    2000.0    0.0    0.0    300.0    300.0    Aria
+Wall:
+    0.1937   0.1309  0.15367  0.1309    300.0    .FALSE.    .TRUE.    .FALSE.    0.0    .FALSE.
 
-!Linesource:
-!    -0.5    0.4999    0.5    0.4999    1.0e15    0.0    0.0    0.0    300.0    300.0    Aria
-
-!Linesource:
-!    0.4999    0.5    0.4999    0.0    1.0e15    0.0    0.0    0.0    300.0    300.0    Aria
-
-
-!   x1     y1     x2     y2      T        specular   diffuse    porous     tau    react
-!Wall:
-!    0.2    0.0    0.2    0.05    300.0    .FALSE.    .FALSE.    .FALSE.    0.0    .TRUE.
-
-!Wall:
-!    0.2    0.05   0.1    0.05    300.0    .FALSE.    .FALSE.    .FALSE.    0.0    .TRUE.
+Wall:
+    0.15367  0.1309  0.09207  0.04293   300.0    .FALSE.    .TRUE.    .FALSE.    0.0    .FALSE.
    
-!Wall:
-!    0.1    0.05   0.1    0.0     300.0    .FALSE.    .FALSE.    .FALSE.    0.0    .TRUE.
+Wall:
+    0.09207  0.04293 0.0      0.0       300.0    .FALSE.    .TRUE.    .FALSE.    0.0    .FALSE.
    
 
     

@@ -9,63 +9,63 @@
 !!!!                                                                       !!!!
 !!!! All units are SI [m, kg, s, ...]                                      !!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! Geometry of the CUBRC double-cone experiment
-
 
 ! ========= Computational domain and grid ===========
+
 Dimensions:
     2
 Axisymmetric:
-    .FALSE.
-Number_of_cells:
-    1000    600    1
+    .TRUE.
 Domain_limits:
-    -0.05    0.1937    0.0    0.15    0.0    1.0
+    -1.0  1.0      0.0  1.0      -0.5  0.5
+Number_of_cells:
+    400  200  1
 Domain_periodicity:
     .FALSE.   .FALSE.   .TRUE.
 Domain_specular:
     .FALSE.    .FALSE.    .TRUE.    .FALSE.
 Domain_diffuse:
-    .FALSE.    .FALSE.    .FALSE.   .FALSE.
+    .FALSE.    .FALSE.    .FALSE.    .FALSE.
+
 Boundary_temperature:
     300.0
-
 
 Bool_dump_moments:
     .FALSE.
 Bool_dump_fluxes:
     .FALSE.
-    
+
 Flowfield_output:
     './dumps/'
 Particle_dump_output:
     './dumps/'
 Fluxes_dump_output:
     './dumps/'
+
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    5.e13
+    1.0e13
 Timestep:
-    1.0e-8
+    1.0e-6
 Number_of_timesteps:
     100000
 Stats_every:
     1
 
 RNG_seed:
-    65645
+    65344
 Dump_part_every:
-    1000000
+    100001
 
 Dump_grid_start:
-    0
+    2000
     
 Dump_grid_avgevery:
-    100
+    1
 
 Dump_grid_numavgs:
-    100
+    4000
 
 Perform_checks:
     .FALSE.
@@ -78,7 +78,6 @@ Species_file:
 Def_mixture:
     argon Ar 1.0
     
-    
 ! ========= Collisions ==============================
 
 Collision_type: ! [MCC / DSMC / NONE]
@@ -88,23 +87,22 @@ MCC_background_dens:
   1.0e20
 MCC_cross_section:  
   1.0e-18
-MCC_species: ! NOT IMPLEMENTED YET!
 
 DSMC_collisions_mixture:
     argon
 VSS_parameters_file:
-    ar.vss
+    arlofthouse.vss
 
 Thermal_bath_bool:
     .FALSE.
 Thermal_bath_Ttr:
-    10000.0
+    20000.0
 
 
 ! ========= Reactions ==============================
 !Reactions_file:
-!    air.tce
-
+!    ar.react
+    
 !Wall_reactions_file:
 !    ar.wall
 
@@ -126,27 +124,51 @@ Initial_particles_Tvib:
 Initial_particles_mixture:
     argon
 
+
 ! ========== Injection from line sources =============
 
-!   x1        y1     x2        y2       n         vx        vy     vz     Ttr       Trot   mix
+!   x1     y1     x2     y2     density     velocity xyz            Ttr      Trot   mix
 Linesource:
-    -0.05     0.0   -0.05     0.1499    1e21      5000.0      0.0    0.0    300.0    0.0   argon
+    -0.9999   0.0    -0.9999   0.9999    1.699e19    6585.0    0.0    0.0    200.0    0.0    argon
 Linesource:
-    -0.05    0.1499  0.1937   0.1499    1e21      5000.0      0.0    0.0    300.0    0.0   argon
+    -0.9999   0.9999    0.9999    0.9999    1.699e19    6585.0    0.0    0.0    200.0    0.0    argon
+Linesource:
+     0.9999   0.9999    0.9999    0.0    1.699e19    6585.0    0.0    0.0    200.0    0.0    argon
+
 
 ! ========== Walls =============
 
-    x1       y1      x2       y2        T        specular   diffuse    porous     tau    react
-
+    x1                   y1                   x2                   y2                   T       specular   diffuse    porous    tau    react
 Wall:
-    0.1937   0.1309  0.15367  0.1309    300.0    .FALSE.    .TRUE.    .FALSE.    0.0    .FALSE.
-
+    0.152400000000000    0.000000000000000    0.149069694351832    0.031685741680627    1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
 Wall:
-    0.15367  0.1309  0.09207  0.04293   300.0    .FALSE.    .TRUE.    .FALSE.    0.0    .FALSE.
-   
+    0.149069694351832    0.031685741680627    0.139224327744732    0.061986664404752    1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
 Wall:
-    0.09207  0.04293 0.0      0.0       300.0    .FALSE.    .TRUE.    .FALSE.    0.0    .FALSE.
-   
+    0.139224327744732    0.061986664404752    0.123294189942742    0.089578472449373    1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
+Wall:
+    0.123294189942742    0.089578472449373    0.101975504409090    0.113255271402755    1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
+Wall:
+    0.101975504409090    0.113255271402755    0.076200000000000    0.131982271536748    1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
+Wall:
+    0.076200000000000    0.131982271536748    0.047094189942742    0.144941013083381    1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
+Wall:
+    0.047094189942742    0.144941013083381    0.015930137801990    0.151565136854125    1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
+Wall:
+    0.015930137801990    0.151565136854125    -0.015930137801990    0.151565136854125    1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
+Wall:
+    -0.015930137801990    0.151565136854125    -0.047094189942742    0.144941013083381    1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
+Wall:
+    -0.047094189942742    0.144941013083381    -0.076200000000000    0.131982271536748    1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
+Wall:
+    -0.076200000000000    0.131982271536748    -0.101975504409090    0.113255271402755    1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
+Wall:
+    -0.101975504409090    0.113255271402755    -0.123294189942742    0.089578472449373    1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
+Wall:
+    -0.123294189942742    0.089578472449373    -0.139224327744732    0.061986664404752    1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
+Wall:
+    -0.139224327744732    0.061986664404752    -0.149069694351832    0.031685741680627    1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
+Wall:
+    -0.149069694351832    0.031685741680627    -0.152400000000000    0.000000000000000    1500.   .FALSE.    .TRUE.    .FALSE.    0.    .FALSE.
 
     
     

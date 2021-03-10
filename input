@@ -15,7 +15,7 @@
 Dimensions:
     2
 Axisymmetric:
-    .TRUE.
+    .FALSE.
 Domain_limits:
     -1.0  1.0      0.0  1.0      -0.5  0.5
 Number_of_cells:
@@ -62,10 +62,10 @@ Dump_grid_start:
     2000
     
 Dump_grid_avgevery:
-    1
+    10
 
 Dump_grid_numavgs:
-    4000
+    500
 
 Perform_checks:
     .FALSE.

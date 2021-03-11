@@ -672,8 +672,8 @@ MODULE timecycle
                         ! Compute the solutions, check if they are any good and, in case, order them to be checked further.
                         SOL1 = (-COEFB - SQRT(DELTA))/COEFA
                         SOL2 = (-COEFB + SQRT(DELTA))/COEFA
-                        IF (SOL1 >= 0 .AND. SOL1 < DTCOLL) THEN
-                           IF (SOL2 >= 0 .AND. SOL2 < DTCOLL) THEN
+                        IF (SOL1 >= 0 .AND. SOL1 < DTCOLL .AND. BETA+ALPHA*particles(IP)%VX*SOL1+WALLS(i)%Y1 >= 0) THEN
+                           IF (SOL2 >= 0 .AND. SOL2 < DTCOLL .AND. BETA+ALPHA*particles(IP)%VX*SOL2+WALLS(i)%Y1 >= 0) THEN
                               GOODSOL = 2
                               IF (SOL1 <= SOL2) THEN
                                  TEST(1) = SOL1
@@ -687,7 +687,7 @@ MODULE timecycle
                               TEST(1) = SOL1
                            ENDIF
                         ELSE
-                           IF (SOL2 >= 0 .AND. SOL2 < DTCOLL) THEN
+                           IF (SOL2 >= 0 .AND. SOL2 < DTCOLL .AND. BETA+ALPHA*particles(IP)%VX*SOL2+WALLS(i)%Y1 >= 0) THEN
                               GOODSOL = 1
                               TEST(1) = SOL2
                            ELSE

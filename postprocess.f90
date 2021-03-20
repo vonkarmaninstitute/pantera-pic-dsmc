@@ -51,6 +51,8 @@ MODULE postprocess
 
       REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: TIMESTEP_MOMENTS
 
+      REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: TIMESTEP_PHI
+
       INTEGER :: LENGTH
 
 
@@ -318,9 +320,14 @@ MODULE postprocess
          END IF
       END IF
 
+      IF (BOOL_PIC) TIMESTEP_PHI = PHI_FIELD
+
       ! Add to cumulated average
       DBLE_AVG_CUMULATED = DBLE(AVG_CUMULATED)
       AVG_NP =   (AVG_NP*DBLE_AVG_CUMULATED + DBLE(TIMESTEP_NP))/(AVG_CUMULATED + 1.)
+      
+      IF (BOOL_PIC) AVG_PHI = (AVG_PHI*DBLE_AVG_CUMULATED + TIMESTEP_PHI)/(AVG_CUMULATED + 1.)
+
       AVG_CUMULATED = AVG_CUMULATED + 1
 
       DO INDEX = 1, NCELLS*NSPECIES
@@ -357,7 +364,7 @@ MODULE postprocess
       END DO
 
       AVG_TTR = (AVG_TTRX + AVG_TTRY + AVG_TTRZ) / 3.0
-      
+
 
 
          
@@ -388,6 +395,8 @@ MODULE postprocess
       DEALLOCATE(INTENSIVE_AVERAGE_TWO)
 
       IF (BOOL_DUMP_MOMENTS) DEALLOCATE(TIMESTEP_MOMENTS)
+
+      IF (BOOL_PIC) DEALLOCATE(TIMESTEP_PHI)
       
    END SUBROUTINE GRID_AVG
 
@@ -565,7 +574,7 @@ MODULE postprocess
                WRITE(54321,*) Q_FIELD
 
                WRITE(54321,'(A,I10,I10,A7)') 'PHI', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) PHI_FIELD
+               WRITE(54321,*) AVG_PHI
 
                WRITE(54321,'(A,I10,I10,A7)') 'E_X', 1, (NX+1)*(NY+1)*1, 'double'
                WRITE(54321,*) E_FIELD(:,:,1)
@@ -655,6 +664,13 @@ MODULE postprocess
          ALLOCATE(AVG_MOMENTS(LENGTH,33))
          AVG_MOMENTS = 0
       END IF
+
+      IF (BOOL_PIC) THEN
+         ALLOCATE(AVG_PHI(NPX, NPY))
+         AVG_PHI = 0
+      END IF
+
+      
 
    END SUBROUTINE INIT_POSTPROCESS
 

@@ -345,6 +345,8 @@ MODULE global
    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: AVG_MOMENTS
    LOGICAL                                   :: BOOL_DUMP_MOMENTS = .FALSE.
 
+   REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: AVG_PHI
+
 CONTAINS  ! @@@@@@@@@@@@@@@@@@@@@ SUBROUTINES @@@@@@@@@@@@@@@@@@@@@@@@
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

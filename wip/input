@@ -1,0 +1,164 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!                 Input file for PANTERA                                !!!!
+!!!!                                                                       !!!!
+!!!! The program reads is line by line, and when it finds a known line, it !!!!
+!!!! reads and saves the value in the next one.                            !!!!
+!!!! All other lines are ignored (you can comment etc).                    !!!!
+!!!! You can put trailing comments on lines, starting with "!" symbol:     !!!!
+!!!! the program will remove them before checking the content of a line.   !!!!
+!!!!                                                                       !!!!
+!!!! All units are SI [m, kg, s, ...]                                      !!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+! ========= Computational domain and grid ===========
+
+Dimensions:
+    2
+Axisymmetric:
+    .FALSE.
+Domain_limits:
+    -7.0  7.0     -7.0  7.0      -0.5  0.5
+Number_of_cells:
+    50  50  1
+Domain_periodicity:
+    .TRUE.   .TRUE.   .TRUE.
+Domain_specular:
+    .FALSE.    .FALSE.    .FALSE.    .FALSE.
+Domain_diffuse:
+    .FALSE.    .FALSE.    .FALSE.    .FALSE.
+
+Boundary_temperature:
+    300.0
+
+Bool_dump_moments:
+    .FALSE.
+Bool_dump_fluxes:
+    .FALSE.
+
+Flowfield_output:
+    './dumps/'
+Particle_dump_output:
+    './dumps/'
+Fluxes_dump_output:
+    './dumps/'
+
+! ========= Numerical parameters ====================
+
+Fnum:  ! Ratio of real-to-simulated particles
+    1.0e15
+Timestep:
+    1.0e-6
+Number_of_timesteps:
+    2000
+Stats_every:
+    1
+
+RNG_seed:
+    65344
+Dump_part_every:
+    100001
+
+Dump_grid_start:
+    2000
+    
+Dump_grid_avgevery:
+    10
+
+Dump_grid_numavgs:
+    500
+
+Perform_checks:
+    .FALSE.
+
+! ========= Multispecies ==============================
+
+Species_file:
+    ar.species
+    
+Def_mixture:
+    argon Ar 1.0
+    
+! ========= Collisions ==============================
+
+Collision_type: ! [MCC / DSMC / NONE]
+  NONE
+
+MCC_background_dens:
+  1.0e20
+MCC_cross_section:  
+  1.0e-18
+
+DSMC_collisions_mixture:
+    argon
+VSS_parameters_file:
+    ar.vss
+
+Thermal_bath_bool:
+    .FALSE.
+Thermal_bath_Ttr:
+    20000.0
+
+
+! ========= Reactions ==============================
+!Reactions_file:
+!    ar.react
+    
+!Wall_reactions_file:
+!    ar.wall
+
+
+! ========= Initial particle seed ===================
+
+Initial_particles_bool:
+    .TRUE.
+Initial_particles_dens:
+    1.e6
+Initial_particles_vel:
+    0.  0.  0.
+Initial_particles_Ttra:
+    300.0 300.0 300.0
+Initial_particles_Trot:
+    0.
+Initial_particles_Tvib:
+    0. 
+Initial_particles_mixture:
+    argon
+
+
+! ========== Injection from line sources =============
+
+!   x1     	y1           x2        y2     	density     velocity   x   y   z    Ttr      Trot   mix
+!Linesource:
+!    -6.9999   -6.9999    -6.9999     6.9999    1.699e19    6585.0    0.0    0.0    200.0    0.0    argon
+!Linesource:
+!    -6.9999    6.9999     6.9999     6.9999    1.699e19    6585.0    0.0    0.0    200.0    0.0    argon
+!Linesource:
+!     6.9999   -6.9999    -6.9999    -6.9999    1.699e19    6585.0    0.0    0.0    200.0    0.0    argon
+
+
+! ========== Walls =============
+!    x1          y1              x2          y2                  T       specular   diffuse    porous    tau    react	wx	wy
+Wall:
+0. 0. 1. 0. 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   0.       0.
+Wall:
+1. 0. 1. 1. 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   0.       0. 
+Wall:
+1. 1. 0. 1. 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   0.       0.
+Wall:
+0. 1. 0. 0. 1500. .true.    .fale.    .FALSE.    0.    .FALSE.    0.       0.
+! ========= MPI parallelization =====================
+! == Style for MPI domain partition can be:
+! ==
+! == 0: longitudinal strips (along x)
+! == 1: blocks (equally sized)
+!
+! For "blocks" style, provide "Domain_partition_num_blocks", giving
+! the number of blocks along x and y.
+! We expect the number of processes to be N_BLOCKS_X*N_BLOCKS_Y
+
+Partition_style:
+    0
+
+Partition_num_blocks:
+    3  3
+

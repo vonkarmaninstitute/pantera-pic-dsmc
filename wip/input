@@ -17,7 +17,7 @@ Dimensions:
 Axisymmetric:
     .FALSE.
 Domain_limits:
-    -1.  1.0     -1.0  1.0      -0.5  0.5
+    -5.  5.0     -5.0  5.0      -0.5  0.5
 Number_of_cells:
     50  50  1
 Domain_periodicity:
@@ -45,7 +45,7 @@ Fluxes_dump_output:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0e16
+    1.0e17
 Timestep:
     1.0e-6
 Number_of_timesteps:
@@ -139,13 +139,13 @@ Initial_particles_mixture:
 ! ========== Walls =============
 !    x1          y1              x2          y2                  T       specular   diffuse    porous    tau    react	wx	wy
 Wall:
-0. 0. 0.0005 0. 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   -1.       0.
+0. 0. 0.0005 0. 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   -3.       0.
 Wall:
-0.0005 0. 0.0005 0.0005 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   -1.       0. 
+0.0005 0. 0.0005 0.0005 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   -3.       0. 
 Wall:
-0.0005 0.0005 0. 0.0005 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   -1.       0.
+0.0005 0.0005 0. 0.0005 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   -3.      0.
 Wall:
-0. 0.0005 0. 0. 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   -1.       0.
+0. 0.0005 0. 0. 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   -3.       0.
 ! ========= MPI parallelization =====================
 ! == Style for MPI domain partition can be:
 ! ==

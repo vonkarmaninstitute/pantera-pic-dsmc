@@ -139,13 +139,13 @@ Initial_particles_mixture:
 ! ========== Walls =============
 !    x1          y1              x2          y2                  T       specular   diffuse    porous    tau    react	wx	wy
 Wall:
-0. 0. 1. 0. 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   0.       0.
+0. 0. 1. 0. 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   -1.       0.
 Wall:
-1. 0. 1. 1. 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   0.       0. 
+1. 0. 1. 1. 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   -1.       0. 
 Wall:
-1. 1. 0. 1. 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   0.       0.
+1. 1. 0. 1. 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   -1.       0.
 Wall:
-0. 1. 0. 0. 1500. .true.    .fale.    .FALSE.    0.    .FALSE.    0.       0.
+0. 1. 0. 0. 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   -1.       0.
 ! ========= MPI parallelization =====================
 ! == Style for MPI domain partition can be:
 ! ==

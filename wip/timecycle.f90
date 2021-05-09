@@ -25,7 +25,6 @@ MODULE timecycle
       ! Init variables
       NP_TOT = 0
       CALL INIT_POSTPROCESS
-
       
       ! Dump particles and flowfield before the first time step, but after the initial seeding
       IF (DUMP_START .EQ. 0) THEN
@@ -42,7 +41,7 @@ MODULE timecycle
       tID = 1
       CALL CPU_TIME(START_CPU_TIME)
       DO WHILE (tID .LE. NT)
-
+write(*,*) 'ciao'
          ! ########### Print simulation info #######################################
 
          CURRENT_TIME = tID*DT
@@ -418,7 +417,7 @@ MODULE timecycle
 
       IMPLICIT NONE
 
-      INTEGER      :: IP, IC, i, j, SOL
+      INTEGER      :: IP, IC, i, j, SOL, n
       INTEGER      :: BOUNDCOLL, WALLCOLL, GOODSOL
       REAL(KIND=8) :: TOTDTCOLL, CANDIDATE_DTCOLL, rfp
       REAL(KIND=8) :: COEFA, COEFB, COEFC, DELTA, SOL1, SOL2, ALPHA, BETA
@@ -447,6 +446,9 @@ MODULE timecycle
       NORMX = [ 1., -1., 0., 0. ]
       NORMY = [ 0., 0., 1., -1. ]
 
+normwallx =[0., 1., 0., -1.]
+normwally =[-1., 0., 1., 0.]
+
       XW = [ XMIN, XMAX, XMIN, XMAX ]
       YW = [ YMAX, YMIN, YMIN, YMAX ]
       ZW = [ 0., 0., 0., 0. ]
@@ -460,16 +462,22 @@ MODULE timecycle
       ALLOCATE(LOCAL_WALL_COLL_COUNT(N_WALLS*N_SPECIES))
       LOCAL_WALL_COLL_COUNT = 0
 
+allocate(d_qdmx(np_proc))
+allocate(d_qdmy(np_proc))
+allocate(coll(np_proc))
+
       DO IP = 1, NP_PROC
          REMOVE_PART(IP) = .FALSE.
-
+coll(ip) = .false.
+d_qdmx(ip) = 0
+d_qdmy(ip) = 0
 
          HASCOLLIDED = .FALSE.
          TOTDTCOLL = 0.
-         DO WHILE (particles(IP)%DTRIM .GT. 0.) ! Repeat the procedure until step is done
+         DO WHILE (particles(IP)%DTRIM .GT. 0.) 
 
-            DTCOLL = particles(IP)%DTRIM ! Looking for collisions within the remaining time
-            ! ______ ADVECTION ______
+            DTCOLL = particles(IP)%DTRIM 
+
             BOUNDCOLL = -1
             DO i = 1, 4 ! Check collisions with boundaries (xmin, xmax, ymin, ymax)
                IF (AXI) THEN
@@ -641,17 +649,17 @@ MODULE timecycle
 
                ELSE
                   ! We are not axisymmetric
-                  DX = -((WALLS(j)%X2 - PARTICLES(IP)%X)*NORMWALLX(j) + (WALLS(j)%Y2 - PARTICLES(IP)%Y)*NORMWALLY(j))  
-        	  VNR = -((PARTICLES(IP)%VX - WALLS(j)%WX)*NORMWALLX(j)+(PARTICLES(IP)%VY - WALLS(j)%WY)*NORMWALLY(j))
+                  DX = -((WALLS(i)%X2 - PARTICLES(IP)%X)*NORMWALLX(i) + (WALLS(i)%Y2 - PARTICLES(IP)%Y)*NORMWALLY(i))  
+                  VNR = -((PARTICLES(IP)%VX - WALLS(i)%WX)*NORMWALLX(i)+(PARTICLES(IP)%VY - WALLS(j)%WY)*NORMWALLY(i))
                   
                   IF (DX .GE. 0. .AND. VNR * DTCOLL .GE. DX) THEN
                      
                      CANDIDATE_DTCOLL = DX/VNR
 
-        XCOLL = PARTICLES(IP)%X + (PARTICLES(IP)%VX - WALLS(j)%WX) * CANDIDATE_DTCOLL
-        YCOLL = PARTICLES(IP)%Y + (PARTICLES(IP)%VY - WALLS(j)%WY) * CANDIDATE_DTCOLL
-COLLDIST = (XCOLL-WALLS(j)%X1)*(WALLS(j)%X2-WALLS(j)%X1)+(YCOLL-WALLS(j)%Y1)*(WALLS(j)%Y2-WALLS(j)%Y1)/((WALLS(j)%X2-WALLS(j) &
-        %X1)**2 + (WALLS(j)%Y2-WALLS(j)%Y1)**2)
+        XCOLL = PARTICLES(IP)%X + (PARTICLES(IP)%VX - WALLS(i)%WX) * CANDIDATE_DTCOLL
+        YCOLL = PARTICLES(IP)%Y + (PARTICLES(IP)%VY - WALLS(i)%WY) * CANDIDATE_DTCOLL
+COLLDIST = (XCOLL-WALLS(i)%X1)*(WALLS(i)%X2-WALLS(i)%X1)+(YCOLL-WALLS(i)%Y1)*(WALLS(i)%Y2-WALLS(i)%Y1)/((WALLS(i)%X2-WALLS(i) &
+        %X1)**2 + (WALLS(i)%Y2-WALLS(i)%Y1)**2)
                      
                      IF ((COLLDIST .GE. 0) .AND. (COLLDIST .LE. 1)) THEN
                         BOUNDCOLL = -1
@@ -659,9 +667,8 @@ COLLDIST = (XCOLL-WALLS(j)%X1)*(WALLS(j)%X2-WALLS(j)%X1)+(YCOLL-WALLS(j)%Y1)*(WA
                         DTCOLL = CANDIDATE_DTCOLL
                         TOTDTCOLL = TOTDTCOLL + DTCOLL
                         HASCOLLIDEDw = .TRUE.
-                        Particles(ip)%xcoll = xcoll
+        Particles(ip)%xcoll = xcoll
         Particles(ip)%ycoll = ycoll
-        !DTRIM = DTRIM - DTCOLL
                      END IF
                   END IF
                END IF
@@ -765,7 +772,7 @@ COLLDIST = (XCOLL-WALLS(j)%X1)*(WALLS(j)%X2-WALLS(j)%X1)+(YCOLL-WALLS(j)%Y1)*(WA
         VX_POST = (PARTICLES(IP)%VX - WALLS(WALLCOLL)%WX) - 2 * (PARTICLES(IP)%VX - WALLS(WALLCOLL)%WX)*NORMWALLX(WALLCOLL)**2
         VY_POST = (PARTICLES(IP)%VY - WALLS(WALLCOLL)%WY) - 2 * (PARTICLES(IP)%VY - WALLS(WALLCOLL)%WY)*NORMWALLY(WALLCOLL)**2
         COLL(IP) = .TRUE.
-        hascollided = .true.
+        hascollidedw = .true.
         d_qdmx(ip) = -(vx_post-particles(ip)%vx)
         d_qdmy(ip) = -(vy_post-particles(ip)%vy)
 
@@ -874,23 +881,27 @@ COLLDIST = (XCOLL-WALLS(j)%X1)*(WALLS(j)%X2-WALLS(j)%X1)+(YCOLL-WALLS(j)%Y1)*(WA
 
 
       END DO ! End loop: DO IP = 1,NP_PROC
-if (hascollidedw) then
+
+ip = np_proc
+n = 1
+        if (hascollidedw) then
         DO WHILE (IP .GE. 1)
         IF (COLL(IP)) THEN
-        i = i + 1
+        n = n
         END IF
-
+n=n+1
         IP = IP - 1
         ENDDO
         
-        D_QDMX_av = sum(D_QDMX)/i
-        D_QDMY_av = sum(D_QDMY)/i
+!        D_QDMX_av = sum(D_QDMX)/n
+!        D_QDMY_av = sum(D_QDMY)/n
         
         DO j = 1,N_WALLS
-        WALLS(j)%WX = WALLS(j)%WX + D_QDMX_av
-        WALLS(j)%WY = WALLS(j)%WY + D_QDMY_av
+        WALLS(j)%WX = WALLS(j)%WX + sum(D_QDMX)/n
+        WALLS(j)%WY = WALLS(j)%WY + sum(D_QDMY)/n
         end do 
         end if
+        
         do j = 1,n_walls
         WALLS(j)%X1 = WALLS(j)%X1 + WALLS(j)%WX * DT
         WALLS(j)%Y1 = WALLS(j)%Y1 + WALLS(j)%WY * DT
@@ -931,7 +942,8 @@ if (hascollidedw) then
       END DO
 
       DEALLOCATE(REMOVE_PART)
-
+deallocate(d_qdmx)
+deallocate(d_qdmy)
 
       ! Tally surface collisions from all processes
       CALL MPI_REDUCE(LOCAL_BOUNDARY_COLL_COUNT, BOUNDARY_COLL_COUNT, 4*N_SPECIES, MPI_INTEGER, MPI_SUM, 0, &

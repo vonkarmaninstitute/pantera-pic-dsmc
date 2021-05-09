@@ -1244,15 +1244,15 @@ MODULE initialization
          
             ! Assign velocity and energy following a Boltzmann distribution
             M = SPECIES(S_ID)%MOLECULAR_MASS
-            IF (S_ID == 15) THEN
-               CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
-                        3.d-2, 3.d-2, 3.d-2, &
-                        VXP, VYP, VZP, M)
-            ELSE
+!            IF (S_ID == 15) THEN
+!               CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
+!                        3.d-2, 3.d-2, 3.d-2, &
+!                        VXP, VYP, VZP, M)
+!            ELSE
                CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
                            TTRAX_INIT, TTRAY_INIT, TTRAZ_INIT, &
                            VXP, VYP, VZP, M)
-            END IF
+!            END IF
 
             CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, TROT_INIT, EROT)
             CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, TVIB_INIT, EVIB)

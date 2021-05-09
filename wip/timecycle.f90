@@ -427,7 +427,7 @@ write(*,*) 'ciao'
       LOGICAL, DIMENSION(:), ALLOCATABLE :: REMOVE_PART
       REAL(KIND=8) :: V_NORM, V_PERP, VZ, VDUMMY, EROT, EVIB, VDOTN
       INTEGER :: S_ID
-      LOGICAL :: HASCOLLIDED, hascollidedw
+      LOGICAL :: HASCOLLIDED, hascollidedw, fermo
       INTEGER, DIMENSION(:), ALLOCATABLE :: LOCAL_BOUNDARY_COLL_COUNT, LOCAL_WALL_COLL_COUNT
 
       REAL(KIND=8) :: TOL
@@ -955,6 +955,21 @@ deallocate(d_qdmy)
       MPI_COMM_WORLD, ierr)
 
       DEALLOCATE(LOCAL_WALL_COLL_COUNT)
+fermo = .false.
+do j = 1,N_walls
+        do i = 1,4
+                dx = -(walls(j)%x1-xw(i))*normx(i)+(walls(j)%y1-yw(j))*normy(i)
+                if (dx .ge. 0) then
+                fermo = .true.
+!write(*,*) tid, 'stop1'
+!                                stop
+                endif
+        enddo                
+enddo
+
+write(*,*) walls(1)%x1
+
+      
 
    END SUBROUTINE ADVECT
 

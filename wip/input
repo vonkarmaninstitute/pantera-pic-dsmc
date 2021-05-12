@@ -19,9 +19,9 @@ Axisymmetric:
 Domain_limits:
     -5.  5.0     -5.0  5.0      -0.5  0.5
 Number_of_cells:
-    50  50  1
+    1  1  1
 Domain_periodicity:
-    .TRUE.   .TRUE.   .TRUE.
+    .false.   .false.   .false.
 Domain_specular:
     .FALSE.    .FALSE.    .FALSE.    .FALSE.
 Domain_diffuse:
@@ -47,7 +47,7 @@ Fluxes_dump_output:
 Fnum:  ! Ratio of real-to-simulated particles
     1.0e17
 Timestep:
-    1.0e-6
+    1.e-3
 Number_of_timesteps:
     2000
 Stats_every:
@@ -114,7 +114,7 @@ Initial_particles_bool:
 Initial_particles_dens:
     9.56e21
 Initial_particles_vel:
-    0.  0.  0.
+    100.  0.  0.
 Initial_particles_Ttra:
     300.0 300.0 300.0
 Initial_particles_Trot:
@@ -139,13 +139,13 @@ Initial_particles_mixture:
 ! ========== Walls =============
 !    x1          y1              x2          y2                  T       specular   diffuse    porous    tau    react	wx	wy
 Wall:
-0. 0. 0.0005 0. 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   -3.       0.
+0. 0. 0.0005 0. 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   -3.       -3.
 Wall:
-0.0005 0. 0.0005 0.0005 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   -3.       0. 
+0.0005 0. 0.0005 0.0005 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   -3.       -3. 
 Wall:
-0.0005 0.0005 0. 0.0005 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   -3.      0.
+0.0005 0.0005 0. 0.0005 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   -3.      -3.
 Wall:
-0. 0.0005 0. 0. 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   -3.       0.
+0. 0.0005 0. 0. 1500.   .true.    .false.    .FALSE.    0.    .FALSE.   -3.       -3.
 ! ========= MPI parallelization =====================
 ! == Style for MPI domain partition can be:
 ! ==

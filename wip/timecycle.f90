@@ -41,7 +41,7 @@ MODULE timecycle
       tID = 1
       CALL CPU_TIME(START_CPU_TIME)
       DO WHILE (tID .LE. NT)
-write(*,*) 'ciao'
+
          ! ########### Print simulation info #######################################
 
          CURRENT_TIME = tID*DT
@@ -62,6 +62,7 @@ write(*,*) 'ciao'
 
             CALL ONLYMASTERPRINT1(PROC_ID, TRIM(stringTMP))
 
+            write(*,*)  walls(4)%wx
          END IF
          
          ! ########### Inject particles from boundaries/injection sources ##########
@@ -958,19 +959,13 @@ deallocate(d_qdmy)
 fermo = .false.
 do j = 1,N_walls
         do i = 1,4
-                dx = -(walls(j)%x1-xw(i))*normx(i)+(walls(j)%y1-yw(j))*normy(i)
+                dx = -((walls(j)%x1-xw(i))*normx(i)+(walls(j)%y1-yw(j))*normy(i))
                 if (dx .ge. 0) then
                 fermo = .true.
-!write(*,*) tid, 'stop1'
-!                                stop
                 endif
         enddo                
 enddo
-
-write(*,*) walls(1)%x1
-
       
-
    END SUBROUTINE ADVECT
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

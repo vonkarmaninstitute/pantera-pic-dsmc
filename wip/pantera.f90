@@ -35,6 +35,7 @@ PROGRAM PANTERA
    if (particles(ip)%x .ge. walls(1)%x1 .and. particles(ip)%x .le. walls(1)%x2 .and. particles(ip)%y .ge. walls(4)%y2 .and. &
    particles(ip)%y .le. walls(4)%y1) then
    call remove_particle_array(ip, particles, np_proc)
+write(*,*) 'ciao'   
    end if
    end do
    ! ========= Time loop ===================================

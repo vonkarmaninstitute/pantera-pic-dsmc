@@ -1,7 +1,0 @@
-WIP
-input: quadrato trasla - initialization seed (da finire - maxwell, vel media nulla, svuotare quadrato )
-        condizioni dominio periodiche, condizione corpo specular reflection
-global: wall ha in sé wx e wy
-particle: ho aggiunto xcoll e ycoll (anche in new type)
-
----> quadrato viaggia con sua velocità, gas inizializzato, guardo il suo moto fin quando si ferma/quando tocca dominio

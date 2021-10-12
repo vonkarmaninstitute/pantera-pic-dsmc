@@ -500,6 +500,7 @@ MODULE initialization
          READ(line,*) SP_NAME, DIAM, OMEGA, TREF, ALPHA
       
          SP_ID = SPECIES_NAME_TO_ID(SP_NAME)
+         IF (SP_ID == -1) CALL ERROR_ABORT('Species name not found in VSS definition file!')
 
          SPECIES(SP_ID)%DIAM  = DIAM
          SPECIES(SP_ID)%OMEGA = OMEGA

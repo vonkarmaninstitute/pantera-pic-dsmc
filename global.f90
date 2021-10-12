@@ -1,6 +1,6 @@
 ! This module holds global variables
 
-MODULE global
+MODULE global 
 
    USE particle
    USE mpi_common
@@ -10,10 +10,12 @@ MODULE global
    ! Constants !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+   ! http://www1.mat.uniroma1.it/~seghini/fortran/scalari.html ---> info about following language
+
    REAL(KIND=8) :: PI   = 3.1415926535897932d0           ! https://dlmf.nist.gov/3.12
-   REAL(KIND=8) :: EPS0 = 8.8541878128d-12               ! https://physics.nist.gov/cgi-bin/cuu/Value?ep0
-   REAL(KIND=8) :: KB   = 1.380649d-23                   ! https://physics.nist.gov/cgi-bin/cuu/Value?k
-   REAL(KIND=8) :: QE   = 1.602176634d-19                ! https://physics.nist.gov/cgi-bin/cuu/Value?e
+   REAL(KIND=8) :: EPS0 = 8.8541878128d-12               ! https://physics.nist.gov/cgi-bin/cuu/Value?ep0 ! VACUUM ELECTRIC PERMITTIVITY
+   REAL(KIND=8) :: KB   = 1.380649d-23                   ! https://physics.nist.gov/cgi-bin/cuu/Value?k   ! BOLTZMANN CONSTANT
+   REAL(KIND=8) :: QE   = 1.602176634d-19                ! https://physics.nist.gov/cgi-bin/cuu/Value?e   ! ELEMENTARY CHARGE
 
    REAL(KIND=8) :: EPS_SCALING = 1.d0
    

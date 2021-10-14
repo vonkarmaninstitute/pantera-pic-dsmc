@@ -1223,8 +1223,8 @@ MODULE initialization
          DO IP = 1, NP_INIT
 
             ! Create particle position randomly in the domain
-            XP = XMIN + (XMAX-XMIN)*rf()
-            !XP = XMIN + 0.5*(XMAX-XMIN)*rf()
+            !XP = XMIN + (XMAX-XMIN)*rf()
+            XP = XMIN + 0.5*(XMAX-XMIN)*rf()
             !IF (XP .GT. 0.) CYCLE
             IF (AXI) THEN
                YP = SQRT(YMIN*YMIN + rf()*(YMAX*YMAX - YMIN*YMIN))
@@ -1246,15 +1246,9 @@ MODULE initialization
          
             ! Assign velocity and energy following a Boltzmann distribution
             M = SPECIES(S_ID)%MOLECULAR_MASS
-            IF (S_ID == 15) THEN
-               CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
-                        3.d-2, 3.d-2, 3.d-2, &
+            CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
+                        TTRAX_INIT, TTRAY_INIT, TTRAZ_INIT, &
                         VXP, VYP, VZP, M)
-            ELSE
-               CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
-                           TTRAX_INIT, TTRAY_INIT, TTRAZ_INIT, &
-                           VXP, VYP, VZP, M)
-            END IF
 
             CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, TROT_INIT, EROT)
             CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, TVIB_INIT, EVIB)
@@ -1263,6 +1257,15 @@ MODULE initialization
 
             CALL INIT_PARTICLE(XP,YP,ZP,VXP,VYP,VZP,EROT,EVIB,S_ID,CID,DT, particleNOW) ! Save in particle
             CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
+
+            ! This is to create an exatly zero net charge init. remove once done. DBDBDBDBDDBDBDBDBDBDBDBDBDDBDBDBDBDBDB
+            CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
+            TTRAX_INIT, TTRAY_INIT, TTRAZ_INIT, &
+            VXP, VYP, VZP, SPECIES(2)%MOLECULAR_MASS)
+            CALL INIT_PARTICLE(XP,YP,ZP,VXP,VYP,VZP,EROT,EVIB,2,CID,DT, particleNOW) ! Save in particle
+            CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
+            ! DBDBDBDBDDBDBDBDBDBDBDBDBDDBDBDBDBDBDBDBDBDBDBDDBDBDBDBDBDBDBDBDDBDBDBDBDBDBDBDBDBDBDDBDBDBDBDBDBDBDBDDBDB
+
          END DO
       END DO
       ! ~~~~~~ At this point, exchange particles among processes ~~~~~~
@@ -1403,13 +1406,28 @@ MODULE initialization
 
       IMPLICIT NONE
 
-      NPX = NX + 1
+      IF (BOOL_X_PERIODIC) THEN
+         NPX = NX
+      ELSE
+         NPX = NX + 1
+      END IF
+
       IF (DIMS == 2) THEN
          NPY = NY + 1
-      ELSE
+      ELSE IF (DIMS == 1) THEN
          NPY = 1
       END IF
+
       ALLOCATE(E_FIELD(0:NPX-1, 0:NPY-1, 3))
+      ALLOCATE(E_THETA_FIELD(0:NPX-1, 0:NPY-1, 3))
+      ALLOCATE(J_FIELD(0:NPX-1, 3))
+      ALLOCATE(MASS_MATRIX(0:NPX-1, 0:NPX-1))
+      E_FIELD = 0.d0
+      E_THETA_FIELD = 0.d0
+      J_FIELD = 0.d0
+      MASS_MATRIX = 0.d0
+
+      ALLOCATE(PHI_FIELD(0:NPX-1, 0:NPY-1))
 
    END SUBROUTINE INITFIELDS
 

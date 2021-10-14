@@ -9,6 +9,15 @@
 ! See "history" section for a list of authors.
 
 ##################################################
+##### Version info  ##############################
+##################################################
+
+This branch (pantera-implicit) implements the electrostatic 1D version of the
+energy conserving semi-implicit method of Lapenta.
+
+Right now moment collection is parallel, but linear system setup and solution is done on the root process only.
+
+##################################################
 ##### Compiling, running and debugging  ##########
 ##################################################
 

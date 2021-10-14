@@ -31,7 +31,7 @@ PROGRAM PANTERA
    CALL INITREACTIONS      ! Initialize variables for reactions
    CALL INITFIELDS         ! Initialize electromagnetic fields
 
-   IF (BOOL_PIC) CALL ASSEMBLE_POISSON
+   !IF (BOOL_PIC) CALL ASSEMBLE_POISSON
    ! ========= Initial particles seed ======================
    IF (BOOL_INITIAL_SEED)   CALL INITIAL_SEED
    ! CALL DUMP_PARTICLES_SCREEN

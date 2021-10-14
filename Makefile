@@ -7,7 +7,8 @@ CMPF  = mpifort -c -g
 LNK   = mpifort
 #-I/usr/include/suitesparse  -L/usr/lib -lumfpack
 #OPTF = -O0 -Wall -Wextra -Warray-temporaries -ggdb3 -pedantic -fimplicit-none -fcheck=all -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow -mcmodel=medium # Debug options
-OPTF = -O3 -Wall -Wextra -fimplicit-none -fbacktrace -ffpe-trap=invalid,zero,overflow -mcmodel=medium # Standard optimization options 
+#OPTF = -O3 -Wall -Wextra -fimplicit-none -fbacktrace -ffpe-trap=invalid,zero,overflow -mcmodel=medium #-fcheck=bounds # Standard optimization options 
+OPTF = -Og -Wall -Wextra -fimplicit-none -fbacktrace -ffpe-trap=invalid,zero,overflow -mcmodel=medium #-fcheck=bounds # Pietro debug options
 #OPTF = -Ofast -march=native -Wall -Wextra -fimplicit-none -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow -mcmodel=medium # Aggressive optimization options 
 
 # Objects: list of all objects *.o

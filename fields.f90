@@ -9,6 +9,131 @@ MODULE fields
 
    CONTAINS
 
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE ASSEMBLE_AMPERE -> Prepares the linear system for the solution   !
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+   SUBROUTINE ASSEMBLE_AMPERE
+
+      INTEGER :: STATUS
+      INTEGER :: I, K, LEFT, RIGHT
+      INTEGER :: MAXNNZ, SIZE
+      TYPE(ST_MATRIX) :: A_ST
+      REAL(KIND=8) :: MASS_SUM
+      
+      SIZE = 3*NPX
+
+      ! Create the matrix in Sparse Triplet format.
+      ! Entries can be input in random order, but not duplicated.
+      ! We have to allocate the ST matrix, but in this case
+      ! it is not a problem, since each point takes at most 5 entries,
+      ! we can use this as an upper limit.
+      ! (We use a 5 point stencil for interior points)
+      MAXNNZ = 3*SIZE
+      CALL ST_MATRIX_ALLOCATE(A_ST, MAXNNZ)
+
+      ! At this point, populate the matrix
+      DO I = 0, NPX-1
+         
+         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+         ! Electrostatic Ampere for semi-implicit !
+         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+         IF (I == 0) THEN
+            LEFT = NPX-1
+         ELSE
+            LEFT = I-1
+         END IF
+         IF (I == NPX-1) THEN
+            RIGHT = 0
+         ELSE
+            RIGHT = I+1
+         END IF
+         ! The K*NPX term shifts by the number of nodes to obtain the other components of the vector $E^{n+1}_i, i=x,y,z$
+         DO K = 0, 2
+            CALL ST_MATRIX_SET(A_ST, K*NPX+I, K*NPX+I,   1.0 + 0.5*DT/EPS0*MASS_MATRIX(I,I) )
+            
+            CALL ST_MATRIX_SET(A_ST, K*NPX+I, K*NPX+LEFT,    + 0.5*DT/EPS0*MASS_MATRIX(I,LEFT) )
+            
+            CALL ST_MATRIX_SET(A_ST, K*NPX+I, K*NPX+RIGHT,   + 0.5*DT/EPS0*MASS_MATRIX(I,RIGHT) )
+         END DO
+
+      END DO
+
+      !IF (PROC_ID .EQ. 0) CALL ST_MATRIX_PRINT(A_ST, NPX, NPY)
+
+      ! Factorize the matrix for later solution
+      !IF (PROC_ID .EQ. 0) CALL ST_MATRIX_PRINT(A_ST, NPX, NPY)
+      CALL ST_MATRIX_TO_CC(A_ST, SIZE, A_CC)
+      CALL S_UMFPACK_SYMBOLIC(SIZE, SIZE, A_CC%AP, A_CC%AI, A_CC%AX, STATUS = STATUS)
+      CALL S_UMFPACK_NUMERIC(A_CC%AP, A_CC%AI, A_CC%AX)
+      CALL S_UMFPACK_FREE_SYMBOLIC
+
+      
+
+
+      ! Populate the right-hand-side vector
+      ALLOCATE(RHS(0:SIZE-1))
+      RHS = 0.d0
+      DO I = 0, NPX-1
+
+         IF (I == 0) THEN
+            LEFT = NPX-1
+         ELSE
+            LEFT = I-1
+         END IF
+         IF (I == NPX-1) THEN
+            RIGHT = 0
+         ELSE
+            RIGHT = I+1
+         END IF
+
+         ! The K*NPX term shifts by the number of nodes to obtain the other components of the vector $E^{n+1}_i, i=x,y,z$
+         DO K = 0, 2
+            MASS_SUM = E_FIELD(I,0,K+1)    *MASS_MATRIX(I,I) + &
+                       E_FIELD(LEFT,0,K+1) *MASS_MATRIX(I,LEFT) + &
+                       E_FIELD(RIGHT,0,K+1)*MASS_MATRIX(I,RIGHT)
+            RHS(K*NPX+I) = E_FIELD(I,0,K+1) - 0.5*DT/EPS0*J_FIELD(I,K+1)
+         END DO
+
+      END DO
+
+   END SUBROUTINE ASSEMBLE_AMPERE
+
+
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE SOLVE_AMPERE -> Solves the Ampere equation for the new Ex, Ey, Ez !
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+   SUBROUTINE SOLVE_AMPERE
+
+      IMPLICIT NONE
+
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: X
+
+      ALLOCATE(X(0:3*NPX-1))
+
+      ! Solve the linear system
+      IF (PROC_ID .EQ. 0) THEN
+         !WRITE(*,*) 'Solving poisson'
+         CALL S_UMFPACK_SOLVE(UMFPACK_A, A_CC%AP, A_CC%AI, A_CC%AX, X, RHS) ! rhs was q_field
+      END IF
+ 
+      CALL MPI_BCAST(X, 3*NPX, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+      
+      ! Reshape the linear array into a 2D array
+      E_THETA_FIELD(:,0,1) = X(0:NPX-1)
+      E_THETA_FIELD(:,0,2) = X(NPX:2*NPX-1)
+      E_THETA_FIELD(:,0,3) = X(2*NPX:3*NPX-1)
+
+      E_FIELD(:,0,1) = 2.0*X(0:NPX-1) - E_FIELD(:,0,1)
+      E_FIELD(:,0,2) = 2.0*X(NPX:2*NPX-1) - E_FIELD(:,0,2)
+      E_FIELD(:,0,3) = 2.0*X(2*NPX:3*NPX-1) - E_FIELD(:,0,3)
+      DEALLOCATE(X)
+      DEALLOCATE(RHS)
+
+      !IF (PROC_ID .EQ. 0) WRITE(*,*) E_FIELD(:,0,1)
+      
+   END SUBROUTINE SOLVE_AMPERE
    
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE ASSEMBLE_POISSON -> Prepares the linear system for the solution  !
@@ -170,7 +295,6 @@ MODULE fields
    END SUBROUTINE ASSEMBLE_POISSON
 
 
-
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE SOLVE_POISSON -> Solves the Poisson equation with the Q_FIELD RHS !
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -244,6 +368,117 @@ MODULE fields
       END DO
       
    END SUBROUTINE SOLVE_POISSON
+
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE DEPOSIT_CURRENT -> Deposits the current of particles on grid points !
+   ! Corresponds to D.4 of Lapenta, 2016                                            !
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+   SUBROUTINE DEPOSIT_CURRENT
+      
+      IMPLICIT NONE
+
+      INTEGER :: JP
+
+      REAL(KIND=8) :: MULT, CHARGE
+      REAL(KIND=8) :: VOL
+      REAL(KIND=8), DIMENSION(4) :: WEIGHTS
+      INTEGER, DIMENSION(4) :: INDICES, INDI, INDJ
+
+      J_FIELD = 0.d0
+
+      DO JP = 1, NP_PROC
+         CHARGE = SPECIES(particles(JP)%S_ID)%CHARGE
+         IF (ABS(CHARGE) .LT. 1.d-6) CYCLE
+
+         CALL COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)
+
+         IF (GRID_TYPE == RECTILINEAR_UNIFORM .AND. .NOT. AXI) THEN
+            VOL = CELL_VOL
+         ELSE
+            VOL = CELL_VOLUMES(particles(JP)%IC)
+         END IF
+         
+         MULT = QE*CHARGE*FNUM/VOL
+
+         IF (DIMS == 1) THEN
+            J_FIELD(INDICES(1), 1) = J_FIELD(INDICES(1), 1) + MULT * particles(JP)%VX * WEIGHTS(1)
+            J_FIELD(INDICES(2), 1) = J_FIELD(INDICES(2), 1) + MULT * particles(JP)%VX * WEIGHTS(2)
+
+            J_FIELD(INDICES(1), 2) = J_FIELD(INDICES(1), 2) + MULT * particles(JP)%VY * WEIGHTS(1)
+            J_FIELD(INDICES(2), 2) = J_FIELD(INDICES(2), 2) + MULT * particles(JP)%VY * WEIGHTS(2)
+
+            J_FIELD(INDICES(1), 3) = J_FIELD(INDICES(1), 3) + MULT * particles(JP)%VZ * WEIGHTS(1)
+            J_FIELD(INDICES(2), 3) = J_FIELD(INDICES(2), 3) + MULT * particles(JP)%VZ * WEIGHTS(2)
+         END IF
+
+      END DO
+
+      !IF (BOOL_PERIODIC(1)) THEN
+      !   J_FIELD(0, :) = J_FIELD(0, :) + J_FIELD(NX, :)
+      !   J_FIELD(NX, :) = J_FIELD(0, :)
+      !END IF
+
+      IF (PROC_ID .EQ. 0) THEN
+         CALL MPI_REDUCE(MPI_IN_PLACE, J_FIELD, NPX*NPY*3, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      ELSE
+         CALL MPI_REDUCE(J_FIELD,      J_FIELD, NPX*NPY*3, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      END IF
+
+
+   END SUBROUTINE DEPOSIT_CURRENT
+
+
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE COMPUTE_MASS_MATRIX -> Computes the effect of particles on field    !
+   ! expressed as mass matrices (in this case just a scalar).                       !
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+   SUBROUTINE COMPUTE_MASS_MATRIX
+      
+      IMPLICIT NONE
+
+      INTEGER :: JP
+      
+      REAL(KIND=8) :: MULT, CHARGE
+      REAL(KIND=8) :: VOL
+      REAL(KIND=8), DIMENSION(4) :: WEIGHTS
+      INTEGER, DIMENSION(4) :: INDICES, INDI, INDJ
+
+      MASS_MATRIX = 0.d0
+
+      DO JP = 1, NP_PROC
+         CHARGE = SPECIES(particles(JP)%S_ID)%CHARGE
+         IF (ABS(CHARGE) .LT. 1.d-6) CYCLE
+
+         CALL COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)
+
+         IF (GRID_TYPE == RECTILINEAR_UNIFORM .AND. .NOT. AXI) THEN
+            VOL = CELL_VOL
+         ELSE
+            VOL = CELL_VOLUMES(particles(JP)%IC)
+         END IF
+         
+         MULT = 0.5*(QE*CHARGE)**2*FNUM*DT/VOL/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
+
+         IF (DIMS == 1) THEN
+            MASS_MATRIX(INDICES(1), INDICES(1)) = MASS_MATRIX(INDICES(1), INDICES(1)) + MULT * WEIGHTS(1)**2
+            MASS_MATRIX(INDICES(1), INDICES(2)) = MASS_MATRIX(INDICES(1), INDICES(2)) + MULT * WEIGHTS(1)*WEIGHTS(2)
+            MASS_MATRIX(INDICES(2), INDICES(1)) = MASS_MATRIX(INDICES(2), INDICES(1)) + MULT * WEIGHTS(2)*WEIGHTS(1)
+            MASS_MATRIX(INDICES(2), INDICES(2)) = MASS_MATRIX(INDICES(2), INDICES(2)) + MULT * WEIGHTS(2)**2
+         END IF
+
+      END DO
+
+      IF (PROC_ID .EQ. 0) THEN
+         ! Will this work with a 2d array?
+         CALL MPI_REDUCE(MPI_IN_PLACE, MASS_MATRIX, NPX*NPY*NPX*NPY, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      ELSE
+         CALL MPI_REDUCE(MASS_MATRIX,  MASS_MATRIX, NPX*NPY*NPX*NPY, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      END IF
+
+
+   END SUBROUTINE COMPUTE_MASS_MATRIX
 
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -381,34 +616,67 @@ MODULE fields
          WEIGHTS(3) = (1.-FX)*FY
          WEIGHTS(4) = FX*FY
 
-      ELSE
-         ! Row and column indices, starting from 0
-         INDI(1) = I
-         INDI(2) = I + 1
-         INDI(3) = -1
-         INDI(4) = -1
+      ELSE IF (DIMS == 1) THEN
+         IF (BOOL_X_PERIODIC) THEN
+            ! Row and column indices, starting from 0
+            INDI(1) = I
+            IF (I == NX-1) THEN
+               INDI(2) = 0
+            ELSE
+               INDI(2) = I + 1
+            END IF
+            INDI(3) = -1
+            INDI(4) = -1
 
-         INDJ(1) = 0
-         INDJ(2) = 0
-         INDJ(3) = -1
-         INDJ(4) = -1
-      
-         ! Left, right
-         INDICES(1) = IC
-         INDICES(2) = IC + 1
-         INDICES(4) = -1
-         INDICES(3) = -1
+            INDJ(1) = 0
+            INDJ(2) = 0
+            INDJ(3) = -1
+            INDJ(4) = -1
+         
+            ! Left, right
+            INDICES(1) = IC-1
+            IF (I == NX-1) THEN
+               INDICES(2) = 0
+            ELSE
+               INDICES(2) = IC
+            END IF
+            INDICES(4) = -1
+            INDICES(3) = -1
 
-         ! Left, right
-         WEIGHTS(1) = (1.-FX)
-         WEIGHTS(2) = FX
-         WEIGHTS(3) = -1
-         WEIGHTS(4) = -1
+            ! Left, right
+            WEIGHTS(1) = (1.-FX)
+            WEIGHTS(2) = FX
+            WEIGHTS(3) = -1
+            WEIGHTS(4) = -1
+         ELSE
+            ! Row and column indices, starting from 0
+            INDI(1) = I
+            INDI(2) = I + 1
+            INDI(3) = -1
+            INDI(4) = -1
+
+            INDJ(1) = 0
+            INDJ(2) = 0
+            INDJ(3) = -1
+            INDJ(4) = -1
+         
+            ! Left, right
+            INDICES(1) = IC
+            INDICES(2) = IC + 1
+            INDICES(4) = -1
+            INDICES(3) = -1
+
+            ! Left, right
+            WEIGHTS(1) = (1.-FX)
+            WEIGHTS(2) = FX
+            WEIGHTS(3) = -1
+            WEIGHTS(4) = -1
+         END IF
       END IF
    END SUBROUTINE COMPUTE_WEIGHTS
 
 
-   SUBROUTINE APPLY_E_FIELD(JP, E)
+   SUBROUTINE APPLY_E_THETA_FIELD(JP, E)
 
       IMPLICIT NONE
 
@@ -419,16 +687,16 @@ MODULE fields
 
       CALL COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)
       IF (DIMS == 2) THEN
-         E = WEIGHTS(1)*E_FIELD(INDI(1), INDJ(1), :) + &
-         WEIGHTS(2)*E_FIELD(INDI(2), INDJ(2), :) + &
-         WEIGHTS(3)*E_FIELD(INDI(3), INDJ(3), :) + &
-         WEIGHTS(4)*E_FIELD(INDI(4), INDJ(4), :)
+         E = WEIGHTS(1)*E_THETA_FIELD(INDI(1), INDJ(1), :) + &
+             WEIGHTS(2)*E_THETA_FIELD(INDI(2), INDJ(2), :) + &
+             WEIGHTS(3)*E_THETA_FIELD(INDI(3), INDJ(3), :) + &
+             WEIGHTS(4)*E_THETA_FIELD(INDI(4), INDJ(4), :)
       ELSE
-         E = WEIGHTS(1)*E_FIELD(INDI(1), INDJ(1), :) + &
-         WEIGHTS(2)*E_FIELD(INDI(2), INDJ(2), :)
+         E = WEIGHTS(1)*E_THETA_FIELD(INDI(1), INDJ(1), :) + &
+             WEIGHTS(2)*E_THETA_FIELD(INDI(2), INDJ(2), :)
       END IF
       
-   END SUBROUTINE APPLY_E_FIELD
+   END SUBROUTINE APPLY_E_THETA_FIELD
 
 
    SUBROUTINE APPLY_POTENTIAL(JP, PHI)

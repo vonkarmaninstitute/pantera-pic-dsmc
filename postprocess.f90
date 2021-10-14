@@ -570,8 +570,8 @@ MODULE postprocess
                WRITE(54321,'(A,I10)') 'POINT_DATA', (NX+1)*(NY+1)*1
                WRITE(54321,'(A,I10)') 'FIELD FieldData', 5
                
-               WRITE(54321,'(A,I10,I10,A7)') 'QRHO', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) Q_FIELD
+               WRITE(54321,'(A,I10,I10,A7)') 'CURRENT', 1, (NX+1)*(NY+1)*1, 'double'
+               WRITE(54321,*) J_FIELD
 
                WRITE(54321,'(A,I10,I10,A7)') 'PHI', 1, (NX+1)*(NY+1)*1, 'double'
                WRITE(54321,*) AVG_PHI
@@ -585,23 +585,43 @@ MODULE postprocess
                WRITE(54321,'(A,I10,I10,A7)') 'E_Z', 1, (NX+1)*(NY+1)*1, 'double'
                WRITE(54321,*) E_FIELD(:,:,3)
             ELSE
-               WRITE(54321,'(A,I10)') 'POINT_DATA', (NX+1)*(NY+1)*1
-               WRITE(54321,'(A,I10)') 'FIELD FieldData', 5
-               
-               WRITE(54321,'(A,I10,I10,A7)') 'QRHO', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) Q_FIELD, Q_FIELD
+               IF (BOOL_X_PERIODIC) THEN
+                  WRITE(54321,'(A,I10)') 'POINT_DATA', (NX)*(NY+1)*1
+                  WRITE(54321,'(A,I10)') 'FIELD FieldData', 6
+                  
+                  WRITE(54321,'(A,I10,I10,A7)') 'J_X', 1, (NX+1)*(NY+1)*1, 'double'
+                  WRITE(54321,*) J_FIELD(:,1), J_FIELD(0,1), J_FIELD(:,1), J_FIELD(0,1)
 
-               WRITE(54321,'(A,I10,I10,A7)') 'PHI', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) PHI_FIELD, PHI_FIELD
+                  WRITE(54321,'(A,I10,I10,A7)') 'J_Y', 1, (NX+1)*(NY+1)*1, 'double'
+                  WRITE(54321,*) J_FIELD(:,2), J_FIELD(0,2), J_FIELD(:,2), J_FIELD(0,2)
 
-               WRITE(54321,'(A,I10,I10,A7)') 'E_X', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) E_FIELD(:,:,1), E_FIELD(:,:,1)
+                  WRITE(54321,'(A,I10,I10,A7)') 'J_Z', 1, (NX+1)*(NY+1)*1, 'double'
+                  WRITE(54321,*) J_FIELD(:,3), J_FIELD(0,3), J_FIELD(:,3), J_FIELD(0,3)
 
-               WRITE(54321,'(A,I10,I10,A7)') 'E_Y', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) E_FIELD(:,:,2), E_FIELD(:,:,2)
+                  WRITE(54321,'(A,I10,I10,A7)') 'E_X', 1, (NX+1)*(NY+1)*1, 'double'
+                  WRITE(54321,*) E_FIELD(:,:,1), E_FIELD(0,:,1), E_FIELD(:,:,1), E_FIELD(0,:,1)
 
-               WRITE(54321,'(A,I10,I10,A7)') 'E_Z', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) E_FIELD(:,:,3), E_FIELD(:,:,3)
+                  WRITE(54321,'(A,I10,I10,A7)') 'E_Y', 1, (NX+1)*(NY+1)*1, 'double'
+                  WRITE(54321,*) E_FIELD(:,:,2), E_FIELD(0,:,2), E_FIELD(:,:,2), E_FIELD(0,:,2)
+
+                  WRITE(54321,'(A,I10,I10,A7)') 'E_Z', 1, (NX+1)*(NY+1)*1, 'double'
+                  WRITE(54321,*) E_FIELD(:,:,3), E_FIELD(0,:,3), E_FIELD(:,:,3), E_FIELD(0,:,3)
+               ELSE
+                  WRITE(54321,'(A,I10)') 'POINT_DATA', (NX+1)*(NY+1)*1
+                  WRITE(54321,'(A,I10)') 'FIELD FieldData', 5
+
+                  WRITE(54321,'(A,I10,I10,A7)') 'PHI', 1, (NX+1)*(NY+1)*1, 'double'
+                  WRITE(54321,*) PHI_FIELD, PHI_FIELD
+
+                  WRITE(54321,'(A,I10,I10,A7)') 'E_X', 1, (NX+1)*(NY+1)*1, 'double'
+                  WRITE(54321,*) E_FIELD(:,:,1), E_FIELD(:,:,1)
+
+                  WRITE(54321,'(A,I10,I10,A7)') 'E_Y', 1, (NX+1)*(NY+1)*1, 'double'
+                  WRITE(54321,*) E_FIELD(:,:,2), E_FIELD(:,:,2)
+
+                  WRITE(54321,'(A,I10,I10,A7)') 'E_Z', 1, (NX+1)*(NY+1)*1, 'double'
+                  WRITE(54321,*) E_FIELD(:,:,3), E_FIELD(:,:,3)
+               END IF
             END IF
          END IF
 
@@ -711,12 +731,12 @@ MODULE postprocess
 
       IMPLICIT NONE
 
-      INTEGER                            :: JP, JS
+      INTEGER                            :: JP, JS, I
    
       INTEGER                            :: TOT_NUM
 
       REAL(KIND=8), DIMENSION(3)         :: TOT_MOMENTUM
-      REAL(KIND=8)                       :: TOT_KE, TOT_IE, TOT_FE, TOT_EE, HX, HY, PHI, CURRENT_TIME
+      REAL(KIND=8)                       :: TOT_KE, TOT_IE, TOT_FE, TOT_EE, CURRENT_TIME
 
 
       TOT_NUM = 0
@@ -748,12 +768,15 @@ MODULE postprocess
          !IF (JS == 4) THEN
          !  TOT_FE = TOT_FE + 15.63e-19/2.
          !END IF
-         IF (BOOL_PIC) THEN
-            CALL APPLY_POTENTIAL(JP, PHI)
-            TOT_EE  = TOT_EE + PHI*1.602176634e-19*SPECIES(JS)%CHARGE * FNUM
-         END IF
 
       END DO
+
+
+      IF (BOOL_PIC) THEN
+         DO I = 0, NPX-1
+            TOT_EE = TOT_EE + 0.5*EPS0*(E_FIELD(I,0,1)**2 + E_FIELD(I,0,2)**2 + E_FIELD(I,0,3)**2)*CELL_VOL
+         END DO
+      END IF
 
 
       ! Collect data from all the processes and print it
@@ -765,8 +788,8 @@ MODULE postprocess
          CALL MPI_REDUCE(MPI_IN_PLACE,  TOT_EE,       1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
          !CALL MPI_REDUCE(MPI_IN_PLACE,  TOT_FE,       1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
 
-         HX = (XMAX-XMIN)/DBLE(NX)
-         HY = (YMAX-YMIN)/DBLE(NY)
+         !HX = (XMAX-XMIN)/DBLE(NX)
+         !HY = (YMAX-YMIN)/DBLE(NY)
          !TOT_EE = -HX*HY*8.8541878128E-12*SUM( Q_FIELD*PACK(PHI_FIELD, .TRUE.) )/FNUM
 
          ! WRITE(*,*) ' '
@@ -777,11 +800,11 @@ MODULE postprocess
          ! WRITE(*,*) 'Total internal energy:  ', TOT_IE, ' [J]'
          ! WRITE(*,*) 'Total formation energy: ', TOT_FE, ' [J]'
          ! WRITE(*,*) 'Total electrostatic energy: ', TOT_EE, ' [J]'
-         ! WRITE(*,*) 'Total energy:          ', TOT_KE+TOT_IE+TOT_FE+TOT_EE, ' [J]'
+         WRITE(*,*) 'Total energy: ', TOT_KE+TOT_EE, 'Electrostic energy: ', TOT_EE, 'Kinetic energy: ', TOT_KE, ' [J]'
          ! WRITE(*,*) ' '
 
          OPEN(54331, FILE='conservation_checks', POSITION='append', STATUS='unknown', ACTION='write')
-         WRITE(54331,*) CURRENT_TIME, TOT_NUM, TOT_MOMENTUM, TOT_KE, TOT_IE, TOT_EE !TOT_FE, TOT_EE
+         WRITE(54331,*) CURRENT_TIME, TOT_NUM, TOT_MOMENTUM, TOT_KE, TOT_IE, TOT_EE, TOT_KE+TOT_IE+TOT_EE
          CLOSE(54331)
 
       ELSE

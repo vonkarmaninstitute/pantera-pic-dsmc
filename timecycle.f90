@@ -29,10 +29,12 @@ MODULE timecycle
 
       ! ########### Compute poisson ##########################################
 
-      IF (BOOL_PIC) THEN
-         CALL DEPOSIT_CHARGE
-         CALL SOLVE_POISSON
-      END IF
+      !IF (BOOL_PIC) THEN
+      !   CALL DEPOSIT_CURRENT
+      !   CALL COMPUTE_MASS_MATRIX
+      !   CALL ASSEMBLE_AMPERE
+      !   CALL SOLVE_AMPERE
+      !END IF
       
       ! Dump particles and flowfield before the first time step, but after the initial seeding
       IF (DUMP_START .EQ. 0) THEN
@@ -77,6 +79,15 @@ MODULE timecycle
          CALL BOUNDARIES_INJECT
          CALL LINE_SOURCE_INJECT
 
+         ! ########### Compute poisson ##########################################
+
+         IF (BOOL_PIC) THEN
+            CALL DEPOSIT_CURRENT
+            CALL COMPUTE_MASS_MATRIX
+            CALL ASSEMBLE_AMPERE
+            CALL SOLVE_AMPERE
+         END IF
+
          ! ########### Advect particles ############################################
 
          CALL ADVECT 
@@ -95,12 +106,7 @@ MODULE timecycle
 
          IF (BOOL_THERMAL_BATH) CALL THERMAL_BATH
 
-         ! ########### Compute poisson ##########################################
 
-         IF (BOOL_PIC) THEN
-            CALL DEPOSIT_CHARGE
-            CALL SOLVE_POISSON
-         END IF
 
          ! ########### Dump particles ##############################################
          IF (tID .GE. DUMP_START) THEN
@@ -485,10 +491,8 @@ MODULE timecycle
          V_NEW(3) = particles(IP)%VZ
 
          IF (BOOL_PIC) THEN
-            CALL APPLY_E_FIELD(IP, E)
+            CALL APPLY_E_THETA_FIELD(IP, E)
             
-
-
             V_OLD(1) = particles(IP)%VX
             V_OLD(2) = particles(IP)%VY
             V_OLD(3) = particles(IP)%VZ
@@ -1008,19 +1012,19 @@ MODULE timecycle
       REAL(KIND=8), DIMENSION(3), INTENT(IN) :: V_OLD, E, B
       REAL(KIND=8), DIMENSION(3) :: V_MINUS, V_PLUS, V_PRIME, T, S
       REAL(KIND=8), INTENT(IN) :: DT, CHARGE, MASS
-      REAL(KIND=8) :: COULOMBCHARGE, BETA_FACTOR
-
-      BETA_FACTOR = BETA_LIMITING_FUNCTION(SQRT(V_OLD(1)**2 + V_OLD(2)**2 + V_OLD(3)**2))
+      REAL(KIND=8) :: COULOMBCHARGE
 
       COULOMBCHARGE = CHARGE * QE
-      V_MINUS = V_OLD + 0.5*COULOMBCHARGE*E/MASS*DT*BETA_FACTOR
+      !V_MINUS = V_OLD + 0.5*COULOMBCHARGE*E/MASS*DT
 
-      T = 0.5*COULOMBCHARGE*B/MASS*DT*BETA_FACTOR
-      V_PRIME = V_MINUS + CROSS(V_MINUS, T)
-      S = 2.*T/(1.+( T(1)*T(1) + T(2)*T(2) + T(3)*T(3) ))
-      V_PLUS = V_MINUS + CROSS(V_PRIME, S)
+      !T = 0.5*COULOMBCHARGE*B/MASS*DT
+      !V_PRIME = V_MINUS + CROSS(V_MINUS, T)
+      !S = 2.*T/(1.+( T(1)*T(1) + T(2)*T(2) + T(3)*T(3) ))
+      !V_PLUS = V_MINUS + CROSS(V_PRIME, S)
 
-      V_NEW = V_PLUS + 0.5*COULOMBCHARGE*E/MASS*DT*BETA_FACTOR
+      !V_NEW = V_PLUS + 0.5*COULOMBCHARGE*E/MASS*DT
+
+      V_NEW = V_OLD + COULOMBCHARGE*E/MASS*DT
 
    END SUBROUTINE
 
@@ -1432,6 +1436,7 @@ MODULE timecycle
       REAL(KIND=8) :: BETA_FACTOR
       REAL(KIND=8), INTENT(IN) :: VELOCITY
 
+      BOOL_SPEED_LIMIT = .FALSE.
       IF (BOOL_SPEED_LIMIT) THEN
          IF (VELOCITY <= SPEED_LIMIT) THEN
             BETA_FACTOR = 1.d0

@@ -1260,7 +1260,7 @@ MODULE initialization
 
             ! This is to create an exatly zero net charge init. remove once done. DBDBDBDBDDBDBDBDBDBDBDBDBDDBDBDBDBDBDB
             CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
-            TTRAX_INIT, TTRAY_INIT, TTRAZ_INIT, &
+            300.d0, 300.d0, 300.d0, &
             VXP, VYP, VZP, SPECIES(2)%MOLECULAR_MASS)
             CALL INIT_PARTICLE(XP,YP,ZP,VXP,VYP,VZP,EROT,EVIB,2,CID,DT, particleNOW) ! Save in particle
             CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array

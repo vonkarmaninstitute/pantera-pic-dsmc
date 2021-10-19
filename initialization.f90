@@ -67,12 +67,6 @@ MODULE initialization
          END IF
          IF (line=='Number_of_cells:')         READ(in1,*) NX, NY, NZ
 
-         IF (line=='Quadtree_root_cells:') THEN
-            READ(in1,*) NX, NY, NZ
-            GRID_TYPE = QUADTREE
-            CALL INIT_QUADTREE
-         END IF
-
          IF (line=='Grid_file:') THEN
             READ(in1,*) GRID_FILENAME
             CALL READ_GRID_FILE(GRID_FILENAME)
@@ -1153,22 +1147,6 @@ MODULE initialization
 
    END SUBROUTINE READ_GRID_FILE
 
-
-   SUBROUTINE INIT_QUADTREE
-      
-      IMPLICIT NONE
-
-      INTEGER :: JC
-
-      IF (NZ .NE. 1) CALL ERROR_ABORT('Error! Number of cells along Z must be 1.')
-      ALLOCATE(QUADTREE_ROOT(NX*NY))
-      DO JC = 1, NX*NY
-         QUADTREE_ROOT(JC)%LEVEL = 1
-         QUADTREE_ROOT(JC)%ISLEAF = .TRUE.
-         !QUADTREE_ROOT(JC)%PARENT => QUADTREE_ROOT
-      END DO
-
-   END SUBROUTINE INIT_QUADTREE
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE INITIAL_SEED -> seeds particles at the beginning of !!

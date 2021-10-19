@@ -61,16 +61,6 @@ MODULE global
    INTEGER(KIND(RECTILINEAR_UNIFORM)) :: GRID_TYPE = RECTILINEAR_UNIFORM
 
 
-   TYPE QUADTREE_CELL
-      INTEGER :: LEVEL
-      LOGICAL :: ISLEAF
-      TYPE(QUADTREE_CELL), DIMENSION(:), ALLOCATABLE :: CHILDREN
-      !TYPE(QUADTREE_CELL), POINTER :: PARENT
-      REAL(KIND=8) :: XSIZE, YSIZE
-   END TYPE QUADTREE_CELL
-
-   TYPE(QUADTREE_CELL), DIMENSION(:), ALLOCATABLE :: QUADTREE_ROOT
-
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Electromagnetic fields !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

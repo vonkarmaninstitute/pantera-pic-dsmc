@@ -30,23 +30,28 @@ MODULE grid_and_partition
          DY = (YMAX - YMIN)/NY
 
          !WRITE(*,*) 'XP = ', XP, 'XMIN = ', XMIN, 'DX = ', DX
+         !HERE WE ARE DEFINING THE EXACT CELL IN WHICH THE PARTICLE IS SITUATED. EX: DX=(10m-0m)/100, XP=5m, XCELL=(5m-0m)/0.1 ---> 50th CELL
          XCELL = INT((XP-XMIN)/DX)
          YCELL = INT((YP-YMIN)/DY)
 
          IF (XCELL .GT. (NX-1)) THEN 
             XCELL = NX-1
             WRITE(*,*) 'Particle out of bound xhi!'
+            WRITE(*,*) 'Particle position ', XP, YP
          ELSE IF (XCELL .LT. 0) THEN
             XCELL = 0
             WRITE(*,*) 'Particle out of bound xlo!'
+            WRITE(*,*) 'Particle position ', XP, YP
          END IF
 
          IF (YCELL .GT. (NY-1)) THEN 
             YCELL = NY-1
             WRITE(*,*) 'Particle out of bound yhi!'
+            WRITE(*,*) 'Particle position ', XP, YP
          ELSE IF (YCELL .LT. 0) THEN
             YCELL = 0
             WRITE(*,*) 'Particle out of bound ylo!'
+            WRITE(*,*) 'Particle position ', XP, YP
          END IF
 
          IDCELL = XCELL + NX*YCELL + 1
@@ -57,17 +62,21 @@ MODULE grid_and_partition
          IF (XCELL .GT. (NX)) THEN 
             XCELL = NX
             WRITE(*,*) 'Particle out of bound xhi!', XCELL, NX
+            WRITE(*,*) 'Particle position ', XP, YP
          ELSE IF (XCELL .LT. 1) THEN
             XCELL = 1
             WRITE(*,*) 'Particle out of bound xlo!'
+            WRITE(*,*) 'Particle position ', XP, YP
          END IF
 
          IF (YCELL .GT. (NY)) THEN 
             YCELL = NY
             WRITE(*,*) 'Particle out of bound yhi!'
+            WRITE(*,*) 'Particle position ', XP, YP
          ELSE IF (YCELL .LT. 1) THEN
             YCELL = 1
             WRITE(*,*) 'Particle out of bound ylo!'
+            WRITE(*,*) 'Particle position ', XP, YP
          END IF
 
          IDCELL = XCELL + NX*(YCELL-1)

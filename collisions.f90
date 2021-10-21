@@ -112,6 +112,7 @@ MODULE collisions
       REAL(KIND=8) :: GX, GY, GZ, G
       REAL(KIND=8) :: COSCHI, SINCHI, THETA, COSTHETA, SINTHETA
       REAL(KIND=8) :: M1, M2, COSA, SINA, BB
+      REAL(KIND=8) :: CFNUM
       LOGICAL      :: SKIP
 
       TYPE(PARTICLE_DATA_STRUCTURE) :: NEWparticle
@@ -122,6 +123,11 @@ MODULE collisions
       IOLJ  = IOF(JC) + NPC(JC) - 1 ! Last particle in the cell
       NPCJ = NPC(JC)                ! Number of particles in the cell
 
+      IF (BOOL_RADIAL_WEIGHTING) THEN
+         CFNUM = CELL_FNUM(JC)
+      ELSE
+         CFNUM = FNUM
+      END IF
       ! Step 1. Compute the number of pairs to test for collision
       ! This in not very efficient for multispecies, could be improved by grouping species.
       ! For now consider all as one group (just one NCOLLMAX)
@@ -155,9 +161,9 @@ MODULE collisions
       VRMAX = SQRT((VXMAX-VXMIN)**2 + (VYMAX-VYMIN)**2 + (VZMAX-VZMIN)**2)
       ! Compute the maximum expected number of collisions
       IF (GRID_TYPE == RECTILINEAR_UNIFORM .AND. DIMS == 2) THEN
-         NCOLLMAX = 0.5*NPC(JC)*(NPC(JC)-1)*SIGMAMAX*VRMAX*FNUM*DT/CELL_VOL
+         NCOLLMAX = 0.5*NPC(JC)*(NPC(JC)-1)*SIGMAMAX*VRMAX*CFNUM*DT/CELL_VOL
       ELSE
-         NCOLLMAX = 0.5*NPC(JC)*(NPC(JC)-1)*SIGMAMAX*VRMAX*FNUM*DT/CELL_VOLUMES(JC)
+         NCOLLMAX = 0.5*NPC(JC)*(NPC(JC)-1)*SIGMAMAX*VRMAX*CFNUM*DT/CELL_VOLUMES(JC)
       END IF
 
       NCOLLMAX_INT = FLOOR(NCOLLMAX+0.5)
@@ -240,7 +246,7 @@ MODULE collisions
             COLLPROB = FCORR/(SIGMAMAX*VRMAX)*VR*SIGMA
          ELSE
             IF (SIGMAMAX*VRMAX .LT. 1e-20) CALL ERROR_ABORT('The product is zero!')
-            IF (VR .LT. 1e-20) CALL ERROR_ABORT('VR is zero!')
+            IF (VR .LT. 1e-20) CYCLE !CALL ERROR_ABORT('VR is zero!')
             COLLPROB = FCORR/(SIGMAMAX*VRMAX)*VR*SIGMA*(VR/CREF)**(1.-2.*OMEGA)
          END IF
 
@@ -249,7 +255,7 @@ MODULE collisions
 
             ! Rimuovere commento per avere avviso
             IF (COLLPROB .GT. 1.) THEN
-               WRITE(*,*) 'Attention => this was a bad DSMC collision!!!'
+               WRITE(*,*) 'Attention => this was a bad DSMC collision!'
             END IF
 
             NCOLLREAL = NCOLLREAL + 1

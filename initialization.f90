@@ -74,6 +74,7 @@ MODULE initialization
          END IF
          ! ~~~~~~~~~~~~~  Numerical settings  ~~~~~~~~~~~~~~~~~
          IF (line=='Fnum:')                    READ(in1,*) FNUM
+         IF (line=='Bool_radial_weighting:')   READ(in1,*) BOOL_RADIAL_WEIGHTING
          IF (line=='Timestep:')                READ(in1,*) DT
          IF (line=='Number_of_timesteps:')     READ(in1,*) NT
          IF (line=='RNG_seed:')                READ(in1,*) RNG_SEED_GLOBAL
@@ -1204,7 +1205,7 @@ MODULE initialization
             XP = XMIN + (XMAX-XMIN)*rf()
             !XP = XMIN + 0.5*(XMAX-XMIN)*rf()
             !IF (XP .GT. 0.) CYCLE
-            IF (AXI) THEN
+            IF (AXI .AND. (.NOT. BOOL_RADIAL_WEIGHTING)) THEN
                YP = SQRT(YMIN*YMIN + rf()*(YMAX*YMAX - YMIN*YMIN))
                ZP = 0
             ELSE
@@ -1356,11 +1357,13 @@ MODULE initialization
 
       IF (GRID_TYPE == RECTILINEAR_UNIFORM .AND. AXI) THEN
          ALLOCATE(CELL_VOLUMES(NX*NY))
+         IF (BOOL_RADIAL_WEIGHTING) ALLOCATE(CELL_FNUM(NX*NY))
          DO I = 1, NX
             DO J = 1, NY
                CELL_YMIN = YMIN + (J-1)*(YMAX-YMIN)/NY
                CELL_YMAX = YMIN + J*(YMAX-YMIN)/NY
                CELL_VOLUMES(I + NX*(J-1)) = 0.5*(XMAX-XMIN)/NX*(CELL_YMAX**2 - CELL_YMIN**2)*(ZMAX-ZMIN)
+               IF (BOOL_RADIAL_WEIGHTING) CELL_FNUM(I + NX*(J-1)) = FNUM*NY*(CELL_YMAX**2 - CELL_YMIN**2)/(YMAX**2-YMIN**2)
             END DO
          END DO
       END IF

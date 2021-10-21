@@ -21,7 +21,7 @@ MODULE postprocess
       INTEGER                            :: JP, JC, JS, INDEX
 
       REAL(KIND=8) :: DBLE_AVG_CUMULATED, NUMPART, SAMPLEDOF
-      REAL(KIND=8) :: CX, CY, CZ, C2, MASS, VOL
+      REAL(KIND=8) :: CX, CY, CZ, C2, MASS, VOL, CFNUM
 
    
       INTEGER, DIMENSION(:), ALLOCATABLE      :: TIMESTEP_NP
@@ -220,19 +220,25 @@ MODULE postprocess
                VOL = CELL_VOLUMES(JC)
             END IF
 
+            IF (BOOL_RADIAL_WEIGHTING) THEN
+               CFNUM = CELL_FNUM(particles(JP)%IC)
+            ELSE
+               CFNUM = FNUM
+            END IF
+
             DO JS = 1, NSPECIES
                INDEX = JC+NCELLS*(JS-1)
                MASS = SPECIES(JS)%MOLECULAR_MASS
                
 
                ! rho
-               TIMESTEP_MOMENTS(INDEX,1) = MASS*FNUM/VOL*TIMESTEP_NP(INDEX)
+               TIMESTEP_MOMENTS(INDEX,1) = MASS*CFNUM/VOL*TIMESTEP_NP(INDEX)
                ! Ux, Uy, Uz
                TIMESTEP_MOMENTS(INDEX,2) = TIMESTEP_VX(INDEX)
                TIMESTEP_MOMENTS(INDEX,3) = TIMESTEP_VY(INDEX)
                TIMESTEP_MOMENTS(INDEX,4) = TIMESTEP_VZ(INDEX)
                ! Higher order moments
-               TIMESTEP_MOMENTS(INDEX,5:33) = TIMESTEP_MOMENTS(INDEX,5:33)*MASS*FNUM/VOL
+               TIMESTEP_MOMENTS(INDEX,5:33) = TIMESTEP_MOMENTS(INDEX,5:33)*MASS*CFNUM/VOL
             END DO
          END DO
 
@@ -504,7 +510,11 @@ MODULE postprocess
             WRITE(string, *) 'nrho_mean_', SPECIES(JS)%NAME
             WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
             IF (GRID_TYPE == RECTILINEAR_NONUNIFORM .OR. AXI) THEN
-               WRITE(54321,*) FNUM*AVG_NP(FIRST:LAST)/CELL_VOLUMES
+               IF (BOOL_RADIAL_WEIGHTING) THEN
+                  WRITE(54321,*) CELL_FNUM*AVG_NP(FIRST:LAST)/CELL_VOLUMES
+               ELSE
+                  WRITE(54321,*) FNUM*AVG_NP(FIRST:LAST)/CELL_VOLUMES
+               END IF
             ELSE IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
                WRITE(54321,*) FNUM*AVG_NP(FIRST:LAST)/CELL_VOL
             END IF
@@ -717,6 +727,7 @@ MODULE postprocess
 
       REAL(KIND=8), DIMENSION(3)         :: TOT_MOMENTUM
       REAL(KIND=8)                       :: TOT_KE, TOT_IE, TOT_FE, TOT_EE, HX, HY, PHI, CURRENT_TIME
+      REAL(KIND=8)                       :: CFNUM
 
 
       TOT_NUM = 0
@@ -734,23 +745,29 @@ MODULE postprocess
 
          JS = particles(JP)%S_ID
 
+         IF (BOOL_RADIAL_WEIGHTING) THEN
+            CFNUM = CELL_FNUM(particles(JP)%IC)
+         ELSE
+            CFNUM = FNUM
+         END IF
+
          ! Momentum
-         TOT_MOMENTUM(1) = TOT_MOMENTUM(1) + SPECIES(JS)%MOLECULAR_MASS*particles(JP)%VX* FNUM
-         TOT_MOMENTUM(2) = TOT_MOMENTUM(2) + SPECIES(JS)%MOLECULAR_MASS*particles(JP)%VY* FNUM
-         TOT_MOMENTUM(3) = TOT_MOMENTUM(3) + SPECIES(JS)%MOLECULAR_MASS*particles(JP)%VZ* FNUM
+         TOT_MOMENTUM(1) = TOT_MOMENTUM(1) + SPECIES(JS)%MOLECULAR_MASS*particles(JP)%VX* CFNUM
+         TOT_MOMENTUM(2) = TOT_MOMENTUM(2) + SPECIES(JS)%MOLECULAR_MASS*particles(JP)%VY* CFNUM
+         TOT_MOMENTUM(3) = TOT_MOMENTUM(3) + SPECIES(JS)%MOLECULAR_MASS*particles(JP)%VZ* CFNUM
          
 
          ! Kinietic energy
          TOT_KE = TOT_KE + 0.5*SPECIES(JS)%MOLECULAR_MASS*(particles(JP)%VX**2+particles(JP)%VY**2+particles(JP)%VZ**2) &
-                  * FNUM
-         TOT_IE = TOT_IE + (particles(JP)%EROT + particles(JP)%EVIB) * FNUM
+                  * CFNUM
+         TOT_IE = TOT_IE + (particles(JP)%EROT + particles(JP)%EVIB) * CFNUM
 
          !IF (JS == 4) THEN
          !  TOT_FE = TOT_FE + 15.63e-19/2.
          !END IF
          IF (BOOL_PIC) THEN
             CALL APPLY_POTENTIAL(JP, PHI)
-            TOT_EE  = TOT_EE + PHI*1.602176634e-19*SPECIES(JS)%CHARGE * FNUM
+            TOT_EE  = TOT_EE + PHI*1.602176634e-19*SPECIES(JS)%CHARGE * CFNUM
          END IF
 
       END DO

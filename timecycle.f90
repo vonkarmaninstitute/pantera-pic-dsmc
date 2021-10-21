@@ -186,7 +186,7 @@ MODULE timecycle
                DTFRAC = rf()*DT
 
                R = rf()
-               IF (DIMS == 2 .AND. AXI) THEN
+               IF (DIMS == 2 .AND. AXI .AND. (.NOT. BOOL_RADIAL_WEIGHTING)) THEN
                   ! Correct but not really robust when Y1 \approx Y2
                   IF (LINESOURCES(ILINE)%Y1 == LINESOURCES(ILINE)%Y2) THEN
                      Y = LINESOURCES(ILINE)%Y1
@@ -432,7 +432,7 @@ MODULE timecycle
 
       IMPLICIT NONE
 
-      INTEGER      :: IP, IC, i, SOL
+      INTEGER      :: IP, IC, i, SOL, OLD_IC
       INTEGER      :: BOUNDCOLL, WALLCOLL, GOODSOL
       REAL(KIND=8) :: DTCOLL, TOTDTCOLL, CANDIDATE_DTCOLL, rfp
       REAL(KIND=8) :: COEFA, COEFB, COEFC, DELTA, SOL1, SOL2, ALPHA, BETA
@@ -449,6 +449,8 @@ MODULE timecycle
       LOGICAL :: HASCOLLIDED
       REAL(KIND=8) :: XCOLL, YCOLL, COLLDIST
       INTEGER, DIMENSION(:), ALLOCATABLE :: LOCAL_BOUNDARY_COLL_COUNT, LOCAL_WALL_COLL_COUNT
+      REAL(KIND=8) :: WEIGHT_RATIO
+      TYPE(PARTICLE_DATA_STRUCTURE) :: NEWparticle
 
       REAL(KIND=8) :: TOL
 
@@ -976,7 +978,27 @@ MODULE timecycle
             CALL REMOVE_PARTICLE_ARRAY(IP, particles, NP_PROC)
          ELSE
             CALL CELL_FROM_POSITION(particles(IP)%X, particles(IP)%Y, IC)
+            OLD_IC = particles(IP)%IC
             particles(IP)%IC = IC
+            ! If cell-based particle weight has changed,
+            IF (BOOL_RADIAL_WEIGHTING .AND. (IC .NE. OLD_IC)) THEN
+               WEIGHT_RATIO = CELL_FNUM(OLD_IC)/CELL_FNUM(IC)
+               ! If the weight has increased, the particle may be removed
+               IF (WEIGHT_RATIO .LT. 1.d0) THEN
+                  rfp = rf()
+                  IF (WEIGHT_RATIO .LT. rfp) CALL REMOVE_PARTICLE_ARRAY(IP, particles, NP_PROC)
+               ELSE IF (WEIGHT_RATIO .GT. 1.d0) THEN
+               ! If the weight has decreased, more particles may be added
+                  rfp = rf()
+                  DO WHILE ((WEIGHT_RATIO - 1.) .GT. rfp)
+                     CALL INIT_PARTICLE(particles(IP)%X, particles(IP)%Y, particles(IP)%Z, &
+                     particles(IP)%VX, particles(IP)%VY,particles(IP)%VZ, &
+                     particles(IP)%EROT,particles(IP)%EVIB,particles(IP)%S_ID,IC,DT,NEWparticle)
+                     CALL ADD_PARTICLE_ARRAY(NEWparticle, NP_PROC, particles)
+                     WEIGHT_RATIO = WEIGHT_RATIO - 1.
+                  END DO
+               END IF
+            END IF
          END IF
 
          IP = IP - 1

@@ -104,6 +104,8 @@ MODULE global
    LOGICAL      :: PERFORM_CHECKS = .FALSE.
    INTEGER      :: CHECKS_EVERY = 1
    INTEGER      :: STATS_EVERY = 1
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CELL_FNUM
+   LOGICAL      :: BOOL_RADIAL_WEIGHTING = .FALSE.
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Collisions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

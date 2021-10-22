@@ -39,8 +39,6 @@ MODULE global
    REAL(KIND=8) :: XMIN, XMAX, YMIN, YMAX, ZMIN, ZMAX
    REAL(KIND=8) :: CELL_VOL
    LOGICAL      :: AXI = .FALSE.
-   LOGICAL      :: BOOL_SPEED_LIMIT = .FALSE.
-   REAL(KIND=8) :: SPEED_LIMIT = 1.d3
    LOGICAL      :: BOOL_X_PERIODIC = .FALSE. ! Assign default value!
    LOGICAL      :: BOOL_Y_PERIODIC = .FALSE.
    LOGICAL      :: BOOL_Z_PERIODIC = .FALSE.

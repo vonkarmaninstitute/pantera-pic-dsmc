@@ -47,7 +47,7 @@ MODULE initialization
          IF (ReasonEOF < 0) EXIT ! End of file reached
 
          ! ~~~~~~~~~~~~~  Geometry and computational domain  ~~~~~~~~~~~~~~~~~
-         IF (line=='Axisymmetric:')     READ(in1,*) AXI
+         IF (line=='Axisymmetric:')            READ(in1,*) AXI
          IF (line=='Domain_limits:')           READ(in1,*) XMIN, XMAX, YMIN, YMAX, ZMIN, ZMAX
          IF (line=='Dimensions:')              READ(in1,*) DIMS
          IF (line=='Domain_periodicity:') THEN

@@ -90,6 +90,7 @@ MODULE initialization
          IF (line=='Particle_dump_output:')    READ(in1,*) PARTDUMP_SAVE_PATH
          IF (line=='Trajectory_dump_output:')  READ(in1,*) TRAJDUMP_SAVE_PATH
          IF (line=='Fluxes_dump_output:')      READ(in1,*) FLUXDUMP_SAVE_PATH
+         IF (line=='Binary_output:')           READ(in1,*) BOOL_BINARY_OUTPUT
          IF (line=='Dump_part_every:')         READ(in1,*) DUMP_EVERY
          IF (line=='Dump_part_start:')         READ(in1,*) DUMP_START
          IF (line=='Dump_grid_avgevery:')      READ(in1,*) DUMP_GRID_AVG_EVERY

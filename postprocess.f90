@@ -408,6 +408,16 @@ MODULE postprocess
 
 
 
+   FUNCTION ITOA(I) RESULT(RES)
+      CHARACTER(:), ALLOCATABLE :: RES
+      INTEGER, INTENT(IN) :: I
+      CHARACTER(RANGE(I)+2) :: TMP
+      WRITE(TMP,'(I0)') I
+      RES = TRIM(TMP)
+   END FUNCTION
+
+
+
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE GRID_SAVE -> Saves cumulated average !!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -464,158 +474,312 @@ MODULE postprocess
             CELL_PROC_ID(i) = JPROC
          END DO
 
-         ! DSMC flowfield file
+         ! Write to file.
 
          !WRITE(file_name,'(A, I0, A)') '/media/pietro/Storage/panteradumps/dsmc_flowfield_', tID, '.vtk'
          WRITE(file_name,'(A, A, I0, A)') TRIM(ADJUSTL(FLOWFIELD_SAVE_PATH)), 'dsmc_flowfield_', tID, '.vtk'
 
-         OPEN(54321, FILE=file_name, ACCESS='SEQUENTIAL', FORM='formatted', STATUS='new')
+         IF (BOOL_BINARY_OUTPUT) THEN
+            OPEN(54321, FILE=file_name, ACCESS='STREAM', FORM='UNFORMATTED', STATUS='NEW', CONVERT='BIG_ENDIAN')
 
-         WRITE(54321,'(A)') '# vtk DataFile Version 3.0'
-         WRITE(54321,'(A)') 'vtk output'
-         WRITE(54321,'(A)') 'ASCII'
-         WRITE(54321,'(A)') 'DATASET RECTILINEAR_GRID'
-         WRITE(54321,'(A,I10,I10,I10)') 'DIMENSIONS', NX+1, NY+1, 1 
-
-         WRITE(54321,'(A,I10,A7)') 'X_COORDINATES', NX+1, 'double'
-         WRITE(54321,*) XNODES
-
-         WRITE(54321,'(A,I10,A7)') 'Y_COORDINATES', NY+1, 'double'
-         WRITE(54321,*) YNODES
-
-         WRITE(54321,'(A,I10,A7)') 'Z_COORDINATES', 1, 'double'
-         WRITE(54321,*) 0.
-
-         WRITE(54321,'(A,I10)') 'CELL_DATA', NCELLS
-         IF (BOOL_DUMP_MOMENTS) THEN
-            WRITE(54321,'(A,I10)') 'FIELD FieldData', (13+33)*NSPECIES+1
-         ELSE
-            WRITE(54321,'(A,I10)') 'FIELD FieldData', 13*NSPECIES+1
-         END IF
-
-
-         ! Write per-cell value
-         WRITE(54321,'(A,I10,I10,A8)') 'PROC_ID', 1, NCELLS, 'integer'
-         WRITE(54321,*) CELL_PROC_ID
-
-         ! Write per-cell, per-species values
-         DO JS = 1, NSPECIES
-            FIRST = 1 + (JS-1)*NCELLS
-            LAST  = JS*NCELLS
+            WRITE(54321) '# vtk DataFile Version 3.0'//ACHAR(10)
+            WRITE(54321) 'vtk output'//ACHAR(10)
+            WRITE(54321) 'BINARY'//ACHAR(10)
+            WRITE(54321) 'DATASET RECTILINEAR_GRID'//ACHAR(10)
             
-            WRITE(string, *) 'number_particles_', SPECIES(JS)%NAME
-            WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
-            WRITE(54321,*) AVG_NP(FIRST:LAST)
+            WRITE(54321) 'DIMENSIONS '//ITOA(NX+1)//' '//ITOA(NY+1)//' '//ITOA(1)//ACHAR(10)
 
-            WRITE(string, *) 'nrho_mean_', SPECIES(JS)%NAME
-            WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
-            IF (GRID_TYPE == RECTILINEAR_NONUNIFORM .OR. AXI) THEN
-               IF (BOOL_RADIAL_WEIGHTING) THEN
-                  WRITE(54321,*) CELL_FNUM*AVG_NP(FIRST:LAST)/CELL_VOLUMES
-               ELSE
-                  WRITE(54321,*) FNUM*AVG_NP(FIRST:LAST)/CELL_VOLUMES
-               END IF
-            ELSE IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
-               WRITE(54321,*) FNUM*AVG_NP(FIRST:LAST)/CELL_VOL
-            END IF
+            WRITE(54321) 'X_COORDINATES '//ITOA(NX+1)//' double'//ACHAR(10)
+            WRITE(54321) XNODES, ACHAR(10)
 
-            WRITE(string, *) 'vx_mean_', SPECIES(JS)%NAME
-            WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
-            WRITE(54321,*) AVG_VX(FIRST:LAST)
+            WRITE(54321) 'Y_COORDINATES '//ITOA(NY+1)//' double'//ACHAR(10)
+            WRITE(54321) YNODES, ACHAR(10)
 
-            WRITE(string, *) 'vy_mean_', SPECIES(JS)%NAME
-            WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
-            WRITE(54321,*) AVG_VY(FIRST:LAST)
+            WRITE(54321) 'Z_COORDINATES '//ITOA(1)//' double'//ACHAR(10)
+            WRITE(54321) 0.d0, ACHAR(10)
 
-            WRITE(string, *) 'vz_mean_', SPECIES(JS)%NAME
-            WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
-            WRITE(54321,*) AVG_VZ(FIRST:LAST)
-
-            WRITE(string, *) 'Ttrx_mean_', SPECIES(JS)%NAME
-            WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
-            WRITE(54321,*) AVG_TTRX(FIRST:LAST)
-
-            WRITE(string, *) 'Ttry_mean_', SPECIES(JS)%NAME
-            WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
-            WRITE(54321,*) AVG_TTRY(FIRST:LAST)
-
-            WRITE(string, *) 'Ttrz_mean_', SPECIES(JS)%NAME
-            WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
-            WRITE(54321,*) AVG_TTRZ(FIRST:LAST)
-
-            WRITE(string, *) 'Ttr_mean_', SPECIES(JS)%NAME
-            WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
-            WRITE(54321,*) AVG_TTR(FIRST:LAST)
-
-            WRITE(string, *) 'Trot_mean_', SPECIES(JS)%NAME
-            WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
-            WRITE(54321,*) AVG_TROT(FIRST:LAST)
-
-            WRITE(string, *) 'Tvib_mean_', SPECIES(JS)%NAME
-            WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
-            WRITE(54321,*) AVG_TVIB(FIRST:LAST)
-
-            WRITE(string, *) 'num_cumulated_one_', SPECIES(JS)%NAME
-            WRITE(54321,'(A,I10,I10,A8)') string, 1, NCELLS, 'integer'
-            WRITE(54321,*) AVG_CUMULATED_INTENSIVE_ONE(FIRST:LAST)
-
-            WRITE(string, *) 'num_cumulated_two_', SPECIES(JS)%NAME
-            WRITE(54321,'(A,I10,I10,A8)') string, 1, NCELLS, 'integer'
-            WRITE(54321,*) AVG_CUMULATED_INTENSIVE_TWO(FIRST:LAST)
-
-            
+            WRITE(54321) 'CELL_DATA '//ITOA(NCELLS)//ACHAR(10)
             IF (BOOL_DUMP_MOMENTS) THEN
-               ! Now dump the 33 moments
-               DO MOM = 1, 33
-                  WRITE(54321,'(A,A,I10,I10,A7)') TRIM(MOMENT_STRING(MOM)), SPECIES(JS)%NAME, 1, NCELLS, 'double'
-                  WRITE(54321,*) AVG_MOMENTS(FIRST:LAST, MOM)
-               END DO
-            END IF
-         
-         
-         END DO
-
-         IF (BOOL_PIC) THEN
-            IF (DIMS == 2) THEN
-               WRITE(54321,'(A,I10)') 'POINT_DATA', (NX+1)*(NY+1)*1
-               WRITE(54321,'(A,I10)') 'FIELD FieldData', 5
-               
-               WRITE(54321,'(A,I10,I10,A7)') 'QRHO', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) Q_FIELD
-
-               WRITE(54321,'(A,I10,I10,A7)') 'PHI', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) AVG_PHI
-
-               WRITE(54321,'(A,I10,I10,A7)') 'E_X', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) E_FIELD(:,:,1)
-
-               WRITE(54321,'(A,I10,I10,A7)') 'E_Y', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) E_FIELD(:,:,2)
-
-               WRITE(54321,'(A,I10,I10,A7)') 'E_Z', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) E_FIELD(:,:,3)
+               WRITE(54321) 'FIELD FieldData '//ITOA( (13+33)*NSPECIES+1 )//ACHAR(10)
             ELSE
-               WRITE(54321,'(A,I10)') 'POINT_DATA', (NX+1)*(NY+1)*1
-               WRITE(54321,'(A,I10)') 'FIELD FieldData', 5
-               
-               WRITE(54321,'(A,I10,I10,A7)') 'QRHO', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) Q_FIELD, Q_FIELD
-
-               WRITE(54321,'(A,I10,I10,A7)') 'PHI', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) PHI_FIELD, PHI_FIELD
-
-               WRITE(54321,'(A,I10,I10,A7)') 'E_X', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) E_FIELD(:,:,1), E_FIELD(:,:,1)
-
-               WRITE(54321,'(A,I10,I10,A7)') 'E_Y', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) E_FIELD(:,:,2), E_FIELD(:,:,2)
-
-               WRITE(54321,'(A,I10,I10,A7)') 'E_Z', 1, (NX+1)*(NY+1)*1, 'double'
-               WRITE(54321,*) E_FIELD(:,:,3), E_FIELD(:,:,3)
+               WRITE(54321) 'FIELD FieldData '//ITOA( 13*NSPECIES+1 )//ACHAR(10)
             END IF
-         END IF
 
-         CLOSE(54321)
+
+            ! Write per-cell value
+            WRITE(54321) 'PROC_ID '//ITOA(1)//' '//ITOA(NCELLS)//' integer'//ACHAR(10)
+            WRITE(54321) CELL_PROC_ID, ACHAR(10)
+
+            ! Write per-cell, per-species values
+            DO JS = 1, NSPECIES
+               FIRST = 1 + (JS-1)*NCELLS
+               LAST  = JS*NCELLS
+            
+               WRITE(string, *) 'number_particles_', SPECIES(JS)%NAME
+               WRITE(54321) string//' '//ITOA(1)//' '//ITOA(NCELLS)//' double'//ACHAR(10)
+               WRITE(54321) AVG_NP(FIRST:LAST), ACHAR(10)
+
+               WRITE(string, *) 'nrho_mean_', SPECIES(JS)%NAME
+               WRITE(54321) string//' '//ITOA(1)//' '//ITOA(NCELLS)//' double'//ACHAR(10)
+               IF (GRID_TYPE == RECTILINEAR_NONUNIFORM .OR. AXI) THEN
+                  IF (BOOL_RADIAL_WEIGHTING) THEN
+                     WRITE(54321) CELL_FNUM*AVG_NP(FIRST:LAST)/CELL_VOLUMES, ACHAR(10)
+                  ELSE
+                     WRITE(54321) FNUM*AVG_NP(FIRST:LAST)/CELL_VOLUMES, ACHAR(10)
+                  END IF
+               ELSE IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
+                  WRITE(54321) FNUM*AVG_NP(FIRST:LAST)/CELL_VOL, ACHAR(10)
+               END IF
+
+               WRITE(string, *) 'vx_mean_', SPECIES(JS)%NAME
+               WRITE(54321) string//' '//ITOA(1)//' '//ITOA(NCELLS)//' double'//ACHAR(10)
+               WRITE(54321) AVG_VX(FIRST:LAST), ACHAR(10)
+
+               WRITE(string, *) 'vy_mean_', SPECIES(JS)%NAME
+               WRITE(54321) string//' '//ITOA(1)//' '//ITOA(NCELLS)//' double'//ACHAR(10)
+               WRITE(54321) AVG_VY(FIRST:LAST), ACHAR(10)
+
+               WRITE(string, *) 'vz_mean_', SPECIES(JS)%NAME
+               WRITE(54321) string//' '//ITOA(1)//' '//ITOA(NCELLS)//' double'//ACHAR(10)
+               WRITE(54321) AVG_VZ(FIRST:LAST), ACHAR(10)
+
+               WRITE(string, *) 'Ttrx_mean_', SPECIES(JS)%NAME
+               WRITE(54321) string//' '//ITOA(1)//' '//ITOA(NCELLS)//' double'//ACHAR(10)
+               WRITE(54321) AVG_TTRX(FIRST:LAST), ACHAR(10)
+
+               WRITE(string, *) 'Ttry_mean_', SPECIES(JS)%NAME
+               WRITE(54321) string//' '//ITOA(1)//' '//ITOA(NCELLS)//' double'//ACHAR(10)
+               WRITE(54321) AVG_TTRY(FIRST:LAST), ACHAR(10)
+
+               WRITE(string, *) 'Ttrz_mean_', SPECIES(JS)%NAME
+               WRITE(54321) string//' '//ITOA(1)//' '//ITOA(NCELLS)//' double'//ACHAR(10)
+               WRITE(54321) AVG_TTRZ(FIRST:LAST), ACHAR(10)
+
+               WRITE(string, *) 'Ttr_mean_', SPECIES(JS)%NAME
+               WRITE(54321) string//' '//ITOA(1)//' '//ITOA(NCELLS)//' double'//ACHAR(10)
+               WRITE(54321) AVG_TTR(FIRST:LAST), ACHAR(10)
+
+               WRITE(string, *) 'Trot_mean_', SPECIES(JS)%NAME
+               WRITE(54321) string//' '//ITOA(1)//' '//ITOA(NCELLS)//' double'//ACHAR(10)
+               WRITE(54321) AVG_TROT(FIRST:LAST), ACHAR(10)
+
+               WRITE(string, *) 'Tvib_mean_', SPECIES(JS)%NAME
+               WRITE(54321) string//' '//ITOA(1)//' '//ITOA(NCELLS)//' double'//ACHAR(10)
+               WRITE(54321) AVG_TVIB(FIRST:LAST), ACHAR(10)
+
+               WRITE(string, *) 'num_cumulated_one_', SPECIES(JS)%NAME
+               WRITE(54321) string//' '//ITOA(1)//' '//ITOA(NCELLS)//' integer'//ACHAR(10)
+               WRITE(54321) AVG_CUMULATED_INTENSIVE_ONE(FIRST:LAST), ACHAR(10)
+
+               WRITE(string, *) 'num_cumulated_two_', SPECIES(JS)%NAME
+               WRITE(54321) string//' '//ITOA(1)//' '//ITOA(NCELLS)//' integer'//ACHAR(10)
+               WRITE(54321) AVG_CUMULATED_INTENSIVE_TWO(FIRST:LAST), ACHAR(10)
+
+            
+               IF (BOOL_DUMP_MOMENTS) THEN
+                  ! Now dump the 33 moments
+                  DO MOM = 1, 33
+                     WRITE(54321) TRIM(MOMENT_STRING(MOM))//SPECIES(JS)%NAME//' '//ITOA(1)//' '//ITOA(NCELLS)//' double'//ACHAR(10)
+                     WRITE(54321) AVG_MOMENTS(FIRST:LAST, MOM), ACHAR(10)
+                  END DO
+               END IF
+         
+         
+            END DO
+
+            IF (BOOL_PIC) THEN
+               IF (DIMS == 2) THEN
+                  WRITE(54321) 'POINT_DATA '//ITOA( (NX+1)*(NY+1)*1 )//ACHAR(10)
+                  WRITE(54321) 'FIELD FieldData '//ITOA(5)//ACHAR(10)
+               
+                  WRITE(54321) 'QRHO '//ITOA(1)//' '//ITOA( (NX+1)*(NY+1)*1 )//' double'//ACHAR(10)
+                  WRITE(54321) Q_FIELD, ACHAR(10)
+
+                  WRITE(54321) 'PHI '//ITOA(1)//' '//ITOA( (NX+1)*(NY+1)*1 )//' double'//ACHAR(10)
+                  WRITE(54321) AVG_PHI, ACHAR(10)
+
+                  WRITE(54321) 'E_X '//ITOA(1)//' '//ITOA( (NX+1)*(NY+1)*1 )//' double'//ACHAR(10)
+                  WRITE(54321) E_FIELD(:,:,1), ACHAR(10)
+
+                  WRITE(54321) 'E_Y '//ITOA(1)//' '//ITOA( (NX+1)*(NY+1)*1 )//' double'//ACHAR(10)
+                  WRITE(54321) E_FIELD(:,:,2), ACHAR(10)
+
+                  WRITE(54321) 'E_Z '//ITOA(1)//' '//ITOA( (NX+1)*(NY+1)*1 )//' double'//ACHAR(10)
+                  WRITE(54321) E_FIELD(:,:,3), ACHAR(10)
+               ELSE
+                  WRITE(54321) 'POINT_DATA '//ITOA( (NX+1)*(NY+1)*1 )//ACHAR(10)
+                  WRITE(54321) 'FIELD FieldData '//ITOA(5)//ACHAR(10)
+
+                  WRITE(54321) 'QRHO '//ITOA(1)//' '//ITOA( (NX+1)*(NY+1)*1 )//' double'//ACHAR(10)
+                  WRITE(54321) Q_FIELD, Q_FIELD, ACHAR(10)
+
+                  WRITE(54321) 'PHI '//ITOA(1)//' '//ITOA( (NX+1)*(NY+1)*1 )//' double'//ACHAR(10)
+                  WRITE(54321) PHI_FIELD, PHI_FIELD, ACHAR(10)
+
+                  WRITE(54321) 'E_X '//ITOA(1)//' '//ITOA( (NX+1)*(NY+1)*1 )//' double'//ACHAR(10)
+                  WRITE(54321) E_FIELD(:,:,1), E_FIELD(:,:,1), ACHAR(10)
+
+                  WRITE(54321) 'E_Y '//ITOA(1)//' '//ITOA( (NX+1)*(NY+1)*1 )//' double'//ACHAR(10)
+                  WRITE(54321) E_FIELD(:,:,2), E_FIELD(:,:,2), ACHAR(10)
+
+                  WRITE(54321) 'E_Z '//ITOA(1)//' '//ITOA( (NX+1)*(NY+1)*1 )//' double'//ACHAR(10)
+                  WRITE(54321) E_FIELD(:,:,3), E_FIELD(:,:,3), ACHAR(10)
+               END IF
+            END IF
+
+            CLOSE(54321)
+            
+         ELSE  ! Write ASCII output.
+            OPEN(54321, FILE=file_name, ACCESS='SEQUENTIAL', FORM='FORMATTED', STATUS='NEW')
+
+            WRITE(54321,'(A)') '# vtk DataFile Version 3.0'
+            WRITE(54321,'(A)') 'vtk output'
+            WRITE(54321,'(A)') 'ASCII'
+            WRITE(54321,'(A)') 'DATASET RECTILINEAR_GRID'
+            
+            WRITE(54321,'(A,I10,I10,I10)') 'DIMENSIONS', NX+1, NY+1, 1 
+
+            WRITE(54321,'(A,I10,A7)') 'X_COORDINATES', NX+1, 'double'
+            WRITE(54321,*) XNODES
+
+            WRITE(54321,'(A,I10,A7)') 'Y_COORDINATES', NY+1, 'double'
+            WRITE(54321,*) YNODES
+
+            WRITE(54321,'(A,I10,A7)') 'Z_COORDINATES', 1, 'double'
+            WRITE(54321,*) 0.
+
+            WRITE(54321,'(A,I10)') 'CELL_DATA', NCELLS
+            IF (BOOL_DUMP_MOMENTS) THEN
+               WRITE(54321,'(A,I10)') 'FIELD FieldData', (13+33)*NSPECIES+1
+            ELSE
+               WRITE(54321,'(A,I10)') 'FIELD FieldData', 13*NSPECIES+1
+            END IF
+
+
+            ! Write per-cell value
+            WRITE(54321,'(A,I10,I10,A8)') 'PROC_ID', 1, NCELLS, 'integer'
+            WRITE(54321,*) CELL_PROC_ID
+
+            ! Write per-cell, per-species values
+            DO JS = 1, NSPECIES
+               FIRST = 1 + (JS-1)*NCELLS
+               LAST  = JS*NCELLS
+            
+               WRITE(string, *) 'number_particles_', SPECIES(JS)%NAME
+               WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
+               WRITE(54321,*) AVG_NP(FIRST:LAST)
+
+               WRITE(string, *) 'nrho_mean_', SPECIES(JS)%NAME
+               WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
+               IF (GRID_TYPE == RECTILINEAR_NONUNIFORM .OR. AXI) THEN
+                  IF (BOOL_RADIAL_WEIGHTING) THEN
+                     WRITE(54321,*) CELL_FNUM*AVG_NP(FIRST:LAST)/CELL_VOLUMES
+                  ELSE
+                     WRITE(54321,*) FNUM*AVG_NP(FIRST:LAST)/CELL_VOLUMES
+                  END IF
+               ELSE IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
+                  WRITE(54321,*) FNUM*AVG_NP(FIRST:LAST)/CELL_VOL
+               END IF
+
+               WRITE(string, *) 'vx_mean_', SPECIES(JS)%NAME
+               WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
+               WRITE(54321,*) AVG_VX(FIRST:LAST)
+
+               WRITE(string, *) 'vy_mean_', SPECIES(JS)%NAME
+               WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
+               WRITE(54321,*) AVG_VY(FIRST:LAST)
+
+               WRITE(string, *) 'vz_mean_', SPECIES(JS)%NAME
+               WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
+               WRITE(54321,*) AVG_VZ(FIRST:LAST)
+
+               WRITE(string, *) 'Ttrx_mean_', SPECIES(JS)%NAME
+               WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
+               WRITE(54321,*) AVG_TTRX(FIRST:LAST)
+
+               WRITE(string, *) 'Ttry_mean_', SPECIES(JS)%NAME
+               WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
+               WRITE(54321,*) AVG_TTRY(FIRST:LAST)
+
+               WRITE(string, *) 'Ttrz_mean_', SPECIES(JS)%NAME
+               WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
+               WRITE(54321,*) AVG_TTRZ(FIRST:LAST)
+
+               WRITE(string, *) 'Ttr_mean_', SPECIES(JS)%NAME
+               WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
+               WRITE(54321,*) AVG_TTR(FIRST:LAST)
+
+               WRITE(string, *) 'Trot_mean_', SPECIES(JS)%NAME
+               WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
+               WRITE(54321,*) AVG_TROT(FIRST:LAST)
+
+               WRITE(string, *) 'Tvib_mean_', SPECIES(JS)%NAME
+               WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
+               WRITE(54321,*) AVG_TVIB(FIRST:LAST)
+
+               WRITE(string, *) 'num_cumulated_one_', SPECIES(JS)%NAME
+               WRITE(54321,'(A,I10,I10,A8)') string, 1, NCELLS, 'integer'
+               WRITE(54321,*) AVG_CUMULATED_INTENSIVE_ONE(FIRST:LAST)
+
+               WRITE(string, *) 'num_cumulated_two_', SPECIES(JS)%NAME
+               WRITE(54321,'(A,I10,I10,A8)') string, 1, NCELLS, 'integer'
+               WRITE(54321,*) AVG_CUMULATED_INTENSIVE_TWO(FIRST:LAST)
+
+            
+               IF (BOOL_DUMP_MOMENTS) THEN
+                  ! Now dump the 33 moments
+                  DO MOM = 1, 33
+                     WRITE(54321,'(A,A,I10,I10,A7)') TRIM(MOMENT_STRING(MOM)), SPECIES(JS)%NAME, 1, NCELLS, 'double'
+                     WRITE(54321,*) AVG_MOMENTS(FIRST:LAST, MOM)
+                  END DO
+               END IF
+         
+         
+            END DO
+
+            IF (BOOL_PIC) THEN
+               IF (DIMS == 2) THEN
+                  WRITE(54321,'(A,I10)') 'POINT_DATA', (NX+1)*(NY+1)*1
+                  WRITE(54321,'(A,I10)') 'FIELD FieldData', 5
+               
+                  WRITE(54321,'(A,I10,I10,A7)') 'QRHO', 1, (NX+1)*(NY+1)*1, 'double'
+                  WRITE(54321,*) Q_FIELD
+
+                  WRITE(54321,'(A,I10,I10,A7)') 'PHI', 1, (NX+1)*(NY+1)*1, 'double'
+                  WRITE(54321,*) AVG_PHI
+
+                  WRITE(54321,'(A,I10,I10,A7)') 'E_X', 1, (NX+1)*(NY+1)*1, 'double'
+                  WRITE(54321,*) E_FIELD(:,:,1)
+
+                  WRITE(54321,'(A,I10,I10,A7)') 'E_Y', 1, (NX+1)*(NY+1)*1, 'double'
+                  WRITE(54321,*) E_FIELD(:,:,2)
+
+                  WRITE(54321,'(A,I10,I10,A7)') 'E_Z', 1, (NX+1)*(NY+1)*1, 'double'
+                  WRITE(54321,*) E_FIELD(:,:,3)
+               ELSE
+                  WRITE(54321,'(A,I10)') 'POINT_DATA', (NX+1)*(NY+1)*1
+                  WRITE(54321,'(A,I10)') 'FIELD FieldData', 5
+
+                  WRITE(54321,'(A,I10,I10,A7)') 'QRHO', 1, (NX+1)*(NY+1)*1, 'double'
+                  WRITE(54321,*) Q_FIELD, Q_FIELD
+
+                  WRITE(54321,'(A,I10,I10,A7)') 'PHI', 1, (NX+1)*(NY+1)*1, 'double'
+                  WRITE(54321,*) PHI_FIELD, PHI_FIELD
+
+                  WRITE(54321,'(A,I10,I10,A7)') 'E_X', 1, (NX+1)*(NY+1)*1, 'double'
+                  WRITE(54321,*) E_FIELD(:,:,1), E_FIELD(:,:,1)
+
+                  WRITE(54321,'(A,I10,I10,A7)') 'E_Y', 1, (NX+1)*(NY+1)*1, 'double'
+                  WRITE(54321,*) E_FIELD(:,:,2), E_FIELD(:,:,2)
+
+                  WRITE(54321,'(A,I10,I10,A7)') 'E_Z', 1, (NX+1)*(NY+1)*1, 'double'
+                  WRITE(54321,*) E_FIELD(:,:,3), E_FIELD(:,:,3)
+               END IF
+            END IF
+
+            CLOSE(54321)
+         
+         END IF
 
       END IF 
 

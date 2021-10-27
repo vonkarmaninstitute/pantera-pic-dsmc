@@ -74,6 +74,7 @@ MODULE grid_and_partition
             WRITE(*,*) 'Particle out of bound yhi!'
             WRITE(*,*) 'Particle position ', XP, YP
          ELSE IF (YCELL .LT. 1) THEN
+            WRITE(*,*) 'Particle y cell', YCELL  
             YCELL = 1
             WRITE(*,*) 'Particle out of bound ylo!'
             WRITE(*,*) 'Particle position ', XP, YP

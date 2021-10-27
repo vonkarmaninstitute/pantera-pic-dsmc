@@ -7,6 +7,7 @@ MODULE timecycle
    USE collisions
    USE postprocess
    USE fields
+   USE grid_and_partition
 
    CONTAINS
 
@@ -792,9 +793,10 @@ MODULE timecycle
                      CALL WALL_REACT(IP, REMOVE_PART(IP))
                   END IF
 
-               ELSE IF (BOOL_DIFFUSE(BOUNDCOLL)) THEN
+               ELSE IF (BOOL_DIFFUSE(BOUNDCOLL)) THEN !Boundcoll = 1,2,3,4 referred to the boundary we are considering (xlow, xhigh, ...)
 
                   CALL MOVE_PARTICLE(IP, DTCOLL)
+                  IF (BOUNDCOLL==4) particles(IP)%Y = YMAX*0.99999
                   particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
                   IF (BOOL_REACT(BOUNDCOLL)) THEN
                      CALL WALL_REACT(IP, REMOVE_PART(IP))
@@ -815,6 +817,9 @@ MODULE timecycle
                      particles(IP)%VZ = VZ
                      particles(IP)%EROT = EROT
                      particles(IP)%EVIB = EVIB
+                     !IF (particles(IP)%VY .GT. 0) THEN
+                     !   WRITE(*,*) 'V_y direction out of bounds', particles(IP)%VY
+                     !END IF
 
                   END IF
 

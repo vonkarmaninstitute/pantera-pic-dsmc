@@ -116,7 +116,8 @@ MODULE global
    LOGICAL      :: PERFORM_CHECKS = .FALSE.
    INTEGER      :: CHECKS_EVERY = 1
    INTEGER      :: STATS_EVERY = 1
-
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CELL_FNUM
+   LOGICAL      :: BOOL_RADIAL_WEIGHTING = .FALSE. 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Collisions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -131,6 +132,7 @@ MODULE global
    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: VSS_SIGMAS ! Matrix of reference cross sections for VSS
    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: VSS_ALPHAS ! Matrix of reference scattering coeff. for VSS
    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: VSS_OMEGAS ! Matrix of reference temperature exponent for VSS
+   REAL(KIND=8) :: VSS_TREF
    REAL(KIND=8) :: SIGMAMAX
 
    LOGICAL           :: BOOL_THERMAL_BATH = .FALSE.

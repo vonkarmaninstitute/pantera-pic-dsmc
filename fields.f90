@@ -257,7 +257,7 @@ MODULE fields
       INTEGER :: JP, I
 
       REAL(KIND=8) :: K, RHO_Q, CHARGE
-      REAL(KIND=8) :: VOL
+      REAL(KIND=8) :: VOL, CFNUM
       REAL(KIND=8), DIMENSION(4) :: WEIGHTS
       INTEGER, DIMENSION(4) :: INDICES, INDI, INDJ
 
@@ -277,7 +277,10 @@ MODULE fields
             VOL = CELL_VOLUMES(particles(JP)%IC)
          END IF
          
-         RHO_Q = -K*CHARGE*FNUM/VOL
+         CFNUM = FNUM
+         IF (BOOL_RADIAL_WEIGHTING) CFNUM = CELL_FNUM(particles(JP)%IC)
+
+         RHO_Q = -K*CHARGE*CFNUM/VOL
 
          IF (DIMS == 2) THEN
             Q_FIELD(INDICES(1)) = Q_FIELD(INDICES(1)) + RHO_Q * WEIGHTS(1)
@@ -479,4 +482,4 @@ MODULE fields
 
    END SUBROUTINE ST_MATRIX_PRINT
 
-END MODULE fields
+END MODULE fields 

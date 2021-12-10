@@ -22,6 +22,10 @@ PROGRAM PANTERA
    ! ========= Print header (important things first) =======
    CALL PRINTTITLE(PROC_ID)
 
+
+   ! DEBUG
+   CALL READ_UNSTRUCTURED_GRID_SU2(MESH_FILENAME)
+
    ! ========= Read input file and init variables ==========
    CALL ONLYMASTERPRINT1(PROC_ID, '> READING INPUT DATA...')
    CALL READINPUT          ! Read input file

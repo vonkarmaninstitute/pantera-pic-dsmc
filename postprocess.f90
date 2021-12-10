@@ -56,7 +56,14 @@ MODULE postprocess
       INTEGER :: LENGTH
 
 
-      LENGTH = NX*NY * N_SPECIES
+      IF (GRID_TYPE == UNSTRUCTURED) THEN
+         NCELLS = U2D_GRID%NUM_CELLS
+      ELSE
+         NCELLS = NX*NY
+      END IF
+
+      NSPECIES = N_SPECIES
+      LENGTH = NCELLS * NSPECIES
 
       ALLOCATE(TIMESTEP_NP(LENGTH))
       
@@ -115,9 +122,6 @@ MODULE postprocess
          TIMESTEP_MOMENTS = 0
       END IF
 
-
-      NCELLS = NX*NY
-      NSPECIES = N_SPECIES
 
       ! Compute average values for this timestep on this process
 
@@ -435,7 +439,7 @@ MODULE postprocess
 
 
       INTEGER                            :: NCELLS, NSPECIES
-      INTEGER                            :: i, JS, FIRST, LAST, JPROC, MOM
+      INTEGER                            :: I, JS, FIRST, LAST, JPROC, MOM
 
       INTEGER, DIMENSION(:), ALLOCATABLE :: CELL_PROC_ID
 
@@ -449,18 +453,24 @@ MODULE postprocess
                         'Riijj_ ', 'Rxxjj_ ', 'Rxyjj_ ', 'Rxzjj_ ', 'Ryyjj_ ', 'Ryzjj_ ', 'Rzzjj_ ', &
                         'Sxiijj_', 'Syiijj_', 'Sziijj_']
 
-      NCELLS = NX*NY
+      
+      IF (GRID_TYPE == UNSTRUCTURED) THEN
+         NCELLS = U2D_GRID%NUM_CELLS
+      ELSE
+         NCELLS = NX*NY
+      END IF
+
       NSPECIES = N_SPECIES
 
       IF (PROC_ID .EQ. 0) THEN
          IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
             XNODES = 0
-            DO i = 0, NX
+            DO I = 0, NX
                XNODES(i+1) = XMIN + (XMAX-XMIN)/NX*i 
             END DO
 
             YNODES = 0
-            DO i = 0, NY
+            DO I = 0, NY
                YNODES(i+1) = YMIN + (YMAX-YMIN)/NY*i
             END DO
          ELSE IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) THEN
@@ -469,7 +479,7 @@ MODULE postprocess
          END IF
 
          ALLOCATE(CELL_PROC_ID(NCELLS))
-         DO i = 0, NCELLS
+         DO I = 0, NCELLS
             CALL PROC_FROM_CELL(i, JPROC)
             CELL_PROC_ID(i) = JPROC
          END DO
@@ -521,7 +531,7 @@ MODULE postprocess
 
                WRITE(string, *) 'nrho_mean_', SPECIES(JS)%NAME
                WRITE(54321) string//' '//ITOA(1)//' '//ITOA(NCELLS)//' double'//ACHAR(10)
-               IF (GRID_TYPE == RECTILINEAR_NONUNIFORM .OR. AXI) THEN
+               IF (GRID_TYPE == RECTILINEAR_NONUNIFORM .OR. GRID_TYPE == UNSTRUCTURED .OR. AXI) THEN
                   IF (BOOL_RADIAL_WEIGHTING) THEN
                      WRITE(54321) CELL_FNUM*AVG_NP(FIRST:LAST)/CELL_VOLUMES, ACHAR(10)
                   ELSE
@@ -635,19 +645,41 @@ MODULE postprocess
             WRITE(54321,'(A)') '# vtk DataFile Version 3.0'
             WRITE(54321,'(A)') 'vtk output'
             WRITE(54321,'(A)') 'ASCII'
-            WRITE(54321,'(A)') 'DATASET RECTILINEAR_GRID'
+
+            IF (GRID_TYPE == UNSTRUCTURED) THEN
+               WRITE(54321,'(A)') 'DATASET UNSTRUCTURED_GRID'
+               
+               WRITE(54321,'(A,I10,A7)') 'POINTS', U2D_GRID%NUM_NODES, 'double'
+               DO I = 1, U2D_GRID%NUM_NODES
+                  WRITE(54321,*) U2D_GRID%NODE_COORDS(I,:)
+               END DO
+
+               WRITE(54321,'(A,I10,I10)') 'CELLS', U2D_GRID%NUM_CELLS, 4*U2D_GRID%NUM_CELLS 
+               DO I = 1, U2D_GRID%NUM_CELLS
+                  WRITE(54321,*) 3, (U2D_GRID%CELL_NODES(I,:) - 1)
+               END DO
+
+               WRITE(54321,'(A,I10)') 'CELL_TYPES', U2D_GRID%NUM_CELLS
+               DO I = 1, U2D_GRID%NUM_CELLS
+                  WRITE(54321,*) 5
+               END DO
+
+
+            ELSE
+               WRITE(54321,'(A)') 'DATASET RECTILINEAR_GRID'
+               
+               WRITE(54321,'(A,I10,I10,I10)') 'DIMENSIONS', NX+1, NY+1, 1 
+
+               WRITE(54321,'(A,I10,A7)') 'X_COORDINATES', NX+1, 'double'
+               WRITE(54321,*) XNODES
+
+               WRITE(54321,'(A,I10,A7)') 'Y_COORDINATES', NY+1, 'double'
+               WRITE(54321,*) YNODES
+
+               WRITE(54321,'(A,I10,A7)') 'Z_COORDINATES', 1, 'double'
+               WRITE(54321,*) 0.
+            END IF
             
-            WRITE(54321,'(A,I10,I10,I10)') 'DIMENSIONS', NX+1, NY+1, 1 
-
-            WRITE(54321,'(A,I10,A7)') 'X_COORDINATES', NX+1, 'double'
-            WRITE(54321,*) XNODES
-
-            WRITE(54321,'(A,I10,A7)') 'Y_COORDINATES', NY+1, 'double'
-            WRITE(54321,*) YNODES
-
-            WRITE(54321,'(A,I10,A7)') 'Z_COORDINATES', 1, 'double'
-            WRITE(54321,*) 0.
-
             WRITE(54321,'(A,I10)') 'CELL_DATA', NCELLS
             IF (BOOL_DUMP_MOMENTS) THEN
                WRITE(54321,'(A,I10)') 'FIELD FieldData', (13+33)*NSPECIES+1
@@ -671,7 +703,7 @@ MODULE postprocess
 
                WRITE(string, *) 'nrho_mean_', SPECIES(JS)%NAME
                WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
-               IF (GRID_TYPE == RECTILINEAR_NONUNIFORM .OR. AXI) THEN
+               IF (GRID_TYPE == RECTILINEAR_NONUNIFORM .OR. GRID_TYPE == UNSTRUCTURED .OR. AXI) THEN
                   IF (BOOL_RADIAL_WEIGHTING) THEN
                      WRITE(54321,*) CELL_FNUM*AVG_NP(FIRST:LAST)/CELL_VOLUMES
                   ELSE
@@ -790,9 +822,15 @@ MODULE postprocess
 
       IMPLICIT NONE
 
-      INTEGER :: LENGTH
+      INTEGER :: NCELLS, LENGTH
 
-      LENGTH = NX*NY * N_SPECIES
+      IF (GRID_TYPE == UNSTRUCTURED) THEN
+         NCELLS = U2D_GRID%NUM_CELLS
+      ELSE
+         NCELLS = NX*NY
+      END IF
+
+      LENGTH = NCELLS * N_SPECIES
       
       ALLOCATE(AVG_NP(LENGTH))
       

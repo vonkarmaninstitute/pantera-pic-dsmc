@@ -540,388 +540,429 @@ MODULE timecycle
 
             DTCOLL = particles(IP)%DTRIM ! Looking for collisions within the remaining time
             ! ______ ADVECTION ______
-            BOUNDCOLL = -1
-            DO i = 1, 4 ! Check collisions with boundaries (xmin, xmax, ymin, ymax)
-               IF (AXI) THEN
-                  ! We are axisymmetric. Check is more complicated.
-                  CANDIDATE_DTCOLL = DTCOLL
-                  
-                  IF (i==1 .OR. i==2) THEN
-                     ! Vertical wall
-                     SOL1 = (BOUNDPOS(i)-particles(IP)%X)/particles(IP)%VX
-                     IF (SOL1 >= 0 .AND. SOL1 < DTCOLL) THEN
-                        GOODSOL = 1
-                        TEST(1) = SOL1
-                     ELSE
-                        GOODSOL = 0
-                     END IF
-                  ELSE
-                     ! Horizontal boundary
-                     COEFA = particles(IP)%VY**2 + particles(IP)%VZ**2
-                     COEFB = particles(IP)%Y * particles(IP)%VY
-                     COEFC = particles(IP)%Y**2 - BOUNDPOS(i)**2
-                     DELTA = COEFB*COEFB-COEFA*COEFC
-                     IF (DELTA .GE. 0) THEN
-                     ! Compute the solutions, check if they are any good and, in case, order them to be checked further.
-                        SOL1 = (-COEFB - SQRT(DELTA))/COEFA
-                        SOL2 = (-COEFB + SQRT(DELTA))/COEFA
-                        IF (SOL1 >= 0 .AND. SOL1 < DTCOLL) THEN
-                           IF (SOL2 >= 0 .AND. SOL2 < DTCOLL) THEN
-                              GOODSOL = 2
-                              IF (SOL1 <= SOL2) THEN
-                                 TEST(1) = SOL1
-                                 TEST(2) = SOL2
-                              ELSE
-                                 TEST(1) = SOL2
-                                 TEST(2) = SOL1
-                              END IF
-                           ELSE
-                              GOODSOL = 1
-                              TEST(1) = SOL1
-                           ENDIF
-                        ELSE
-                           IF (SOL2 >= 0 .AND. SOL2 < DTCOLL) THEN
-                              GOODSOL = 1
-                              TEST(1) = SOL2
-                           ELSE
-                              GOODSOL = 0
-                           END IF 
-                        END IF
-                     ELSE
-                        GOODSOL = 0
-                     END IF
-                  END IF
 
-                  ! Now further checks for each of the good solutions:
-                  ! - if the velocity at collision time is actually towards the surface
-                  ! - if the collision point is within the extremes of the segment
-                  ! Note: this requires moving the particle to the collision point and then moving back.
-                  IF (GOODSOL /= 0) THEN
-                     DO SOL = 1, GOODSOL
-                        CALL MOVE_PARTICLE(IP, TEST(SOL))
-                        IF ((particles(IP)%VX*NORMX(i) + particles(IP)%VY*NORMY(i)) < 0) THEN
-                           ! Collision happens!
-                           DTCOLL = TEST(SOL)
-                           BOUNDCOLL = i    
-                           TOTDTCOLL = TOTDTCOLL + DTCOLL  
-                           HASCOLLIDED = .TRUE.
-                           IF (BOUNDCOLL == 3) WRITE(*,*) "Collision with axis!"
-                        END IF
-                        CALL MOVE_PARTICLE(IP, -TEST(SOL))
-                     END DO
-                  END IF
-
-                  
-
-               ELSE
-                  ! We are not axisymmetric
-                  ! Compute the velocity normal to the boundary
-                  VN = -(particles(IP)%VX * NORMX(i) + particles(IP)%VY * NORMY(i))
+            IF (GRID_TYPE == UNSTRUCTURED) THEN
+               ! For unstructured, we only need to check the boundaries of the cell.
+               BOUNDCOLL = -1
+               DO I = 1, 3
+                  !IF ((IC .LT. 1) .OR. (IC .GT. U2D_GRID%NUM_CELLS)) WRITE(*,*) 'IC WAS: ', IC
+                  VN = particles(IP)%VX * U2D_GRID%EDGE_NORMAL(IC,I,1) &
+                     + particles(IP)%VY * U2D_GRID%EDGE_NORMAL(IC,I,2)
                   ! Compute the distance from the boundary
-                  DX = (particles(IP)%X - XW(i)) * NORMX(i) + (particles(IP)%Y - YW(i)) * NORMY(i)
+                  DX = (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),1) - particles(IP)%X) * U2D_GRID%EDGE_NORMAL(IC,I,1) &
+                     + (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),2) - particles(IP)%Y) * U2D_GRID%EDGE_NORMAL(IC,I,2)
                   ! Check if a collision happens (sooner than previously calculated)
                   IF (VN .GE. 0. .AND. VN * DTCOLL .GT. DX) THEN
-                     
-                     ! Find candidate collision point (don't need this for boundaries)
-                     ! XCOLL = particles(IP)%X + particles(IP)%VX * DTCOLL 
-                     ! YCOLL = particles(IP)%Y + particles(IP)%VY * DTCOLL
-                     ! ZCOLL = particles(IP)%Z + particles(IP)%VZ * DTCOLL
 
                      DTCOLL = DX/VN
-                     BOUNDCOLL = i    
+                     BOUNDCOLL = I
                      TOTDTCOLL = TOTDTCOLL + DTCOLL  
-                     HASCOLLIDED = .TRUE.               
+                     HASCOLLIDED = .TRUE.     
 
                   END IF
-               END IF
-            END DO
+               END DO
 
-            
-
-            ! Check collisions with surfaces
-            ! If earlier than dtcoll remember to set BOUNDCOLL to -1 and the new dtcoll
-            WALLCOLL = -1
-            DO i = 1, N_WALLS
-               IF (AXI) THEN
-                  ! We are axisymmetric
-                  CANDIDATE_DTCOLL = DTCOLL
-                  ! Compute auxiliary parameters
-                  IF (WALLS(i)%X1 == WALLS(i)%X2) THEN
-                     ! Vertical wall
-                     SOL1 = (WALLS(i)%X1-particles(IP)%X)/particles(IP)%VX
-                     IF (SOL1 >= 0 .AND. SOL1 < DTCOLL) THEN
-                        GOODSOL = 1
-                        TEST(1) = SOL1
-                     ELSE
-                        GOODSOL = 0
-                     END IF
-                  ELSE
-                     ! Non-vertical wall
-                     ALPHA = (WALLS(i)%Y2-WALLS(i)%Y1)/(WALLS(i)%X2-WALLS(i)%X1)
-                     BETA  = (particles(IP)%X - WALLS(i)%X1)*ALPHA
-
-                     COEFA = particles(IP)%VY**2 + particles(IP)%VZ**2 - ALPHA*ALPHA*particles(IP)%VX**2
-                     COEFB = particles(IP)%Y * particles(IP)%VY - (BETA + WALLS(i)%Y1)*ALPHA*particles(IP)%VX
-                     COEFC = particles(IP)%Y**2 - (BETA + WALLS(i)%Y1)**2
-                     DELTA = COEFB*COEFB-COEFA*COEFC
-                     IF (DELTA .GE. 0) THEN
-                        ! Compute the solutions, check if they are any good and, in case, order them to be checked further.
-                        SOL1 = (-COEFB - SQRT(DELTA))/COEFA
-                        SOL2 = (-COEFB + SQRT(DELTA))/COEFA
-                        IF (SOL1 >= 0 .AND. SOL1 < DTCOLL .AND. BETA+ALPHA*particles(IP)%VX*SOL1+WALLS(i)%Y1 >= 0) THEN
-                           IF (SOL2 >= 0 .AND. SOL2 < DTCOLL .AND. BETA+ALPHA*particles(IP)%VX*SOL2+WALLS(i)%Y1 >= 0) THEN
-                              GOODSOL = 2
-                              IF (SOL1 <= SOL2) THEN
-                                 TEST(1) = SOL1
-                                 TEST(2) = SOL2
-                              ELSE
-                                 TEST(1) = SOL2
-                                 TEST(2) = SOL1
-                              END IF
-                           ELSE
-                              GOODSOL = 1
-                              TEST(1) = SOL1
-                           ENDIF
-                        ELSE
-                           IF (SOL2 >= 0 .AND. SOL2 < DTCOLL .AND. BETA+ALPHA*particles(IP)%VX*SOL2+WALLS(i)%Y1 >= 0) THEN
-                              GOODSOL = 1
-                              TEST(1) = SOL2
-                           ELSE
-                              GOODSOL = 0
-                           END IF 
-                        END IF
-                     ELSE
-                        GOODSOL = 0
-                     END IF
-                  END IF
-
-                  ! Now further checks for each of the good solutions:
-                  ! - if the velocity at collision time is actually towards the surface
-                  ! - if the collision point is within the extremes of the segment
-                  ! Note: this requires moving the particle to the collision point and then moving back.
-                  IF (GOODSOL /= 0) THEN
-                     DO SOL = 1, GOODSOL
-                        CALL MOVE_PARTICLE(IP, TEST(SOL))
-                        IF ((particles(IP)%VX*WALLS(i)%NORMX + particles(IP)%VY*WALLS(i)%NORMY) < 0) THEN
-
-                           COLLDIST = ((particles(IP)%X-WALLS(i)%X1)*(WALLS(i)%X2-WALLS(i)%X1) &
-                                    + (particles(IP)%Y-WALLS(i)%Y1)*(WALLS(i)%Y2-WALLS(i)%Y1)) &
-                                    / ((WALLS(i)%X2-WALLS(i)%X1)**2 + (WALLS(i)%Y2-WALLS(i)%Y1)**2)
-                           IF ((COLLDIST .GE. 0) .AND. (COLLDIST .LE. 1)) THEN
-                              ! Collision happens!
-                              DTCOLL = TEST(SOL)
-                              BOUNDCOLL = -1
-                              WALLCOLL = i   
-                              TOTDTCOLL = TOTDTCOLL + DTCOLL  
-                              HASCOLLIDED = .TRUE.
-                           END IF
-                        END IF
-                        CALL MOVE_PARTICLE(IP, -TEST(SOL))
-                     END DO
-                  END IF
-
-
-               ELSE
-                  ! We are not axisymmetric
-                  ! Compute the velocity normal to the surface
-                  VN = -(particles(IP)%VX * WALLS(i)%NORMX + particles(IP)%VY * WALLS(i)%NORMY)
-                  ! Compute the distance from the boundary
-                  DX = (particles(IP)%X - WALLS(i)%X1) * WALLS(i)%NORMX + (particles(IP)%Y - WALLS(i)%Y1) * WALLS(i)%NORMY
-                  ! Check if a collision happens (sooner than previously calculated)
-                  IF (DX .GE. 0. .AND. VN * DTCOLL .GE. DX) THEN
-                     
-                     CANDIDATE_DTCOLL = DX/VN
-                     ! Find candidate collision point
-                     XCOLL = particles(IP)%X + particles(IP)%VX * CANDIDATE_DTCOLL 
-                     YCOLL = particles(IP)%Y + particles(IP)%VY * CANDIDATE_DTCOLL
-                     COLLDIST = ((XCOLL-WALLS(i)%X1)*(WALLS(i)%X2-WALLS(i)%X1)+(YCOLL-WALLS(i)%Y1)*(WALLS(i)%Y2-WALLS(i)%Y1))/ &
-                     ((WALLS(i)%X2-WALLS(i)%X1)**2 + (WALLS(i)%Y2-WALLS(i)%Y1)**2)
-                     IF ((COLLDIST .GE. 0) .AND. (COLLDIST .LE. 1)) THEN
-                        BOUNDCOLL = -1
-                        WALLCOLL = i
-                        DTCOLL = CANDIDATE_DTCOLL
-                        TOTDTCOLL = TOTDTCOLL + DTCOLL
-                        HASCOLLIDED = .TRUE.
-                     END IF
-                  END IF
-               END IF
-            END DO
-
-
-            IF (BOUNDCOLL .NE. -1) THEN
-               ! Collision with a boundary
-               ! Tally the collision
-               LOCAL_BOUNDARY_COLL_COUNT(BOUNDCOLL+4*(particles(IP)%S_ID-1)) = &
-               LOCAL_BOUNDARY_COLL_COUNT(BOUNDCOLL+4*(particles(IP)%S_ID-1)) + 1
-
-               IF (BOOL_PERIODIC(BOUNDCOLL)) THEN
-
-                  CALL MOVE_PARTICLE(IP, DTCOLL)
-                  SELECT CASE (BOUNDCOLL)
-                     CASE (1)
-                        particles(IP)%X = particles(IP)%X + XMAX - XMIN
-                     CASE (2)
-                        particles(IP)%X = particles(IP)%X - XMAX + XMIN
-                     CASE (3)
-                        particles(IP)%Y = particles(IP)%Y + YMAX - YMIN
-                     CASE (4)
-                        particles(IP)%Y = particles(IP)%Y - YMAX + YMIN
-                  END SELECT
-                  particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
-
-               ELSE IF (BOOL_SPECULAR(BOUNDCOLL)) THEN
-               
-                  CALL MOVE_PARTICLE(IP, DTCOLL)
-                  SELECT CASE (BOUNDCOLL)
-                     CASE (1)
-                        particles(IP)%VX = - particles(IP)%VX
-                     CASE (2)
-                        particles(IP)%VX = - particles(IP)%VX
-                     CASE (3)
-                        particles(IP)%VY = - particles(IP)%VY
-                     CASE (4)
-                        particles(IP)%VY = - particles(IP)%VY
-                  END SELECT
-                  particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
-
-                  IF (BOOL_REACT(BOUNDCOLL)) THEN
-                     CALL WALL_REACT(IP, REMOVE_PART(IP))
-                  END IF
-
-               ELSE IF (BOOL_DIFFUSE(BOUNDCOLL)) THEN
-
+               IF (BOUNDCOLL .NE. -1) THEN
                   CALL MOVE_PARTICLE(IP, DTCOLL)
                   particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
-                  IF (BOOL_REACT(BOUNDCOLL)) THEN
-                     CALL WALL_REACT(IP, REMOVE_PART(IP))
-                  END IF
-                  IF (.NOT. REMOVE_PART(IP)) THEN
-                     S_ID = particles(IP)%S_ID
-                     CALL MAXWELL(0.d0, 0.d0, 0.d0, &
-                     BOUNDTEMP, BOUNDTEMP, BOUNDTEMP, &
-                     VDUMMY, V_PERP, VZ, SPECIES(S_ID)%MOLECULAR_MASS)
 
-                     CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, BOUNDTEMP, EROT)
-                     CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, BOUNDTEMP, EVIB)
-                                    
-                     V_NORM = FLX(0.d0, BOUNDTEMP, SPECIES(S_ID)%MOLECULAR_MASS)
-
-                     particles(IP)%VX = V_NORM*NORMX(BOUNDCOLL) - V_PERP*NORMY(BOUNDCOLL)
-                     particles(IP)%VY = V_PERP*NORMX(BOUNDCOLL) + V_NORM*NORMY(BOUNDCOLL)
-                     particles(IP)%VZ = VZ
-                     particles(IP)%EROT = EROT
-                     particles(IP)%EVIB = EVIB
-
-                  END IF
-
-               ELSE
-
-                  REMOVE_PART(IP) = .TRUE.
-                  particles(IP)%DTRIM = 0.
-
-               END IF
-            ELSE IF (WALLCOLL .NE. -1) THEN
-               ! Collision with a wall
-               ! Tally the collision
-               LOCAL_WALL_COLL_COUNT(WALLCOLL+N_WALLS*(particles(IP)%S_ID-1)) = &
-               LOCAL_WALL_COLL_COUNT(WALLCOLL+N_WALLS*(particles(IP)%S_ID-1)) + 1
-
-               IF (WALLS(WALLCOLL)%SPECULAR) THEN
-                  rfp = rf()
-                  IF (WALLS(WALLCOLL)%POROUS .AND. rfp .LE. WALLS(WALLCOLL)%TRANSMISSIVITY) THEN
-
+                  ! Move to new cell
+                  IF (U2D_GRID%CELL_NEIGHBORS(IC, BOUNDCOLL) == -1) THEN
                      REMOVE_PART(IP) = .TRUE.
                      particles(IP)%DTRIM = 0.
+                  ELSE
+                     particles(IP)%IC = U2D_GRID%CELL_NEIGHBORS(IC, BOUNDCOLL)
+                     IC = particles(IP)%IC
+                     !WRITE(*,*) 'moved particle to cell: ', IC
+                  END IF
+               ELSE
+                  CALL MOVE_PARTICLE(IP, particles(IP)%DTRIM)
+                  particles(IP)%DTRIM = 0.d0
+               END IF
+
+            ELSE ! Grid type is rectilinear
+               BOUNDCOLL = -1
+               DO i = 1, 4 ! Check collisions with boundaries (xmin, xmax, ymin, ymax)
+                  IF (AXI) THEN
+                     ! We are axisymmetric. Check is more complicated.
+                     CANDIDATE_DTCOLL = DTCOLL
+                     
+                     IF (i==1 .OR. i==2) THEN
+                        ! Vertical wall
+                        SOL1 = (BOUNDPOS(i)-particles(IP)%X)/particles(IP)%VX
+                        IF (SOL1 >= 0 .AND. SOL1 < DTCOLL) THEN
+                           GOODSOL = 1
+                           TEST(1) = SOL1
+                        ELSE
+                           GOODSOL = 0
+                        END IF
+                     ELSE
+                        ! Horizontal boundary
+                        COEFA = particles(IP)%VY**2 + particles(IP)%VZ**2
+                        COEFB = particles(IP)%Y * particles(IP)%VY
+                        COEFC = particles(IP)%Y**2 - BOUNDPOS(i)**2
+                        DELTA = COEFB*COEFB-COEFA*COEFC
+                        IF (DELTA .GE. 0) THEN
+                        ! Compute the solutions, check if they are any good and, in case, order them to be checked further.
+                           SOL1 = (-COEFB - SQRT(DELTA))/COEFA
+                           SOL2 = (-COEFB + SQRT(DELTA))/COEFA
+                           IF (SOL1 >= 0 .AND. SOL1 < DTCOLL) THEN
+                              IF (SOL2 >= 0 .AND. SOL2 < DTCOLL) THEN
+                                 GOODSOL = 2
+                                 IF (SOL1 <= SOL2) THEN
+                                    TEST(1) = SOL1
+                                    TEST(2) = SOL2
+                                 ELSE
+                                    TEST(1) = SOL2
+                                    TEST(2) = SOL1
+                                 END IF
+                              ELSE
+                                 GOODSOL = 1
+                                 TEST(1) = SOL1
+                              ENDIF
+                           ELSE
+                              IF (SOL2 >= 0 .AND. SOL2 < DTCOLL) THEN
+                                 GOODSOL = 1
+                                 TEST(1) = SOL2
+                              ELSE
+                                 GOODSOL = 0
+                              END IF 
+                           END IF
+                        ELSE
+                           GOODSOL = 0
+                        END IF
+                     END IF
+
+                     ! Now further checks for each of the good solutions:
+                     ! - if the velocity at collision time is actually towards the surface
+                     ! - if the collision point is within the extremes of the segment
+                     ! Note: this requires moving the particle to the collision point and then moving back.
+                     IF (GOODSOL /= 0) THEN
+                        DO SOL = 1, GOODSOL
+                           CALL MOVE_PARTICLE(IP, TEST(SOL))
+                           IF ((particles(IP)%VX*NORMX(i) + particles(IP)%VY*NORMY(i)) < 0) THEN
+                              ! Collision happens!
+                              DTCOLL = TEST(SOL)
+                              BOUNDCOLL = i    
+                              TOTDTCOLL = TOTDTCOLL + DTCOLL  
+                              HASCOLLIDED = .TRUE.
+                              IF (BOUNDCOLL == 3) WRITE(*,*) "Collision with axis!"
+                           END IF
+                           CALL MOVE_PARTICLE(IP, -TEST(SOL))
+                        END DO
+                     END IF
+
+                     
 
                   ELSE
+                     ! We are not axisymmetric
+                     ! Compute the velocity normal to the boundary
+                     VN = -(particles(IP)%VX * NORMX(i) + particles(IP)%VY * NORMY(i))
+                     ! Compute the distance from the boundary
+                     DX = (particles(IP)%X - XW(i)) * NORMX(i) + (particles(IP)%Y - YW(i)) * NORMY(i)
+                     ! Check if a collision happens (sooner than previously calculated)
+                     IF (VN .GE. 0. .AND. VN * DTCOLL .GT. DX) THEN
+                        
+                        ! Find candidate collision point (don't need this for boundaries)
+                        ! XCOLL = particles(IP)%X + particles(IP)%VX * DTCOLL 
+                        ! YCOLL = particles(IP)%Y + particles(IP)%VY * DTCOLL
+                        ! ZCOLL = particles(IP)%Z + particles(IP)%VZ * DTCOLL
+
+                        DTCOLL = DX/VN
+                        BOUNDCOLL = i    
+                        TOTDTCOLL = TOTDTCOLL + DTCOLL  
+                        HASCOLLIDED = .TRUE.               
+
+                     END IF
+                  END IF
+               END DO
+
+               
+
+               ! Check collisions with surfaces
+               ! If earlier than dtcoll remember to set BOUNDCOLL to -1 and the new dtcoll
+               WALLCOLL = -1
+               DO i = 1, N_WALLS
+                  IF (AXI) THEN
+                     ! We are axisymmetric
+                     CANDIDATE_DTCOLL = DTCOLL
+                     ! Compute auxiliary parameters
+                     IF (WALLS(i)%X1 == WALLS(i)%X2) THEN
+                        ! Vertical wall
+                        SOL1 = (WALLS(i)%X1-particles(IP)%X)/particles(IP)%VX
+                        IF (SOL1 >= 0 .AND. SOL1 < DTCOLL) THEN
+                           GOODSOL = 1
+                           TEST(1) = SOL1
+                        ELSE
+                           GOODSOL = 0
+                        END IF
+                     ELSE
+                        ! Non-vertical wall
+                        ALPHA = (WALLS(i)%Y2-WALLS(i)%Y1)/(WALLS(i)%X2-WALLS(i)%X1)
+                        BETA  = (particles(IP)%X - WALLS(i)%X1)*ALPHA
+
+                        COEFA = particles(IP)%VY**2 + particles(IP)%VZ**2 - ALPHA*ALPHA*particles(IP)%VX**2
+                        COEFB = particles(IP)%Y * particles(IP)%VY - (BETA + WALLS(i)%Y1)*ALPHA*particles(IP)%VX
+                        COEFC = particles(IP)%Y**2 - (BETA + WALLS(i)%Y1)**2
+                        DELTA = COEFB*COEFB-COEFA*COEFC
+                        IF (DELTA .GE. 0) THEN
+                           ! Compute the solutions, check if they are any good and, in case, order them to be checked further.
+                           SOL1 = (-COEFB - SQRT(DELTA))/COEFA
+                           SOL2 = (-COEFB + SQRT(DELTA))/COEFA
+                           IF (SOL1 >= 0 .AND. SOL1 < DTCOLL .AND. BETA+ALPHA*particles(IP)%VX*SOL1+WALLS(i)%Y1 >= 0) THEN
+                              IF (SOL2 >= 0 .AND. SOL2 < DTCOLL .AND. BETA+ALPHA*particles(IP)%VX*SOL2+WALLS(i)%Y1 >= 0) THEN
+                                 GOODSOL = 2
+                                 IF (SOL1 <= SOL2) THEN
+                                    TEST(1) = SOL1
+                                    TEST(2) = SOL2
+                                 ELSE
+                                    TEST(1) = SOL2
+                                    TEST(2) = SOL1
+                                 END IF
+                              ELSE
+                                 GOODSOL = 1
+                                 TEST(1) = SOL1
+                              ENDIF
+                           ELSE
+                              IF (SOL2 >= 0 .AND. SOL2 < DTCOLL .AND. BETA+ALPHA*particles(IP)%VX*SOL2+WALLS(i)%Y1 >= 0) THEN
+                                 GOODSOL = 1
+                                 TEST(1) = SOL2
+                              ELSE
+                                 GOODSOL = 0
+                              END IF 
+                           END IF
+                        ELSE
+                           GOODSOL = 0
+                        END IF
+                     END IF
+
+                     ! Now further checks for each of the good solutions:
+                     ! - if the velocity at collision time is actually towards the surface
+                     ! - if the collision point is within the extremes of the segment
+                     ! Note: this requires moving the particle to the collision point and then moving back.
+                     IF (GOODSOL /= 0) THEN
+                        DO SOL = 1, GOODSOL
+                           CALL MOVE_PARTICLE(IP, TEST(SOL))
+                           IF ((particles(IP)%VX*WALLS(i)%NORMX + particles(IP)%VY*WALLS(i)%NORMY) < 0) THEN
+
+                              COLLDIST = ((particles(IP)%X-WALLS(i)%X1)*(WALLS(i)%X2-WALLS(i)%X1) &
+                                       + (particles(IP)%Y-WALLS(i)%Y1)*(WALLS(i)%Y2-WALLS(i)%Y1)) &
+                                       / ((WALLS(i)%X2-WALLS(i)%X1)**2 + (WALLS(i)%Y2-WALLS(i)%Y1)**2)
+                              IF ((COLLDIST .GE. 0) .AND. (COLLDIST .LE. 1)) THEN
+                                 ! Collision happens!
+                                 DTCOLL = TEST(SOL)
+                                 BOUNDCOLL = -1
+                                 WALLCOLL = i   
+                                 TOTDTCOLL = TOTDTCOLL + DTCOLL  
+                                 HASCOLLIDED = .TRUE.
+                              END IF
+                           END IF
+                           CALL MOVE_PARTICLE(IP, -TEST(SOL))
+                        END DO
+                     END IF
+
+
+                  ELSE
+                     ! We are not axisymmetric
+                     ! Compute the velocity normal to the surface
+                     VN = -(particles(IP)%VX * WALLS(i)%NORMX + particles(IP)%VY * WALLS(i)%NORMY)
+                     ! Compute the distance from the boundary
+                     DX = (particles(IP)%X - WALLS(i)%X1) * WALLS(i)%NORMX + (particles(IP)%Y - WALLS(i)%Y1) * WALLS(i)%NORMY
+                     ! Check if a collision happens (sooner than previously calculated)
+                     IF (DX .GE. 0. .AND. VN * DTCOLL .GE. DX) THEN
+                        
+                        CANDIDATE_DTCOLL = DX/VN
+                        ! Find candidate collision point
+                        XCOLL = particles(IP)%X + particles(IP)%VX * CANDIDATE_DTCOLL 
+                        YCOLL = particles(IP)%Y + particles(IP)%VY * CANDIDATE_DTCOLL
+                        COLLDIST = ((XCOLL-WALLS(i)%X1)*(WALLS(i)%X2-WALLS(i)%X1)+(YCOLL-WALLS(i)%Y1)*(WALLS(i)%Y2-WALLS(i)%Y1))/ &
+                        ((WALLS(i)%X2-WALLS(i)%X1)**2 + (WALLS(i)%Y2-WALLS(i)%Y1)**2)
+                        IF ((COLLDIST .GE. 0) .AND. (COLLDIST .LE. 1)) THEN
+                           BOUNDCOLL = -1
+                           WALLCOLL = i
+                           DTCOLL = CANDIDATE_DTCOLL
+                           TOTDTCOLL = TOTDTCOLL + DTCOLL
+                           HASCOLLIDED = .TRUE.
+                        END IF
+                     END IF
+                  END IF
+               END DO
+
+
+               IF (BOUNDCOLL .NE. -1) THEN
+                  ! Collision with a boundary
+                  ! Tally the collision
+                  LOCAL_BOUNDARY_COLL_COUNT(BOUNDCOLL+4*(particles(IP)%S_ID-1)) = &
+                  LOCAL_BOUNDARY_COLL_COUNT(BOUNDCOLL+4*(particles(IP)%S_ID-1)) + 1
+
+                  IF (BOOL_PERIODIC(BOUNDCOLL)) THEN
 
                      CALL MOVE_PARTICLE(IP, DTCOLL)
-                     !WRITE(*,*) "Specular reflection! Velocity before: ",  particles(IP)%VX, ", ", particles(IP)%VY
-                     VDOTN = particles(IP)%VX*WALLS(WALLCOLL)%NORMX+particles(IP)%VY*WALLS(WALLCOLL)%NORMY
-                     particles(IP)%VX = particles(IP)%VX - 2.*VDOTN*WALLS(WALLCOLL)%NORMX
-                     particles(IP)%VY = particles(IP)%VY - 2.*VDOTN*WALLS(WALLCOLL)%NORMY
-                     !WRITE(*,*) "Normal:  ",  WALLS(WALLCOLL)%NORMX, ", ", WALLS(WALLCOLL)%NORMY
-                     !WRITE(*,*) "Specular reflection! Velocity after:  ",  particles(IP)%VX, ", ", particles(IP)%VY
+                     SELECT CASE (BOUNDCOLL)
+                        CASE (1)
+                           particles(IP)%X = particles(IP)%X + XMAX - XMIN
+                        CASE (2)
+                           particles(IP)%X = particles(IP)%X - XMAX + XMIN
+                        CASE (3)
+                           particles(IP)%Y = particles(IP)%Y + YMAX - YMIN
+                        CASE (4)
+                           particles(IP)%Y = particles(IP)%Y - YMAX + YMIN
+                     END SELECT
                      particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
 
-                     IF (WALLS(WALLCOLL)%REACT) THEN
+                  ELSE IF (BOOL_SPECULAR(BOUNDCOLL)) THEN
+                  
+                     CALL MOVE_PARTICLE(IP, DTCOLL)
+                     SELECT CASE (BOUNDCOLL)
+                        CASE (1)
+                           particles(IP)%VX = - particles(IP)%VX
+                        CASE (2)
+                           particles(IP)%VX = - particles(IP)%VX
+                        CASE (3)
+                           particles(IP)%VY = - particles(IP)%VY
+                        CASE (4)
+                           particles(IP)%VY = - particles(IP)%VY
+                     END SELECT
+                     particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
+
+                     IF (BOOL_REACT(BOUNDCOLL)) THEN
                         CALL WALL_REACT(IP, REMOVE_PART(IP))
                      END IF
 
-                  END IF
-               ELSE IF (WALLS(WALLCOLL)%DIFFUSE) THEN
-                  rfp = rf()
-                  IF (WALLS(WALLCOLL)%POROUS .AND. rfp .LE. WALLS(WALLCOLL)%TRANSMISSIVITY) THEN
+                  ELSE IF (BOOL_DIFFUSE(BOUNDCOLL)) THEN
 
-                     REMOVE_PART(IP) = .TRUE.
-                     particles(IP)%DTRIM = 0.
-                     
-                  ELSE
-                        
                      CALL MOVE_PARTICLE(IP, DTCOLL)
                      particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
-                     IF (WALLS(WALLCOLL)%REACT) THEN
+                     IF (BOOL_REACT(BOUNDCOLL)) THEN
                         CALL WALL_REACT(IP, REMOVE_PART(IP))
                      END IF
                      IF (.NOT. REMOVE_PART(IP)) THEN
                         S_ID = particles(IP)%S_ID
                         CALL MAXWELL(0.d0, 0.d0, 0.d0, &
-                        WALLS(WALLCOLL)%TEMP, WALLS(WALLCOLL)%TEMP, WALLS(WALLCOLL)%TEMP, &
+                        BOUNDTEMP, BOUNDTEMP, BOUNDTEMP, &
                         VDUMMY, V_PERP, VZ, SPECIES(S_ID)%MOLECULAR_MASS)
 
-                        CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, WALLS(WALLCOLL)%TEMP, EROT)
-                        CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, WALLS(WALLCOLL)%TEMP, EVIB)
+                        CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, BOUNDTEMP, EROT)
+                        CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, BOUNDTEMP, EVIB)
                                        
-                        V_NORM = FLX(0.d0, WALLS(WALLCOLL)%TEMP, SPECIES(S_ID)%MOLECULAR_MASS)
+                        V_NORM = FLX(0.d0, BOUNDTEMP, SPECIES(S_ID)%MOLECULAR_MASS)
 
-                        particles(IP)%VX = V_NORM*WALLS(WALLCOLL)%NORMX - V_PERP*WALLS(WALLCOLL)%NORMY
-                        particles(IP)%VY = V_PERP*WALLS(WALLCOLL)%NORMX + V_NORM*WALLS(WALLCOLL)%NORMY
+                        particles(IP)%VX = V_NORM*NORMX(BOUNDCOLL) - V_PERP*NORMY(BOUNDCOLL)
+                        particles(IP)%VY = V_PERP*NORMX(BOUNDCOLL) + V_NORM*NORMY(BOUNDCOLL)
                         particles(IP)%VZ = VZ
                         particles(IP)%EROT = EROT
                         particles(IP)%EVIB = EVIB
 
                      END IF
+
+                  ELSE
+
+                     REMOVE_PART(IP) = .TRUE.
+                     particles(IP)%DTRIM = 0.
+
+                  END IF
+               ELSE IF (WALLCOLL .NE. -1) THEN
+                  ! Collision with a wall
+                  ! Tally the collision
+                  LOCAL_WALL_COLL_COUNT(WALLCOLL+N_WALLS*(particles(IP)%S_ID-1)) = &
+                  LOCAL_WALL_COLL_COUNT(WALLCOLL+N_WALLS*(particles(IP)%S_ID-1)) + 1
+
+                  IF (WALLS(WALLCOLL)%SPECULAR) THEN
+                     rfp = rf()
+                     IF (WALLS(WALLCOLL)%POROUS .AND. rfp .LE. WALLS(WALLCOLL)%TRANSMISSIVITY) THEN
+
+                        REMOVE_PART(IP) = .TRUE.
+                        particles(IP)%DTRIM = 0.
+
+                     ELSE
+
+                        CALL MOVE_PARTICLE(IP, DTCOLL)
+                        !WRITE(*,*) "Specular reflection! Velocity before: ",  particles(IP)%VX, ", ", particles(IP)%VY
+                        VDOTN = particles(IP)%VX*WALLS(WALLCOLL)%NORMX+particles(IP)%VY*WALLS(WALLCOLL)%NORMY
+                        particles(IP)%VX = particles(IP)%VX - 2.*VDOTN*WALLS(WALLCOLL)%NORMX
+                        particles(IP)%VY = particles(IP)%VY - 2.*VDOTN*WALLS(WALLCOLL)%NORMY
+                        !WRITE(*,*) "Normal:  ",  WALLS(WALLCOLL)%NORMX, ", ", WALLS(WALLCOLL)%NORMY
+                        !WRITE(*,*) "Specular reflection! Velocity after:  ",  particles(IP)%VX, ", ", particles(IP)%VY
+                        particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
+
+                        IF (WALLS(WALLCOLL)%REACT) THEN
+                           CALL WALL_REACT(IP, REMOVE_PART(IP))
+                        END IF
+
+                     END IF
+                  ELSE IF (WALLS(WALLCOLL)%DIFFUSE) THEN
+                     rfp = rf()
+                     IF (WALLS(WALLCOLL)%POROUS .AND. rfp .LE. WALLS(WALLCOLL)%TRANSMISSIVITY) THEN
+
+                        REMOVE_PART(IP) = .TRUE.
+                        particles(IP)%DTRIM = 0.
+                        
+                     ELSE
+                           
+                        CALL MOVE_PARTICLE(IP, DTCOLL)
+                        particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
+                        IF (WALLS(WALLCOLL)%REACT) THEN
+                           CALL WALL_REACT(IP, REMOVE_PART(IP))
+                        END IF
+                        IF (.NOT. REMOVE_PART(IP)) THEN
+                           S_ID = particles(IP)%S_ID
+                           CALL MAXWELL(0.d0, 0.d0, 0.d0, &
+                           WALLS(WALLCOLL)%TEMP, WALLS(WALLCOLL)%TEMP, WALLS(WALLCOLL)%TEMP, &
+                           VDUMMY, V_PERP, VZ, SPECIES(S_ID)%MOLECULAR_MASS)
+
+                           CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, WALLS(WALLCOLL)%TEMP, EROT)
+                           CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, WALLS(WALLCOLL)%TEMP, EVIB)
+                                          
+                           V_NORM = FLX(0.d0, WALLS(WALLCOLL)%TEMP, SPECIES(S_ID)%MOLECULAR_MASS)
+
+                           particles(IP)%VX = V_NORM*WALLS(WALLCOLL)%NORMX - V_PERP*WALLS(WALLCOLL)%NORMY
+                           particles(IP)%VY = V_PERP*WALLS(WALLCOLL)%NORMX + V_NORM*WALLS(WALLCOLL)%NORMY
+                           particles(IP)%VZ = VZ
+                           particles(IP)%EROT = EROT
+                           particles(IP)%EVIB = EVIB
+
+                        END IF
+                     END IF
+
+                  ELSE
+
+                     REMOVE_PART(IP) = .TRUE.
+                     particles(IP)%DTRIM = 0.
+
                   END IF
 
                ELSE
-
-                  REMOVE_PART(IP) = .TRUE.
+                  ! No collision in this timestep
+                  CALL MOVE_PARTICLE(IP, particles(IP)%DTRIM)
                   particles(IP)%DTRIM = 0.
 
                END IF
 
-            ELSE
-               ! No collision in this timestep
-               CALL MOVE_PARTICLE(IP, particles(IP)%DTRIM)
-               particles(IP)%DTRIM = 0.
+
+               ! Axisymmetric velocity rotation already performed in MOVE_PARTICLE()
+
+         
+               ! _______ CHECK WHERE PARTICLE ENDED UP _______
+
+               ! ++++++++ Check if particle is still in the domain ++++++++++++
+               !IF (particles(IP)%X .GE. XMIN .AND. particles(IP)%X .LE. XMAX .AND. & 
+               !    particles(IP)%Y .GE. YMIN .AND. particles(IP)%Y .LE. YMAX .AND. &
+               !    particles(IP)%Z .GE. ZMIN .AND. particles(IP)%Z .LE. ZMAX) THEN   ! Check that the particle is still in the domain
+         
+                  ! Compute the index of the cell in which the particle ended up
+                  !CALL CELL_FROM_POSITION(particles(IP)%X, particles(IP)%Y, IC)
+                  !particles(IP)%IC = IC
+         
+                  !DTRIM = 0.E0 ! Timestep is over.
+      
+               ! +++++++++ Particle crossed domain boundaries ++++++++
+               !ELSE
+
+                  ! CALL IMPACT_BOUNDARY(IP, DTRIM) 
+               !   DTRIM = 0.E0 ! TMP TMP TMP TMP TMP TMP TMP TMP TMP
+               !END IF
 
             END IF
-
-
-            ! Axisymmetric velocity rotation already performed in MOVE_PARTICLE()
-
-      
-            ! _______ CHECK WHERE PARTICLE ENDED UP _______
-
-            ! ++++++++ Check if particle is still in the domain ++++++++++++
-            !IF (particles(IP)%X .GE. XMIN .AND. particles(IP)%X .LE. XMAX .AND. & 
-            !    particles(IP)%Y .GE. YMIN .AND. particles(IP)%Y .LE. YMAX .AND. &
-            !    particles(IP)%Z .GE. ZMIN .AND. particles(IP)%Z .LE. ZMAX) THEN   ! Check that the particle is still in the domain
-      
-               ! Compute the index of the cell in which the particle ended up
-               !CALL CELL_FROM_POSITION(particles(IP)%X, particles(IP)%Y, IC)
-               !particles(IP)%IC = IC
-      
-               !DTRIM = 0.E0 ! Timestep is over.
-   
-            ! +++++++++ Particle crossed domain boundaries ++++++++
-            !ELSE
-
-               ! CALL IMPACT_BOUNDARY(IP, DTRIM) 
-            !   DTRIM = 0.E0 ! TMP TMP TMP TMP TMP TMP TMP TMP TMP
-            !END IF
-
-            
 
          END DO ! WHILE (DTRIM .GT. 0.)
 
@@ -970,7 +1011,7 @@ MODULE timecycle
          ! Is particle IP out of the domain? Then remove it!
          IF (REMOVE_PART(IP)) THEN
             CALL REMOVE_PARTICLE_ARRAY(IP, particles, NP_PROC)
-         ELSE
+         ELSE IF (GRID_TYPE .NE. UNSTRUCTURED) THEN
             CALL CELL_FROM_POSITION(particles(IP)%X, particles(IP)%Y, IC)
             OLD_IC = particles(IP)%IC
             particles(IP)%IC = IC

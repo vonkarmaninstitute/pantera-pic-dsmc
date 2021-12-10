@@ -23,20 +23,20 @@ pantera.exe: pantera.o $(OBJS)
 pantera.o: pantera.f90 $(OBJS) 
 	$(CMPF) $(OPTF) pantera.f90
 
+global.o: global.f90 mpi_common.o particle.o
+	$(CMPF) $(OPTF) global.f90
+
 timecycle.o: timecycle.f90  global.o  particle.o  screen.o  collisions.o  postprocess.o  fields.o
 	$(CMPF) $(OPTF) timecycle.f90
 
 initialization.o: initialization.f90  global.o  tools.o  grid_and_partition.o
 	$(CMPF) $(OPTF) initialization.f90
 
-tools.o: tools.f90  grid_and_partition.o  mpi_common.o  global.o  mt19937.o
+tools.o: tools.f90  mpi_common.o  global.o  mt19937.o
 	$(CMPF) $(OPTF) tools.f90
 
-grid_and_partition.o: grid_and_partition.f90 mpi_common.o global.o 
+grid_and_partition.o: grid_and_partition.f90 mpi_common.o  global.o  tools.o
 	$(CMPF) $(OPTF) grid_and_partition.f90
-
-global.o: global.f90 mpi_common.o particle.o
-	$(CMPF) $(OPTF) global.f90
 
 screen.o: screen.f90
 	$(CMPF) $(OPTF) screen.f90

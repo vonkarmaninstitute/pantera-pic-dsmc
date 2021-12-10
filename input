@@ -16,9 +16,9 @@ Dimensions:
 Axisymmetric:
     .FALSE.
 Number_of_cells:
-    20    20    1
+    1    1    1
 Domain_limits:
-    0.0    1.0    0.0    1.0    0.0    1.0
+    -10.0    10.0    -10.0    10.0    0.0    1.0
 Domain_periodicity:
     .FALSE.   .FALSE.   .FALSE.
 Domain_specular:
@@ -49,7 +49,7 @@ Fnum:  ! Ratio of real-to-simulated particles
 Timestep:
     1.0e-5
 Number_of_timesteps:
-    5000
+    300
 Stats_every:
     1
 
@@ -58,14 +58,14 @@ RNG_seed:
 Dump_part_every:
     1000000
 
+Binary_output:
+    .FALSE.
 Dump_grid_start:
-    1000000
-    
+    0
 Dump_grid_avgevery:
-    20
-
+    1
 Dump_grid_numavgs:
-    1000
+    1
 
 Perform_checks:
     .FALSE.
@@ -73,16 +73,10 @@ Perform_checks:
 ! ========= Multispecies ==============================
 
 Species_file:
-    ar.species
+    airbasic.species
     
 Def_mixture:
-    Ions Ar+ 1.0
-    
-Def_mixture:
-    Electrons e 1.0
-    
-Def_mixture:
-    collmix e 1.0
+    Aria N2 1.0
     
     
 ! ========= Collisions ==============================
@@ -98,8 +92,8 @@ MCC_species: ! NOT IMPLEMENTED YET!
 
 ! DSMC VHS collisions  ! NOT IMPLEMENTED YET!
 
-DSMC_collisions_mixture:
-    collmix
+!DSMC_collisions_mixture:
+!    collmix
 !VSS_parameters_file:
 !    ar.vss
 
@@ -122,7 +116,7 @@ Thermal_bath_Ttr:
 Initial_particles_bool:
     .TRUE.
 Initial_particles_dens:
-    1.e6
+    1.e5
 Initial_particles_vel:
     0.  0.  0.
 Initial_particles_Ttra:
@@ -132,7 +126,7 @@ Initial_particles_Trot:
 Initial_particles_Tvib:
     0. 
 Initial_particles_mixture:
-    Ions
+    Aria
 ! ========== Injection from boundaries ==============
 
 Boundaries_inject_bool:
@@ -177,7 +171,7 @@ Linesource_Trot:
 
 ! Bordo
 !Linesource:
-!    -0.5    0.0    -0.5    0.5    1.0e15    2000.0    0.0    0.0    300.0    300.0    Aria
+!    0.0    0.0    -0.5    0.5    1.0e6    0.0    0.0    0.0    300.0    300.0    Aria
 
 !Linesource:
 !    -0.5    0.4999    0.5    0.4999    1.0e15    0.0    0.0    0.0    300.0    300.0    Aria

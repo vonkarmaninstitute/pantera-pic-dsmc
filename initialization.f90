@@ -1168,9 +1168,12 @@ MODULE initialization
 
       IMPLICIT NONE
 
-      INTEGER            :: IP, NP_INIT
+      INTEGER            :: IP, NP_INIT, IC
       REAL(KIND=8)       :: Xp, Yp, Zp, VXp, VYp, VZp, EROT, EVIB, DOMAIN_VOLUME
       INTEGER            :: CID
+
+      REAL(KIND=8), DIMENSION(3) :: V1, V2, V3
+      REAL(KIND=8)       :: XI, ETA, ETATEMP
 
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
       REAL(KIND=8)  :: M
@@ -1191,59 +1194,91 @@ MODULE initialization
       DO i = 1, MIXTURES(MIX_INIT)%N_COMPONENTS
          
          S_ID = MIXTURES(MIX_INIT)%COMPONENTS(i)%ID
-         ! Compute number of particles of this species per process to be created.
-         IF (AXI) THEN
-            DOMAIN_VOLUME = 0.5*(XMAX-XMIN)*(YMAX**2-YMIN**2)*(ZMAX-ZMIN)
-         ELSE
-            DOMAIN_VOLUME = (XMAX-XMIN)*(YMAX-YMIN)*(ZMAX-ZMIN)
-         END IF
-         NP_INIT = NINT(NRHO_INIT/(FNUM*SPECIES(S_ID)%SPWT)*DOMAIN_VOLUME* &
-                       MIXTURES(MIX_INIT)%COMPONENTS(i)%MOLFRAC/N_MPI_THREADS)
-         IF (NP_INIT == 0) CYCLE
-         DO IP = 1, NP_INIT
+         IF (GRID_TYPE == UNSTRUCTURED) THEN
+            DO IC = 1, U2D_GRID%NUM_CELLS
+               ! Compute number of particles of this species per process to be created in this cell.
+               NP_INIT = NINT(NRHO_INIT/(FNUM*SPECIES(S_ID)%SPWT)*CELL_VOLUMES(IC)* &
+                           MIXTURES(MIX_INIT)%COMPONENTS(i)%MOLFRAC/N_MPI_THREADS)
+               IF (NP_INIT == 0) CYCLE
 
-            ! Create particle position randomly in the domain
-            XP = XMIN + (XMAX-XMIN)*rf()
-            !XP = XMIN + 0.5*(XMAX-XMIN)*rf()
-            !IF (XP .GT. 0.) CYCLE
-            IF (AXI .AND. (.NOT. BOOL_RADIAL_WEIGHTING)) THEN
-               YP = SQRT(YMIN*YMIN + rf()*(YMAX*YMAX - YMIN*YMIN))
-               ZP = 0
+               V1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,1),:)
+               V2 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,2),:)
+               V3 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,3),:)
+
+               DO IP = 1, NP_INIT
+
+                  ! Create particle position randomly in the cell
+                  XI = rf()
+                  ETATEMP = rf()
+                  IF (ETATEMP > 1-XI) THEN
+                     ETA = 1-XI
+                     XI = 1-ETATEMP
+                  ELSE
+                     ETA = ETATEMP
+                  END IF
+
+                  XP = V1(1) + (V2(1)-V1(1))*XI + (V3(1)-V1(1))*ETA
+                  YP = V1(2) + (V2(2)-V1(2))*XI + (V3(2)-V1(2))*ETA
+                  ZP = ZMIN + (ZMAX-ZMIN)*rf()
+
+                  ! Assign velocity and energy following a Boltzmann distribution
+                  M = SPECIES(S_ID)%MOLECULAR_MASS
+                  CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
+                               TTRAX_INIT, TTRAY_INIT, TTRAZ_INIT, &
+                               VXP, VYP, VZP, M)
+
+                  CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, TROT_INIT, EROT)
+                  CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, TVIB_INIT, EVIB)
+
+                  CALL INIT_PARTICLE(XP,YP,ZP,VXP,VYP,VZP,EROT,EVIB,S_ID,IC,DT, particleNOW) ! Save in particle
+                  CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
+               END DO
+            END DO
+         ELSE ! Structured grid
+            ! Compute number of particles of this species per process to be created.
+            IF (AXI) THEN
+               DOMAIN_VOLUME = 0.5*(XMAX-XMIN)*(YMAX**2-YMIN**2)*(ZMAX-ZMIN)
             ELSE
-               YP = YMIN + (YMAX-YMIN)*rf()
-               ZP = ZMIN + (ZMAX-ZMIN)*rf()
+               DOMAIN_VOLUME = (XMAX-XMIN)*(YMAX-YMIN)*(ZMAX-ZMIN)
             END IF
+            NP_INIT = NINT(NRHO_INIT/(FNUM*SPECIES(S_ID)%SPWT)*DOMAIN_VOLUME* &
+                        MIXTURES(MIX_INIT)%COMPONENTS(i)%MOLFRAC/N_MPI_THREADS)
+            IF (NP_INIT == 0) CYCLE
+            DO IP = 1, NP_INIT
 
-            ! Chose particle species based on mixture specifications
-            ! RANVAR = rf()
-            ! DO i = 1, MIXTURES(MIX_INIT)%N_COMPONENTS
-            !    RANVAR = RANVAR - MIXTURES(MIX_INIT)%COMPONENTS(i)%MOLFRAC
-            !    IF (RANVAR < 0.) THEN
-            !       S_ID = MIXTURES(MIX_INIT)%COMPONENTS(i)%ID
-            !       EXIT
-            !    END IF
-            ! END DO
-         
-            ! Assign velocity and energy following a Boltzmann distribution
-            M = SPECIES(S_ID)%MOLECULAR_MASS
-            IF (S_ID == 15) THEN
-               CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
-                        3.d-2, 3.d-2, 3.d-2, &
-                        VXP, VYP, VZP, M)
-            ELSE
-               CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
-                           TTRAX_INIT, TTRAY_INIT, TTRAZ_INIT, &
+               ! Create particle position randomly in the domain
+               XP = XMIN + (XMAX-XMIN)*rf()
+               !XP = XMIN + 0.5*(XMAX-XMIN)*rf()
+               !IF (XP .GT. 0.) CYCLE
+               IF (AXI .AND. (.NOT. BOOL_RADIAL_WEIGHTING)) THEN
+                  YP = SQRT(YMIN*YMIN + rf()*(YMAX*YMAX - YMIN*YMIN))
+                  ZP = 0
+               ELSE
+                  YP = YMIN + (YMAX-YMIN)*rf()
+                  ZP = ZMIN + (ZMAX-ZMIN)*rf()
+               END IF
+            
+               ! Assign velocity and energy following a Boltzmann distribution
+               M = SPECIES(S_ID)%MOLECULAR_MASS
+               IF (S_ID == 15) THEN
+                  CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
+                           3.d-2, 3.d-2, 3.d-2, &
                            VXP, VYP, VZP, M)
-            END IF
+               ELSE
+                  CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
+                              TTRAX_INIT, TTRAY_INIT, TTRAZ_INIT, &
+                              VXP, VYP, VZP, M)
+               END IF
 
-            CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, TROT_INIT, EROT)
-            CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, TVIB_INIT, EVIB)
+               CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, TROT_INIT, EROT)
+               CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, TVIB_INIT, EVIB)
 
-            CALL CELL_FROM_POSITION(XP,YP,  CID) ! Find cell containing particle
+               CALL CELL_FROM_POSITION(XP,YP,  CID) ! Find cell containing particle
 
-            CALL INIT_PARTICLE(XP,YP,ZP,VXP,VYP,VZP,EROT,EVIB,S_ID,CID,DT, particleNOW) ! Save in particle
-            CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
-         END DO
+               CALL INIT_PARTICLE(XP,YP,ZP,VXP,VYP,VZP,EROT,EVIB,S_ID,CID,DT, particleNOW) ! Save in particle
+               CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
+            END DO
+         END IF
       END DO
       ! ~~~~~~ At this point, exchange particles among processes ~~~~~~
       CALL EXCHANGE
@@ -1259,7 +1294,7 @@ MODULE initialization
       IMPLICIT NONE
  
       ! ------------ Check values for number of cells ------------
-      IF ( (NX < 1) .OR. (NY < 1) ) THEN
+      IF ( GRID_TYPE .NE. UNSTRUCTURED .AND. ((NX < 1) .OR. (NY < 1)) ) THEN
          CALL ERROR_ABORT('ERROR! Number of cells along X or Y smaller than one. ABORTING!')
       END IF 
 

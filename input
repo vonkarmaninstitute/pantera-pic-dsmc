@@ -191,7 +191,9 @@ Linesource_Trot:
 !    0.1    0.05   0.1    0.0     300.0    .FALSE.    .FALSE.    .FALSE.    0.0    .TRUE.
    
 
-    
+Boundary_condition:
+    Inlet    specular
+
     
 ! ========= MPI parallelization =====================
 ! == Style for MPI domain partition can be:

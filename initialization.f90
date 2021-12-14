@@ -27,6 +27,7 @@ MODULE initialization
       INTEGER            :: ReasonEOF
 
       CHARACTER*512      :: MIXTURE_DEFINITION, VSS_PARAMS_FILENAME, LINESOURCE_DEFINITION, WALL_DEFINITION
+      CHARACTER*512      :: BC_DEFINITION
       CHARACTER*64       :: MIX_INIT_NAME, MIX_BOUNDINJECT_NAME, DSMC_COLL_MIX_NAME, MCC_BG_MIX_NAME
 
       ! Open input file for reading
@@ -71,6 +72,11 @@ MODULE initialization
             READ(in1,*) GRID_FILENAME
             CALL READ_GRID_FILE(GRID_FILENAME)
             GRID_TYPE = RECTILINEAR_NONUNIFORM
+         END IF
+
+         IF (line=='Boundary_condition:') THEN
+            READ(in1,'(A)') BC_DEFINITION
+            CALL DEF_BOUNDARY_CONDITION(BC_DEFINITION)
          END IF
          ! ~~~~~~~~~~~~~  Numerical settings  ~~~~~~~~~~~~~~~~~
          IF (line=='Fnum:')                    READ(in1,*) FNUM
@@ -869,6 +875,48 @@ MODULE initialization
       WALLS(N_WALLS)%NORMY = - (WALLS(N_WALLS)%X2 - WALLS(N_WALLS)%X1)/LENGTH
 
    END SUBROUTINE DEF_WALL
+
+
+   SUBROUTINE DEF_BOUNDARY_CONDITION(DEFINITION)
+
+      IMPLICIT NONE
+
+      CHARACTER(LEN=*), INTENT(IN) :: DEFINITION
+
+      INTEGER :: N_STR, I, IPG
+      CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
+
+
+      CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
+
+      ! phys_group type parameters
+      IPG = -1
+      DO I = 1, N_GRID_BC
+         IF (GRID_BC(I)%PHYSICAL_GROUP_NAME == STRARRAY(1)) IPG = I
+      END DO
+      IF (IPG == -1) CALL ERROR_ABORT('Error in boundary condition definition. Group name not found.')
+
+      IF (STRARRAY(2) == 'vacuum') THEN
+         GRID_BC(IPG)%PARTICLE_BC = VACUUM
+      ELSE IF (STRARRAY(2) == 'specular') THEN
+         GRID_BC(IPG)%PARTICLE_BC = SPECULAR
+      ELSE IF (STRARRAY(2) == 'diffuse') THEN
+         GRID_BC(IPG)%PARTICLE_BC = DIFFUSE
+      ELSE IF (STRARRAY(2) == 'axis') THEN
+         GRID_BC(IPG)%PARTICLE_BC = AXIS
+         ! Needs more info
+      ELSE IF (STRARRAY(2) == 'periodic') THEN
+         GRID_BC(IPG)%PARTICLE_BC = PERIODIC
+         ! Needs more info
+      ELSE IF (STRARRAY(2) == 'emit') THEN
+         GRID_BC(IPG)%PARTICLE_BC = EMIT
+         ! Needs more info
+      ELSE
+         CALL ERROR_ABORT('Error in boundary condition definition.')
+      END IF
+
+
+   END SUBROUTINE DEF_BOUNDARY_CONDITION
 
 
    SUBROUTINE READ_REACTIONS(FILENAME)

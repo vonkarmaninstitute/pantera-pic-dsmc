@@ -433,7 +433,7 @@ MODULE timecycle
       IMPLICIT NONE
 
       INTEGER      :: IP, IC, i, SOL, OLD_IC
-      INTEGER      :: BOUNDCOLL, WALLCOLL, GOODSOL
+      INTEGER      :: BOUNDCOLL, WALLCOLL, GOODSOL, EDGE_PG
       REAL(KIND=8) :: DTCOLL, TOTDTCOLL, CANDIDATE_DTCOLL, rfp
       REAL(KIND=8) :: COEFA, COEFB, COEFC, DELTA, SOL1, SOL2, ALPHA, BETA
       REAL(KIND=8), DIMENSION(2) :: TEST
@@ -568,8 +568,16 @@ MODULE timecycle
 
                   ! Move to new cell
                   IF (U2D_GRID%CELL_NEIGHBORS(IC, BOUNDCOLL) == -1) THEN
-                     REMOVE_PART(IP) = .TRUE.
-                     particles(IP)%DTRIM = 0.
+                     EDGE_PG = U2D_GRID%CELL_EDGES_PG(IC, BOUNDCOLL)
+                     IF (EDGE_PG == 0 .OR. GRID_BC(EDGE_PG)%PARTICLE_BC == VACUUM) THEN
+                        REMOVE_PART(IP) = .TRUE.
+                        particles(IP)%DTRIM = 0.
+                     ELSE IF (GRID_BC(EDGE_PG)%PARTICLE_BC == SPECULAR) THEN
+                        VDOTN = particles(IP)%VX*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,1) &
+                              + particles(IP)%VY*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,2)
+                        particles(IP)%VX = particles(IP)%VX - 2.*VDOTN*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,1)
+                        particles(IP)%VY = particles(IP)%VY - 2.*VDOTN*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,2)
+                     END IF
                   ELSE
                      particles(IP)%IC = U2D_GRID%CELL_NEIGHBORS(IC, BOUNDCOLL)
                      IC = particles(IP)%IC

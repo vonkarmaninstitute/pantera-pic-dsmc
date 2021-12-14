@@ -602,8 +602,6 @@ MODULE grid_and_partition
 
       INTEGER, DIMENSION(2) :: WHICH1, WHICH2
 
-
-
       INTEGER :: NCELLSPP
 
       ! Open input file for reading
@@ -642,12 +640,13 @@ MODULE grid_and_partition
 
             U2D_GRID%NUM_CELLS = NUM
          ELSE IF (LINE == 'NMARK=') THEN
-            ALLOCATE(U2D_GRID%PHYSICAL_GROUPS(NUM))
-            U2D_GRID%NUM_PHYSGROUPS = NUM
 
             ! Assign physical groups to cell edges.
             ALLOCATE(U2D_GRID%CELL_EDGES_PG(U2D_GRID%NUM_CELLS, 3))
             U2D_GRID%CELL_EDGES_PG = 0
+
+            ALLOCATE(GRID_BC(NUM)) ! Append the physical group to the list
+            N_GRID_BC = NUM
 
             DO I = 1, NUM
                
@@ -657,7 +656,9 @@ MODULE grid_and_partition
                ELSE
                   WRITE(*,*) 'Found marker tag, with groupname: ', GROUPNAME
                END IF
-               U2D_GRID%PHYSICAL_GROUPS(I) = GROUPNAME
+      
+               GRID_BC(I)%PHYSICAL_GROUP_NAME = GROUPNAME
+         
                
                READ(in5,*, IOSTAT=ReasonEOF) LINE, NUMELEMS
                IF (LINE .NE. 'MARKER_ELEMS=') THEN

@@ -150,18 +150,18 @@ MODULE grid_and_partition
       ! The domain partition is thus in strips along the "x" axis, as the cells are assumed 
       ! to be numbered along x.
          IF (GRID_TYPE == UNSTRUCTURED) THEN
-            NCELLS = U2D_GRID%NUM_CELLS
+            IDPROC = U2D_GRID%CELL_PROC(IDCELL)
          ELSE
             NCELLS = NX*NY
-         END IF
-         NCELLSPP = CEILING(REAL(NCELLS)/REAL(N_MPI_THREADS))
+            
+            NCELLSPP = CEILING(REAL(NCELLS)/REAL(N_MPI_THREADS))
 
-         ! 3) Here is the process ID 
-         IDPROC   = INT((IDCELL-1)/NCELLSPP) ! Before was giving wrong result for peculiar combinations of NCELLS and NCELLSPP
-         IF (IDPROC .GT. N_MPI_THREADS-1 .OR. IDPROC .LT. 0) THEN
-            WRITE(*,*) 'Error! PROC_FROM_CELL returned proc:', IDPROC
+            ! 3) Here is the process ID 
+            IDPROC   = INT((IDCELL-1)/NCELLSPP) ! Before was giving wrong result for peculiar combinations of NCELLS and NCELLSPP
+            IF (IDPROC .GT. N_MPI_THREADS-1 .OR. IDPROC .LT. 0) THEN
+               WRITE(*,*) 'Error! PROC_FROM_CELL returned proc:', IDPROC
+            END IF
          END IF
-
 
       ELSE IF (DOMPART_TYPE == 1) THEN ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ B L O C K S
       !
@@ -604,6 +604,12 @@ MODULE grid_and_partition
 
       INTEGER :: NCELLSPP
 
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CENTROID
+      INTEGER, DIMENSION(:), ALLOCATABLE      :: ORDER
+      INTEGER :: IMIN, TEMP1
+      REAL(KIND=8) :: TEMP2
+
+
       ! Open input file for reading
       OPEN(UNIT=in5,FILE=FILENAME, STATUS='old',IOSTAT=ios)
 
@@ -754,12 +760,6 @@ MODULE grid_and_partition
       !   WRITE(*,*) 'Cell ', I, ' neighbors cells ', TEMP_CELL_NEIGHBORS(I, :)
       !END DO
 
-      ! Distributing cells over MPI processes
-      NCELLSPP = CEILING(REAL(U2D_GRID%NUM_CELLS)/REAL(N_MPI_THREADS))
-      ALLOCATE(U2D_GRID%CELL_PROC(U2D_GRID%NUM_CELLS))
-      DO I = 1, U2D_GRID%NUM_CELLS
-         U2D_GRID%CELL_PROC(I) = INT((I-1)/NCELLSPP)
-      END DO
 
       ! Compute cell edge normals
       IND(1,:) = [1,2]
@@ -802,7 +802,42 @@ MODULE grid_and_partition
 
       END DO
 
+      WRITE(*,*) '==========================================='
+      WRITE(*,*) 'Partitioning domain.'
+      WRITE(*,*) '==========================================='
 
+      ALLOCATE(CENTROID(U2D_GRID%NUM_CELLS))
+      DO I = 1, U2D_GRID%NUM_CELLS
+         CENTROID(I) = (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,1), 2) &
+                     +  U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,2), 2) &
+                     +  U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,3), 2)) / 3.
+      END DO
+
+      ALLOCATE(ORDER(U2D_GRID%NUM_CELLS))
+
+      DO I = 1, U2D_GRID%NUM_CELLS
+         ORDER(I) = I
+      END DO
+      DO I = 1, U2D_GRID%NUM_CELLS-1
+         ! find ith smallest in 'a'
+         IMIN = MINLOC(CENTROID(I:), 1) + I - 1
+         ! swap to position i in 'a' and 'b', if not already there
+         IF (IMIN .NE. I) THEN
+            TEMP2 = CENTROID(I); CENTROID(I) = CENTROID(IMIN); CENTROID(IMIN) = TEMP2
+            TEMP1 = ORDER(I); ORDER(I) = ORDER(IMIN); ORDER(IMIN) = TEMP1
+         END IF
+      END DO
+
+      DEALLOCATE(CENTROID)
+
+      ! Distributing cells over MPI processes
+      NCELLSPP = CEILING(REAL(U2D_GRID%NUM_CELLS)/REAL(N_MPI_THREADS))
+      ALLOCATE(U2D_GRID%CELL_PROC(U2D_GRID%NUM_CELLS))
+      DO I = 1, U2D_GRID%NUM_CELLS
+         U2D_GRID%CELL_PROC(ORDER(I)) = INT((I-1)/NCELLSPP)
+      END DO
+
+      DEALLOCATE(ORDER)
 
    END SUBROUTINE READ_UNSTRUCTURED_GRID_SU2
 

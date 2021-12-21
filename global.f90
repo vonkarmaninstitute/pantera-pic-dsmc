@@ -74,7 +74,9 @@ MODULE global
 
    TYPE(UNSTRUCTURED_GRID_DATA_STRUCTURE) :: U2D_GRID
 
-   CHARACTER*256 :: MESH_FILENAME = 'meshtestfine.su2'
+   !CHARACTER*256 :: MESH_FILENAME = 'meshlofthousecoarse.su2'
+   CHARACTER*256 :: MESH_FILENAME = 'meshlofthousenew.su2'
+   !CHARACTER*256 :: MESH_FILENAME = 'meshtestfine.su2'
 
 
    INTEGER         :: N_GRID_BC = 0
@@ -86,10 +88,29 @@ MODULE global
    TYPE BOUNDARY_CONDITION_DATA_STRUCTURE
       CHARACTER(LEN=256)     :: PHYSICAL_GROUP_NAME
       INTEGER(KIND(VACUUM))  :: PARTICLE_BC = VACUUM
+
+      REAL(KIND=8) :: WALL_TEMP
    END TYPE BOUNDARY_CONDITION_DATA_STRUCTURE
 
    TYPE(BOUNDARY_CONDITION_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: GRID_BC
 
+
+
+   TYPE EMIT_TASK_DATA_STRUCTURE
+      REAL(KIND=8) :: NRHO
+      REAL(KIND=8) :: UX, UY, UZ
+      REAL(KIND=8) :: TTRA, TROT, TVIB
+      REAL(KIND=8) :: S_NORM
+      INTEGER      :: MIX_ID
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: NFS
+      INTEGER      :: IC
+      INTEGER      :: IV1, IV2
+      INTEGER      :: IEDGE
+   END TYPE EMIT_TASK_DATA_STRUCTURE
+
+   TYPE(EMIT_TASK_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: EMIT_TASKS
+   INTEGER :: N_EMIT_TASKS
+   
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Electromagnetic fields !!!!!!!!!!!!!!!!!!!!!!!!!!!!!

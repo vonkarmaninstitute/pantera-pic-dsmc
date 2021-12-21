@@ -81,6 +81,81 @@ MODULE collisions
    
    END SUBROUTINE DSMC_COLLISIONS
 
+
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE DSMC_COLLISIONS_UNSTRUCTURED -> Computes DSMC collisions on the unstructured grid  !
+   ! Called by TIME_LOOP if DSMC collisions are active                                             !
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+   SUBROUTINE DSMC_COLLISIONS_UNSTRUCTURED 
+
+      ! First, reorder particles
+      ! IND => index of particle in particle array, indexed by particles I own and sorted by cells
+      ! NPC => number of particles in cell, indexed by cell index (a block length for IND) 
+      ! could this be indexed by all cells? for those that I don't own, NPC will turn out to be 0.
+      ! + would simplify significantly,
+      ! - could be up to about 50 times bigger
+      ! + it's just a list of integers
+      ! --->  I am gonna try and in case revert back.
+      ! IOF => index (for IND) of first particle in a cell (an offset in IND)
+      
+      INTEGER, DIMENSION(:), ALLOCATABLE :: NPC, IOF
+      INTEGER, DIMENSION(:), ALLOCATABLE :: IND
+      INTEGER                            :: JP, JC, NCELLS, IDX
+      INTEGER                            :: NCOLLREAL
+
+      ALLOCATE(NPC(U2D_GRID%NUM_CELLS))
+      ALLOCATE(IOF(U2D_GRID%NUM_CELLS))
+
+      ! Count the number of particles in each cell, to allocate arrays later
+      NPC = 0
+      DO JP = 1, NP_PROC
+         JC = particles(JP)%IC
+         NPC(JC) = NPC(JC) + 1
+      END DO
+
+      NCELLS = U2D_GRID%NUM_CELLS
+
+      ! Fill the array of offsets (IOF). IOF(IC) is the the index of the first
+      ! particle in cell IP
+      IOF = -1
+      IDX = 1
+      DO JC = 1, NCELLS
+         IF (NPC(JC) .NE. 0) THEN
+            IOF(JC) = IDX
+            IDX = IDX + NPC(JC)
+         END IF
+      END DO
+
+      ! Allocate and fill the array of indices (IND). IND(IP) is the particle index (for the "particles" array)
+      ! but ordered by cells, with offsets given by IND(IC) and stride length NPC(IC)
+      ALLOCATE(IND(NP_PROC))
+   
+      NPC = 0
+      DO JP = 1, NP_PROC
+         JC = particles(JP)%IC
+         IND(IOF(JC) + NPC(JC)) = JP
+         NPC(JC) = NPC(JC) + 1
+      END DO
+   
+      ! Compute collisions between particles
+      TIMESTEP_COLL = 0
+      DO JC = 1, NCELLS
+         IF (NPC(JC) .GT. 1) THEN
+            ! For cells where there is at least two particles, call the collision procedure.
+            CALL VSS_COLLIS(JC, NPC, IOF, IND, NCOLLREAL)
+            ! Add to the total number of collisions for this process
+            TIMESTEP_COLL = TIMESTEP_COLL + NCOLLREAL
+         END IF
+      END DO
+   
+      !WRITE(*,*) 'Number of real collisions: ', TIMESTEP_COLL
+      DEALLOCATE(NPC)
+      DEALLOCATE(IOF)
+      DEALLOCATE(IND)
+   
+   END SUBROUTINE DSMC_COLLISIONS_UNSTRUCTURED
+
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE VSS_COLLIS -> Compute collisions with VSS model !!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

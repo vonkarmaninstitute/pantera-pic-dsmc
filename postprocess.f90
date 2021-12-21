@@ -479,7 +479,7 @@ MODULE postprocess
          END IF
 
          ALLOCATE(CELL_PROC_ID(NCELLS))
-         DO I = 0, NCELLS
+         DO I = 1, NCELLS
             CALL PROC_FROM_CELL(i, JPROC)
             CELL_PROC_ID(i) = JPROC
          END DO

@@ -11,7 +11,7 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 ! ========= Computational domain and grid ===========
-Dimensions:
+Dimensiomeshtestns:
     2
 Axisymmetric:
     .FALSE.
@@ -45,11 +45,11 @@ Fluxes_dump_output:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.e0
+    1.e13
 Timestep:
-    1.0e-5
+    1.0e-6
 Number_of_timesteps:
-    300
+    10000
 Stats_every:
     1
 
@@ -63,9 +63,9 @@ Binary_output:
 Dump_grid_start:
     0
 Dump_grid_avgevery:
-    1
+    10
 Dump_grid_numavgs:
-    1
+    100
 
 Perform_checks:
     .FALSE.
@@ -73,16 +73,16 @@ Perform_checks:
 ! ========= Multispecies ==============================
 
 Species_file:
-    airbasic.species
+    arsimple.species
     
 Def_mixture:
-    Aria N2 1.0
+    Argon Ar 1.0
     
     
 ! ========= Collisions ==============================
 
 Collision_type: ! [MCC / DSMC / NONE]
-  NONE 
+  DSMC 
 
 MCC_background_dens:
   1.0e20
@@ -92,10 +92,10 @@ MCC_species: ! NOT IMPLEMENTED YET!
 
 ! DSMC VHS collisions  ! NOT IMPLEMENTED YET!
 
-!DSMC_collisions_mixture:
-!    collmix
-!VSS_parameters_file:
-!    ar.vss
+DSMC_collisions_mixture:
+    Argon
+VSS_parameters_file:
+    arsimple.vss
 
 Thermal_bath_bool:
     .FALSE.
@@ -114,7 +114,7 @@ Thermal_bath_Ttr:
 ! ========= Initial particle seed ===================
 
 Initial_particles_bool:
-    .TRUE.
+    .FALSE.
 Initial_particles_dens:
     1.e5
 Initial_particles_vel:
@@ -126,73 +126,22 @@ Initial_particles_Trot:
 Initial_particles_Tvib:
     0. 
 Initial_particles_mixture:
-    Aria
-! ========== Injection from boundaries ==============
-
-Boundaries_inject_bool:
-    .FALSE.
-
-Boundaries_inject_which_bool:        ! From which boundary you want to inject particles
-    .FALSE.  .FALSE.  .FALSE.  .FALSE. 
-Boundaries_inject_dens:
-    1.0e19
-Boundaries_inject_vel:
-    0. 0. 0.
-Boundaries_inject_Ttra:
-    273.0
-Boundaries_inject_Trot:
-    0.
-Boundaries_inject_mixture:
-    Aria
-! ========== Injection from line source =============
-
-Linesource_bool:
-    .FALSE.
-Linesource_center:
-    0.5   0.
-Linesource_length_y:
-    0.2
-Linesource_dens:
-    1.e24
-Linesource_vel:
-    200.  0. 0.
-Linesource_Ttra:
-    0.0001
-Linesource_Trot:
-    0.
-
-!   x1        y1     x2        y2       n         vx        vy     vz     Ttr       Trot   mix
-!Linesource:
-!    0.099999  1     0.099999   0        1e10      -5e6      0.0    0.0    5500.0    0.0   Electrons
-!Linesource:
-!    0.2001    0.0    0.2001    0.015    7.9e12    0.0       0.0    0.0    5802.0    0.0    Electrons
+    Argon
 
 
 
-! Bordo
-!Linesource:
-!    0.0    0.0    -0.5    0.5    1.0e6    0.0    0.0    0.0    300.0    300.0    Aria
-
-!Linesource:
-!    -0.5    0.4999    0.5    0.4999    1.0e15    0.0    0.0    0.0    300.0    300.0    Aria
-
-!Linesource:
-!    0.4999    0.5    0.4999    0.0    1.0e15    0.0    0.0    0.0    300.0    300.0    Aria
-
-
-!   x1     y1     x2     y2      T        specular   diffuse    porous     tau    react
-!Wall:
-!    0.2    0.0    0.2    0.05    300.0    .FALSE.    .FALSE.    .FALSE.    0.0    .TRUE.
-
-!Wall:
-!    0.2    0.05   0.1    0.05    300.0    .FALSE.    .FALSE.    .FALSE.    0.0    .TRUE.
-   
-!Wall:
-!    0.1    0.05   0.1    0.0     300.0    .FALSE.    .FALSE.    .FALSE.    0.0    .TRUE.
-   
 
 Boundary_condition:
-    Inlet    specular
+    Symmetry    specular
+
+Boundary_condition:
+    Cylinder    diffuse    1500.0
+
+Boundary_condition:
+    Flow    vacuum
+    
+Boundary_emit:
+    Flow    Argon    1.699e19    6585.0    0.0    0.0    200.0    200.0    200.0
 
     
 ! ========= MPI parallelization =====================
@@ -210,4 +159,3 @@ Partition_style:
 
 Partition_num_blocks:
     3  3
-

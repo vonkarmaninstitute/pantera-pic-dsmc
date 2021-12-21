@@ -76,6 +76,7 @@ MODULE timecycle
 
          CALL BOUNDARIES_INJECT
          CALL LINE_SOURCE_INJECT
+         CALL BOUNDARIES_EMIT
 
          ! ########### Advect particles ############################################
 
@@ -89,7 +90,8 @@ MODULE timecycle
 
          IF (BOOL_MCC)  CALL MCC_COLLISIONS
 
-         IF (BOOL_DSMC) CALL DSMC_COLLISIONS
+         IF (BOOL_DSMC .AND. GRID_TYPE .NE. UNSTRUCTURED) CALL DSMC_COLLISIONS
+         IF (BOOL_DSMC .AND. GRID_TYPE == UNSTRUCTURED) CALL DSMC_COLLISIONS_UNSTRUCTURED
 
          IF (BOOL_BGK) CALL BGK_COLLISIONS
 
@@ -138,6 +140,80 @@ MODULE timecycle
  
 
 
+   SUBROUTINE BOUNDARIES_EMIT
+  
+      IMPLICIT NONE
+   
+      INTEGER      :: IP, IC, IS, NFS, ITASK
+      REAL(KIND=8) :: DTFRAC, Vdummy, V_NORM, V_PARA, X1, X2, Y1, Y2, R, NORMX, NORMY
+      REAL(KIND=8) :: X, Y, Z, VX, VY, VZ, EROT, EVIB 
+      TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
+   
+      INTEGER :: S_ID
+      REAL(KIND=8) :: M
+
+      TYPE(EMIT_TASK_DATA_STRUCTURE) :: EMIT_TASK
+
+      DO ITASK = 1, N_EMIT_TASKS
+         EMIT_TASK = EMIT_TASKS(ITASK)
+
+         X1 = U2D_GRID%NODE_COORDS(EMIT_TASK%IV1, 1)
+         Y1 = U2D_GRID%NODE_COORDS(EMIT_TASK%IV1, 2)
+         X2 = U2D_GRID%NODE_COORDS(EMIT_TASK%IV2, 1)
+         Y2 = U2D_GRID%NODE_COORDS(EMIT_TASK%IV2, 2)
+
+         IC = EMIT_TASK%IC
+
+         DO IS = 1, MIXTURES(EMIT_TASK%MIX_ID)%N_COMPONENTS ! Loop on mixture components
+
+            S_ID = MIXTURES(EMIT_TASK%MIX_ID)%COMPONENTS(IS)%ID
+            M = SPECIES(S_ID)%MOLECULAR_MASS
+            NFS = FLOOR(EMIT_TASK%NFS(IS))
+            IF (EMIT_TASK%NFS(IS)-REAL(NFS, KIND=8) .GE. rf()) THEN ! Same as SPARTA's perspeciess
+               NFS = NFS + 1
+            END IF
+
+
+            DO IP = 1, NFS ! Loop on particles to be injected
+
+               CALL MAXWELL(0.d0, 0.d0, 0.d0, &
+                           EMIT_TASK%TTRA, EMIT_TASK%TTRA, EMIT_TASK%TTRA, &
+                           Vdummy, V_PARA, VZ, M)
+
+               CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, EMIT_TASK%TROT, EROT)
+               CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, EMIT_TASK%TVIB, EVIB)
+
+               V_NORM = FLX(EMIT_TASK%S_NORM, EMIT_TASK%TTRA, M)
+
+               NORMX = -U2D_GRID%EDGE_NORMAL(EMIT_TASK%IC,EMIT_TASK%IEDGE,1)
+               NORMY = -U2D_GRID%EDGE_NORMAL(EMIT_TASK%IC,EMIT_TASK%IEDGE,2)
+
+               VX = V_NORM*NORMX - V_PARA*NORMY + EMIT_TASK%UX
+               VY = V_PARA*NORMX + V_NORM*NORMY + EMIT_TASK%UY
+               VZ = VZ + EMIT_TASK%UZ
+
+               DTFRAC = rf()*DT
+
+               R = rf()
+               
+               X = X1 + R*(X2-X1)
+               Y = Y1 + R*(Y2-Y1)
+               Z = ZMIN + (ZMAX-ZMIN)*rf()
+
+               ! Init a particle object and assign it to the local vector of particles
+               CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EROT,EVIB,S_ID,IC,DTFRAC,  particleNOW)
+               CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles)
+
+            END DO
+
+         END DO
+      END DO
+
+   END SUBROUTINE BOUNDARIES_EMIT
+
+
+
+   ! Should not be used in unstructured.
    SUBROUTINE LINE_SOURCE_INJECT
   
       IMPLICIT NONE
@@ -245,7 +321,7 @@ MODULE timecycle
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE BOUNDARIES_INJECT -> Injects particles from domain borders !!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
- 
+   ! Deprecated.
    SUBROUTINE BOUNDARIES_INJECT
    
       IMPLICIT NONE
@@ -443,7 +519,7 @@ MODULE timecycle
       LOGICAL, DIMENSION(:), ALLOCATABLE :: REMOVE_PART
       REAL(KIND=8), DIMENSION(3) :: V_OLD, V_NEW
       REAL(KIND=8), DIMENSION(3) :: E, B
-      REAL(KIND=8) :: V_NORM, V_PERP, VZ, VDUMMY, EROT, EVIB, VDOTN
+      REAL(KIND=8) :: V_NORM, V_PARA, V_PERP, VZ, VDUMMY, EROT, EVIB, VDOTN, WALL_TEMP
       INTEGER :: S_ID
       LOGICAL :: HASCOLLIDED
       REAL(KIND=8) :: XCOLL, YCOLL, COLLDIST
@@ -542,10 +618,11 @@ MODULE timecycle
             ! ______ ADVECTION ______
 
             IF (GRID_TYPE == UNSTRUCTURED) THEN
+               !WRITE(*,*) 'Moving particle ', IP, ' for ', DTCOLL, ' s. Position: ', particles(IP)%X, particles(IP)%Y,&
+               !' velocity: ', particles(IP)%VX, particles(IP)%VY
                ! For unstructured, we only need to check the boundaries of the cell.
                BOUNDCOLL = -1
                DO I = 1, 3
-                  !IF ((IC .LT. 1) .OR. (IC .GT. U2D_GRID%NUM_CELLS)) WRITE(*,*) 'IC WAS: ', IC
                   VN = particles(IP)%VX * U2D_GRID%EDGE_NORMAL(IC,I,1) &
                      + particles(IP)%VY * U2D_GRID%EDGE_NORMAL(IC,I,2)
                   ! Compute the distance from the boundary
@@ -569,14 +646,38 @@ MODULE timecycle
                   ! Move to new cell
                   IF (U2D_GRID%CELL_NEIGHBORS(IC, BOUNDCOLL) == -1) THEN
                      EDGE_PG = U2D_GRID%CELL_EDGES_PG(IC, BOUNDCOLL)
-                     IF (EDGE_PG == 0 .OR. GRID_BC(EDGE_PG)%PARTICLE_BC == VACUUM) THEN
+                     IF (EDGE_PG .NE. -1) THEN
+                        IF (GRID_BC(EDGE_PG)%PARTICLE_BC == SPECULAR) THEN
+                           VDOTN = particles(IP)%VX*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,1) &
+                                 + particles(IP)%VY*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,2)
+                           particles(IP)%VX = particles(IP)%VX - 2.*VDOTN*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,1)
+                           particles(IP)%VY = particles(IP)%VY - 2.*VDOTN*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,2)
+                        ELSE IF (GRID_BC(EDGE_PG)%PARTICLE_BC == DIFFUSE) THEN
+                           S_ID = particles(IP)%S_ID
+                           WALL_TEMP = GRID_BC(EDGE_PG)%WALL_TEMP
+                           CALL MAXWELL(0.d0, 0.d0, 0.d0, &
+                           WALL_TEMP, WALL_TEMP, WALL_TEMP, &
+                           VDUMMY, V_PARA, VZ, SPECIES(S_ID)%MOLECULAR_MASS)
+
+                           CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, WALL_TEMP, EROT)
+                           CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, WALL_TEMP, EVIB)
+                                          
+                           V_PERP = FLX(0.d0, WALL_TEMP, SPECIES(S_ID)%MOLECULAR_MASS)
+
+                           particles(IP)%VX = - V_PERP*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,1) &
+                                            - V_PARA*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,2)
+                           particles(IP)%VY = - V_PERP*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,2) &
+                                            + V_PARA*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,1)
+                           particles(IP)%VZ = VZ
+                           particles(IP)%EROT = EROT
+                           particles(IP)%EVIB = EVIB
+                        ELSE
+                           REMOVE_PART(IP) = .TRUE.
+                           particles(IP)%DTRIM = 0.d0
+                        END IF
+                     ELSE
                         REMOVE_PART(IP) = .TRUE.
-                        particles(IP)%DTRIM = 0.
-                     ELSE IF (GRID_BC(EDGE_PG)%PARTICLE_BC == SPECULAR) THEN
-                        VDOTN = particles(IP)%VX*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,1) &
-                              + particles(IP)%VY*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,2)
-                        particles(IP)%VX = particles(IP)%VX - 2.*VDOTN*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,1)
-                        particles(IP)%VY = particles(IP)%VY - 2.*VDOTN*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,2)
+                        particles(IP)%DTRIM = 0.d0
                      END IF
                   ELSE
                      particles(IP)%IC = U2D_GRID%CELL_NEIGHBORS(IC, BOUNDCOLL)

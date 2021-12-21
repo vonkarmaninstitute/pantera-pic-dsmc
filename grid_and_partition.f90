@@ -643,7 +643,7 @@ MODULE grid_and_partition
 
             ! Assign physical groups to cell edges.
             ALLOCATE(U2D_GRID%CELL_EDGES_PG(U2D_GRID%NUM_CELLS, 3))
-            U2D_GRID%CELL_EDGES_PG = 0
+            U2D_GRID%CELL_EDGES_PG = -1
 
             ALLOCATE(GRID_BC(NUM)) ! Append the physical group to the list
             N_GRID_BC = NUM
@@ -671,6 +671,8 @@ MODULE grid_and_partition
                   READ(in5,*, IOSTAT=ReasonEOF) ELEM_TYPE, V1, V2
                   IF (ELEM_TYPE .NE. 3) WRITE(*,*) 'Error! element type was not line.'
 
+                  V1 = V1 + 1
+                  V2 = V2 + 1
                   DO IC = 1, U2D_GRID%NUM_CELLS
                      IF ((U2D_GRID%CELL_NODES(IC, 1) == V1 .AND. U2D_GRID%CELL_NODES(IC, 2) == V2) .OR. &
                          (U2D_GRID%CELL_NODES(IC, 1) == V2 .AND. U2D_GRID%CELL_NODES(IC, 2) == V1)) THEN
@@ -781,6 +783,26 @@ MODULE grid_and_partition
       WRITE(*,*) '==========================================='
       WRITE(*,*) 'Done reading grid file.'
       WRITE(*,*) '==========================================='
+
+      WRITE(*,*) '==========================================='
+      WRITE(*,*) 'Checking ordering.'
+      WRITE(*,*) '==========================================='
+
+      DO I = 1, U2D_GRID%NUM_CELLS
+         X1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,2), 1) &
+            - U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,1), 1)
+         X2 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,3), 1) &
+            - U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,1), 1)
+         Y1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,2), 2) &
+            - U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,1), 2)
+         Y2 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,3), 2) &
+            - U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,1), 2)
+
+         IF (X1*Y2-X2*Y1 < 0) CALL ERROR_ABORT('2D mesh triangles have negative z-normal.')
+
+      END DO
+
+
 
    END SUBROUTINE READ_UNSTRUCTURED_GRID_SU2
 

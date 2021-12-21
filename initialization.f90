@@ -78,6 +78,12 @@ MODULE initialization
             READ(in1,'(A)') BC_DEFINITION
             CALL DEF_BOUNDARY_CONDITION(BC_DEFINITION)
          END IF
+
+         IF (line=='Boundary_emit:') THEN
+            READ(in1,'(A)') BC_DEFINITION
+            CALL DEF_BOUNDARY_EMIT(BC_DEFINITION)
+         END IF
+
          ! ~~~~~~~~~~~~~  Numerical settings  ~~~~~~~~~~~~~~~~~
          IF (line=='Fnum:')                    READ(in1,*) FNUM
          IF (line=='Bool_radial_weighting:')   READ(in1,*) BOOL_RADIAL_WEIGHTING
@@ -432,7 +438,7 @@ MODULE initialization
          NAME, MOLWT, MOLECULAR_MASS, ROTDOF, ROTREL, VIBDOF, VIBREL, VIBTEMP, SPWT, CHARGE
       
          ALLOCATE(TEMP_SPECIES(N_SPECIES+1)) ! Append the species to the list
-         TEMP_SPECIES(1:N_SPECIES) = SPECIES
+         TEMP_SPECIES(1:N_SPECIES) = SPECIES(1:N_SPECIES)
          CALL MOVE_ALLOC(TEMP_SPECIES, SPECIES)
          N_SPECIES = N_SPECIES + 1
 
@@ -778,7 +784,7 @@ MODULE initialization
 
 
       ALLOCATE(TEMP_MIXTURES(N_MIXTURES+1)) ! Append the mixture to the list
-      TEMP_MIXTURES(1:N_MIXTURES) = MIXTURES
+      TEMP_MIXTURES(1:N_MIXTURES) = MIXTURES(1:N_MIXTURES)
       CALL MOVE_ALLOC(TEMP_MIXTURES, MIXTURES)
       N_MIXTURES = N_MIXTURES + 1
 
@@ -902,6 +908,7 @@ MODULE initialization
          GRID_BC(IPG)%PARTICLE_BC = SPECULAR
       ELSE IF (STRARRAY(2) == 'diffuse') THEN
          GRID_BC(IPG)%PARTICLE_BC = DIFFUSE
+         READ(STRARRAY(3), '(ES14.0)') GRID_BC(IPG)%WALL_TEMP
       ELSE IF (STRARRAY(2) == 'axis') THEN
          GRID_BC(IPG)%PARTICLE_BC = AXIS
          ! Needs more info
@@ -917,6 +924,89 @@ MODULE initialization
 
 
    END SUBROUTINE DEF_BOUNDARY_CONDITION
+
+
+
+
+
+   SUBROUTINE DEF_BOUNDARY_EMIT(DEFINITION)
+
+      IMPLICIT NONE
+
+      CHARACTER(LEN=*), INTENT(IN) :: DEFINITION
+
+      INTEGER :: N_STR
+      CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
+
+      CHARACTER*64 :: MIX_NAME
+      INTEGER      :: MIX_ID, I, IC, IPG
+      TYPE(EMIT_TASK_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: TEMP_EMIT_TASKS
+
+      REAL(KIND=8) :: NRHO, UX, UY, UZ, TTRA, TROT, TVIB
+
+      CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
+
+      IPG = -1
+      DO I = 1, N_GRID_BC
+         IF (GRID_BC(I)%PHYSICAL_GROUP_NAME == STRARRAY(1)) IPG = I
+      END DO
+      IF (IPG == -1) CALL ERROR_ABORT('Error in boundary emit definition. Group name not found.')
+
+
+      READ(STRARRAY(2),'(A10)') MIX_NAME
+      READ(STRARRAY(3), '(ES14.0)') NRHO
+      READ(STRARRAY(4), '(ES14.0)') UX
+      READ(STRARRAY(5), '(ES14.0)') UY
+      READ(STRARRAY(6), '(ES14.0)') UZ
+      READ(STRARRAY(7), '(ES14.0)') TTRA
+      READ(STRARRAY(8),'(ES14.0)') TROT
+      READ(STRARRAY(9),'(ES14.0)') TVIB
+
+
+      MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
+
+      WRITE(*,*) 'Read boundary emit definition. Parameters: ', IPG, ', ', MIX_NAME, ', ', MIX_ID, ', ', NRHO, ', ',&
+       UX, ', ', UY, ', ', UZ, ', ', TTRA, ', ', TROT, ', ', TVIB
+
+      DO IC = 1, U2D_GRID%NUM_CELLS
+         DO I = 1, 3
+            IF (U2D_GRID%CELL_EDGES_PG(IC,I) == IPG) THEN
+               
+               ALLOCATE(TEMP_EMIT_TASKS(N_EMIT_TASKS+1)) ! Append the mixture to the list
+               TEMP_EMIT_TASKS(1:N_EMIT_TASKS) = EMIT_TASKS(1:N_EMIT_TASKS)
+               CALL MOVE_ALLOC(TEMP_EMIT_TASKS, EMIT_TASKS)
+               N_EMIT_TASKS = N_EMIT_TASKS + 1
+
+               EMIT_TASKS(N_EMIT_TASKS)%NRHO = NRHO
+               EMIT_TASKS(N_EMIT_TASKS)%UX = UX
+               EMIT_TASKS(N_EMIT_TASKS)%UY = UY
+               EMIT_TASKS(N_EMIT_TASKS)%UZ = UZ
+               EMIT_TASKS(N_EMIT_TASKS)%TTRA = TTRA
+               EMIT_TASKS(N_EMIT_TASKS)%TROT = TROT
+               EMIT_TASKS(N_EMIT_TASKS)%TVIB = TVIB
+               EMIT_TASKS(N_EMIT_TASKS)%MIX_ID = MIX_ID
+               EMIT_TASKS(N_EMIT_TASKS)%IC = IC
+               EMIT_TASKS(N_EMIT_TASKS)%IEDGE = I
+
+               IF (I == 1) THEN
+                  EMIT_TASKS(N_EMIT_TASKS)%IV1 = U2D_GRID%CELL_NODES(IC,1)
+                  EMIT_TASKS(N_EMIT_TASKS)%IV2 = U2D_GRID%CELL_NODES(IC,2)
+               ELSE IF (I == 2) THEN
+                  EMIT_TASKS(N_EMIT_TASKS)%IV1 = U2D_GRID%CELL_NODES(IC,2)
+                  EMIT_TASKS(N_EMIT_TASKS)%IV2 = U2D_GRID%CELL_NODES(IC,3)
+               ELSE
+                  EMIT_TASKS(N_EMIT_TASKS)%IV1 = U2D_GRID%CELL_NODES(IC,3)
+                  EMIT_TASKS(N_EMIT_TASKS)%IV2 = U2D_GRID%CELL_NODES(IC,1)
+               END IF
+
+               ! NFS WILL BE INITIALIZED LATER.
+            END IF
+         END DO
+      END DO      
+
+
+   END SUBROUTINE DEF_BOUNDARY_EMIT
+
 
 
    SUBROUTINE READ_REACTIONS(FILENAME)
@@ -1515,10 +1605,13 @@ MODULE initialization
       REAL(KIND=8) :: PI2  
 
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: nfs_LINE
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TASK_NFS
       !INTEGER, DIMENSION(:), ALLOCATABLE :: EMIT_COUNT
  
       REAL(KIND=8)  :: M, FRAC
-      INTEGER :: N_COMP, IS, S_ID, ILINE
+      INTEGER :: N_COMP, IS, S_ID, ILINE, ITASK
+
+      REAL(KIND=8) :: X1, X2, Y1, Y2
     
       PI2  = 2.*PI
 
@@ -1680,6 +1773,63 @@ MODULE initialization
 
          CALL MOVE_ALLOC(nfs_LINE, LINESOURCES(ILINE)%nfs)
      
+      END DO
+
+
+
+
+
+
+      ! =====================================================
+      ! Injection from unstructured grid boundaries
+
+      DO ITASK = 1, N_EMIT_TASKS ! Loop on line sources
+
+         N_COMP = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%N_COMPONENTS
+         
+         ALLOCATE(TASK_NFS(N_COMP))
+
+         X1 = U2D_GRID%NODE_COORDS(EMIT_TASKS(ITASK)%IV1, 1)
+         Y1 = U2D_GRID%NODE_COORDS(EMIT_TASKS(ITASK)%IV1, 2)
+         X2 = U2D_GRID%NODE_COORDS(EMIT_TASKS(ITASK)%IV2, 1)
+         Y2 = U2D_GRID%NODE_COORDS(EMIT_TASKS(ITASK)%IV2, 2)
+
+
+         DO IS = 1, N_COMP ! Loop on mixture components
+            ! The species ID of the component
+            S_ID = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%COMPONENTS(IS)%ID
+            M = SPECIES(S_ID)%MOLECULAR_MASS
+            FRAC = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%COMPONENTS(IS)%MOLFRAC
+            BETA = 1./SQRT(2.*KB/M*EMIT_TASKS(ITASK)%TTRA) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
+         
+            LINELENGTH = SQRT((X2-X1)**2 + (Y2-Y1)**2)
+
+            NORMX = -U2D_GRID%EDGE_NORMAL(EMIT_TASKS(ITASK)%IC, EMIT_TASKS(ITASK)%IEDGE, 1)
+            NORMY = -U2D_GRID%EDGE_NORMAL(EMIT_TASKS(ITASK)%IC, EMIT_TASKS(ITASK)%IEDGE, 2)
+
+            U_NORM = EMIT_TASKS(ITASK)%UX*NORMX + EMIT_TASKS(ITASK)%UY*NORMY ! Molecular speed ratio normal to boundary
+            S_NORM = U_NORM*BETA
+            EMIT_TASKS(ITASK)%S_NORM = S_NORM
+            Snow   = S_NORM     ! temp variable
+
+            FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) &
+                           + SQRT(PI)*Snow*(1.+ERF1(Snow)))      ! Tot number flux emitted
+
+            AREA = LINELENGTH*(ZMAX-ZMIN)
+
+            NtotINJECT = FLUXLINESOURCE*AREA*DT/FNUM         ! Tot num of particles to be injected
+
+            TASK_NFS(IS) = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
+            
+            ! Check: if we are hypersonic and stuff exits domain print a warning
+            IF (S_NORM .LE. -3.) THEN 
+               CALL ONLYMASTERPRINT1(PROC_ID, '$$$ Warning! Hypersonic boundary! Almost no &
+                                                   &particles will be emitted at boundary.')
+            END IF
+         END DO
+
+         CALL MOVE_ALLOC(TASK_NFS, EMIT_TASKS(ITASK)%NFS)
+
       END DO
 
 

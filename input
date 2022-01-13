@@ -11,12 +11,14 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 ! ========= Computational domain and grid ===========
-Dimensiomeshtestns:
+Dimensions:
     2
 Axisymmetric:
     .FALSE.
 Number_of_cells:
     1    1    1
+Mesh_file_SU2:
+    'why5.su2'
 Domain_limits:
     -10.0    10.0    -10.0    10.0    0.0    1.0
 Domain_periodicity:
@@ -29,7 +31,7 @@ Boundary_temperature:
     300.0
     
 Bool_PIC:
-    .FALSE.
+    .TRUE.
 
 Bool_dump_moments:
     .FALSE.
@@ -45,7 +47,7 @@ Fluxes_dump_output:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.e13
+    1.e15
 Timestep:
     1.0e-6
 Number_of_timesteps:
@@ -82,7 +84,7 @@ Def_mixture:
 ! ========= Collisions ==============================
 
 Collision_type: ! [MCC / DSMC / NONE]
-  DSMC 
+  NONE
 
 MCC_background_dens:
   1.0e20
@@ -132,17 +134,16 @@ Initial_particles_mixture:
 
 
 Boundary_condition:
-    Symmetry    specular
+    Bound    vacuum
 
 Boundary_condition:
-    Cylinder    diffuse    1500.0
+    Neum    vacuum
 
 Boundary_condition:
-    Flow    vacuum
-    
-Boundary_emit:
-    Flow    Argon    1.699e19    6585.0    0.0    0.0    200.0    200.0    200.0
+    Bound    dirichlet    11.1
 
+Boundary_condition:
+    Neum    neumann    0.0
     
 ! ========= MPI parallelization =====================
 ! == Style for MPI domain partition can be:

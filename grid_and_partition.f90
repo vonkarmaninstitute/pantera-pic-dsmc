@@ -569,8 +569,6 @@ MODULE grid_and_partition
          U2D_GRID%CELL_PROC(I) = INT((I-1)/NCELLSPP)
       END DO
 
-      GRID_TYPE = UNSTRUCTURED
-
       WRITE(*,*) '==========================================='
       WRITE(*,*) 'Done reading grid file.'
       WRITE(*,*) '==========================================='
@@ -778,7 +776,6 @@ MODULE grid_and_partition
          END DO
       END DO
 
-      GRID_TYPE = UNSTRUCTURED
 
       WRITE(*,*) '==========================================='
       WRITE(*,*) 'Done reading grid file.'

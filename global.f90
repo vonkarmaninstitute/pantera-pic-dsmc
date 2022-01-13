@@ -75,9 +75,12 @@ MODULE global
    TYPE(UNSTRUCTURED_GRID_DATA_STRUCTURE) :: U2D_GRID
 
    !CHARACTER*256 :: MESH_FILENAME = 'meshlofthousecoarse.su2'
-   CHARACTER*256 :: MESH_FILENAME = 'meshlofthousenew.su2'
+   !CHARACTER*256 :: MESH_FILENAME = 'meshlofthousenew.su2'
    !CHARACTER*256 :: MESH_FILENAME = 'meshtestfine.su2'
-
+   !CHARACTER*256 :: MESH_FILENAME = 'meshrectfine.su2'
+   !CHARACTER*256 :: MESH_FILENAME = 'meshtestbound.su2'
+   !CHARACTER*256 :: MESH_FILENAME = 'meshlh.su2'
+   CHARACTER*256 :: MESH_FILENAME
 
    INTEGER         :: N_GRID_BC = 0
 
@@ -85,11 +88,18 @@ MODULE global
       ENUMERATOR VACUUM, SPECULAR, DIFFUSE, AXIS, PERIODIC, EMIT
    END ENUM
 
+   ENUM, BIND(C)
+      ENUMERATOR DIRICHLET_BC, NEUMANN_BC, ROBIN_BC
+   END ENUM
+
    TYPE BOUNDARY_CONDITION_DATA_STRUCTURE
-      CHARACTER(LEN=256)     :: PHYSICAL_GROUP_NAME
-      INTEGER(KIND(VACUUM))  :: PARTICLE_BC = VACUUM
+      CHARACTER(LEN=256)       :: PHYSICAL_GROUP_NAME
+      INTEGER(KIND(VACUUM))    :: PARTICLE_BC = VACUUM
+      INTEGER(KIND(DIRICHLET_BC)) :: FIELD_BC = DIRICHLET_BC
 
       REAL(KIND=8) :: WALL_TEMP
+      REAL(KIND=8) :: WALL_POTENTIAL
+      REAL(KIND=8) :: WALL_EFIELD
    END TYPE BOUNDARY_CONDITION_DATA_STRUCTURE
 
    TYPE(BOUNDARY_CONDITION_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: GRID_BC
@@ -120,11 +130,12 @@ MODULE global
 
    INTEGER :: NPX, NPY
    REAL(KIND=8), DIMENSION(:, :, :), ALLOCATABLE :: E_FIELD
-   REAL(KIND=8), DIMENSION(:, :), ALLOCATABLE :: PHI_FIELD
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: PHI_FIELD
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: Q_FIELD
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: DIRICHLET
    LOGICAL, DIMENSION(:), ALLOCATABLE :: IS_DIRICHLET
-   
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: NEUMANN
+   LOGICAL, DIMENSION(:), ALLOCATABLE :: IS_NEUMANN   
 
    TYPE ST_MATRIX
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: VALUE
@@ -388,7 +399,7 @@ MODULE global
    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: AVG_MOMENTS
    LOGICAL                                   :: BOOL_DUMP_MOMENTS = .FALSE.
 
-   REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: AVG_PHI
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_PHI
 
 CONTAINS  ! @@@@@@@@@@@@@@@@@@@@@ SUBROUTINES @@@@@@@@@@@@@@@@@@@@@@@@
 
@@ -455,7 +466,18 @@ CONTAINS  ! @@@@@@@@@@@@@@@@@@@@@ SUBROUTINES @@@@@@@@@@@@@@@@@@@@@@@@
       TYPE(ST_MATRIX), INTENT(INOUT) :: THIS
       INTEGER, INTENT(IN) :: ROWIDX, COLIDX
       REAL(KIND=8), INTENT(IN) :: VAL
+      INTEGER :: I
 
+
+            ! Look if this entry is already in the matrix.
+      DO I = 0, THIS%NNZ-1
+         IF (THIS%RIDX(I) == ROWIDX .AND. THIS%CIDX(I) == COLIDX) THEN
+            THIS%VALUE(I) = VAL
+            RETURN
+         END IF
+      END DO
+
+      ! If it is not, add it at the end.
       THIS%RIDX(THIS%NNZ) = ROWIDX
       THIS%CIDX(THIS%NNZ) = COLIDX
       THIS%VALUE(THIS%NNZ) = VAL
@@ -463,6 +485,35 @@ CONTAINS  ! @@@@@@@@@@@@@@@@@@@@@ SUBROUTINES @@@@@@@@@@@@@@@@@@@@@@@@
       THIS%NNZ = THIS%NNZ + 1
 
    END SUBROUTINE ST_MATRIX_SET
+
+
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE ST_MATRIX_ADD -> Adds to an element of a previously     !
+   ! allocated sparse triplet matrix: THIS(ROWIDX,COLIDX)=VAL           !
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+   SUBROUTINE ST_MATRIX_ADD(THIS, ROWIDX, COLIDX, VAL)
+
+      TYPE(ST_MATRIX), INTENT(INOUT) :: THIS
+      INTEGER, INTENT(IN) :: ROWIDX, COLIDX
+      REAL(KIND=8), INTENT(IN) :: VAL
+      INTEGER :: I
+
+      ! Look if this entry is already in the matrix.
+      DO I = 0, THIS%NNZ-1
+         IF (THIS%RIDX(I) == ROWIDX .AND. THIS%CIDX(I) == COLIDX) THEN
+            THIS%VALUE(I) = THIS%VALUE(I) + VAL
+            RETURN
+         END IF
+      END DO
+
+      ! If it is not, add it at the end.
+      THIS%RIDX(THIS%NNZ) = ROWIDX
+      THIS%CIDX(THIS%NNZ) = COLIDX
+      THIS%VALUE(THIS%NNZ) = VAL
+      THIS%NNZ = THIS%NNZ + 1
+
+   END SUBROUTINE ST_MATRIX_ADD
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE ST_MATRIX_TO_CC -> Converts a sparse triplet matrix to  !

@@ -74,6 +74,12 @@ MODULE initialization
             GRID_TYPE = RECTILINEAR_NONUNIFORM
          END IF
 
+         IF (line=='Mesh_file_SU2:') THEN
+            READ(in1,*) MESH_FILENAME
+            CALL READ_UNSTRUCTURED_GRID_SU2(MESH_FILENAME)
+            GRID_TYPE = UNSTRUCTURED
+         END IF
+
          IF (line=='Boundary_condition:') THEN
             READ(in1,'(A)') BC_DEFINITION
             CALL DEF_BOUNDARY_CONDITION(BC_DEFINITION)
@@ -918,6 +924,13 @@ MODULE initialization
       ELSE IF (STRARRAY(2) == 'emit') THEN
          GRID_BC(IPG)%PARTICLE_BC = EMIT
          ! Needs more info
+      !!! Field BCs
+      ELSE IF (STRARRAY(2) == 'dirichlet') THEN
+         GRID_BC(IPG)%FIELD_BC = DIRICHLET_BC
+         READ(STRARRAY(3), '(ES14.0)') GRID_BC(IPG)%WALL_POTENTIAL
+      ELSE IF (STRARRAY(2) == 'neumann') THEN
+         GRID_BC(IPG)%FIELD_BC = NEUMANN_BC
+         READ(STRARRAY(3), '(ES14.0)') GRID_BC(IPG)%WALL_EFIELD
       ELSE
          CALL ERROR_ABORT('Error in boundary condition definition.')
       END IF
@@ -1558,13 +1571,17 @@ MODULE initialization
 
       IMPLICIT NONE
 
-      NPX = NX + 1
-      IF (DIMS == 2) THEN
-         NPY = NY + 1
+      IF (GRID_TYPE == UNSTRUCTURED) THEN
+         ALLOCATE(E_FIELD(U2D_GRID%NUM_CELLS, 1, 3))
       ELSE
-         NPY = 1
+         NPX = NX + 1
+         IF (DIMS == 2) THEN
+            NPY = NY + 1
+         ELSE
+            NPY = 1
+         END IF
+         ALLOCATE(E_FIELD(0:NPX-1, 0:NPY-1, 3))
       END IF
-      ALLOCATE(E_FIELD(0:NPX-1, 0:NPY-1, 3))
 
    END SUBROUTINE INITFIELDS
 

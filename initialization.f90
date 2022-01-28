@@ -101,6 +101,7 @@ MODULE initialization
          IF (line=='Stats_every:')             READ(in1,*) STATS_EVERY
          IF (line=='Bool_PIC:')                READ(in1,*) BOOL_PIC
          IF (line=='Epsilon_scaling:')         READ(in1,*) EPS_SCALING
+         IF (line=='PIC_implicit:')            READ(in1,*) BOOL_PIC_IMPLICIT
 
          ! ~~~~~~~~~~~~~  File output ~~~~~~~~~~~~~~~
 
@@ -895,7 +896,7 @@ MODULE initialization
 
       CHARACTER(LEN=*), INTENT(IN) :: DEFINITION
 
-      INTEGER :: N_STR, I, IPG
+      INTEGER :: N_STR, I, IPG, J, K
       CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
 
 
@@ -915,11 +916,10 @@ MODULE initialization
       ELSE IF (STRARRAY(2) == 'diffuse') THEN
          GRID_BC(IPG)%PARTICLE_BC = DIFFUSE
          READ(STRARRAY(3), '(ES14.0)') GRID_BC(IPG)%WALL_TEMP
+      ELSE IF (STRARRAY(2) == 'react') THEN
+         GRID_BC(IPG)%REACT = .TRUE.
       ELSE IF (STRARRAY(2) == 'axis') THEN
          GRID_BC(IPG)%PARTICLE_BC = AXIS
-         ! Needs more info
-      ELSE IF (STRARRAY(2) == 'periodic') THEN
-         GRID_BC(IPG)%PARTICLE_BC = PERIODIC
          ! Needs more info
       ELSE IF (STRARRAY(2) == 'emit') THEN
          GRID_BC(IPG)%PARTICLE_BC = EMIT
@@ -931,6 +931,20 @@ MODULE initialization
       ELSE IF (STRARRAY(2) == 'neumann') THEN
          GRID_BC(IPG)%FIELD_BC = NEUMANN_BC
          READ(STRARRAY(3), '(ES14.0)') GRID_BC(IPG)%WALL_EFIELD
+      !!! BCs for both particles and field
+      ELSE IF (STRARRAY(2) == 'periodic_master') THEN
+         GRID_BC(IPG)%PARTICLE_BC = PERIODIC_MASTER
+         GRID_BC(IPG)%FIELD_BC = PERIODIC_SLAVE_BC
+         READ(STRARRAY(3), '(ES14.0)') GRID_BC(IPG)%TRANSLATEVEC(1)
+         READ(STRARRAY(3), '(ES14.0)') GRID_BC(IPG)%TRANSLATEVEC(2)
+
+         ! DO J = 1, U2D_GRID%NUM_CELLS
+         !    DO K = 1, 3
+         !       IF (U2D_GRID%CELL_EDGES_PG(J, K) == IPG) THEN
+         !          ! This is the periodic edge. Find its corresponding neighbor.
+         !       END IF
+         !    END DO
+         ! END DO
       ELSE
          CALL ERROR_ABORT('Error in boundary condition definition.')
       END IF
@@ -1348,7 +1362,7 @@ MODULE initialization
          IF (GRID_TYPE == UNSTRUCTURED) THEN
             DO IC = 1, U2D_GRID%NUM_CELLS
                ! Compute number of particles of this species per process to be created in this cell.
-               NP_INIT = NINT(NRHO_INIT/(FNUM*SPECIES(S_ID)%SPWT)*CELL_VOLUMES(IC)* &
+               NP_INIT = RANDINT(NRHO_INIT/(FNUM*SPECIES(S_ID)%SPWT)*CELL_VOLUMES(IC)* &
                            MIXTURES(MIX_INIT)%COMPONENTS(i)%MOLFRAC/N_MPI_THREADS)
                IF (NP_INIT == 0) CYCLE
 
@@ -1573,6 +1587,7 @@ MODULE initialization
 
       IF (GRID_TYPE == UNSTRUCTURED) THEN
          ALLOCATE(E_FIELD(U2D_GRID%NUM_CELLS, 1, 3))
+         IF (BOOL_PIC_IMPLICIT) ALLOCATE(EBAR_FIELD(U2D_GRID%NUM_CELLS, 1, 3))
       ELSE
          NPX = NX + 1
          IF (DIMS == 2) THEN

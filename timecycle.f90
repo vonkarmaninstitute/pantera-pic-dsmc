@@ -32,6 +32,11 @@ MODULE timecycle
       IF (BOOL_PIC) THEN
          CALL DEPOSIT_CHARGE
          CALL SOLVE_POISSON
+         IF (BOOL_PIC_IMPLICIT) THEN
+            CALL DEPOSIT_CURRENT
+            CALL ASSEMBLE_AMPERE
+            CALL SOLVE_AMPERE
+         END IF
       END IF
       
       ! Dump particles and flowfield before the first time step, but after the initial seeding
@@ -100,8 +105,14 @@ MODULE timecycle
          ! ########### Compute poisson ##########################################
 
          IF (BOOL_PIC) THEN
-            CALL DEPOSIT_CHARGE
-            CALL SOLVE_POISSON
+            IF (BOOL_PIC_IMPLICIT) THEN
+               CALL DEPOSIT_CURRENT
+               CALL ASSEMBLE_AMPERE
+               CALL SOLVE_AMPERE
+            ELSE
+               CALL DEPOSIT_CHARGE
+               CALL SOLVE_POISSON
+            END IF
          END IF
 
          ! ########### Dump particles ##############################################
@@ -562,6 +573,8 @@ MODULE timecycle
          V_NEW(3) = particles(IP)%VZ
 
          IF (BOOL_PIC) THEN
+            !PHIBAR_FIELD = 0.d0
+            !EBAR_FIELD = 0.d0
             CALL APPLY_E_FIELD(IP, E)
             
 
@@ -648,11 +661,19 @@ MODULE timecycle
                      EDGE_PG = U2D_GRID%CELL_EDGES_PG(IC, BOUNDCOLL)
                      IF (EDGE_PG .NE. -1) THEN
                         IF (GRID_BC(EDGE_PG)%PARTICLE_BC == SPECULAR) THEN
+                           IF (GRID_BC(EDGE_PG)%REACT) THEN
+                              CALL WALL_REACT(IP, REMOVE_PART(IP))
+                           END IF
+                           
                            VDOTN = particles(IP)%VX*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,1) &
                                  + particles(IP)%VY*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,2)
                            particles(IP)%VX = particles(IP)%VX - 2.*VDOTN*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,1)
                            particles(IP)%VY = particles(IP)%VY - 2.*VDOTN*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,2)
                         ELSE IF (GRID_BC(EDGE_PG)%PARTICLE_BC == DIFFUSE) THEN
+                           IF (GRID_BC(EDGE_PG)%REACT) THEN
+                              CALL WALL_REACT(IP, REMOVE_PART(IP))
+                           END IF
+
                            S_ID = particles(IP)%S_ID
                            WALL_TEMP = GRID_BC(EDGE_PG)%WALL_TEMP
                            CALL MAXWELL(0.d0, 0.d0, 0.d0, &

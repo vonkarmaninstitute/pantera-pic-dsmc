@@ -4,6 +4,7 @@ MODULE fields
 
    USE mUMFPACK
    USE global
+   USE screen
 
    IMPLICIT NONE
 
@@ -35,7 +36,7 @@ MODULE fields
          SIZE = NPX*NPY
       END IF
 
-      ALLOCATE(Q_FIELD(0:SIZE-1))
+      ALLOCATE(RHS(0:SIZE-1))
       ALLOCATE(DIRICHLET(0:SIZE-1))
       ALLOCATE(IS_DIRICHLET(0:SIZE-1))
       IS_DIRICHLET = .FALSE.
@@ -345,7 +346,7 @@ MODULE fields
 
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   ! SUBROUTINE SOLVE_POISSON -> Solves the Poisson equation with the Q_FIELD RHS !
+   ! SUBROUTINE SOLVE_POISSON -> Solves the Poisson equation with the RHS RHS !
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    SUBROUTINE SOLVE_POISSON
@@ -374,8 +375,8 @@ MODULE fields
       ! Solve the linear system
       IF (PROC_ID .EQ. 0) THEN
          !WRITE(*,*) 'Solving poisson'
-         !WRITE(*,*) Q_FIELD
-         CALL S_UMFPACK_SOLVE(UMFPACK_A, A_CC%AP, A_CC%AI, A_CC%AX, X, Q_FIELD)
+         !WRITE(*,*) RHS
+         CALL S_UMFPACK_SOLVE(UMFPACK_A, A_CC%AP, A_CC%AI, A_CC%AX, X, RHS)
          !WRITE(*,*) 'Solution:'
          !WRITE(*,*) X
          !X = 0.d0
@@ -383,6 +384,7 @@ MODULE fields
  
       CALL MPI_BCAST(X, SIZE, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
       PHI_FIELD = X
+      PHIBAR_FIELD = X
       DEALLOCATE(X)
 
       ! Reshape the linear array into a 2D array
@@ -487,7 +489,7 @@ MODULE fields
 
       K = QE/(EPS0*EPS_SCALING**2) ! [V m] Elementary charge / Dielectric constant of vacuum
 
-      Q_FIELD = 1.d0
+      RHS = 0.d0
 
       DO JP = 1, NP_PROC
          CHARGE = SPECIES(particles(JP)%S_ID)%CHARGE
@@ -510,10 +512,11 @@ MODULE fields
             PSI1 = 0.5*( (Y2-Y3)*(XP-X3) - (X2-X3)*(YP-Y3))/VOL
             PSI2 = 0.5*(-(Y1-Y3)*(XP-X3) + (X1-X3)*(YP-Y3))/VOL
             PSI3 = 0.5*(-(Y2-Y1)*(XP-X1) + (X2-X1)*(YP-Y1))/VOL
-
-            Q_FIELD(V1-1) = Q_FIELD(V1-1) + K*PSI1
-            Q_FIELD(V2-1) = Q_FIELD(V2-1) + K*PSI2
-            Q_FIELD(V3-1) = Q_FIELD(V3-1) + K*PSI3
+            
+            RHO_Q = K*CHARGE*FNUM
+            RHS(V1-1) = RHS(V1-1) + RHO_Q*PSI1
+            RHS(V2-1) = RHS(V2-1) + RHO_Q*PSI2
+            RHS(V3-1) = RHS(V3-1) + RHO_Q*PSI3
 
          ELSE
 
@@ -531,13 +534,13 @@ MODULE fields
             RHO_Q = -K*CHARGE*CFNUM/VOL
 
             IF (DIMS == 2) THEN
-               Q_FIELD(INDICES(1)) = Q_FIELD(INDICES(1)) + RHO_Q * WEIGHTS(1)
-               Q_FIELD(INDICES(2)) = Q_FIELD(INDICES(2)) + RHO_Q * WEIGHTS(2)
-               Q_FIELD(INDICES(3)) = Q_FIELD(INDICES(3)) + RHO_Q * WEIGHTS(3)
-               Q_FIELD(INDICES(4)) = Q_FIELD(INDICES(4)) + RHO_Q * WEIGHTS(4)            
+               RHS(INDICES(1)) = RHS(INDICES(1)) + RHO_Q * WEIGHTS(1)
+               RHS(INDICES(2)) = RHS(INDICES(2)) + RHO_Q * WEIGHTS(2)
+               RHS(INDICES(3)) = RHS(INDICES(3)) + RHO_Q * WEIGHTS(3)
+               RHS(INDICES(4)) = RHS(INDICES(4)) + RHO_Q * WEIGHTS(4)            
             ELSE
-               Q_FIELD(INDICES(1)) = Q_FIELD(INDICES(1)) + RHO_Q * WEIGHTS(1)
-               Q_FIELD(INDICES(2)) = Q_FIELD(INDICES(2)) + RHO_Q * WEIGHTS(2)
+               RHS(INDICES(1)) = RHS(INDICES(1)) + RHO_Q * WEIGHTS(1)
+               RHS(INDICES(2)) = RHS(INDICES(2)) + RHO_Q * WEIGHTS(2)
             END IF
 
          END IF
@@ -551,20 +554,18 @@ MODULE fields
       END IF
 
       IF (PROC_ID .EQ. 0) THEN
-         CALL MPI_REDUCE(MPI_IN_PLACE, Q_FIELD, SIZE, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         CALL MPI_REDUCE(MPI_IN_PLACE, RHS, SIZE, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
       ELSE
-         CALL MPI_REDUCE(Q_FIELD,      Q_FIELD, SIZE, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         CALL MPI_REDUCE(RHS,          RHS, SIZE, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
       END IF
 
-      Q_FIELD = 1.d0
-
       DO I = 0, SIZE-1
-         IF (IS_DIRICHLET(I)) Q_FIELD(I)=DIRICHLET(I)
-         IF (IS_NEUMANN(I))   Q_FIELD(I)=NEUMANN(I)
+         IF (IS_DIRICHLET(I)) RHS(I)=DIRICHLET(I)
+         IF (IS_NEUMANN(I))   RHS(I)=NEUMANN(I)
       END DO
 
 
-      ! Q_FIELD = 0
+      ! RHS = 0
       ! ALLOCATE(Q_TEMP(NPX,NPY))
       ! Q_TEMP = 0
       ! DO I = NPX/4, 3*NPX/4
@@ -572,9 +573,392 @@ MODULE fields
       !       Q_TEMP(I,J) = 1.d0
       !    END DO
       ! END DO
-      ! Q_FIELD = PACK(Q_TEMP, .TRUE.)
+      ! RHS = PACK(Q_TEMP, .TRUE.)
 
    END SUBROUTINE DEPOSIT_CHARGE
+
+
+
+   SUBROUTINE ASSEMBLE_AMPERE
+
+      INTEGER :: STATUS
+      INTEGER :: I, J
+      INTEGER :: MAXNNZ, SIZE
+      TYPE(ST_MATRIX) :: A_ST
+      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA
+      INTEGER :: V1, V2, V3
+      INTEGER :: EDGE_PG
+      LOGICAL, DIMENSION(:), ALLOCATABLE :: IS_UNUSED
+      REAL(KIND=8) :: COEFF1, COEFF2, COEFF3, NORMX, NORMY, MM
+
+      IF (GRID_TYPE == UNSTRUCTURED) THEN
+         SIZE = U2D_GRID%NUM_NODES
+      ELSE
+         SIZE = NPX*NPY
+      END IF
+
+      IF (.NOT. ALLOCATED(RHS)) ALLOCATE(RHS(0:SIZE-1))
+      RHS = 0.d0
+
+      IF (.NOT. ALLOCATED(DIRICHLET)) ALLOCATE(DIRICHLET(0:SIZE-1))
+      IF (.NOT. ALLOCATED(IS_DIRICHLET)) ALLOCATE(IS_DIRICHLET(0:SIZE-1))
+      IS_DIRICHLET = .FALSE.
+
+      IF (.NOT. ALLOCATED(NEUMANN)) ALLOCATE(NEUMANN(0:SIZE-1))
+      NEUMANN = 0.d0
+      IF (.NOT. ALLOCATED(IS_NEUMANN)) ALLOCATE(IS_NEUMANN(0:SIZE-1))
+      IS_NEUMANN = .FALSE.
+
+
+      ! Create the matrix in Sparse Triplet format.
+  
+      CALL CC_MATRIX_DEALLOCATE(A_CC)
+      MAXNNZ = 10*SIZE
+      CALL ST_MATRIX_ALLOCATE(A_ST, MAXNNZ)
+
+      ! At this point, populate the matrix
+      IF (GRID_TYPE == UNSTRUCTURED) THEN
+         ALLOCATE(IS_UNUSED(0:SIZE-1))
+         IS_UNUSED = .TRUE.
+
+         DO I = 1, U2D_GRID%NUM_CELLS
+            V1 = U2D_GRID%CELL_NODES(I,1)
+            V2 = U2D_GRID%CELL_NODES(I,2)
+            V3 = U2D_GRID%CELL_NODES(I,3)
+            IS_UNUSED(V1-1) = .FALSE.; IS_UNUSED(V2-1) = .FALSE.; IS_UNUSED(V3-1) = .FALSE.
+            DO J = 1, 3
+               EDGE_PG = U2D_GRID%CELL_EDGES_PG(I, J)
+               IF (EDGE_PG .NE. -1) THEN
+                  IF (GRID_BC(EDGE_PG)%FIELD_BC == ROBIN_BC) THEN
+                     IF (J==1) THEN
+                        DIRICHLET(V1-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                        DIRICHLET(V2-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                        IS_DIRICHLET(V1-1) = .TRUE.; IS_DIRICHLET(V2-1) = .TRUE.
+                     ELSE IF (J==2) THEN
+                        DIRICHLET(V2-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                        DIRICHLET(V3-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                        IS_DIRICHLET(V2-1) = .TRUE.; IS_DIRICHLET(V3-1) = .TRUE.
+                     ELSE
+                        DIRICHLET(V3-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                        DIRICHLET(V1-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                        IS_DIRICHLET(V3-1) = .TRUE.; IS_DIRICHLET(V1-1) = .TRUE.
+                     END IF
+                  END IF
+
+                  IF (GRID_BC(EDGE_PG)%FIELD_BC == NEUMANN_BC) THEN
+                     IF (J==1) THEN
+                        IS_NEUMANN(V1-1) = .TRUE.; IS_NEUMANN(V2-1) = .TRUE.
+                     ELSE IF (J==2) THEN
+                        IS_NEUMANN(V2-1) = .TRUE.; IS_NEUMANN(V3-1) = .TRUE.
+                     ELSE
+                        IS_NEUMANN(V3-1) = .TRUE.; IS_NEUMANN(V1-1) = .TRUE.
+                     END IF
+                  END IF
+               END IF
+            END DO
+         END DO
+
+         IS_DIRICHLET(0) = .TRUE.
+         DIRICHLET(0) = 0.d0
+
+         DO I = 1, U2D_GRID%NUM_CELLS
+            AREA = CELL_VOLUMES(I)
+            V1 = U2D_GRID%CELL_NODES(I,1)
+            V2 = U2D_GRID%CELL_NODES(I,2)
+            V3 = U2D_GRID%CELL_NODES(I,3)            
+            X1 = U2D_GRID%NODE_COORDS(V1, 1)
+            X2 = U2D_GRID%NODE_COORDS(V2, 1)
+            X3 = U2D_GRID%NODE_COORDS(V3, 1)
+            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
+            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
+            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
+            K11 = 0.25*((Y2-Y3)**2 + (X2-X3)**2)/AREA
+            K22 = 0.25*((Y1-Y3)**2 + (X1-X3)**2)/AREA
+            K33 = 0.25*((Y2-Y1)**2 + (X2-X1)**2)/AREA
+            K12 =-0.25*((Y2-Y3)*(Y1-Y3) + (X2-X3)*(X1-X3))/AREA
+            K23 = 0.25*((Y1-Y3)*(Y2-Y1) + (X1-X3)*(X2-X1))/AREA
+            K13 =-0.25*((Y2-Y3)*(Y2-Y1) + (X2-X3)*(X2-X1))/AREA
+            MM = MASS_MATRIX(I)+1.
+
+            ! We need to ADD to a sparse matrix entry.
+            IF (IS_DIRICHLET(V1-1)) THEN
+               CALL ST_MATRIX_SET(A_ST, V1-1, V1-1, 1.d0)
+            ELSE IF (.NOT. IS_NEUMANN(V1-1)) THEN
+               CALL ST_MATRIX_ADD(A_ST, V1-1, V1-1, MM*K11)
+               CALL ST_MATRIX_ADD(A_ST, V1-1, V2-1, MM*K12)
+               CALL ST_MATRIX_ADD(A_ST, V1-1, V3-1, MM*K13)
+               RHS(V1-1) = RHS(V1-1) + PHI_FIELD(V1-1)*K11+PHI_FIELD(V2-1)*K12+PHI_FIELD(V3-1)*K13
+            END IF
+            IF (IS_DIRICHLET(V2-1)) THEN
+               CALL ST_MATRIX_SET(A_ST, V2-1, V2-1, 1.d0)
+            ELSE IF (.NOT. IS_NEUMANN(V2-1)) THEN
+               CALL ST_MATRIX_ADD(A_ST, V2-1, V1-1, MM*K12)
+               CALL ST_MATRIX_ADD(A_ST, V2-1, V3-1, MM*K23)
+               CALL ST_MATRIX_ADD(A_ST, V2-1, V2-1, MM*K22)
+               RHS(V2-1) = RHS(V2-1) + PHI_FIELD(V1-1)*K12+PHI_FIELD(V2-1)*K22+PHI_FIELD(V3-1)*K23
+            END IF
+            IF (IS_DIRICHLET(V3-1)) THEN
+               CALL ST_MATRIX_SET(A_ST, V3-1, V3-1, 1.d0)
+            ELSE IF (.NOT. IS_NEUMANN(V3-1)) THEN
+               CALL ST_MATRIX_ADD(A_ST, V3-1, V1-1, MM*K13)
+               CALL ST_MATRIX_ADD(A_ST, V3-1, V2-1, MM*K23)
+               CALL ST_MATRIX_ADD(A_ST, V3-1, V3-1, MM*K33)
+               RHS(V3-1) = RHS(V3-1) + PHI_FIELD(V1-1)*K13+PHI_FIELD(V2-1)*K23+PHI_FIELD(V3-1)*K33
+            END IF
+
+            DO J = 1, 3
+               EDGE_PG = U2D_GRID%CELL_EDGES_PG(I, J)
+               IF (EDGE_PG == -1) CYCLE
+               IF (GRID_BC(EDGE_PG)%FIELD_BC == NEUMANN_BC) THEN
+                  NORMX = U2D_GRID%EDGE_NORMAL(I,J,1)
+                  NORMY = U2D_GRID%EDGE_NORMAL(I,J,2)
+                  COEFF1 = 0.5*( (Y2-Y3)*NORMX - (X2-X3)*NORMY)/AREA
+                  COEFF2 = 0.5*(-(Y1-Y3)*NORMX + (X1-X3)*NORMY)/AREA
+                  COEFF3 = 0.5*(-(Y2-Y1)*NORMX + (X2-X1)*NORMY)/AREA
+
+                  IF (J==1) THEN
+                     IF (.NOT. IS_DIRICHLET(V1-1)) THEN
+                        CALL ST_MATRIX_ADD(A_ST, V1-1, V1-1, COEFF1)
+                        CALL ST_MATRIX_ADD(A_ST, V1-1, V2-1, COEFF2)
+                        CALL ST_MATRIX_ADD(A_ST, V1-1, V3-1, COEFF3)
+                        NEUMANN(V1-1) = NEUMANN(V1-1) + GRID_BC(EDGE_PG)%WALL_EFIELD
+                     END IF
+                     IF (.NOT. IS_DIRICHLET(V2-1)) THEN
+                        CALL ST_MATRIX_ADD(A_ST, V2-1, V1-1, COEFF1)
+                        CALL ST_MATRIX_ADD(A_ST, V2-1, V2-1, COEFF2)
+                        CALL ST_MATRIX_ADD(A_ST, V2-1, V3-1, COEFF3)
+                        NEUMANN(V2-1) = NEUMANN(V2-1) + GRID_BC(EDGE_PG)%WALL_EFIELD
+                     END IF                     
+                  ELSE IF (J==2) THEN
+                     IF (.NOT. IS_DIRICHLET(V2-1)) THEN
+                        CALL ST_MATRIX_ADD(A_ST, V2-1, V1-1, COEFF1)
+                        CALL ST_MATRIX_ADD(A_ST, V2-1, V2-1, COEFF2)
+                        CALL ST_MATRIX_ADD(A_ST, V2-1, V3-1, COEFF3)
+                        NEUMANN(V2-1) = NEUMANN(V2-1) + GRID_BC(EDGE_PG)%WALL_EFIELD
+                     END IF
+                     IF (.NOT. IS_DIRICHLET(V3-1)) THEN
+                        CALL ST_MATRIX_ADD(A_ST, V3-1, V1-1, COEFF1)
+                        CALL ST_MATRIX_ADD(A_ST, V3-1, V2-1, COEFF2)
+                        CALL ST_MATRIX_ADD(A_ST, V3-1, V3-1, COEFF3)
+                        NEUMANN(V3-1) = NEUMANN(V3-1) + GRID_BC(EDGE_PG)%WALL_EFIELD
+                     END IF
+                  ELSE
+                     IF (.NOT. IS_DIRICHLET(V3-1)) THEN
+                        CALL ST_MATRIX_ADD(A_ST, V3-1, V1-1, COEFF1)
+                        CALL ST_MATRIX_ADD(A_ST, V3-1, V2-1, COEFF2)
+                        CALL ST_MATRIX_ADD(A_ST, V3-1, V3-1, COEFF3)
+                        NEUMANN(V3-1) = NEUMANN(V3-1) + GRID_BC(EDGE_PG)%WALL_EFIELD
+                     END IF
+                     IF (.NOT. IS_DIRICHLET(V1-1)) THEN
+                        CALL ST_MATRIX_ADD(A_ST, V1-1, V1-1, COEFF1)
+                        CALL ST_MATRIX_ADD(A_ST, V1-1, V2-1, COEFF2)
+                        CALL ST_MATRIX_ADD(A_ST, V1-1, V3-1, COEFF3)
+                        NEUMANN(V1-1) = NEUMANN(V1-1) + GRID_BC(EDGE_PG)%WALL_EFIELD
+                     END IF
+                  END IF
+               END IF
+            END DO
+
+         END DO
+
+         DO I = 0, U2D_GRID%NUM_NODES-1
+            IF (IS_UNUSED(I)) THEN
+               CALL ST_MATRIX_SET(A_ST, I, I, 1.d0)
+               IS_DIRICHLET(I) = .TRUE.
+               DIRICHLET(I) = 0.d0
+            ELSE IF ((.NOT. IS_DIRICHLET(I)) .AND. (.NOT. IS_NEUMANN(I)) ) THEN
+               RHS(I) = RHS(I) + 0.5*DT/EPS0*J_FIELD(I)
+            END IF
+         END DO
+         DEALLOCATE(IS_UNUSED)
+
+      ELSE
+         CALL ERROR_ABORT('Implicit with cartesian grid not implemented!')
+      END IF
+
+      ! Factorize the matrix for later solution
+      !IF (PROC_ID .EQ. 0) CALL ST_MATRIX_PRINT(A_ST, SIZE)
+
+      ! IF (PROC_ID == 0) THEN
+      !    DO J = 0, A_ST%NNZ-1
+      !       WRITE(*,*) 'R ',  A_ST%RIDX(J), ' C ', A_ST%CIDX(J), ' V ', A_ST%VALUE(J)
+      !    END DO
+      ! ELSE
+      !    CALL SLEEP(5)
+      ! END IF
+
+      DO I = 0, SIZE-1
+         IF (IS_DIRICHLET(I)) RHS(I)=DIRICHLET(I)
+         IF (IS_NEUMANN(I))   RHS(I)=NEUMANN(I)
+      END DO
+
+      CALL ST_MATRIX_TO_CC(A_ST, SIZE, A_CC)
+      CALL S_UMFPACK_SYMBOLIC(SIZE, SIZE, A_CC%AP, A_CC%AI, A_CC%AX, STATUS = STATUS)
+      WRITE(*,*) 'Status is = ', STATUS
+      CALL S_UMFPACK_NUMERIC(A_CC%AP, A_CC%AI, A_CC%AX, STATUS = STATUS)
+      WRITE(*,*) 'Status 1 is = ', STATUS
+      CALL S_UMFPACK_FREE_SYMBOLIC
+
+   END SUBROUTINE ASSEMBLE_AMPERE
+
+
+   SUBROUTINE DEPOSIT_CURRENT
+      
+      IMPLICIT NONE
+
+      INTEGER :: JP, IC
+
+      REAL(KIND=8) :: CHARGE
+      REAL(KIND=8) :: VOL
+      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3
+      INTEGER :: V1, V2, V3, SIZE, SIZEC
+      REAL(KIND=8) :: DPSI1DX, DPSI2DX, DPSI3DX, DPSI1DY, DPSI2DY, DPSI3DY
+
+
+      IF (GRID_TYPE == UNSTRUCTURED) THEN
+         SIZE = U2D_GRID%NUM_NODES
+         SIZEC = U2D_GRID%NUM_CELLS
+      ELSE
+         CALL ERROR_ABORT('Not implemented.')
+      END IF
+
+      IF (.NOT. ALLOCATED(J_FIELD)) ALLOCATE(J_FIELD(0:SIZE-1))
+      J_FIELD = 0.d0
+      IF (.NOT. ALLOCATED(MASS_MATRIX)) ALLOCATE(MASS_MATRIX(SIZEC))
+      MASS_MATRIX = 0.d0
+
+      DO JP = 1, NP_PROC
+         CHARGE = SPECIES(particles(JP)%S_ID)%CHARGE
+         IF (ABS(CHARGE) .LT. 1.d-6) CYCLE
+
+         IF (GRID_TYPE == UNSTRUCTURED) THEN 
+            IC = particles(JP)%IC
+            VOL = CELL_VOLUMES(IC)
+            V1 = U2D_GRID%CELL_NODES(IC,1)
+            V2 = U2D_GRID%CELL_NODES(IC,2)
+            V3 = U2D_GRID%CELL_NODES(IC,3)            
+            X1 = U2D_GRID%NODE_COORDS(V1, 1)
+            X2 = U2D_GRID%NODE_COORDS(V2, 1)
+            X3 = U2D_GRID%NODE_COORDS(V3, 1)
+            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
+            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
+            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
+            DPSI1DX =  0.5*(Y2-Y3)/VOL
+            DPSI2DX = -0.5*(Y1-Y3)/VOL
+            DPSI3DX = -0.5*(Y2-Y1)/VOL
+            DPSI1DY = -0.5*(X2-X3)/VOL
+            DPSI2DY =  0.5*(X1-X3)/VOL
+            DPSI3DY =  0.5*(X2-X1)/VOL
+            
+            J_FIELD(V1-1) = J_FIELD(V1-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI1DX + particles(JP)%VY*DPSI1DY)
+            J_FIELD(V2-1) = J_FIELD(V2-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI2DX + particles(JP)%VY*DPSI2DY)
+            J_FIELD(V3-1) = J_FIELD(V3-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI3DX + particles(JP)%VY*DPSI3DY)
+
+            MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT**2/EPS0/VOL*FNUM*(QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
+         ELSE
+
+            CALL ERROR_ABORT('Not implemented.')
+
+         END IF
+      END DO
+
+
+      IF (PROC_ID .EQ. 0) THEN
+         CALL MPI_REDUCE(MPI_IN_PLACE, J_FIELD, SIZE, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      ELSE
+         CALL MPI_REDUCE(J_FIELD,      J_FIELD, SIZE, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      END IF
+
+
+      IF (PROC_ID .EQ. 0) THEN
+         CALL MPI_REDUCE(MPI_IN_PLACE, MASS_MATRIX, SIZEC, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      ELSE
+         CALL MPI_REDUCE(MASS_MATRIX,  MASS_MATRIX, SIZEC, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      END IF
+
+
+   END SUBROUTINE DEPOSIT_CURRENT
+
+
+   SUBROUTINE SOLVE_AMPERE
+
+      IMPLICIT NONE
+
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: X
+      REAL(KIND=8) :: HX, HY
+      INTEGER :: I
+      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, AREA
+      INTEGER :: V1, V2, V3, SIZE
+
+      HX = (XMAX-XMIN)/DBLE(NX)
+      HY = (YMAX-YMIN)/DBLE(NY)
+
+
+      IF (GRID_TYPE == UNSTRUCTURED) THEN
+         SIZE = U2D_GRID%NUM_NODES
+      ELSE
+         SIZE = NPX*NPY
+      END IF
+
+      ALLOCATE(X(0:SIZE-1))
+
+      ! Solve the linear system
+      IF (PROC_ID .EQ. 0) THEN
+         !WRITE(*,*) 'Solving poisson'
+         !WRITE(*,*) RHS
+         CALL S_UMFPACK_SOLVE(UMFPACK_A, A_CC%AP, A_CC%AI, A_CC%AX, X, RHS)
+         !WRITE(*,*) 'Solution:'
+         !WRITE(*,*) X
+         !X = 0.d0
+      END IF
+ 
+      CALL MPI_BCAST(X, SIZE, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+      PHIBAR_FIELD = X
+      DEALLOCATE(X)
+
+      PHI_FIELD = 2*PHIBAR_FIELD-PHI_FIELD
+
+      ! Reshape the linear array into a 2D array
+      IF (GRID_TYPE == UNSTRUCTURED) THEN
+
+         ! Compute the electric field at grid points
+         DO I = 1, U2D_GRID%NUM_CELLS
+            AREA = CELL_VOLUMES(I)
+            V1 = U2D_GRID%CELL_NODES(I,1)
+            V2 = U2D_GRID%CELL_NODES(I,2)
+            V3 = U2D_GRID%CELL_NODES(I,3)            
+            X1 = U2D_GRID%NODE_COORDS(V1, 1)
+            X2 = U2D_GRID%NODE_COORDS(V2, 1)
+            X3 = U2D_GRID%NODE_COORDS(V3, 1)
+            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
+            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
+            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
+
+            E_FIELD(I,1,1) = -0.5/AREA*(  PHI_FIELD(V1-1)*(Y2-Y3) &
+                                        - PHI_FIELD(V2-1)*(Y1-Y3) &
+                                        - PHI_FIELD(V3-1)*(Y2-Y1))
+            E_FIELD(I,1,2) = -0.5/AREA*(- PHI_FIELD(V1-1)*(X2-X3) &
+                                        + PHI_FIELD(V2-1)*(X1-X3) &
+                                        + PHI_FIELD(V3-1)*(X2-X1))
+            E_FIELD(I,1,3) = 0.d0
+
+            EBAR_FIELD(I,1,1) = -0.5/AREA*(  PHIBAR_FIELD(V1-1)*(Y2-Y3) &
+                                           - PHIBAR_FIELD(V2-1)*(Y1-Y3) &
+                                           - PHIBAR_FIELD(V3-1)*(Y2-Y1))
+            EBAR_FIELD(I,1,2) = -0.5/AREA*(- PHIBAR_FIELD(V1-1)*(X2-X3) &
+                                           + PHIBAR_FIELD(V2-1)*(X1-X3) &
+                                           + PHIBAR_FIELD(V3-1)*(X2-X1))
+            EBAR_FIELD(I,1,3) = 0.d0
+         END DO
+
+      ELSE
+         
+         CALL ERROR_ABORT('Not implemented.')
+         
+      END IF
+
+   END SUBROUTINE SOLVE_AMPERE
+
 
 
    SUBROUTINE COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)
@@ -680,9 +1064,11 @@ MODULE fields
       INTEGER, DIMENSION(4) :: INDICES, INDI, INDJ
 
       IF (GRID_TYPE == UNSTRUCTURED) THEN
-
-         E = E_FIELD(particles(JP)%IC, 1, :)
-
+         IF (BOOL_PIC_IMPLICIT) THEN
+            E = EBAR_FIELD(particles(JP)%IC, 1, :)
+         ELSE
+            E = E_FIELD(particles(JP)%IC, 1, :)
+         END IF
       ELSE
 
          CALL COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)

@@ -1147,9 +1147,9 @@ MODULE timecycle
 
       IMPLICIT NONE
 
-      INTEGER      :: JP1, JP2, JR, I, J, SP_ID1, SP_ID2, P1_SP_ID, P2_SP_ID, P3_SP_ID, NP_PROC_INITIAL
+      INTEGER      :: JP1, JP2, JR, JC, I, J, SP_ID1, SP_ID2, P1_SP_ID, P2_SP_ID, P3_SP_ID, NP_PROC_INITIAL
       REAL(KIND=8) :: P_COLL, PTCE, rfp
-      REAL(KIND=8) :: SIGMA, OMEGA, CREF, ALPHA, FRAC
+      REAL(KIND=8) :: SIGMA, OMEGA, CREF, ALPHA
       REAL(KIND=8) :: PI2
       REAL(KIND=8), DIMENSION(3) :: C1, C2, GREL, W
       REAL(KIND=8) :: GX, GY, GZ, G
@@ -1163,13 +1163,15 @@ MODULE timecycle
 
       TIMESTEP_COLL = 0
 
-      NP_PROC_INITIAL = NP_PROC
+      NP_PROC_INITIAL = NP_PROC ! Number of particles in local MPI process
       DO JP1 = 1,NP_PROC_INITIAL
-         SP_ID1 = particles(JP1)%S_ID
+         JC = particles(JP1)%IC ! Define the cell in which the particle is situated
 
-         DO J = 1, MIXTURES(MCC_BG_MIX)%N_COMPONENTS
-            SP_ID2 = MIXTURES(MCC_BG_MIX)%COMPONENTS(J)%ID
-            
+         SP_ID1 = particles(JP1)%S_ID ! Identification of first particle specie that enters in the collision procedure 
+
+         DO J = 1, N_SPECIES 
+            SP_ID2 = SP_IDS(J)
+
             !SIGMA = PI * (0.5 * (SPECIES(SP_ID1)%DIAM + SPECIES(SP_ID2)%DIAM))**2
             !OMEGA = 0.5 * (SPECIES(SP_ID1)%OMEGA + SPECIES(SP_ID2)%OMEGA)
             CREF = VSS_GREFS(SP_ID1, SP_ID2)
@@ -1177,12 +1179,13 @@ MODULE timecycle
             SIGMA = VSS_SIGMAS(SP_ID1, SP_ID2)
             OMEGA = VSS_OMEGAS(SP_ID1, SP_ID2)
             ALPHA = VSS_ALPHAS(SP_ID1, SP_ID2)
-            
+
             ! Sample the velocity of second collision partner, that would be in the MCC backgorund
             ! This may bias collisions towards higher temperatures of particle 2!
             CALL MAXWELL(0.d0, 0.d0, 0.d0, &
             MCC_BG_TTRA, MCC_BG_TTRA, MCC_BG_TTRA, &
-            C2(1), C2(2), C2(3), SPECIES(SP_ID2)%MOLECULAR_MASS)
+            C2(1), C2(2), C2(3), SPECIES(SP_ID2)%MOLECULAR_MASS) ! Associate initial parameters to Maxwell function
+            ! Being the gas at rest, mean velocity is zero everywhere. Only peculiar velocity (C(i)) is non zero
 
             ! Compute the real relative velocity
             VR2 = (C2(1) - particles(JP1)%VX)**2 + &
@@ -1192,9 +1195,8 @@ MODULE timecycle
             VR = SQRT(VR2)
             
 
-            ! Compute collision probability
-            FRAC = MIXTURES(MCC_BG_MIX)%COMPONENTS(J)%MOLFRAC
-            P_COLL = 1 - exp(-DT*MCC_BG_DENS*FRAC*VR*SIGMA*(VR/CREF)**(1.-2.*OMEGA))
+            ! Compute collision probability. Number density referred to the cell JC previously defined
+            P_COLL = 1 - exp(-DT*MCC_BG_NRHO(J, JC)*VR*SIGMA*(VR/CREF)**(1.-2.*OMEGA))
 
             ! Try the collision
             IF (rf() < P_COLL) THEN ! Collision happens
@@ -1248,10 +1250,10 @@ MODULE timecycle
                   IF (ECOLL .LE. EA) CYCLE
                   rfp = rf()
                   PTCE = REACTIONS(JR)%C1 * (ECOLL-EA)**REACTIONS(JR)%C2 * (1.-EA/ECOLL)**REACTIONS(JR)%C3
-                  ! Here we suppose that the probability is so low that we can test sequentially with acceptable error
+                  ! Here we suppose that the probability is so low that we can test sequentially with acMAXWELL
                   IF (rfp .LT. PTCE) THEN
                      SKIP = .TRUE.
-                     ! React
+                     ! React   
                      ECOLL = ECOLL - EA
 
                      ! Use R1 as P1 and assign internal energy to it.

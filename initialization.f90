@@ -26,7 +26,7 @@ MODULE initialization
       CHARACTER*512      :: line
       INTEGER            :: ReasonEOF
 
-      CHARACTER*512      :: MIXTURE_DEFINITION, VSS_PARAMS_FILENAME, LINESOURCE_DEFINITION, WALL_DEFINITION
+      CHARACTER*512      :: MCC_FILENAME, MIXTURE_DEFINITION, VSS_PARAMS_FILENAME, LINESOURCE_DEFINITION, WALL_DEFINITION
       CHARACTER*64       :: MIX_INIT_NAME, MIX_BOUNDINJECT_NAME, DSMC_COLL_MIX_NAME, MCC_BG_MIX_NAME
 
       ! Open input file for reading
@@ -124,6 +124,10 @@ MODULE initialization
          IF (line=='MCC_background_mixture:') THEN
             READ(in1,*) MCC_BG_MIX_NAME
             MCC_BG_MIX = MIXTURE_NAME_TO_ID(MCC_BG_MIX_NAME)
+         END IF
+         IF (line=='MCC_background_dens_file:') THEN
+            READ(in1,*) MCC_FILENAME 
+            CALL READ_VTK_FILE(MCC_FILENAME)
          END IF
          IF (line=='VSS_parameters_file:')     THEN
             READ(in1,*) VSS_PARAMS_FILENAME
@@ -431,7 +435,7 @@ MODULE initialization
          NAME, MOLWT, MOLECULAR_MASS, ROTDOF, ROTREL, VIBDOF, VIBREL, VIBTEMP, SPWT, CHARGE
       
          ALLOCATE(TEMP_SPECIES(N_SPECIES+1)) ! Append the species to the list
-         TEMP_SPECIES(1:N_SPECIES) = SPECIES
+         TEMP_SPECIES(1:N_SPECIES) = SPECIES(1:N_SPECIES)
          CALL MOVE_ALLOC(TEMP_SPECIES, SPECIES)
          N_SPECIES = N_SPECIES + 1
 
@@ -573,7 +577,7 @@ MODULE initialization
       INTEGER :: N_STR
       CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
 
-      INTEGER, ALLOCATABLE :: SP_IDS(:)
+      ! INTEGER, ALLOCATABLE :: SP_IDS(:)
       REAL(KIND=8) :: OMEGA
       REAL(KIND=8) :: TREF
       REAL(KIND=8) :: READ_VALUE
@@ -779,7 +783,7 @@ MODULE initialization
 
 
       ALLOCATE(TEMP_MIXTURES(N_MIXTURES+1)) ! Append the mixture to the list
-      TEMP_MIXTURES(1:N_MIXTURES) = MIXTURES
+      TEMP_MIXTURES(1:N_MIXTURES) = MIXTURES(1:N_MIXTURES)
       CALL MOVE_ALLOC(TEMP_MIXTURES, MIXTURES)
       N_MIXTURES = N_MIXTURES + 1
 
@@ -808,7 +812,7 @@ MODULE initialization
 
       
       ALLOCATE(TEMP_LINESOURCES(N_LINESOURCES+1)) ! Append the mixture to the list
-      TEMP_LINESOURCES(1:N_LINESOURCES) = LINESOURCES
+      TEMP_LINESOURCES(1:N_LINESOURCES) = LINESOURCES(1:N_LINESOURCES)
       CALL MOVE_ALLOC(TEMP_LINESOURCES, LINESOURCES)
       N_LINESOURCES = N_LINESOURCES + 1
 
@@ -851,7 +855,7 @@ MODULE initialization
 
       
       ALLOCATE(TEMP_WALLS(N_WALLS+1))
-      TEMP_WALLS(1:N_WALLS) = WALLS
+      TEMP_WALLS(1:N_WALLS) = WALLS(1:N_WALLS)
       CALL MOVE_ALLOC(TEMP_WALLS, WALLS)
       N_WALLS = N_WALLS + 1
 
@@ -965,7 +969,7 @@ MODULE initialization
          IF (ReasonEOF < 0) EXIT ! End of file reached
          
          ALLOCATE(TEMP_REACTIONS(N_REACTIONS+1)) ! Append the mixture to the list
-         TEMP_REACTIONS(1:N_REACTIONS) = REACTIONS
+         TEMP_REACTIONS(1:N_REACTIONS) = REACTIONS(1:N_REACTIONS)
          CALL MOVE_ALLOC(TEMP_REACTIONS, REACTIONS)
          N_REACTIONS = N_REACTIONS + 1
          REACTIONS(N_REACTIONS) = NEW_REACTION
@@ -1071,7 +1075,7 @@ MODULE initialization
          IF (ReasonEOF < 0) EXIT ! End of file reached
          
          ALLOCATE(TEMP_WALL_REACTIONS(N_WALL_REACTIONS+1)) ! Append the mixture to the list
-         TEMP_WALL_REACTIONS(1:N_WALL_REACTIONS) = WALL_REACTIONS
+         TEMP_WALL_REACTIONS(1:N_WALL_REACTIONS) = WALL_REACTIONS(1:N_WALL_REACTIONS)
          CALL MOVE_ALLOC(TEMP_WALL_REACTIONS, WALL_REACTIONS)
          N_WALL_REACTIONS = N_WALL_REACTIONS + 1
          WALL_REACTIONS(N_WALL_REACTIONS) = NEW_REACTION
@@ -1140,7 +1144,7 @@ MODULE initialization
       READ(in5,*, IOSTAT=ReasonEOF) ZMIN, ZMAX ! Read coords of z cells boundaries
       IF (ReasonEOF < 0) CALL ERROR_ABORT('Attention, format error in grid definition file! ABORTING.')
    
-      ALLOCATE(CELL_VOLUMES(NX*NY))
+      ALLOCATE(CELL_VOLUMES(NX*NY)) ! We are defining cells volume
       DO I = 1, NX
          DO J = 1, NY
             IF (DIMS == 2 .AND. .NOT. AXI) THEN
@@ -1155,6 +1159,71 @@ MODULE initialization
       CLOSE(in5)
 
    END SUBROUTINE READ_GRID_FILE
+
+
+   SUBROUTINE READ_VTK_FILE(FILENAME)
+
+      IMPLICIT NONE
+
+      CHARACTER*64, INTENT(IN) :: FILENAME
+      CHARACTER*512      :: line
+      INTEGER, PARAMETER :: in5 = 5557
+      INTEGER            :: ios
+      INTEGER            :: ReasonEOF
+
+      ! Open input file for reading
+      OPEN(UNIT=in5,FILE=FILENAME, STATUS='old',IOSTAT=ios)
+
+      IF (ios.NE.0) THEN
+         CALL ERROR_ABORT('Attention, vtk file not found! ABORTING.')
+      END IF
+
+
+      ! +++++++ Read until the end of file ++++++++
+      DO
+
+         READ(in5,'(A)', IOSTAT=ReasonEOF) line ! Read line
+         CALL STRIP_COMMENTS(line, '!')         ! Remove comments from line
+
+         IF (ReasonEOF < 0) EXIT ! End of file reached
+
+
+         ! Reading of file vtk's lines referred to number density per each cell 
+         ! All species has been considered
+         ! TODO: make it more general, independently from the species considered 
+         
+         IF( .NOT. ALLOCATED(MCC_BG_NRHO)) ALLOCATE(MCC_BG_NRHO(N_SPECIES, NX*NY))
+
+         IF      (line=='nrho_mean_O2')  THEN
+            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(1, NX*NY)
+         ELSE IF (line=='nrho_mean_N2')  THEN
+            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(2, NX*NY)
+         ELSE IF (line=='nrho_mean_O')   THEN
+            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(3, NX*NY)
+         ELSE IF (line=='nrho_mean_N')   THEN
+            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(4, NX*NY)
+         ELSE IF (line=='nrho_mean_NO')  THEN
+            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(5, NX*NY)
+         ELSE IF (line=='nrho_mean_O2+') THEN
+            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(6, NX*NY)
+         ELSE IF (line=='nrho_mean_N2+') THEN
+            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(7, NX*NY)
+         ELSE IF (line=='nrho_mean_O+')  THEN
+            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(8, NX*NY)
+         ELSE IF (line=='nrho_mean_N+')  THEN
+            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(9, NX*NY)
+         ELSE IF (line=='nrho_mean_NO+') THEN
+            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(10, NX*NY)
+         ELSE IF (line=='nrho_mean_e')   THEN
+            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(11, NX*NY)
+         END IF
+
+      END DO ! Loop for reading input file
+
+      CLOSE(in5) ! Close input file
+
+   END SUBROUTINE READ_VTK_FILE  
+
 
 
    SUBROUTINE INIT_QUADTREE
@@ -1747,7 +1816,7 @@ MODULE initialization
 
 
 
-   INTEGER FUNCTION MIXTURE_NAME_TO_ID(NAME)
+   INTEGER FUNCTION MIXTURE_NAME_TO_ID(NAME) ! We are referring each mixture to a number ID
 
       IMPLICIT NONE
 

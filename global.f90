@@ -128,6 +128,7 @@ MODULE global
    INTEGER           :: MCC_BG_MIX
    INTEGER           :: DSMC_COLL_MIX
    INTEGER           :: TIMESTEP_COLL
+   INTEGER, ALLOCATABLE :: SP_IDS(:)
    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: VSS_GREFS ! Matrix of reference relative velocities for VSS
    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: VSS_SIGMAS ! Matrix of reference cross sections for VSS
    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: VSS_ALPHAS ! Matrix of reference scattering coeff. for VSS
@@ -140,6 +141,13 @@ MODULE global
 
    INTEGER           :: BGK_MODEL_TYPE_INT = 2
    REAL(KIND=8)      :: BGK_BG_DENS, BGK_SIGMA, BGK_BG_MASS
+
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!! MCC collisions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+   REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: MCC_BG_NRHO 
+   CHARACTER(LEN=256) :: MCC_FILENAME
 
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

@@ -18,7 +18,7 @@ Axisymmetric:
 Number_of_cells:
     1    1    1
 Mesh_file_SU2:
-    'langmuir1.su2'
+    'rectsheath1.su2'
 Domain_limits:
     -10.0    10.0    -10.0    10.0    0.0    1.0
 Domain_periodicity:
@@ -33,7 +33,7 @@ Boundary_temperature:
 Bool_PIC:
     .TRUE.
 PIC_implicit:
-    .TRUE.
+    .FALSE.
 
 Bool_dump_moments:
     .FALSE.
@@ -51,9 +51,9 @@ Fluxes_dump_output:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.e7
+    1.e3
 Timestep:
-    2.0e-8
+    1.0e-7
 !    2.5e-9
 !1.0e-7
 Number_of_timesteps:
@@ -70,9 +70,9 @@ Dump_part_every:
 Dump_grid_start:
     0
 Dump_grid_avgevery:
-    1
+    10
 Dump_grid_numavgs:
-    1
+    100
 
 Perform_checks:
     .TRUE.
@@ -126,7 +126,7 @@ Thermal_bath_Ttr:
 ! ========= Initial particle seed ===================
 
 Initial_particles_bool:
-    .TRUE.
+    .FALSE.
 Initial_particles_dens:
     1.0e12
 Initial_particles_vel:
@@ -141,25 +141,31 @@ Initial_particles_mixture:
     Plasma
 
 
-
+Boundary_condition:
+    Bound    vacuum
 
 Boundary_condition:
-    Symmetry    specular
+    Bound    dirichlet    0.0
 
-Boundary_condition:
-    Probe    vacuum
 
-Boundary_condition:
-    Inlet    specular
 
-Boundary_condition:
-    Symmetry    neumann    0.0
+!Boundary_condition:
+!    Symmetry    vacuum
 
-Boundary_condition:
-    Probe    dirichlet    0.0
+!Boundary_condition:
+!    Probe    vacuum
 
-Boundary_condition:
-    Inlet    dirichlet    0.0
+!Boundary_condition:
+!    Inlet    vacuum
+
+!Boundary_condition:
+!    Symmetry    dirichlet    0.0
+
+!Boundary_condition:
+!    Probe    dirichlet    0.0
+
+!Boundary_condition:
+!    Inlet    dirichlet    0.0
 
 !Boundary_emit:
 !    Inlet    Plasma    1.0e12    0.0    0.0    0.0    300.0    300.0    300.0

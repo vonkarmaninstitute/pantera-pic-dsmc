@@ -53,7 +53,8 @@ Fluxes_dump_output:
 Fnum:  ! Ratio of real-to-simulated particles
     1.e7
 Timestep:
-    2.5e-9
+    2.0e-8
+!    2.5e-9
 !1.0e-7
 Number_of_timesteps:
     100000
@@ -146,19 +147,19 @@ Boundary_condition:
     Symmetry    specular
 
 Boundary_condition:
-    Probe    specular
+    Probe    vacuum
 
 Boundary_condition:
     Inlet    specular
 
-!Boundary_condition:
-!    Symmetry    dirichlet    0.0
+Boundary_condition:
+    Symmetry    neumann    0.0
 
-!Boundary_condition:
-!    Probe    dirichlet    0.0
+Boundary_condition:
+    Probe    dirichlet    0.0
 
-!Boundary_condition:
-!    Inlet    dirichlet    0.0
+Boundary_condition:
+    Inlet    dirichlet    0.0
 
 !Boundary_emit:
 !    Inlet    Plasma    1.0e12    0.0    0.0    0.0    300.0    300.0    300.0

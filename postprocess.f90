@@ -1044,7 +1044,6 @@ MODULE postprocess
          !  TOT_FE = TOT_FE + 15.63e-19/2.
          !END IF
          IF (BOOL_PIC .AND. (GRID_TYPE .NE. UNSTRUCTURED)) THEN
-            wRITE(*,*) 'why are we here? just to suffer...'
             CALL APPLY_POTENTIAL(JP, PHI)
             TOT_EE  = TOT_EE + PHI*1.602176634e-19*SPECIES(JS)%CHARGE * CFNUM
          END IF
@@ -1062,7 +1061,7 @@ MODULE postprocess
          IF (GRID_TYPE == UNSTRUCTURED) THEN
             TOT_EE = 0.d0
             DO JC = 1, U2D_GRID%NUM_CELLS
-               TOT_EE = TOT_EE + (E_FIELD(JC, 1, 1)**2 + E_FIELD(JC, 1, 1)**2)*CELL_VOLUMES(JC)
+               TOT_EE = TOT_EE + (E_FIELD(JC, 1, 1)**2 + E_FIELD(JC, 1, 2)**2)*CELL_VOLUMES(JC)
             END DO
             TOT_EE = TOT_EE *0.5*EPS0
          ELSE

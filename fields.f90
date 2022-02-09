@@ -98,6 +98,9 @@ MODULE fields
             END DO
          END DO
 
+         !IS_DIRICHLET(0) = .TRUE.    ! DBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDDBDBDBDBDBDBDB
+         !DIRICHLET(0) = 0.d0
+
          DO I = 1, U2D_GRID%NUM_CELLS
             AREA = CELL_VOLUMES(I)
             V1 = U2D_GRID%CELL_NODES(I,1)
@@ -333,13 +336,14 @@ MODULE fields
       ! ELSE
       !    CALL SLEEP(5)
       ! END IF
-
-      CALL ST_MATRIX_TO_CC(A_ST, SIZE, A_CC)
-      CALL S_UMFPACK_SYMBOLIC(SIZE, SIZE, A_CC%AP, A_CC%AI, A_CC%AX, STATUS = STATUS)
-      WRITE(*,*) 'Status is = ', STATUS
-      CALL S_UMFPACK_NUMERIC(A_CC%AP, A_CC%AI, A_CC%AX, STATUS = STATUS)
-      WRITE(*,*) 'Status 1 is = ', STATUS
-      CALL S_UMFPACK_FREE_SYMBOLIC
+      IF (PROC_ID .EQ. 0) THEN
+         CALL ST_MATRIX_TO_CC(A_ST, SIZE, A_CC)
+         CALL S_UMFPACK_SYMBOLIC(SIZE, SIZE, A_CC%AP, A_CC%AI, A_CC%AX, STATUS = STATUS)
+         WRITE(*,*) 'Status is = ', STATUS
+         CALL S_UMFPACK_NUMERIC(A_CC%AP, A_CC%AI, A_CC%AX, STATUS = STATUS)
+         WRITE(*,*) 'Status 1 is = ', STATUS
+         CALL S_UMFPACK_FREE_SYMBOLIC
+      END IF
 
    END SUBROUTINE ASSEMBLE_POISSON
 
@@ -377,6 +381,7 @@ MODULE fields
          !WRITE(*,*) 'Solving poisson'
          !WRITE(*,*) RHS
          CALL S_UMFPACK_SOLVE(UMFPACK_A, A_CC%AP, A_CC%AI, A_CC%AX, X, RHS)
+         CALL S_UMFPACK_FREE_NUMERIC
          !WRITE(*,*) 'Solution:'
          !WRITE(*,*) X
          !X = 0.d0
@@ -629,7 +634,7 @@ MODULE fields
             DO J = 1, 3
                EDGE_PG = U2D_GRID%CELL_EDGES_PG(I, J)
                IF (EDGE_PG .NE. -1) THEN
-                  IF (GRID_BC(EDGE_PG)%FIELD_BC == ROBIN_BC) THEN
+                  IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC) THEN
                      IF (J==1) THEN
                         DIRICHLET(V1-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
                         DIRICHLET(V2-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
@@ -658,8 +663,8 @@ MODULE fields
             END DO
          END DO
 
-         IS_DIRICHLET(0) = .TRUE.
-         DIRICHLET(0) = 0.d0
+         !IS_DIRICHLET(0) = .TRUE. ! DBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDDBDBDBDBDBDBDB
+         !DIRICHLET(0) = 0.d0
 
          DO I = 1, U2D_GRID%NUM_CELLS
             AREA = CELL_VOLUMES(I)
@@ -792,12 +797,14 @@ MODULE fields
          IF (IS_NEUMANN(I))   RHS(I)=NEUMANN(I)
       END DO
 
-      CALL ST_MATRIX_TO_CC(A_ST, SIZE, A_CC)
-      CALL S_UMFPACK_SYMBOLIC(SIZE, SIZE, A_CC%AP, A_CC%AI, A_CC%AX, STATUS = STATUS)
-      WRITE(*,*) 'Status is = ', STATUS
-      CALL S_UMFPACK_NUMERIC(A_CC%AP, A_CC%AI, A_CC%AX, STATUS = STATUS)
-      WRITE(*,*) 'Status 1 is = ', STATUS
-      CALL S_UMFPACK_FREE_SYMBOLIC
+      IF (PROC_ID .EQ. 0) THEN
+         CALL ST_MATRIX_TO_CC(A_ST, SIZE, A_CC)
+         CALL S_UMFPACK_SYMBOLIC(SIZE, SIZE, A_CC%AP, A_CC%AI, A_CC%AX, STATUS = STATUS)
+         WRITE(*,*) 'Status is = ', STATUS
+         CALL S_UMFPACK_NUMERIC(A_CC%AP, A_CC%AI, A_CC%AX, STATUS = STATUS)
+         WRITE(*,*) 'Status 1 is = ', STATUS
+         CALL S_UMFPACK_FREE_SYMBOLIC
+      END IF
 
    END SUBROUTINE ASSEMBLE_AMPERE
 
@@ -907,6 +914,7 @@ MODULE fields
          !WRITE(*,*) 'Solving poisson'
          !WRITE(*,*) RHS
          CALL S_UMFPACK_SOLVE(UMFPACK_A, A_CC%AP, A_CC%AI, A_CC%AX, X, RHS)
+         CALL S_UMFPACK_FREE_NUMERIC
          !WRITE(*,*) 'Solution:'
          !WRITE(*,*) X
          !X = 0.d0

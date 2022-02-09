@@ -102,19 +102,6 @@ MODULE timecycle
 
          IF (BOOL_THERMAL_BATH) CALL THERMAL_BATH
 
-         ! ########### Compute poisson ##########################################
-
-         IF (BOOL_PIC) THEN
-            IF (BOOL_PIC_IMPLICIT) THEN
-               CALL DEPOSIT_CURRENT
-               CALL ASSEMBLE_AMPERE
-               CALL SOLVE_AMPERE
-            ELSE
-               CALL DEPOSIT_CHARGE
-               CALL SOLVE_POISSON
-            END IF
-         END IF
-
          ! ########### Dump particles ##############################################
          IF (tID .GE. DUMP_START) THEN
             IF (MOD(tID-DUMP_START, DUMP_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
@@ -145,6 +132,20 @@ MODULE timecycle
          IF (PERFORM_CHECKS .AND. MOD(tID, CHECKS_EVERY) .EQ. 0) CALL CHECKS
 
          tID = tID + 1
+
+         ! ########### Compute poisson ##########################################
+
+         IF (BOOL_PIC) THEN
+            IF (BOOL_PIC_IMPLICIT) THEN
+               CALL DEPOSIT_CURRENT
+               CALL ASSEMBLE_AMPERE
+               CALL SOLVE_AMPERE
+            ELSE
+               CALL DEPOSIT_CHARGE
+               CALL SOLVE_POISSON
+            END IF
+         END IF
+         
       END DO
 
    END SUBROUTINE TIME_LOOP

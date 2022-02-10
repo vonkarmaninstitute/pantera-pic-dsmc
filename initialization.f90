@@ -26,7 +26,7 @@ MODULE initialization
       CHARACTER*512      :: line
       INTEGER            :: ReasonEOF
 
-      CHARACTER*512      :: MCC_FILENAME, MIXTURE_DEFINITION, VSS_PARAMS_FILENAME, LINESOURCE_DEFINITION, WALL_DEFINITION
+      CHARACTER*512      :: MIXTURE_DEFINITION, VSS_PARAMS_FILENAME, LINESOURCE_DEFINITION, WALL_DEFINITION
       CHARACTER*64       :: MIX_INIT_NAME, MIX_BOUNDINJECT_NAME, DSMC_COLL_MIX_NAME, MCC_BG_MIX_NAME
 
       ! Open input file for reading
@@ -273,6 +273,19 @@ MODULE initialization
             string = 'Background number density [1/m^3]:'
             WRITE(*,'(A5,A50,ES14.3)') '     ', string, MCC_BG_DENS
 
+            string = 'Background non uniform number density [1/m^3]:'
+            DO j = 1, N_SPECIES
+               WRITE(*,*) string, SPECIES(j)%NAME, MCC_BG_NRHO(j, 1:5)
+            END DO
+
+            ! string = 'Background species:'
+            ! DO j = 1, N_SPECIES
+            !    WRITE(*,*) string, BG_SPECIE
+            ! END DO
+
+            ! string = 'STRING'
+            ! WRITE(*,*) '     ', string, string1
+
             string = 'Background translational temperature [K]::'
             WRITE(*,'(A5,A50,ES14.3)') '     ', string, MCC_BG_TTRA
 
@@ -435,7 +448,7 @@ MODULE initialization
          NAME, MOLWT, MOLECULAR_MASS, ROTDOF, ROTREL, VIBDOF, VIBREL, VIBTEMP, SPWT, CHARGE
       
          ALLOCATE(TEMP_SPECIES(N_SPECIES+1)) ! Append the species to the list
-         TEMP_SPECIES(1:N_SPECIES) = SPECIES(1:N_SPECIES)
+         TEMP_SPECIES(1:N_SPECIES) = SPECIES
          CALL MOVE_ALLOC(TEMP_SPECIES, SPECIES)
          N_SPECIES = N_SPECIES + 1
 
@@ -783,7 +796,7 @@ MODULE initialization
 
 
       ALLOCATE(TEMP_MIXTURES(N_MIXTURES+1)) ! Append the mixture to the list
-      TEMP_MIXTURES(1:N_MIXTURES) = MIXTURES(1:N_MIXTURES)
+      TEMP_MIXTURES(1:N_MIXTURES) = MIXTURES
       CALL MOVE_ALLOC(TEMP_MIXTURES, MIXTURES)
       N_MIXTURES = N_MIXTURES + 1
 
@@ -812,7 +825,7 @@ MODULE initialization
 
       
       ALLOCATE(TEMP_LINESOURCES(N_LINESOURCES+1)) ! Append the mixture to the list
-      TEMP_LINESOURCES(1:N_LINESOURCES) = LINESOURCES(1:N_LINESOURCES)
+      TEMP_LINESOURCES(1:N_LINESOURCES) = LINESOURCES
       CALL MOVE_ALLOC(TEMP_LINESOURCES, LINESOURCES)
       N_LINESOURCES = N_LINESOURCES + 1
 
@@ -855,7 +868,7 @@ MODULE initialization
 
       
       ALLOCATE(TEMP_WALLS(N_WALLS+1))
-      TEMP_WALLS(1:N_WALLS) = WALLS(1:N_WALLS)
+      TEMP_WALLS(1:N_WALLS) = WALLS
       CALL MOVE_ALLOC(TEMP_WALLS, WALLS)
       N_WALLS = N_WALLS + 1
 
@@ -969,7 +982,7 @@ MODULE initialization
          IF (ReasonEOF < 0) EXIT ! End of file reached
          
          ALLOCATE(TEMP_REACTIONS(N_REACTIONS+1)) ! Append the mixture to the list
-         TEMP_REACTIONS(1:N_REACTIONS) = REACTIONS(1:N_REACTIONS)
+         TEMP_REACTIONS(1:N_REACTIONS) = REACTIONS
          CALL MOVE_ALLOC(TEMP_REACTIONS, REACTIONS)
          N_REACTIONS = N_REACTIONS + 1
          REACTIONS(N_REACTIONS) = NEW_REACTION
@@ -1075,7 +1088,7 @@ MODULE initialization
          IF (ReasonEOF < 0) EXIT ! End of file reached
          
          ALLOCATE(TEMP_WALL_REACTIONS(N_WALL_REACTIONS+1)) ! Append the mixture to the list
-         TEMP_WALL_REACTIONS(1:N_WALL_REACTIONS) = WALL_REACTIONS(1:N_WALL_REACTIONS)
+         TEMP_WALL_REACTIONS(1:N_WALL_REACTIONS) = WALL_REACTIONS
          CALL MOVE_ALLOC(TEMP_WALL_REACTIONS, WALL_REACTIONS)
          N_WALL_REACTIONS = N_WALL_REACTIONS + 1
          WALL_REACTIONS(N_WALL_REACTIONS) = NEW_REACTION
@@ -1170,6 +1183,8 @@ MODULE initialization
       INTEGER, PARAMETER :: in5 = 5557
       INTEGER            :: ios
       INTEGER            :: ReasonEOF
+      INTEGER :: N_STR
+      CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
 
       ! Open input file for reading
       OPEN(UNIT=in5,FILE=FILENAME, STATUS='old',IOSTAT=ios)
@@ -1178,44 +1193,68 @@ MODULE initialization
          CALL ERROR_ABORT('Attention, vtk file not found! ABORTING.')
       END IF
 
+      ALLOCATE(MCC_BG_NRHO(N_SPECIES, NX*NY))
+      ALLOCATE(BG_SPECIE(N_SPECIES))
 
       ! +++++++ Read until the end of file ++++++++
+      ! I = 0
       DO
 
          READ(in5,'(A)', IOSTAT=ReasonEOF) line ! Read line
          CALL STRIP_COMMENTS(line, '!')         ! Remove comments from line
-
+         CALL SPLIT_STR(line, ' ', STRARRAY, N_STR)
+      
+         ! line = TRIM(ADJUSTL(line))
+         ! WRITE(*,*) line
+         ! trimmare spazio successivi stringa da leggere
+         ! adjustl leading spaces 
          IF (ReasonEOF < 0) EXIT ! End of file reached
+
 
 
          ! Reading of file vtk's lines referred to number density per each cell 
          ! All species has been considered
          ! TODO: make it more general, independently from the species considered 
-         
-         IF( .NOT. ALLOCATED(MCC_BG_NRHO)) ALLOCATE(MCC_BG_NRHO(N_SPECIES, NX*NY))
 
-         IF      (line=='nrho_mean_O2')  THEN
-            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(1, NX*NY)
-         ELSE IF (line=='nrho_mean_N2')  THEN
-            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(2, NX*NY)
-         ELSE IF (line=='nrho_mean_O')   THEN
-            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(3, NX*NY)
-         ELSE IF (line=='nrho_mean_N')   THEN
-            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(4, NX*NY)
-         ELSE IF (line=='nrho_mean_NO')  THEN
-            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(5, NX*NY)
-         ELSE IF (line=='nrho_mean_O2+') THEN
-            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(6, NX*NY)
-         ELSE IF (line=='nrho_mean_N2+') THEN
-            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(7, NX*NY)
-         ELSE IF (line=='nrho_mean_O+')  THEN
-            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(8, NX*NY)
-         ELSE IF (line=='nrho_mean_N+')  THEN
-            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(9, NX*NY)
-         ELSE IF (line=='nrho_mean_NO+') THEN
-            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(10, NX*NY)
-         ELSE IF (line=='nrho_mean_e')   THEN
-            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(11, NX*NY)
+
+         !    WRITE (*,*) 'Stringa trovata'
+         !    string1 = STRARRAY(1)(1:10) 
+         !    ! string2 = string1(1:10)
+         ! END IF
+!          IF (STRARRAY(1)(1:10) == 'nrho_mean_') THEN
+!             ! ALLOCATE(BG_SPECIE(I+1))
+!             BG_SPECIE(1:N_SPECIES) = STRARRAY(1)(11:12)
+!             ! SP_BG_ID(I) = SPECIES_NAME_TO_ID(BG_SPECIE(I))
+!             ! WRITE (*,*) 'Stringa trovata'
+!             ! READ(in5,*, IOSTAT=ReasonEOF) BG_SPECIE
+!             ! DO I = 1, N_SPECIES
+!             !    SP_BG_ID(I) = SPECIES_NAME_TO_ID(BG_SPECIE(I))
+!             ! END DO
+!             READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(1:N_SPECIES, :)
+
+            ! I = I + 1
+         IF      (STRARRAY(1)=='nrho_mean_O2')  THEN
+            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(1, :)
+         ELSE IF (STRARRAY(1)=='nrho_mean_N2')  THEN
+            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(2, :)
+         ELSE IF (STRARRAY(1)=='nrho_mean_O')   THEN
+            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(3, :)
+         ELSE IF (STRARRAY(1)=='nrho_mean_N')   THEN
+            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(4, :)
+         ELSE IF (STRARRAY(1)=='nrho_mean_NO')  THEN
+            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(5, :)
+         ELSE IF (STRARRAY(1)=='nrho_mean_O2+') THEN
+            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(6, :)
+         ELSE IF (STRARRAY(1)=='nrho_mean_N2+') THEN
+            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(7, :)
+         ELSE IF (STRARRAY(1)=='nrho_mean_O+')  THEN
+            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(8, :)
+         ELSE IF (STRARRAY(1)=='nrho_mean_N+')  THEN
+            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(9, :)
+         ELSE IF (STRARRAY(1)=='nrho_mean_NO+') THEN
+            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(10, :)
+         ELSE IF (STRARRAY(1)=='nrho_mean_e')   THEN
+            READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(11, :)
          END IF
 
       END DO ! Loop for reading input file

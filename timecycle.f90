@@ -1169,7 +1169,7 @@ MODULE timecycle
 
          SP_ID1 = particles(JP1)%S_ID ! Identification of first particle specie that enters in the collision procedure 
 
-         DO J = 1, N_SPECIES 
+         DO J = 1, N_SPECIES
             SP_ID2 = SP_IDS(J)
 
             !SIGMA = PI * (0.5 * (SPECIES(SP_ID1)%DIAM + SPECIES(SP_ID2)%DIAM))**2

@@ -145,9 +145,11 @@ MODULE global
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! MCC collisions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-   REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: MCC_BG_NRHO 
+   REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: MCC_BG_NRHO
+   INTEGER, ALLOCATABLE :: SP_BG_ID(:)
+   CHARACTER*512, ALLOCATABLE    :: BG_SPECIE(:)
    CHARACTER(LEN=256) :: MCC_FILENAME
+   CHARACTER(LEN=256) :: string1
 
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

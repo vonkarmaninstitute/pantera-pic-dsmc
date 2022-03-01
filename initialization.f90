@@ -1233,6 +1233,9 @@ MODULE initialization
 !             READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(1:N_SPECIES, :)
 
             ! I = I + 1
+
+         MCC_BG_NRHO = 0.d0
+
          IF      (STRARRAY(1)=='nrho_mean_O2')  THEN
             READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(1, :)
          ELSE IF (STRARRAY(1)=='nrho_mean_N2')  THEN
@@ -1501,7 +1504,7 @@ MODULE initialization
       ELSE IF (GRID_TYPE == RECTILINEAR_UNIFORM .AND. (.NOT. AXI)) THEN
          ALLOCATE(CELL_VOLUMES(NX*NY))
          CELL_VOLUMES = CELL_VOL 
-         WRITE(*,*) CELL_VOLUMES
+        ! WRITE(*,*) CELL_VOLUMES
       END IF
 
 

@@ -1237,9 +1237,9 @@ MODULE initialization
             READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(1, :)
          ELSE IF (STRARRAY(1)=='nrho_mean_N2')  THEN
             READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(2, :)
-         ELSE IF (STRARRAY(1)=='nrho_mean_O')   THEN
+         ELSE IF (STRARRAY(1)=='nrho_mean_O2p')   THEN
             READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(3, :)
-         ELSE IF (STRARRAY(1)=='nrho_mean_N')   THEN
+         ELSE IF (STRARRAY(1)=='nrho_mean_N2p')   THEN
             READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(4, :)
          ELSE IF (STRARRAY(1)=='nrho_mean_NO')  THEN
             READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(5, :)
@@ -1498,6 +1498,10 @@ MODULE initialization
             IF (BOOL_RADIAL_WEIGHTING) CELL_FNUM(I + NX*(J-1)) = FNUM*NY*(CELL_YMAX**2 - CELL_YMIN**2)/(YMAX**2-YMIN**2)
             END DO
          END DO
+      ELSE IF (GRID_TYPE == RECTILINEAR_UNIFORM .AND. (.NOT. AXI)) THEN
+         ALLOCATE(CELL_VOLUMES(NX*NY))
+         CELL_VOLUMES = CELL_VOL 
+         WRITE(*,*) CELL_VOLUMES
       END IF
 
 

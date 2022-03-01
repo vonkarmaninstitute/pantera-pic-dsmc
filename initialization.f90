@@ -1237,9 +1237,9 @@ MODULE initialization
             READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(1, :)
          ELSE IF (STRARRAY(1)=='nrho_mean_N2')  THEN
             READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(2, :)
-         ELSE IF (STRARRAY(1)=='nrho_mean_O2p')   THEN
+         ELSE IF (STRARRAY(1)=='nrho_mean_O')   THEN
             READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(3, :)
-         ELSE IF (STRARRAY(1)=='nrho_mean_N2p')   THEN
+         ELSE IF (STRARRAY(1)=='nrho_mean_N')   THEN
             READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(4, :)
          ELSE IF (STRARRAY(1)=='nrho_mean_NO')  THEN
             READ(in5,*, IOSTAT=ReasonEOF) MCC_BG_NRHO(5, :)

@@ -24,11 +24,10 @@ MODULE fields
       TYPE(ST_MATRIX) :: A_ST
       REAL(KIND=8) :: HX, HY
       REAL(KIND=8) :: AX, AY, BX, BY, CX, CY, H1X, H2X, H1Y, H2Y, R
-      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA
+      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA, EDGELENGTH
       INTEGER :: V1, V2, V3
       INTEGER :: EDGE_PG
       LOGICAL, DIMENSION(:), ALLOCATABLE :: IS_UNUSED
-      REAL(KIND=8) :: COEFF1, COEFF2, COEFF3, NORMX, NORMY
 
       IF (GRID_TYPE == UNSTRUCTURED) THEN
          SIZE = U2D_GRID%NUM_NODES
@@ -124,21 +123,21 @@ MODULE fields
             ! We need to ADD to a sparse matrix entry.
             IF (IS_DIRICHLET(V1-1)) THEN
                CALL ST_MATRIX_SET(A_ST, V1-1, V1-1, 1.d0)
-            ELSE IF (.NOT. IS_NEUMANN(V1-1)) THEN
+            ELSE !IF (.NOT. IS_NEUMANN(V1-1)) THEN
                CALL ST_MATRIX_ADD(A_ST, V1-1, V1-1, K11)
                CALL ST_MATRIX_ADD(A_ST, V1-1, V2-1, K12)
                CALL ST_MATRIX_ADD(A_ST, V1-1, V3-1, K13)
             END IF
             IF (IS_DIRICHLET(V2-1)) THEN
                CALL ST_MATRIX_SET(A_ST, V2-1, V2-1, 1.d0)
-            ELSE IF (.NOT. IS_NEUMANN(V2-1)) THEN
+            ELSE !IF (.NOT. IS_NEUMANN(V2-1)) THEN
                CALL ST_MATRIX_ADD(A_ST, V2-1, V1-1, K12)
                CALL ST_MATRIX_ADD(A_ST, V2-1, V3-1, K23)
                CALL ST_MATRIX_ADD(A_ST, V2-1, V2-1, K22)
             END IF
             IF (IS_DIRICHLET(V3-1)) THEN
                CALL ST_MATRIX_SET(A_ST, V3-1, V3-1, 1.d0)
-            ELSE IF (.NOT. IS_NEUMANN(V3-1)) THEN
+            ELSE !IF (.NOT. IS_NEUMANN(V3-1)) THEN
                CALL ST_MATRIX_ADD(A_ST, V3-1, V1-1, K13)
                CALL ST_MATRIX_ADD(A_ST, V3-1, V2-1, K23)
                CALL ST_MATRIX_ADD(A_ST, V3-1, V3-1, K33)
@@ -148,52 +147,33 @@ MODULE fields
                EDGE_PG = U2D_GRID%CELL_EDGES_PG(I, J)
                IF (EDGE_PG == -1) CYCLE
                IF (GRID_BC(EDGE_PG)%FIELD_BC == NEUMANN_BC) THEN
-                  NORMX = U2D_GRID%EDGE_NORMAL(I,J,1)
-                  NORMY = U2D_GRID%EDGE_NORMAL(I,J,2)
-                  COEFF1 = 0.5*( (Y2-Y3)*NORMX - (X2-X3)*NORMY)/AREA
-                  COEFF2 = 0.5*(-(Y1-Y3)*NORMX + (X1-X3)*NORMY)/AREA
-                  COEFF3 = 0.5*(-(Y2-Y1)*NORMX + (X2-X1)*NORMY)/AREA
 
                   IF (J==1) THEN
+                     EDGELENGTH = SQRT((X2-X1)**2 + (Y2-Y1)**2)
                      IF (.NOT. IS_DIRICHLET(V1-1)) THEN
-                        CALL ST_MATRIX_ADD(A_ST, V1-1, V1-1, COEFF1)
-                        CALL ST_MATRIX_ADD(A_ST, V1-1, V2-1, COEFF2)
-                        CALL ST_MATRIX_ADD(A_ST, V1-1, V3-1, COEFF3)
-                        NEUMANN(V1-1) = NEUMANN(V1-1) + GRID_BC(EDGE_PG)%WALL_EFIELD
+                        NEUMANN(V1-1) = NEUMANN(V1-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
                      END IF
                      IF (.NOT. IS_DIRICHLET(V2-1)) THEN
-                        CALL ST_MATRIX_ADD(A_ST, V2-1, V1-1, COEFF1)
-                        CALL ST_MATRIX_ADD(A_ST, V2-1, V2-1, COEFF2)
-                        CALL ST_MATRIX_ADD(A_ST, V2-1, V3-1, COEFF3)
-                        NEUMANN(V2-1) = NEUMANN(V2-1) + GRID_BC(EDGE_PG)%WALL_EFIELD
-                     END IF                     
+                        NEUMANN(V2-1) = NEUMANN(V2-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
+                     END IF
                   ELSE IF (J==2) THEN
+                     EDGELENGTH = SQRT((X3-X2)**2 + (Y3-Y2)**2)
                      IF (.NOT. IS_DIRICHLET(V2-1)) THEN
-                        CALL ST_MATRIX_ADD(A_ST, V2-1, V1-1, COEFF1)
-                        CALL ST_MATRIX_ADD(A_ST, V2-1, V2-1, COEFF2)
-                        CALL ST_MATRIX_ADD(A_ST, V2-1, V3-1, COEFF3)
-                        NEUMANN(V2-1) = NEUMANN(V2-1) + GRID_BC(EDGE_PG)%WALL_EFIELD
+                        NEUMANN(V2-1) = NEUMANN(V2-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
                      END IF
                      IF (.NOT. IS_DIRICHLET(V3-1)) THEN
-                        CALL ST_MATRIX_ADD(A_ST, V3-1, V1-1, COEFF1)
-                        CALL ST_MATRIX_ADD(A_ST, V3-1, V2-1, COEFF2)
-                        CALL ST_MATRIX_ADD(A_ST, V3-1, V3-1, COEFF3)
-                        NEUMANN(V3-1) = NEUMANN(V3-1) + GRID_BC(EDGE_PG)%WALL_EFIELD
+                        NEUMANN(V3-1) = NEUMANN(V3-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
                      END IF
                   ELSE
-                     IF (.NOT. IS_DIRICHLET(V3-1)) THEN
-                        CALL ST_MATRIX_ADD(A_ST, V3-1, V1-1, COEFF1)
-                        CALL ST_MATRIX_ADD(A_ST, V3-1, V2-1, COEFF2)
-                        CALL ST_MATRIX_ADD(A_ST, V3-1, V3-1, COEFF3)
-                        NEUMANN(V3-1) = NEUMANN(V3-1) + GRID_BC(EDGE_PG)%WALL_EFIELD
-                     END IF
+                     EDGELENGTH = SQRT((X1-X3)**2 + (Y1-Y3)**2)
                      IF (.NOT. IS_DIRICHLET(V1-1)) THEN
-                        CALL ST_MATRIX_ADD(A_ST, V1-1, V1-1, COEFF1)
-                        CALL ST_MATRIX_ADD(A_ST, V1-1, V2-1, COEFF2)
-                        CALL ST_MATRIX_ADD(A_ST, V1-1, V3-1, COEFF3)
-                        NEUMANN(V1-1) = NEUMANN(V1-1) + GRID_BC(EDGE_PG)%WALL_EFIELD
+                        NEUMANN(V1-1) = NEUMANN(V1-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
+                     END IF
+                     IF (.NOT. IS_DIRICHLET(V3-1)) THEN
+                        NEUMANN(V3-1) = NEUMANN(V3-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
                      END IF
                   END IF
+
                END IF
             END DO
 
@@ -565,9 +545,13 @@ MODULE fields
          CALL MPI_REDUCE(RHS,          RHS, SIZE, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
       END IF
 
+
       DO I = 0, SIZE-1
-         IF (IS_DIRICHLET(I)) RHS(I)=DIRICHLET(I)
-         IF (IS_NEUMANN(I))   RHS(I)=NEUMANN(I)
+         IF (IS_DIRICHLET(I)) THEN
+            RHS(I)=DIRICHLET(I)
+         ELSE IF (IS_NEUMANN(I)) THEN
+            RHS(I)=RHS(I) + NEUMANN(I)
+         END IF
       END DO
 
 
@@ -595,7 +579,7 @@ MODULE fields
       INTEGER :: V1, V2, V3
       INTEGER :: EDGE_PG
       LOGICAL, DIMENSION(:), ALLOCATABLE :: IS_UNUSED
-      REAL(KIND=8) :: COEFF1, COEFF2, COEFF3, NORMX, NORMY, MM
+      REAL(KIND=8) :: MM
 
       IF (GRID_TYPE == UNSTRUCTURED) THEN
          SIZE = U2D_GRID%NUM_NODES
@@ -689,7 +673,7 @@ MODULE fields
             ! We need to ADD to a sparse matrix entry.
             IF (IS_DIRICHLET(V1-1)) THEN
                CALL ST_MATRIX_SET(A_ST, V1-1, V1-1, 1.d0)
-            ELSE IF (.NOT. IS_NEUMANN(V1-1)) THEN
+            ELSE !IF (.NOT. IS_NEUMANN(V1-1)) THEN
                CALL ST_MATRIX_ADD(A_ST, V1-1, V1-1, MM*K11)
                CALL ST_MATRIX_ADD(A_ST, V1-1, V2-1, MM*K12)
                CALL ST_MATRIX_ADD(A_ST, V1-1, V3-1, MM*K13)
@@ -697,7 +681,7 @@ MODULE fields
             END IF
             IF (IS_DIRICHLET(V2-1)) THEN
                CALL ST_MATRIX_SET(A_ST, V2-1, V2-1, 1.d0)
-            ELSE IF (.NOT. IS_NEUMANN(V2-1)) THEN
+            ELSE !IF (.NOT. IS_NEUMANN(V2-1)) THEN
                CALL ST_MATRIX_ADD(A_ST, V2-1, V1-1, MM*K12)
                CALL ST_MATRIX_ADD(A_ST, V2-1, V3-1, MM*K23)
                CALL ST_MATRIX_ADD(A_ST, V2-1, V2-1, MM*K22)
@@ -705,65 +689,47 @@ MODULE fields
             END IF
             IF (IS_DIRICHLET(V3-1)) THEN
                CALL ST_MATRIX_SET(A_ST, V3-1, V3-1, 1.d0)
-            ELSE IF (.NOT. IS_NEUMANN(V3-1)) THEN
+            ELSE !IF (.NOT. IS_NEUMANN(V3-1)) THEN
                CALL ST_MATRIX_ADD(A_ST, V3-1, V1-1, MM*K13)
                CALL ST_MATRIX_ADD(A_ST, V3-1, V2-1, MM*K23)
                CALL ST_MATRIX_ADD(A_ST, V3-1, V3-1, MM*K33)
                RHS(V3-1) = RHS(V3-1) + PHI_FIELD(V1-1)*K13+PHI_FIELD(V2-1)*K23+PHI_FIELD(V3-1)*K33
             END IF
 
-            DO J = 1, 3
-               EDGE_PG = U2D_GRID%CELL_EDGES_PG(I, J)
-               IF (EDGE_PG == -1) CYCLE
-               IF (GRID_BC(EDGE_PG)%FIELD_BC == NEUMANN_BC) THEN
-                  NORMX = U2D_GRID%EDGE_NORMAL(I,J,1)
-                  NORMY = U2D_GRID%EDGE_NORMAL(I,J,2)
-                  COEFF1 = 0.5*( (Y2-Y3)*NORMX - (X2-X3)*NORMY)/AREA
-                  COEFF2 = 0.5*(-(Y1-Y3)*NORMX + (X1-X3)*NORMY)/AREA
-                  COEFF3 = 0.5*(-(Y2-Y1)*NORMX + (X2-X1)*NORMY)/AREA
+         ! Neumann part has to be included only if the derivative changes in time.
+         !    DO J = 1, 3
+         !       EDGE_PG = U2D_GRID%CELL_EDGES_PG(I, J)
+         !       IF (EDGE_PG == -1) CYCLE
+         !       IF (GRID_BC(EDGE_PG)%FIELD_BC == NEUMANN_BC) THEN
 
-                  IF (J==1) THEN
-                     IF (.NOT. IS_DIRICHLET(V1-1)) THEN
-                        CALL ST_MATRIX_ADD(A_ST, V1-1, V1-1, COEFF1)
-                        CALL ST_MATRIX_ADD(A_ST, V1-1, V2-1, COEFF2)
-                        CALL ST_MATRIX_ADD(A_ST, V1-1, V3-1, COEFF3)
-                        NEUMANN(V1-1) = NEUMANN(V1-1) + GRID_BC(EDGE_PG)%WALL_EFIELD
-                     END IF
-                     IF (.NOT. IS_DIRICHLET(V2-1)) THEN
-                        CALL ST_MATRIX_ADD(A_ST, V2-1, V1-1, COEFF1)
-                        CALL ST_MATRIX_ADD(A_ST, V2-1, V2-1, COEFF2)
-                        CALL ST_MATRIX_ADD(A_ST, V2-1, V3-1, COEFF3)
-                        NEUMANN(V2-1) = NEUMANN(V2-1) + GRID_BC(EDGE_PG)%WALL_EFIELD
-                     END IF                     
-                  ELSE IF (J==2) THEN
-                     IF (.NOT. IS_DIRICHLET(V2-1)) THEN
-                        CALL ST_MATRIX_ADD(A_ST, V2-1, V1-1, COEFF1)
-                        CALL ST_MATRIX_ADD(A_ST, V2-1, V2-1, COEFF2)
-                        CALL ST_MATRIX_ADD(A_ST, V2-1, V3-1, COEFF3)
-                        NEUMANN(V2-1) = NEUMANN(V2-1) + GRID_BC(EDGE_PG)%WALL_EFIELD
-                     END IF
-                     IF (.NOT. IS_DIRICHLET(V3-1)) THEN
-                        CALL ST_MATRIX_ADD(A_ST, V3-1, V1-1, COEFF1)
-                        CALL ST_MATRIX_ADD(A_ST, V3-1, V2-1, COEFF2)
-                        CALL ST_MATRIX_ADD(A_ST, V3-1, V3-1, COEFF3)
-                        NEUMANN(V3-1) = NEUMANN(V3-1) + GRID_BC(EDGE_PG)%WALL_EFIELD
-                     END IF
-                  ELSE
-                     IF (.NOT. IS_DIRICHLET(V3-1)) THEN
-                        CALL ST_MATRIX_ADD(A_ST, V3-1, V1-1, COEFF1)
-                        CALL ST_MATRIX_ADD(A_ST, V3-1, V2-1, COEFF2)
-                        CALL ST_MATRIX_ADD(A_ST, V3-1, V3-1, COEFF3)
-                        NEUMANN(V3-1) = NEUMANN(V3-1) + GRID_BC(EDGE_PG)%WALL_EFIELD
-                     END IF
-                     IF (.NOT. IS_DIRICHLET(V1-1)) THEN
-                        CALL ST_MATRIX_ADD(A_ST, V1-1, V1-1, COEFF1)
-                        CALL ST_MATRIX_ADD(A_ST, V1-1, V2-1, COEFF2)
-                        CALL ST_MATRIX_ADD(A_ST, V1-1, V3-1, COEFF3)
-                        NEUMANN(V1-1) = NEUMANN(V1-1) + GRID_BC(EDGE_PG)%WALL_EFIELD
-                     END IF
-                  END IF
-               END IF
-            END DO
+         !          IF (J==1) THEN
+         !             EDGELENGTH = SQRT((X2-X1)**2 + (Y2-Y1)**2)
+         !             IF (.NOT. IS_DIRICHLET(V1-1)) THEN
+         !                NEUMANN(V1-1) = NEUMANN(V1-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
+         !             END IF
+         !             IF (.NOT. IS_DIRICHLET(V2-1)) THEN
+         !                NEUMANN(V2-1) = NEUMANN(V2-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
+         !             END IF
+         !          ELSE IF (J==2) THEN
+         !             EDGELENGTH = SQRT((X3-X2)**2 + (Y3-Y2)**2)
+         !             IF (.NOT. IS_DIRICHLET(V2-1)) THEN
+         !                NEUMANN(V2-1) = NEUMANN(V2-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
+         !             END IF
+         !             IF (.NOT. IS_DIRICHLET(V3-1)) THEN
+         !                NEUMANN(V3-1) = NEUMANN(V3-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
+         !             END IF
+         !          ELSE
+         !             EDGELENGTH = SQRT((X1-X3)**2 + (Y1-Y3)**2)
+         !             IF (.NOT. IS_DIRICHLET(V1-1)) THEN
+         !                NEUMANN(V1-1) = NEUMANN(V1-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
+         !             END IF
+         !             IF (.NOT. IS_DIRICHLET(V3-1)) THEN
+         !                NEUMANN(V3-1) = NEUMANN(V3-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
+         !             END IF
+         !          END IF
+
+         !       END IF
+         !    END DO
 
          END DO
 
@@ -772,7 +738,7 @@ MODULE fields
                CALL ST_MATRIX_SET(A_ST, I, I, 1.d0)
                IS_DIRICHLET(I) = .TRUE.
                DIRICHLET(I) = 0.d0
-            ELSE IF ((.NOT. IS_DIRICHLET(I)) .AND. (.NOT. IS_NEUMANN(I)) ) THEN
+            ELSE IF (.NOT. IS_DIRICHLET(I) ) THEN
                RHS(I) = RHS(I) + 0.5*DT/EPS0*J_FIELD(I)
             END IF
          END DO
@@ -794,8 +760,11 @@ MODULE fields
       ! END IF
 
       DO I = 0, SIZE-1
-         IF (IS_DIRICHLET(I)) RHS(I)=DIRICHLET(I)
-         IF (IS_NEUMANN(I))   RHS(I)=NEUMANN(I)
+         IF (IS_DIRICHLET(I)) THEN
+            RHS(I)=DIRICHLET(I)
+         ELSE IF (IS_NEUMANN(I)) THEN
+            RHS(I)=RHS(I) + NEUMANN(I)
+         END IF
       END DO
 
       IF (PROC_ID .EQ. 0) THEN

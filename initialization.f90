@@ -896,7 +896,7 @@ MODULE initialization
 
       CHARACTER(LEN=*), INTENT(IN) :: DEFINITION
 
-      INTEGER :: N_STR, I, IPG, J, K
+      INTEGER :: N_STR, I, IPG
       CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
 
 

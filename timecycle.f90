@@ -83,7 +83,7 @@ MODULE timecycle
          CALL LINE_SOURCE_INJECT
          CALL BOUNDARIES_EMIT
 
-         CALL FIXED_IONIZATION
+         !CALL FIXED_IONIZATION
 
          ! ########### Advect particles ############################################
 
@@ -243,7 +243,7 @@ MODULE timecycle
       REAL(KIND=8)  :: M
       INTEGER       :: S_ID, i
 
-      REAL(KIND=8)  :: NDOT = 1.d13
+      REAL(KIND=8)  :: NDOT = 1.d12
 
       ! Print message 
       CALL ONLYMASTERPRINT1(PROC_ID, '> SEEDING IONIZED PARTICLES IN THE DOMAIN...')

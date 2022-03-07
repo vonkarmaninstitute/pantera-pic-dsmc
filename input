@@ -20,7 +20,7 @@ Number_of_cells:
 Domain_limits:
     -10.0    10.0    -10.0    10.0    0.0    1.0
 Mesh_file_SU2:
-    'langmuir_coarse.su2'
+    'langmuir_mid.su2'
 Domain_periodicity:
     .FALSE.   .FALSE.   .FALSE.
 Domain_specular:
@@ -49,11 +49,11 @@ Fluxes_dump_output:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.e7
+    1.e5
 Timestep:
-    1.0e-7
+    1.0e-8
 Number_of_timesteps:
-    10000
+    100000
 Stats_every:
     1
 
@@ -67,7 +67,7 @@ Binary_output:
 Dump_grid_start:
     0
 Dump_grid_avgevery:
-    10
+    100
 Dump_grid_numavgs:
     1
 
@@ -122,7 +122,7 @@ Thermal_bath_Ttr:
 Initial_particles_bool:
     .TRUE.
 Initial_particles_dens:
-    1.0e13
+    1.0e10
 Initial_particles_vel:
     0.  0.  0.
 Initial_particles_Ttra:
@@ -147,7 +147,7 @@ Boundary_condition:
     Inlet    vacuum
     
 Boundary_emit:
-    Inlet    Plasma    1.0e13    0.0    0.0    0.0    300.0    300.0    300.0
+    Inlet    Plasma    1.0e10    0.0    0.0    0.0    300.0    300.0    300.0
 
 Boundary_condition:
     Probe    dirichlet    0.0

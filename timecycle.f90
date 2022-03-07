@@ -233,7 +233,7 @@ MODULE timecycle
       IMPLICIT NONE
 
       INTEGER            :: IP, NP_INIT, IC
-      REAL(KIND=8)       :: Xp, Yp, Zp, VXp, VYp, VZp, EROT, EVIB, DOMAIN_VOLUME
+      REAL(KIND=8)       :: Xp, Yp, Zp, VXp, VYp, VZp, EROT, EVIB, DOMAIN_VOLUME, DTFRAC
       INTEGER            :: CID
 
       REAL(KIND=8), DIMENSION(3) :: V1, V2, V3
@@ -296,7 +296,9 @@ MODULE timecycle
                   CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, TROT_INIT, EROT)
                   CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, TVIB_INIT, EVIB)
 
-                  CALL INIT_PARTICLE(XP,YP,ZP,VXP,VYP,VZP,EROT,EVIB,S_ID,IC,DT, particleNOW) ! Save in particle
+                  DTFRAC = rf()*DT
+
+                  CALL INIT_PARTICLE(XP,YP,ZP,VXP,VYP,VZP,EROT,EVIB,S_ID,IC,DTFRAC, particleNOW) ! Save in particle
                   CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
                END DO
             END DO
@@ -341,7 +343,9 @@ MODULE timecycle
 
                CALL CELL_FROM_POSITION(XP,YP,  CID) ! Find cell containing particle
 
-               CALL INIT_PARTICLE(XP,YP,ZP,VXP,VYP,VZP,EROT,EVIB,S_ID,CID,DT, particleNOW) ! Save in particle
+               DTFRAC = rf()*DT
+
+               CALL INIT_PARTICLE(XP,YP,ZP,VXP,VYP,VZP,EROT,EVIB,S_ID,CID,DTFRAC, particleNOW) ! Save in particle
                CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
             END DO
          END IF
@@ -712,7 +716,7 @@ MODULE timecycle
             V_OLD(2) = particles(IP)%VY
             V_OLD(3) = particles(IP)%VZ
 
-            CALL UPDATE_VELOCITY_BORIS(DT, V_OLD, V_NEW, &
+            CALL UPDATE_VELOCITY_BORIS(particles(IP)%DTRIM, V_OLD, V_NEW, &
             SPECIES(particles(IP)%S_ID)%CHARGE, SPECIES(particles(IP)%S_ID)%MOLECULAR_MASS, &
             E, B)
 

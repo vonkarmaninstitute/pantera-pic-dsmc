@@ -831,7 +831,8 @@ MODULE fields
             J_FIELD(V2-1) = J_FIELD(V2-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI2DX + particles(JP)%VY*DPSI2DY)
             J_FIELD(V3-1) = J_FIELD(V3-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI3DX + particles(JP)%VY*DPSI3DY)
 
-            MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT**2/EPS0/VOL*FNUM*(QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
+            MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/VOL*FNUM &
+                              * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
          ELSE
 
             CALL ERROR_ABORT('Not implemented.')

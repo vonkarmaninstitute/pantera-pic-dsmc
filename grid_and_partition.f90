@@ -768,6 +768,7 @@ MODULE grid_and_partition
       IND(2,:) = [2,3]
       IND(3,:) = [3,1]
       ALLOCATE(U2D_GRID%EDGE_NORMAL(U2D_GRID%NUM_CELLS, 3, 2))
+      ALLOCATE(U2D_GRID%CELL_EDGES_LEN(U2D_GRID%NUM_CELLS, 3))
       DO I = 1, U2D_GRID%NUM_CELLS
          DO J = 1, 3
             X1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,IND(J,1)), 1)
@@ -775,6 +776,7 @@ MODULE grid_and_partition
             Y1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,IND(J,1)), 2)
             Y2 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,IND(J,2)), 2)
             LEN = SQRT((Y2-Y1)*(Y2-Y1) + (X2-X1)*(X2-X1))
+            U2D_GRID%CELL_EDGES_LEN(I,J) = LEN
             U2D_GRID%EDGE_NORMAL(I,J,1) = (Y2-Y1)/LEN
             U2D_GRID%EDGE_NORMAL(I,J,2) = (X1-X2)/LEN
          END DO

@@ -1847,7 +1847,11 @@ MODULE initialization
             FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) &
                            + SQRT(PI)*Snow*(1.+ERF1(Snow)))      ! Tot number flux emitted
 
-            AREA = LINELENGTH*(ZMAX-ZMIN)
+            IF (AXI) THEN
+               AREA = (ZMAX-ZMIN)*0.5*(Y1+Y2)*LINELENGTH
+            ELSE
+               AREA = LINELENGTH*(ZMAX-ZMIN)
+            END IF
 
             NtotINJECT = FLUXLINESOURCE*AREA*DT/FNUM         ! Tot num of particles to be injected
 

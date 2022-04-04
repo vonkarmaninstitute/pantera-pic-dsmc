@@ -209,10 +209,25 @@ MODULE timecycle
                DTFRAC = rf()*DT
 
                R = rf()
-               
-               X = X1 + R*(X2-X1)
-               Y = Y1 + R*(Y2-Y1)
-               Z = ZMIN + (ZMAX-ZMIN)*rf()
+               IF (AXI) THEN
+                  IF (Y1 == Y2) THEN
+                     Y = Y1
+                     X = X1 + R*(X2-X1)
+                     Z = 0
+                  ELSE IF (Y1 < Y2) THEN
+                     Y = SQRT(Y1*Y1 + R*(Y2*Y2 - Y1*Y1))
+                     X = X1 + (Y-Y1)/(Y2-Y1)*(X2-X1)
+                     Z = 0
+                  ELSE
+                     Y = SQRT(Y2*Y2 + R*(Y1*Y1 - Y2*Y2))
+                     X = X2 + (Y-Y2)/(Y1-Y2)*(X1-X2)
+                     Z = 0
+                  END IF
+               ELSE
+                  X = X1 + R*(X2-X1)
+                  Y = Y1 + R*(Y2-Y1)
+                  Z = ZMIN + (ZMAX-ZMIN)*rf()
+               END IF
 
                ! Init a particle object and assign it to the local vector of particles
                CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EROT,EVIB,S_ID,IC,DTFRAC,  particleNOW)
@@ -659,7 +674,7 @@ MODULE timecycle
       REAL(KIND=8), DIMENSION(2) :: TEST
       REAL(KIND=8), DIMENSION(4) :: NORMX, NORMY, XW, YW, ZW, BOUNDPOS
       ! REAL(KIND=8) :: XCOLL, YCOLL, ZCOLL
-      REAL(KIND=8) :: VN, DX
+      REAL(KIND=8) :: VN, DX, VR
       LOGICAL, DIMENSION(:), ALLOCATABLE :: REMOVE_PART
       REAL(KIND=8), DIMENSION(3) :: V_OLD, V_NEW
       REAL(KIND=8), DIMENSION(3) :: E, B
@@ -769,18 +784,124 @@ MODULE timecycle
                ! For unstructured, we only need to check the boundaries of the cell.
                BOUNDCOLL = -1
                DO I = 1, 3
-                  VN = particles(IP)%VX * U2D_GRID%EDGE_NORMAL(IC,I,1) &
-                     + particles(IP)%VY * U2D_GRID%EDGE_NORMAL(IC,I,2)
-                  ! Compute the distance from the boundary
-                  DX = (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),1) - particles(IP)%X) * U2D_GRID%EDGE_NORMAL(IC,I,1) &
-                     + (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),2) - particles(IP)%Y) * U2D_GRID%EDGE_NORMAL(IC,I,2)
-                  ! Check if a collision happens (sooner than previously calculated)
-                  IF (VN .GE. 0. .AND. VN * DTCOLL .GT. DX) THEN
 
-                     DTCOLL = DX/VN
-                     BOUNDCOLL = I
-                     TOTDTCOLL = TOTDTCOLL + DTCOLL  
-                     HASCOLLIDED = .TRUE.     
+                  IF (AXI) THEN
+                     !!!! DBDBDBDBDDBBDBDBDBDBDBDBDBDBDBDDB work on this. To be adapted to the three sides of the cell.
+                     ! We are axisymmetric
+                     ! CANDIDATE_DTCOLL = DTCOLL
+                     ! ! Compute auxiliary parameters
+                     ! IF (U2D_GRID%EDGE_NORMAL(IC,I,2) == 0.d0) THEN
+                     !    ! Vertical wall
+                     !    SOL1 = (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),1) - particles(IP)%X)/particles(IP)%VX
+                     !    IF (SOL1 >= 0 .AND. SOL1 < DTCOLL) THEN
+                     !       GOODSOL = 1
+                     !       TEST(1) = SOL1
+                     !    ELSE
+                     !       GOODSOL = 0
+                     !    END IF
+                     ! ELSE
+                     !    ! Non-vertical wall
+                     !    EDGE_X1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),1)
+                     !    EDGE_Y1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),2)
+                     !    ALPHA = -U2D_GRID%EDGE_NORMAL(IC,I,1)/U2D_GRID%EDGE_NORMAL(IC,I,2)
+                     !    BETA  = (particles(IP)%X - EDGE_X1)*ALPHA
+
+                     !    COEFA = particles(IP)%VY**2 + particles(IP)%VZ**2 - ALPHA*ALPHA*particles(IP)%VX**2
+                     !    COEFB = particles(IP)%Y * particles(IP)%VY - (BETA + EDGE_Y1)*ALPHA*particles(IP)%VX
+                     !    COEFC = particles(IP)%Y**2 - (BETA + EDGE_Y1)**2
+                     !    DELTA = COEFB*COEFB-COEFA*COEFC
+                     !    IF (DELTA .GE. 0) THEN
+                     !       ! Compute the solutions, check if they are any good and, in case, order them to be checked further.
+                     !       SOL1 = (-COEFB - SQRT(DELTA))/COEFA
+                     !       SOL2 = (-COEFB + SQRT(DELTA))/COEFA
+                     !       IF (SOL1 >= 0 .AND. SOL1 < DTCOLL .AND. BETA+ALPHA*particles(IP)%VX*SOL1+EDGE_Y1 >= 0) THEN
+                     !          IF (SOL2 >= 0 .AND. SOL2 < DTCOLL .AND. BETA+ALPHA*particles(IP)%VX*SOL2+EDGE_Y1 >= 0) THEN
+                     !             GOODSOL = 2
+                     !             IF (SOL1 <= SOL2) THEN
+                     !                TEST(1) = SOL1
+                     !                TEST(2) = SOL2
+                     !             ELSE
+                     !                TEST(1) = SOL2
+                     !                TEST(2) = SOL1
+                     !             END IF
+                     !          ELSE
+                     !             GOODSOL = 1
+                     !             TEST(1) = SOL1
+                     !          ENDIF
+                     !       ELSE
+                     !          IF (SOL2 >= 0 .AND. SOL2 < DTCOLL .AND. BETA+ALPHA*particles(IP)%VX*SOL2+EDGE_Y1 >= 0) THEN
+                     !             GOODSOL = 1
+                     !             TEST(1) = SOL2
+                     !          ELSE
+                     !             GOODSOL = 0
+                     !          END IF 
+                     !       END IF
+                     !    ELSE
+                     !       GOODSOL = 0
+                     !    END IF
+                     ! END IF
+
+                     ! ! Now further checks for each of the good solutions:
+                     ! ! - if the velocity at collision time is actually towards the surface
+                     ! ! - if the collision point is within the extremes of the segment
+                     ! ! Note: this requires moving the particle to the collision point and then moving back.
+                     ! IF (GOODSOL /= 0) THEN
+                     !    DO SOL = 1, GOODSOL
+                     !       CALL MOVE_PARTICLE(IP, TEST(SOL))
+                     !       IF ((particles(IP)%VX*U2D_GRID%EDGE_NORMAL(IC,I,1) &
+                     !          + particles(IP)%VY*U2D_GRID%EDGE_NORMAL(IC,I,2)) > 0) THEN
+
+                     !             !DBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBBDBDBDBDBDBDBDBDBDB
+                     !          COLLDIST = ((particles(IP)%X-WALLS(i)%X1)*(WALLS(i)%X2-WALLS(i)%X1) &
+                     !                   + (particles(IP)%Y-WALLS(i)%Y1)*(WALLS(i)%Y2-WALLS(i)%Y1)) &
+                     !                   / ((WALLS(i)%X2-WALLS(i)%X1)**2 + (WALLS(i)%Y2-WALLS(i)%Y1)**2)
+                     !          IF ((COLLDIST .GE. 0) .AND. (COLLDIST .LE. 1)) THEN
+                     !             ! Collision happens!
+                     !             DTCOLL = TEST(SOL)
+                     !             BOUNDCOLL = I  
+                     !             TOTDTCOLL = TOTDTCOLL + DTCOLL  
+                     !             HASCOLLIDED = .TRUE.
+                     !          END IF
+                     !       END IF
+                     !       CALL MOVE_PARTICLE(IP, -TEST(SOL))
+                     !    END DO
+                     ! END IF
+
+                     ! We are axisymmetric
+                     ! This is the simplified axisymmetric mover. The correct version is above, but colldist should be computed correctly.
+                     VR = SQRT(particles(IP)%VY**2 + particles(IP)%VZ**2)
+                     VN = particles(IP)%VX * U2D_GRID%EDGE_NORMAL(IC,I,1) &
+                                      + VR * U2D_GRID%EDGE_NORMAL(IC,I,2)
+                     ! Compute the distance from the boundary
+                     DX = (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),1) - particles(IP)%X) * U2D_GRID%EDGE_NORMAL(IC,I,1) &
+                        + (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),2) - particles(IP)%Y) * U2D_GRID%EDGE_NORMAL(IC,I,2)
+                     ! Check if a collision happens (sooner than previously calculated)
+                     IF (VN .GE. 0. .AND. VN * DTCOLL .GT. DX) THEN
+
+                        DTCOLL = DX/VN
+                        BOUNDCOLL = I
+                        TOTDTCOLL = TOTDTCOLL + DTCOLL  
+                        HASCOLLIDED = .TRUE.     
+
+                     END IF
+
+
+                  ELSE
+                     ! We are not axisymmetric
+                     VN = particles(IP)%VX * U2D_GRID%EDGE_NORMAL(IC,I,1) &
+                        + particles(IP)%VY * U2D_GRID%EDGE_NORMAL(IC,I,2)
+                     ! Compute the distance from the boundary
+                     DX = (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),1) - particles(IP)%X) * U2D_GRID%EDGE_NORMAL(IC,I,1) &
+                        + (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),2) - particles(IP)%Y) * U2D_GRID%EDGE_NORMAL(IC,I,2)
+                     ! Check if a collision happens (sooner than previously calculated)
+                     IF (VN .GE. 0. .AND. VN * DTCOLL .GT. DX) THEN
+
+                        DTCOLL = DX/VN
+                        BOUNDCOLL = I
+                        TOTDTCOLL = TOTDTCOLL + DTCOLL  
+                        HASCOLLIDED = .TRUE.     
+
+                     END IF
 
                   END IF
                END DO
@@ -793,6 +914,7 @@ MODULE timecycle
                   IF (U2D_GRID%CELL_NEIGHBORS(IC, BOUNDCOLL) == -1) THEN
                      EDGE_PG = U2D_GRID%CELL_EDGES_PG(IC, BOUNDCOLL)
                      IF (EDGE_PG .NE. -1) THEN
+                        ! Apply particle boundary condition
                         IF (GRID_BC(EDGE_PG)%PARTICLE_BC == SPECULAR) THEN
                            IF (GRID_BC(EDGE_PG)%REACT) THEN
                               CALL WALL_REACT(IP, REMOVE_PART(IP))

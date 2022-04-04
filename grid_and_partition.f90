@@ -593,7 +593,7 @@ MODULE grid_and_partition
 
       INTEGER            :: NUM, I, J, FOUND, V1, V2, ELEM_TYPE, NUMELEMS, IC
       INTEGER, DIMENSION(3,2) :: IND
-      REAL(KIND=8)       :: X1, X2, Y1, Y2, LEN
+      REAL(KIND=8)       :: X1, X2, Y1, Y2, LEN, RAD
       REAL(KIND=8), DIMENSION(3) :: XYZ, A, B, C
 
       INTEGER, DIMENSION(:,:), ALLOCATABLE      :: TEMP_CELL_NEIGHBORS
@@ -717,8 +717,12 @@ MODULE grid_and_partition
          C = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,3), :)
 
          IF (DIMS == 2 .AND. .NOT. AXI) THEN
-            CELL_VOLUMES(I) = 0.5*ABS(A(1)*(B(2)-C(2)) + B(1)*(C(2)-A(2)) + C(1)*(A(2)-B(2)))
+            CELL_VOLUMES(I) = 0.5*ABS(A(1)*(B(2)-C(2)) + B(1)*(C(2)-A(2)) + C(1)*(A(2)-B(2))) * (ZMAX-ZMIN)
             !WRITE(*,*) CELL_VOLUMES(I)
+         END IF
+         IF (DIMS == 2 .AND. AXI) THEN
+            RAD = (A(2)+B(2)+C(2))/3.
+            CELL_VOLUMES(I) = 0.5*ABS(A(1)*(B(2)-C(2)) + B(1)*(C(2)-A(2)) + C(1)*(A(2)-B(2))) * (ZMAX-ZMIN)*RAD
          END IF
       END DO
 

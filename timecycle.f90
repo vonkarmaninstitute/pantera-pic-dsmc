@@ -851,8 +851,8 @@ MODULE timecycle
                            IF ((particles(IP)%VX*U2D_GRID%EDGE_NORMAL(IC,I,1) &
                               + particles(IP)%VY*U2D_GRID%EDGE_NORMAL(IC,I,2)) > 0) THEN
 
-                              COLLDIST = -U2D_GRID%EDGE_NORMAL(IC,I,2)*(particles(IP)%X-EDGE_X1)/U2D_GRID%CELL_EDGE_LEN(IC,I) &
-                                         +U2D_GRID%EDGE_NORMAL(IC,I,1)*(particles(IP)%Y-EDGE_Y1)/U2D_GRID%CELL_EDGE_LEN(IC,I)*
+                              COLLDIST = -U2D_GRID%EDGE_NORMAL(IC,I,2)*(particles(IP)%X-EDGE_X1)/U2D_GRID%CELL_EDGES_LEN(IC,I) &
+                                         +U2D_GRID%EDGE_NORMAL(IC,I,1)*(particles(IP)%Y-EDGE_Y1)/U2D_GRID%CELL_EDGES_LEN(IC,I)
                               IF ((COLLDIST .GE. 0) .AND. (COLLDIST .LE. 1)) THEN
                                  ! Collision happens!
                                  DTCOLL = TEST(SOL)

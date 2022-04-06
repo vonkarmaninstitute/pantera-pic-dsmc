@@ -790,9 +790,12 @@ MODULE timecycle
                      ! We are axisymmetric
                      CANDIDATE_DTCOLL = DTCOLL
                      ! Compute auxiliary parameters
+                     EDGE_X1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),1)
+                     EDGE_Y1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),2)
+
                      IF (U2D_GRID%EDGE_NORMAL(IC,I,2) == 0.d0) THEN
                         ! Vertical wall
-                        SOL1 = (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),1) - particles(IP)%X)/particles(IP)%VX
+                        SOL1 = (EDGE_X1 - particles(IP)%X)/particles(IP)%VX
                         IF (SOL1 >= 0 .AND. SOL1 < DTCOLL) THEN
                            GOODSOL = 1
                            TEST(1) = SOL1
@@ -801,8 +804,6 @@ MODULE timecycle
                         END IF
                      ELSE
                         ! Non-vertical wall
-                        EDGE_X1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),1)
-                        EDGE_Y1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),2)
                         ALPHA = -U2D_GRID%EDGE_NORMAL(IC,I,1)/U2D_GRID%EDGE_NORMAL(IC,I,2)
                         BETA  = (particles(IP)%X - EDGE_X1)*ALPHA
 

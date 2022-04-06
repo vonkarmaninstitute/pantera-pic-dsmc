@@ -103,7 +103,7 @@ MODULE fields
          !DIRICHLET(0) = 0.d0
 
          DO I = 1, U2D_GRID%NUM_CELLS
-            AREA = CELL_VOLUMES(I)
+            AREA = CELL_AREAS(I)
             V1 = U2D_GRID%CELL_NODES(I,1)
             V2 = U2D_GRID%CELL_NODES(I,2)
             V3 = U2D_GRID%CELL_NODES(I,3)            
@@ -378,7 +378,7 @@ MODULE fields
 
          ! Compute the electric field at grid points
          DO I = 1, U2D_GRID%NUM_CELLS
-            AREA = CELL_VOLUMES(I)
+            AREA = CELL_AREAS(I)
             V1 = U2D_GRID%CELL_NODES(I,1)
             V2 = U2D_GRID%CELL_NODES(I,2)
             V3 = U2D_GRID%CELL_NODES(I,3)            
@@ -652,7 +652,7 @@ MODULE fields
          !DIRICHLET(0) = 0.d0
 
          DO I = 1, U2D_GRID%NUM_CELLS
-            AREA = CELL_VOLUMES(I)
+            AREA = CELL_AREAS(I)
             V1 = U2D_GRID%CELL_NODES(I,1)
             V2 = U2D_GRID%CELL_NODES(I,2)
             V3 = U2D_GRID%CELL_NODES(I,3)            
@@ -902,7 +902,7 @@ MODULE fields
 
          ! Compute the electric field at grid points
          DO I = 1, U2D_GRID%NUM_CELLS
-            AREA = CELL_VOLUMES(I)
+            AREA = CELL_AREAS(I)
             V1 = U2D_GRID%CELL_NODES(I,1)
             V2 = U2D_GRID%CELL_NODES(I,2)
             V3 = U2D_GRID%CELL_NODES(I,3)            

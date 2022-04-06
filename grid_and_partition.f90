@@ -710,19 +710,21 @@ MODULE grid_and_partition
       !END DO
 
       ! Compute cell volumes
+      ALLOCATE(CELL_AREAS(U2D_GRID%NUM_CELLS))
       ALLOCATE(CELL_VOLUMES(U2D_GRID%NUM_CELLS))
       DO I = 1, U2D_GRID%NUM_CELLS
          A = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,1), :)
          B = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,2), :)
          C = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,3), :)
 
+         CELL_AREAS(I) = 0.5*ABS(A(1)*(B(2)-C(2)) + B(1)*(C(2)-A(2)) + C(1)*(A(2)-B(2)))
          IF (DIMS == 2 .AND. .NOT. AXI) THEN
-            CELL_VOLUMES(I) = 0.5*ABS(A(1)*(B(2)-C(2)) + B(1)*(C(2)-A(2)) + C(1)*(A(2)-B(2))) * (ZMAX-ZMIN)
+            CELL_VOLUMES(I) = CELL_AREAS(I) * (ZMAX-ZMIN)
             !WRITE(*,*) CELL_VOLUMES(I)
          END IF
          IF (DIMS == 2 .AND. AXI) THEN
             RAD = (A(2)+B(2)+C(2))/3.
-            CELL_VOLUMES(I) = 0.5*ABS(A(1)*(B(2)-C(2)) + B(1)*(C(2)-A(2)) + C(1)*(A(2)-B(2))) * (ZMAX-ZMIN)*RAD
+            CELL_VOLUMES(I) = CELL_AREAS(I) * (ZMAX-ZMIN)*RAD
          END IF
       END DO
 

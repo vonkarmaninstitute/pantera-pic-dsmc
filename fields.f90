@@ -602,7 +602,7 @@ MODULE fields
                DO J = 1, 3
                   IN = U2D_GRID%CELL_NODES(IC,J)
                   BK(IN-1) = BK(IN-1) + QE/EPS0*CELL_AREAS(IC)/3*BOLTZ_NRHOE(IN)
-                  DBDPHI(IN) = DBDPHI(IN) + QE*QE/(EPS0*KB*BOLTZ_TE)*CELL_AREAS(IC)/3*BOLTZ_NRHOE(IN)
+                  DBDPHI(IN-1) = DBDPHI(IN-1) + QE*QE/(EPS0*KB*BOLTZ_TE)*CELL_AREAS(IC)/3*BOLTZ_NRHOE(IN)
                END DO
             END DO
 
@@ -615,7 +615,7 @@ MODULE fields
             ALLOCATE(JAC_ST%CIDX, SOURCE = A_ST%CIDX)
 
             DO IN = 1, SIZE
-               CALL ST_MATRIX_ADD(JAC_ST, IN-1, IN-1, -DBDPHI(IN))
+               CALL ST_MATRIX_ADD(JAC_ST, IN-1, IN-1, -DBDPHI(IN-1))
             END DO
 
             CALL ST_MATRIX_TO_CC(JAC_ST, SIZE, JAC_CC)

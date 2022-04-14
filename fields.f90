@@ -608,6 +608,7 @@ MODULE fields
 
             CALL ST_MATRIX_MULT(A_ST, PHIK, AX)
             FK = AX - RHS - BK
+            DEALLOCATE(AX)
 
             JAC_ST%NNZ = A_ST%NNZ
             ALLOCATE(JAC_ST%VALUE, SOURCE = A_ST%VALUE)
@@ -632,7 +633,6 @@ MODULE fields
 
          DEALLOCATE(BK)
          DEALLOCATE(DBDPHI)
-         DEALLOCATE(AX)
          DEALLOCATE(PHIK)
          CALL ST_MATRIX_DEALLOCATE(JAC_ST)
          CALL CC_MATRIX_DEALLOCATE(JAC_CC)

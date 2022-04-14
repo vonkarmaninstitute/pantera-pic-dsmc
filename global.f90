@@ -566,7 +566,7 @@ CONTAINS  ! @@@@@@@@@@@@@@@@@@@@@ SUBROUTINES @@@@@@@@@@@@@@@@@@@@@@@@
       RESULT = 0.d0
 
       DO I = 0, THIS%NNZ-1
-         RESULT(THIS%RIDX(I)+1) = RESULT(THIS%RIDX(I)+1) + THIS%VALUE(I)*VECTOR(THIS%CIDX(I)+1)
+         RESULT(THIS%RIDX(I)) = RESULT(THIS%RIDX(I)) + THIS%VALUE(I)*VECTOR(THIS%CIDX(I))
       END DO
 
    END SUBROUTINE ST_MATRIX_MULT

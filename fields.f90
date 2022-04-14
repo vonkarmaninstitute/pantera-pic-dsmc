@@ -597,6 +597,7 @@ MODULE fields
          DO ITERATION = 1, 10
             WRITE(*,*) '---> Starting iteration ', ITERATION
             
+            WRITE(*,*) PHIK
             DO IN = 1, SIZE
                BOLTZ_NRHOE(IN) = BOLTZ_N0*EXP( QE*(PHIK(IN-1) - BOLTZ_PHI0) / (KB*BOLTZ_TE) )
             END DO

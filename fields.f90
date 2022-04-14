@@ -606,7 +606,15 @@ MODULE fields
                END DO
             END DO
 
-            CALL ST_MATRIX_MULT(A_ST, PHIK, AX)
+            !CALL ST_MATRIX_MULT(A_ST, PHIK, AX)
+            ALLOCATE( AX(0:SIZE-1) )
+            AX = 0.d0
+      
+            DO J = 0, A_ST%NNZ-1
+               AX(A_ST%RIDX(J)) = AX(A_ST%RIDX(J)) + A_ST%VALUE(J)*PHIK(A_ST%CIDX(J))
+            END DO
+
+            ALLOCATE(FK(0:SIZE-1))
             FK = AX - RHS - BK
             DEALLOCATE(AX)
 
@@ -624,6 +632,7 @@ MODULE fields
             CALL S_UMFPACK_NUMERIC(JAC_CC%AP, JAC_CC%AI, JAC_CC%AX, STATUS = STATUS)
             CALL S_UMFPACK_FREE_SYMBOLIC
             CALL S_UMFPACK_SOLVE(UMFPACK_A, JAC_CC%AP, JAC_CC%AI, JAC_CC%AX, YK, FK)
+            DEALLOCATE(FK)
             PHIK = PHIK - YK
             CALL S_UMFPACK_FREE_NUMERIC
 

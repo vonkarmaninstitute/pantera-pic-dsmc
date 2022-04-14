@@ -31,7 +31,11 @@ MODULE timecycle
 
       IF (BOOL_PIC) THEN
          CALL DEPOSIT_CHARGE
-         CALL SOLVE_POISSON
+         IF (BOOL_FLUID_ELECTRONS) THEN
+            CALL SOLVE_POISSON_NONLINEAR
+         ELSE
+            CALL SOLVE_POISSON
+         END IF
          IF (BOOL_PIC_IMPLICIT) THEN
             CALL DEPOSIT_CURRENT
             CALL ASSEMBLE_AMPERE
@@ -144,7 +148,11 @@ MODULE timecycle
                CALL SOLVE_AMPERE
             ELSE
                CALL DEPOSIT_CHARGE
-               CALL SOLVE_POISSON
+               IF (BOOL_FLUID_ELECTRONS) THEN
+                  CALL SOLVE_POISSON_NONLINEAR
+               ELSE
+                  CALL SOLVE_POISSON
+               END IF
             END IF
          END IF
          

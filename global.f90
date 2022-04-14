@@ -54,8 +54,11 @@ MODULE global
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: XSIZE, YSIZE
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CELL_VOLUMES
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CELL_AREAS
-   LOGICAL :: BOOL_FLUID_ELECTRONS
    
+   LOGICAL :: BOOL_FLUID_ELECTRONS
+   REAL(KIND=8) :: BOLTZ_N0, BOLTZ_PHI0, BOLTZ_TE
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: BOLTZ_NRHOE
+
    ENUM, BIND(C)
       ENUMERATOR RECTILINEAR_UNIFORM, RECTILINEAR_NONUNIFORM, QUADTREE, UNSTRUCTURED
    END ENUM
@@ -157,6 +160,8 @@ MODULE global
       INTEGER, DIMENSION(:), ALLOCATABLE      :: RIDX, CIDX
       INTEGER :: NNZ
    END TYPE ST_MATRIX
+
+   TYPE(ST_MATRIX) :: A_ST
 
    TYPE CC_MATRIX
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AX
@@ -541,6 +546,30 @@ CONTAINS  ! @@@@@@@@@@@@@@@@@@@@@ SUBROUTINES @@@@@@@@@@@@@@@@@@@@@@@@
       THIS%NNZ = THIS%NNZ + 1
 
    END SUBROUTINE ST_MATRIX_ADD
+
+
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE ST_MATRIX_MULT -> Computes the matrix-vector product    !
+   ! The matrix and vectors are zero-indexed!                           !
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+   SUBROUTINE ST_MATRIX_MULT(THIS, VECTOR, RESULT)
+
+      IMPLICIT NONE
+
+      TYPE(ST_MATRIX), INTENT(IN) :: THIS
+      REAL(KIND=8), DIMENSION(:), INTENT(IN) :: VECTOR
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE, INTENT(OUT) :: RESULT
+      INTEGER :: I
+
+      ALLOCATE( RESULT(0:MAXVAL(THIS%RIDX)) )
+      RESULT = 0.d0
+
+      DO I = 0, THIS%NNZ-1
+         RESULT(THIS%RIDX(I)+1) = RESULT(THIS%RIDX(I)+1) + THIS%VALUE(I)*VECTOR(THIS%CIDX(I)+1)
+      END DO
+
+   END SUBROUTINE ST_MATRIX_MULT
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE ST_MATRIX_TO_CC -> Converts a sparse triplet matrix to  !

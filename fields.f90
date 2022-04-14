@@ -21,7 +21,6 @@ MODULE fields
       INTEGER :: I, J
       INTEGER :: IC, IS, IW, IN, IE
       INTEGER :: MAXNNZ, SIZE
-      TYPE(ST_MATRIX) :: A_ST
       REAL(KIND=8) :: HX, HY
       REAL(KIND=8) :: AX, AY, BX, BY, CX, CY, H1X, H2X, H1Y, H2Y, R
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA, EDGELENGTH
@@ -567,6 +566,78 @@ MODULE fields
 
    END SUBROUTINE DEPOSIT_CHARGE
 
+
+
+   SUBROUTINE SOLVE_POISSON_NONLINEAR
+      
+      IMPLICIT NONE
+
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AX, YK, FK, BK, DBDPHI, PHIK
+      TYPE(ST_MATRIX) :: JAC_ST
+      TYPE(CC_MATRIX) :: JAC_CC
+      INTEGER :: J, IC, IN, SIZE, ITERATION, STATUS
+
+      IF (PROC_ID .EQ. 0) THEN
+
+         SIZE = U2D_GRID%NUM_NODES
+
+         PHIK = PHI_FIELD
+         ALLOCATE(BK(0:SIZE-1))
+         ALLOCATE(DBDPHI(0:SIZE-1))
+         IF (.NOT. ALLOCATED(BOLTZ_NRHOE)) ALLOCATE(BOLTZ_NRHOE(SIZE))
+
+         DO ITERATION = 1, 10
+            WRITE(*,*) '---> Starting iteration ', ITERATION
+            
+            DO IN = 1, SIZE
+               BOLTZ_NRHOE(IN) = BOLTZ_N0*EXP( QE*(PHIK(IN-1) - BOLTZ_PHI0) / (KB*BOLTZ_TE) )
+            END DO
+
+            BK = 0.d0
+            DBDPHI = 0.d0
+            DO IC = 1, U2D_GRID%NUM_CELLS
+               DO J = 1, 3
+                  IN = U2D_GRID%CELL_NODES(IC,J)
+                  BK(IN-1) = BK(IN-1) + QE/EPS0*CELL_AREAS(IC)/3*BOLTZ_NRHOE(IN)
+                  DBDPHI(IN) = DBDPHI(IN) + QE*QE/(EPS0*KB*BOLTZ_TE)*CELL_AREAS(IC)/3*BOLTZ_NRHOE(IN)
+               END DO
+            END DO
+
+            CALL ST_MATRIX_MULT(A_ST, PHIK, AX)
+            FK = AX - RHS - BK
+
+            JAC_ST%NNZ = A_ST%NNZ
+            ALLOCATE(JAC_ST%VALUE, SOURCE = A_ST%VALUE)
+            ALLOCATE(JAC_ST%RIDX, SOURCE = A_ST%RIDX)
+            ALLOCATE(JAC_ST%CIDX, SOURCE = A_ST%CIDX)
+
+            DO IN = 1, SIZE
+               CALL ST_MATRIX_ADD(JAC_ST, IN-1, IN-1, -DBDPHI(IN))
+            END DO
+
+            CALL ST_MATRIX_TO_CC(JAC_ST, SIZE, JAC_CC)
+            CALL S_UMFPACK_SYMBOLIC(SIZE, SIZE, JAC_CC%AP, JAC_CC%AI, JAC_CC%AX, STATUS = STATUS)
+            CALL S_UMFPACK_NUMERIC(JAC_CC%AP, JAC_CC%AI, JAC_CC%AX, STATUS = STATUS)
+            CALL S_UMFPACK_FREE_SYMBOLIC
+            CALL S_UMFPACK_SOLVE(UMFPACK_A, JAC_CC%AP, JAC_CC%AI, JAC_CC%AX, YK, FK)
+            PHIK = PHIK - YK
+            CALL S_UMFPACK_FREE_NUMERIC
+
+            IF (NORM2(YK) < 1.d-6) EXIT
+         END DO
+         PHI_FIELD = PHIK
+
+         DEALLOCATE(BK)
+         DEALLOCATE(DBDPHI)
+         DEALLOCATE(AX)
+         DEALLOCATE(PHIK)
+         CALL ST_MATRIX_DEALLOCATE(JAC_ST)
+         CALL CC_MATRIX_DEALLOCATE(JAC_CC)
+      END IF
+
+      CALL MPI_BCAST(PHI_FIELD, SIZE, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+
+   END SUBROUTINE SOLVE_POISSON_NONLINEAR
 
 
    SUBROUTINE ASSEMBLE_AMPERE

@@ -584,9 +584,9 @@ MODULE fields
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, AREA
       INTEGER :: V1, V2, V3
 
-      IF (PROC_ID .EQ. 0) THEN
+      SIZE = U2D_GRID%NUM_NODES
 
-         SIZE = U2D_GRID%NUM_NODES
+      IF (PROC_ID .EQ. 0) THEN
 
          ALLOCATE(PHIK, SOURCE = PHI_FIELD)
          ALLOCATE(BK(0:SIZE-1))
@@ -597,7 +597,7 @@ MODULE fields
          DO ITERATION = 1, 10
             WRITE(*,*) '---> Starting iteration ', ITERATION
             
-            WRITE(*,*) PHIK
+            !WRITE(*,*) PHIK
             DO IN = 1, SIZE
                BOLTZ_NRHOE(IN) = BOLTZ_N0*EXP( QE*(PHIK(IN-1) - BOLTZ_PHI0) / (KB*BOLTZ_TE) )
             END DO
@@ -610,6 +610,7 @@ MODULE fields
                   IF (.NOT. IS_DIRICHLET(IN-1)) THEN
                      BK(IN-1) = BK(IN-1) + QE/EPS0*CELL_AREAS(IC)/3*BOLTZ_NRHOE(IN)
                      DBDPHI(IN-1) = DBDPHI(IN-1) + QE*QE/(EPS0*KB*BOLTZ_TE)*CELL_AREAS(IC)/3*BOLTZ_NRHOE(IN)
+                     !DBDPHI(IN-1) = DBDPHI(IN-1) + QE*QE/(EPS0*KB*BOLTZ_TE)*CELL_AREAS(IC)/3*BOLTZ_N0
                   END IF
                END DO
             END DO
@@ -658,32 +659,33 @@ MODULE fields
          DEALLOCATE(PHIK)
          DEALLOCATE(YK)
 
-         PHIBAR_FIELD = PHI_FIELD
-         ! Compute the electric field at grid points
-         DO I = 1, U2D_GRID%NUM_CELLS
-            AREA = CELL_AREAS(I)
-            V1 = U2D_GRID%CELL_NODES(I,1)
-            V2 = U2D_GRID%CELL_NODES(I,2)
-            V3 = U2D_GRID%CELL_NODES(I,3)            
-            X1 = U2D_GRID%NODE_COORDS(V1, 1)
-            X2 = U2D_GRID%NODE_COORDS(V2, 1)
-            X3 = U2D_GRID%NODE_COORDS(V3, 1)
-            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
-
-            E_FIELD(I,1,1) = -0.5/AREA*(  PHI_FIELD(V1-1)*(Y2-Y3) &
-                                        - PHI_FIELD(V2-1)*(Y1-Y3) &
-                                        - PHI_FIELD(V3-1)*(Y2-Y1))
-            E_FIELD(I,1,2) = -0.5/AREA*(- PHI_FIELD(V1-1)*(X2-X3) &
-                                        + PHI_FIELD(V2-1)*(X1-X3) &
-                                        + PHI_FIELD(V3-1)*(X2-X1))
-            E_FIELD(I,1,3) = 0.d0
-         END DO
-
       END IF
 
       CALL MPI_BCAST(PHI_FIELD, SIZE, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+
+      PHIBAR_FIELD = PHI_FIELD
+      ! Compute the electric field at grid points
+      DO I = 1, U2D_GRID%NUM_CELLS
+         AREA = CELL_AREAS(I)
+         V1 = U2D_GRID%CELL_NODES(I,1)
+         V2 = U2D_GRID%CELL_NODES(I,2)
+         V3 = U2D_GRID%CELL_NODES(I,3)            
+         X1 = U2D_GRID%NODE_COORDS(V1, 1)
+         X2 = U2D_GRID%NODE_COORDS(V2, 1)
+         X3 = U2D_GRID%NODE_COORDS(V3, 1)
+         Y1 = U2D_GRID%NODE_COORDS(V1, 2)
+         Y2 = U2D_GRID%NODE_COORDS(V2, 2)
+         Y3 = U2D_GRID%NODE_COORDS(V3, 2)
+
+         E_FIELD(I,1,1) = -0.5/AREA*(  PHI_FIELD(V1-1)*(Y2-Y3) &
+                                     - PHI_FIELD(V2-1)*(Y1-Y3) &
+                                     - PHI_FIELD(V3-1)*(Y2-Y1))
+         E_FIELD(I,1,2) = -0.5/AREA*(- PHI_FIELD(V1-1)*(X2-X3) &
+                                     + PHI_FIELD(V2-1)*(X1-X3) &
+                                     + PHI_FIELD(V3-1)*(X2-X1))
+         E_FIELD(I,1,3) = 0.d0
+      END DO
+
 
    END SUBROUTINE SOLVE_POISSON_NONLINEAR
 

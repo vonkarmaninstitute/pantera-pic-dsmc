@@ -24,6 +24,7 @@ MODULE fields
       REAL(KIND=8) :: HX, HY
       REAL(KIND=8) :: AX, AY, BX, BY, CX, CY, H1X, H2X, H1Y, H2Y, R
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA, EDGELENGTH
+      REAL(KIND=8) :: D11, D22, D33
       INTEGER :: V1, V2, V3
       INTEGER :: EDGE_PG
       LOGICAL, DIMENSION(:), ALLOCATABLE :: IS_UNUSED
@@ -121,28 +122,37 @@ MODULE fields
             K12 =-0.25*((Y2-Y3)*(Y1-Y3) + (X2-X3)*(X1-X3))/AREA
             K23 = 0.25*((Y1-Y3)*(Y2-Y1) + (X1-X3)*(X2-X1))/AREA
             K13 =-0.25*((Y2-Y3)*(Y2-Y1) + (X2-X3)*(X2-X1))/AREA
+            IF (AXI) THEN
+               D11 =-(X2-X3)/(Y1+Y2+Y3)
+               D22 = (X1-X3)/(Y1+Y2+Y3)
+               D33 = (X2-X1)/(Y1+Y2+Y3)
+            ELSE
+               D11 = 0.d0
+               D22 = 0.d0
+               D33 = 0.d0
+            END IF
 
             ! We need to ADD to a sparse matrix entry.
             IF (IS_DIRICHLET(V1-1)) THEN
                CALL ST_MATRIX_SET(A_ST, V1-1, V1-1, 1.d0)
             ELSE !IF (.NOT. IS_NEUMANN(V1-1)) THEN
-               CALL ST_MATRIX_ADD(A_ST, V1-1, V1-1, K11)
-               CALL ST_MATRIX_ADD(A_ST, V1-1, V2-1, K12)
-               CALL ST_MATRIX_ADD(A_ST, V1-1, V3-1, K13)
+               CALL ST_MATRIX_ADD(A_ST, V1-1, V1-1, K11-D11)
+               CALL ST_MATRIX_ADD(A_ST, V1-1, V2-1, K12-D22)
+               CALL ST_MATRIX_ADD(A_ST, V1-1, V3-1, K13-D33)
             END IF
             IF (IS_DIRICHLET(V2-1)) THEN
                CALL ST_MATRIX_SET(A_ST, V2-1, V2-1, 1.d0)
             ELSE !IF (.NOT. IS_NEUMANN(V2-1)) THEN
-               CALL ST_MATRIX_ADD(A_ST, V2-1, V1-1, K12)
-               CALL ST_MATRIX_ADD(A_ST, V2-1, V3-1, K23)
-               CALL ST_MATRIX_ADD(A_ST, V2-1, V2-1, K22)
+               CALL ST_MATRIX_ADD(A_ST, V2-1, V1-1, K12-D11)
+               CALL ST_MATRIX_ADD(A_ST, V2-1, V3-1, K23-D22)
+               CALL ST_MATRIX_ADD(A_ST, V2-1, V2-1, K22-D33)
             END IF
             IF (IS_DIRICHLET(V3-1)) THEN
                CALL ST_MATRIX_SET(A_ST, V3-1, V3-1, 1.d0)
             ELSE !IF (.NOT. IS_NEUMANN(V3-1)) THEN
-               CALL ST_MATRIX_ADD(A_ST, V3-1, V1-1, K13)
-               CALL ST_MATRIX_ADD(A_ST, V3-1, V2-1, K23)
-               CALL ST_MATRIX_ADD(A_ST, V3-1, V3-1, K33)
+               CALL ST_MATRIX_ADD(A_ST, V3-1, V1-1, K13-D11)
+               CALL ST_MATRIX_ADD(A_ST, V3-1, V2-1, K23-D22)
+               CALL ST_MATRIX_ADD(A_ST, V3-1, V3-1, K33-D33)
             END IF
 
             DO J = 1, 3

@@ -14,17 +14,17 @@
 Dimensions:
     2
 Axisymmetric:
-    .FALSE.
+    .TRUE.
 Number_of_cells:
     1    1    1
 Domain_limits:
-    -10.0    10.0    -10.0    10.0    0.0    1.0
+    -10.0    10.0    0.0    10.0    -3.14    3.14
 Mesh_file_SU2:
-    'langmuir_mid.su2'
+    'cyltest2.su2'
 Domain_periodicity:
-    .FALSE.   .FALSE.   .FALSE.
+    .FALSE.   .FALSE.   .TRUE.
 Domain_specular:
-    .FALSE.    .FALSE.    .FALSE.    .FALSE.
+    .FALSE.    .FALSE.    .TRUE.    .FALSE.
 Domain_diffuse:
     .FALSE.    .FALSE.    .FALSE.   .FALSE.
 Boundary_temperature:
@@ -33,7 +33,7 @@ Boundary_temperature:
 Bool_PIC:
     .TRUE.
 PIC_implicit:
-    .TRUE.
+    .FALSE.
 
 Bool_dump_moments:
     .FALSE.
@@ -49,11 +49,11 @@ Fluxes_dump_output:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.e5
+    1.e7
 Timestep:
     1.0e-8
 Number_of_timesteps:
-    100000
+    1
 Stats_every:
     1
 
@@ -67,7 +67,7 @@ Binary_output:
 Dump_grid_start:
     0
 Dump_grid_avgevery:
-    100
+    1
 Dump_grid_numavgs:
     1
 
@@ -132,31 +132,20 @@ Initial_particles_Trot:
 Initial_particles_Tvib:
     0. 
 Initial_particles_mixture:
-    Plasma
+    Ions
 
 
 
-
-Boundary_condition:
-    Symmetry    specular
-
-Boundary_condition:
-    Probe    vacuum
-
-Boundary_condition:
-    Inlet    vacuum
     
-Boundary_emit:
-    Inlet    Plasma    1.0e10    0.0    0.0    0.0    300.0    300.0    300.0
+Boundary_condition:
+    Outer    dirichlet    0.0
 
 Boundary_condition:
-    Probe    dirichlet    0.0
+    Axis    neumann    0.0
 
 Boundary_condition:
-    Symmetry    neumann    0.0
-
-Boundary_condition:
-    Inlet    neumann    0.0
+    Sides    neumann    0.0
+    
     
 ! ========= MPI parallelization =====================
 ! == Style for MPI domain partition can be:

@@ -24,7 +24,6 @@ MODULE fields
       REAL(KIND=8) :: HX, HY
       REAL(KIND=8) :: AX, AY, BX, BY, CX, CY, H1X, H2X, H1Y, H2Y, R
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA, EDGELENGTH
-      REAL(KIND=8) :: D11, D22, D33
       INTEGER :: V1, V2, V3
       INTEGER :: EDGE_PG
       LOGICAL, DIMENSION(:), ALLOCATABLE :: IS_UNUSED
@@ -130,15 +129,6 @@ MODULE fields
                K23 = K23*(Y1+Y2+Y3)/3.
                K13 = K13*(Y1+Y2+Y3)/3.
             END IF
-            ! IF (AXI) THEN
-            !    D11 =-(X2-X3)/(Y1+Y2+Y3)
-            !    D22 = (X1-X3)/(Y1+Y2+Y3)
-            !    D33 = (X2-X1)/(Y1+Y2+Y3)
-            ! ELSE
-            !    D11 = 0.d0
-            !    D22 = 0.d0
-            !    D33 = 0.d0
-            ! END IF
 
             ! We need to ADD to a sparse matrix entry.
             IF (IS_DIRICHLET(V1-1)) THEN

@@ -123,36 +123,44 @@ MODULE fields
             K23 = 0.25*((Y1-Y3)*(Y2-Y1) + (X1-X3)*(X2-X1))/AREA
             K13 =-0.25*((Y2-Y3)*(Y2-Y1) + (X2-X3)*(X2-X1))/AREA
             IF (AXI) THEN
-               D11 =-(X2-X3)/(Y1+Y2+Y3)
-               D22 = (X1-X3)/(Y1+Y2+Y3)
-               D33 = (X2-X1)/(Y1+Y2+Y3)
-            ELSE
-               D11 = 0.d0
-               D22 = 0.d0
-               D33 = 0.d0
+               K11 = K11*(Y1+Y2+Y3)/3.
+               K22 = K22*(Y1+Y2+Y3)/3.
+               K33 = K33*(Y1+Y2+Y3)/3.
+               K12 = K12*(Y1+Y2+Y3)/3.
+               K23 = K23*(Y1+Y2+Y3)/3.
+               K13 = K13*(Y1+Y2+Y3)/3.
             END IF
+            ! IF (AXI) THEN
+            !    D11 =-(X2-X3)/(Y1+Y2+Y3)
+            !    D22 = (X1-X3)/(Y1+Y2+Y3)
+            !    D33 = (X2-X1)/(Y1+Y2+Y3)
+            ! ELSE
+            !    D11 = 0.d0
+            !    D22 = 0.d0
+            !    D33 = 0.d0
+            ! END IF
 
             ! We need to ADD to a sparse matrix entry.
             IF (IS_DIRICHLET(V1-1)) THEN
                CALL ST_MATRIX_SET(A_ST, V1-1, V1-1, 1.d0)
             ELSE !IF (.NOT. IS_NEUMANN(V1-1)) THEN
-               CALL ST_MATRIX_ADD(A_ST, V1-1, V1-1, K11-D11)
-               CALL ST_MATRIX_ADD(A_ST, V1-1, V2-1, K12-D22)
-               CALL ST_MATRIX_ADD(A_ST, V1-1, V3-1, K13-D33)
+               CALL ST_MATRIX_ADD(A_ST, V1-1, V1-1, K11)
+               CALL ST_MATRIX_ADD(A_ST, V1-1, V2-1, K12)
+               CALL ST_MATRIX_ADD(A_ST, V1-1, V3-1, K13)
             END IF
             IF (IS_DIRICHLET(V2-1)) THEN
                CALL ST_MATRIX_SET(A_ST, V2-1, V2-1, 1.d0)
             ELSE !IF (.NOT. IS_NEUMANN(V2-1)) THEN
-               CALL ST_MATRIX_ADD(A_ST, V2-1, V1-1, K12-D11)
-               CALL ST_MATRIX_ADD(A_ST, V2-1, V3-1, K23-D22)
-               CALL ST_MATRIX_ADD(A_ST, V2-1, V2-1, K22-D33)
+               CALL ST_MATRIX_ADD(A_ST, V2-1, V1-1, K12)
+               CALL ST_MATRIX_ADD(A_ST, V2-1, V3-1, K23)
+               CALL ST_MATRIX_ADD(A_ST, V2-1, V2-1, K22)
             END IF
             IF (IS_DIRICHLET(V3-1)) THEN
                CALL ST_MATRIX_SET(A_ST, V3-1, V3-1, 1.d0)
             ELSE !IF (.NOT. IS_NEUMANN(V3-1)) THEN
-               CALL ST_MATRIX_ADD(A_ST, V3-1, V1-1, K13-D11)
-               CALL ST_MATRIX_ADD(A_ST, V3-1, V2-1, K23-D22)
-               CALL ST_MATRIX_ADD(A_ST, V3-1, V3-1, K33-D33)
+               CALL ST_MATRIX_ADD(A_ST, V3-1, V1-1, K13)
+               CALL ST_MATRIX_ADD(A_ST, V3-1, V2-1, K23)
+               CALL ST_MATRIX_ADD(A_ST, V3-1, V3-1, K33)
             END IF
 
             DO J = 1, 3
@@ -507,9 +515,9 @@ MODULE fields
             Y3 = U2D_GRID%NODE_COORDS(V3, 2)
             XP = particles(JP)%X
             YP = particles(JP)%Y
-            PSI1 = 0.5*( (Y2-Y3)*(XP-X3) - (X2-X3)*(YP-Y3))/VOL
-            PSI2 = 0.5*(-(Y1-Y3)*(XP-X3) + (X1-X3)*(YP-Y3))/VOL
-            PSI3 = 0.5*(-(Y2-Y1)*(XP-X1) + (X2-X1)*(YP-Y1))/VOL
+            PSI1 = 0.5*( (Y2-Y3)*(XP-X3) - (X2-X3)*(YP-Y3))/VOL*YP
+            PSI2 = 0.5*(-(Y1-Y3)*(XP-X3) + (X1-X3)*(YP-Y3))/VOL*YP
+            PSI3 = 0.5*(-(Y2-Y1)*(XP-X1) + (X2-X1)*(YP-Y1))/VOL*YP
             
             RHO_Q = K*CHARGE*FNUM
             RHS(V1-1) = RHS(V1-1) + RHO_Q*PSI1

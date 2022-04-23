@@ -20,7 +20,7 @@ Number_of_cells:
 Domain_limits:
     -10.0    10.0    0.0    10.0    -3.14    3.14
 Mesh_file_SU2:
-    'cyltest2.su2'
+    'cyltest1.su2'
 Domain_periodicity:
     .FALSE.   .FALSE.   .TRUE.
 Domain_specular:
@@ -49,7 +49,7 @@ Fluxes_dump_output:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.e7
+    1.e4
 Timestep:
     1.0e-8
 Number_of_timesteps:

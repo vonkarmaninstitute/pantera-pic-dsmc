@@ -505,9 +505,14 @@ MODULE fields
             Y3 = U2D_GRID%NODE_COORDS(V3, 2)
             XP = particles(JP)%X
             YP = particles(JP)%Y
-            PSI1 = 0.5*( (Y2-Y3)*(XP-X3) - (X2-X3)*(YP-Y3))/VOL*YP
-            PSI2 = 0.5*(-(Y1-Y3)*(XP-X3) + (X1-X3)*(YP-Y3))/VOL*YP
-            PSI3 = 0.5*(-(Y2-Y1)*(XP-X1) + (X2-X1)*(YP-Y1))/VOL*YP
+            PSI1 = 0.5*( (Y2-Y3)*(XP-X3) - (X2-X3)*(YP-Y3))/VOL
+            PSI2 = 0.5*(-(Y1-Y3)*(XP-X3) + (X1-X3)*(YP-Y3))/VOL
+            PSI3 = 0.5*(-(Y2-Y1)*(XP-X1) + (X2-X1)*(YP-Y1))/VOL
+            IF (AXI) THEN
+               PSI1 = PSI1 * YP
+               PSI2 = PSI2 * YP
+               PSI3 = PSI3 * YP
+            END IF
             
             RHO_Q = K*CHARGE*FNUM
             RHS(V1-1) = RHS(V1-1) + RHO_Q*PSI1
@@ -705,10 +710,10 @@ MODULE fields
       INTEGER :: MAXNNZ, SIZE
       TYPE(ST_MATRIX) :: A_ST
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA
+      REAL(KIND=8) :: K11TILDE, K22TILDE, K33TILDE, K12TILDE, K23TILDE, K13TILDE
       INTEGER :: V1, V2, V3
       INTEGER :: EDGE_PG
       LOGICAL, DIMENSION(:), ALLOCATABLE :: IS_UNUSED
-      REAL(KIND=8) :: MM
 
       IF (GRID_TYPE == UNSTRUCTURED) THEN
          SIZE = U2D_GRID%NUM_NODES
@@ -797,32 +802,58 @@ MODULE fields
             K12 =-0.25*((Y2-Y3)*(Y1-Y3) + (X2-X3)*(X1-X3))/AREA
             K23 = 0.25*((Y1-Y3)*(Y2-Y1) + (X1-X3)*(X2-X1))/AREA
             K13 =-0.25*((Y2-Y3)*(Y2-Y1) + (X2-X3)*(X2-X1))/AREA
-            MM = MASS_MATRIX(I)+1.
+            K11TILDE = K11*(Y1+Y2+Y3)/3.
+            K22TILDE = K22*(Y1+Y2+Y3)/3.
+            K33TILDE = K33*(Y1+Y2+Y3)/3.
+            K12TILDE = K12*(Y1+Y2+Y3)/3.
+            K23TILDE = K23*(Y1+Y2+Y3)/3.
+            K13TILDE = K13*(Y1+Y2+Y3)/3.
 
             ! We need to ADD to a sparse matrix entry.
             IF (IS_DIRICHLET(V1-1)) THEN
                CALL ST_MATRIX_SET(A_ST, V1-1, V1-1, 1.d0)
             ELSE !IF (.NOT. IS_NEUMANN(V1-1)) THEN
-               CALL ST_MATRIX_ADD(A_ST, V1-1, V1-1, MM*K11)
-               CALL ST_MATRIX_ADD(A_ST, V1-1, V2-1, MM*K12)
-               CALL ST_MATRIX_ADD(A_ST, V1-1, V3-1, MM*K13)
-               RHS(V1-1) = RHS(V1-1) + PHI_FIELD(V1-1)*K11+PHI_FIELD(V2-1)*K12+PHI_FIELD(V3-1)*K13
+               IF (AXI) THEN
+                  CALL ST_MATRIX_ADD(A_ST, V1-1, V1-1, K11TILDE + MASS_MATRIX(I)*K11)
+                  CALL ST_MATRIX_ADD(A_ST, V1-1, V2-1, K12TILDE + MASS_MATRIX(I)*K12)
+                  CALL ST_MATRIX_ADD(A_ST, V1-1, V3-1, K13TILDE + MASS_MATRIX(I)*K13)
+                  RHS(V1-1) = RHS(V1-1) + PHI_FIELD(V1-1)*K11TILDE+PHI_FIELD(V2-1)*K12TILDE+PHI_FIELD(V3-1)*K13TILDE
+               ELSE
+                  CALL ST_MATRIX_ADD(A_ST, V1-1, V1-1, (MASS_MATRIX(I)+1.)*K11)
+                  CALL ST_MATRIX_ADD(A_ST, V1-1, V2-1, (MASS_MATRIX(I)+1.)*K12)
+                  CALL ST_MATRIX_ADD(A_ST, V1-1, V3-1, (MASS_MATRIX(I)+1.)*K13)
+                  RHS(V1-1) = RHS(V1-1) + PHI_FIELD(V1-1)*K11+PHI_FIELD(V2-1)*K12+PHI_FIELD(V3-1)*K13
+               END IF
             END IF
             IF (IS_DIRICHLET(V2-1)) THEN
                CALL ST_MATRIX_SET(A_ST, V2-1, V2-1, 1.d0)
             ELSE !IF (.NOT. IS_NEUMANN(V2-1)) THEN
-               CALL ST_MATRIX_ADD(A_ST, V2-1, V1-1, MM*K12)
-               CALL ST_MATRIX_ADD(A_ST, V2-1, V3-1, MM*K23)
-               CALL ST_MATRIX_ADD(A_ST, V2-1, V2-1, MM*K22)
-               RHS(V2-1) = RHS(V2-1) + PHI_FIELD(V1-1)*K12+PHI_FIELD(V2-1)*K22+PHI_FIELD(V3-1)*K23
+               IF (AXI) THEN
+                  CALL ST_MATRIX_ADD(A_ST, V2-1, V1-1, K11TILDE + MASS_MATRIX(I)*K12)
+                  CALL ST_MATRIX_ADD(A_ST, V2-1, V3-1, K12TILDE + MASS_MATRIX(I)*K23)
+                  CALL ST_MATRIX_ADD(A_ST, V2-1, V2-1, K13TILDE + MASS_MATRIX(I)*K22)
+                  RHS(V2-1) = RHS(V2-1) + PHI_FIELD(V1-1)*K12TILDE+PHI_FIELD(V2-1)*K22TILDE+PHI_FIELD(V3-1)*K23TILDE
+               ELSE
+                  CALL ST_MATRIX_ADD(A_ST, V2-1, V1-1, (MASS_MATRIX(I)+1.)*K12)
+                  CALL ST_MATRIX_ADD(A_ST, V2-1, V3-1, (MASS_MATRIX(I)+1.)*K23)
+                  CALL ST_MATRIX_ADD(A_ST, V2-1, V2-1, (MASS_MATRIX(I)+1.)*K22)
+                  RHS(V2-1) = RHS(V2-1) + PHI_FIELD(V1-1)*K12+PHI_FIELD(V2-1)*K22+PHI_FIELD(V3-1)*K23
+               END IF
             END IF
             IF (IS_DIRICHLET(V3-1)) THEN
                CALL ST_MATRIX_SET(A_ST, V3-1, V3-1, 1.d0)
             ELSE !IF (.NOT. IS_NEUMANN(V3-1)) THEN
-               CALL ST_MATRIX_ADD(A_ST, V3-1, V1-1, MM*K13)
-               CALL ST_MATRIX_ADD(A_ST, V3-1, V2-1, MM*K23)
-               CALL ST_MATRIX_ADD(A_ST, V3-1, V3-1, MM*K33)
-               RHS(V3-1) = RHS(V3-1) + PHI_FIELD(V1-1)*K13+PHI_FIELD(V2-1)*K23+PHI_FIELD(V3-1)*K33
+               IF (AXI) THEN
+                  CALL ST_MATRIX_ADD(A_ST, V3-1, V1-1, K13TILDE + MASS_MATRIX(I)*K13)
+                  CALL ST_MATRIX_ADD(A_ST, V3-1, V2-1, K23TILDE + MASS_MATRIX(I)*K23)
+                  CALL ST_MATRIX_ADD(A_ST, V3-1, V3-1, K33TILDE + MASS_MATRIX(I)*K33)
+                  RHS(V3-1) = RHS(V3-1) + PHI_FIELD(V1-1)*K13TILDE+PHI_FIELD(V2-1)*K23TILDE+PHI_FIELD(V3-1)*K33TILDE
+               ELSE
+                  CALL ST_MATRIX_ADD(A_ST, V3-1, V1-1, (MASS_MATRIX(I)+1.)*K13)
+                  CALL ST_MATRIX_ADD(A_ST, V3-1, V2-1, (MASS_MATRIX(I)+1.)*K23)
+                  CALL ST_MATRIX_ADD(A_ST, V3-1, V3-1, (MASS_MATRIX(I)+1.)*K33)
+                  RHS(V3-1) = RHS(V3-1) + PHI_FIELD(V1-1)*K13+PHI_FIELD(V2-1)*K23+PHI_FIELD(V3-1)*K33
+               END IF
             END IF
 
          ! Neumann part has to be included only if the derivative changes in time.
@@ -956,12 +987,21 @@ MODULE fields
             DPSI2DY =  0.5*(X1-X3)/VOL
             DPSI3DY =  0.5*(X2-X1)/VOL
             
-            J_FIELD(V1-1) = J_FIELD(V1-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI1DX + particles(JP)%VY*DPSI1DY)
-            J_FIELD(V2-1) = J_FIELD(V2-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI2DX + particles(JP)%VY*DPSI2DY)
-            J_FIELD(V3-1) = J_FIELD(V3-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI3DX + particles(JP)%VY*DPSI3DY)
+            IF (AXI) THEN
+               J_FIELD(V1-1) = J_FIELD(V1-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI1DX + particles(JP)%VY*DPSI1DY)*particles(JP)%Y
+               J_FIELD(V2-1) = J_FIELD(V2-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI2DX + particles(JP)%VY*DPSI2DY)*particles(JP)%Y
+               J_FIELD(V3-1) = J_FIELD(V3-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI3DX + particles(JP)%VY*DPSI3DY)*particles(JP)%Y
 
-            MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/VOL*FNUM &
-                              * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
+               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/VOL*FNUM &
+                                 * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS*particles(JP)%Y
+            ELSE
+               J_FIELD(V1-1) = J_FIELD(V1-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI1DX + particles(JP)%VY*DPSI1DY)
+               J_FIELD(V2-1) = J_FIELD(V2-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI2DX + particles(JP)%VY*DPSI2DY)
+               J_FIELD(V3-1) = J_FIELD(V3-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI3DX + particles(JP)%VY*DPSI3DY)
+
+               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/VOL*FNUM &
+                                 * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
+            END IF
          ELSE
 
             CALL ERROR_ABORT('Not implemented.')

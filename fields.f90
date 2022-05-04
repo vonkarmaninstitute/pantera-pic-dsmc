@@ -476,7 +476,7 @@ MODULE fields
       INTEGER :: JP, I, IC
 
       REAL(KIND=8) :: K, RHO_Q, CHARGE
-      REAL(KIND=8) :: VOL, CFNUM
+      REAL(KIND=8) :: VOL, CFNUM, AREA
       REAL(KIND=8), DIMENSION(4) :: WEIGHTS
       INTEGER, DIMENSION(4) :: INDICES, INDI, INDJ
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, XP, YP
@@ -493,7 +493,7 @@ MODULE fields
 
          IF (GRID_TYPE == UNSTRUCTURED) THEN 
             IC = particles(JP)%IC
-            VOL = CELL_VOLUMES(IC)
+            AREA = CELL_AREAS(IC)
             V1 = U2D_GRID%CELL_NODES(IC,1)
             V2 = U2D_GRID%CELL_NODES(IC,2)
             V3 = U2D_GRID%CELL_NODES(IC,3)            
@@ -505,14 +505,9 @@ MODULE fields
             Y3 = U2D_GRID%NODE_COORDS(V3, 2)
             XP = particles(JP)%X
             YP = particles(JP)%Y
-            PSI1 = 0.5*( (Y2-Y3)*(XP-X3) - (X2-X3)*(YP-Y3))/VOL
-            PSI2 = 0.5*(-(Y1-Y3)*(XP-X3) + (X1-X3)*(YP-Y3))/VOL
-            PSI3 = 0.5*(-(Y2-Y1)*(XP-X1) + (X2-X1)*(YP-Y1))/VOL
-            IF (AXI) THEN
-               PSI1 = PSI1 * YP
-               PSI2 = PSI2 * YP
-               PSI3 = PSI3 * YP
-            END IF
+            PSI1 = 0.5*( (Y2-Y3)*(XP-X3) - (X2-X3)*(YP-Y3))/AREA/(ZMAX-ZMIN)
+            PSI2 = 0.5*(-(Y1-Y3)*(XP-X3) + (X1-X3)*(YP-Y3))/AREA/(ZMAX-ZMIN)
+            PSI3 = 0.5*(-(Y2-Y1)*(XP-X1) + (X2-X1)*(YP-Y1))/AREA/(ZMAX-ZMIN)
             
             RHO_Q = K*CHARGE*FNUM
             RHS(V1-1) = RHS(V1-1) + RHO_Q*PSI1
@@ -829,9 +824,9 @@ MODULE fields
                CALL ST_MATRIX_SET(A_ST, V2-1, V2-1, 1.d0)
             ELSE !IF (.NOT. IS_NEUMANN(V2-1)) THEN
                IF (AXI) THEN
-                  CALL ST_MATRIX_ADD(A_ST, V2-1, V1-1, K11TILDE + MASS_MATRIX(I)*K12)
-                  CALL ST_MATRIX_ADD(A_ST, V2-1, V3-1, K12TILDE + MASS_MATRIX(I)*K23)
-                  CALL ST_MATRIX_ADD(A_ST, V2-1, V2-1, K13TILDE + MASS_MATRIX(I)*K22)
+                  CALL ST_MATRIX_ADD(A_ST, V2-1, V1-1, K12TILDE + MASS_MATRIX(I)*K12)
+                  CALL ST_MATRIX_ADD(A_ST, V2-1, V3-1, K23TILDE + MASS_MATRIX(I)*K23)
+                  CALL ST_MATRIX_ADD(A_ST, V2-1, V2-1, K22TILDE + MASS_MATRIX(I)*K22)
                   RHS(V2-1) = RHS(V2-1) + PHI_FIELD(V1-1)*K12TILDE+PHI_FIELD(V2-1)*K22TILDE+PHI_FIELD(V3-1)*K23TILDE
                ELSE
                   CALL ST_MATRIX_ADD(A_ST, V2-1, V1-1, (MASS_MATRIX(I)+1.)*K12)
@@ -946,7 +941,7 @@ MODULE fields
       INTEGER :: JP, IC
 
       REAL(KIND=8) :: CHARGE
-      REAL(KIND=8) :: VOL
+      REAL(KIND=8) :: AREA
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3
       INTEGER :: V1, V2, V3, SIZE, SIZEC
       REAL(KIND=8) :: DPSI1DX, DPSI2DX, DPSI3DX, DPSI1DY, DPSI2DY, DPSI3DY
@@ -970,7 +965,7 @@ MODULE fields
 
          IF (GRID_TYPE == UNSTRUCTURED) THEN 
             IC = particles(JP)%IC
-            VOL = CELL_VOLUMES(IC)
+            AREA = CELL_AREAS(IC)
             V1 = U2D_GRID%CELL_NODES(IC,1)
             V2 = U2D_GRID%CELL_NODES(IC,2)
             V3 = U2D_GRID%CELL_NODES(IC,3)            
@@ -980,26 +975,26 @@ MODULE fields
             Y1 = U2D_GRID%NODE_COORDS(V1, 2)
             Y2 = U2D_GRID%NODE_COORDS(V2, 2)
             Y3 = U2D_GRID%NODE_COORDS(V3, 2)
-            DPSI1DX =  0.5*(Y2-Y3)/VOL
-            DPSI2DX = -0.5*(Y1-Y3)/VOL
-            DPSI3DX = -0.5*(Y2-Y1)/VOL
-            DPSI1DY = -0.5*(X2-X3)/VOL
-            DPSI2DY =  0.5*(X1-X3)/VOL
-            DPSI3DY =  0.5*(X2-X1)/VOL
+            DPSI1DX =  0.5*(Y2-Y3)/AREA
+            DPSI2DX = -0.5*(Y1-Y3)/AREA
+            DPSI3DX = -0.5*(Y2-Y1)/AREA
+            DPSI1DY = -0.5*(X2-X3)/AREA
+            DPSI2DY =  0.5*(X1-X3)/AREA
+            DPSI3DY =  0.5*(X2-X1)/AREA
             
             IF (AXI) THEN
-               J_FIELD(V1-1) = J_FIELD(V1-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI1DX + particles(JP)%VY*DPSI1DY)*particles(JP)%Y
-               J_FIELD(V2-1) = J_FIELD(V2-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI2DX + particles(JP)%VY*DPSI2DY)*particles(JP)%Y
-               J_FIELD(V3-1) = J_FIELD(V3-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI3DX + particles(JP)%VY*DPSI3DY)*particles(JP)%Y
+               J_FIELD(V1-1) = J_FIELD(V1-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI1DX + particles(JP)%VY*DPSI1DY)/(ZMAX-ZMIN)
+               J_FIELD(V2-1) = J_FIELD(V2-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI2DX + particles(JP)%VY*DPSI2DY)/(ZMAX-ZMIN)
+               J_FIELD(V3-1) = J_FIELD(V3-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI3DX + particles(JP)%VY*DPSI3DY)/(ZMAX-ZMIN)
 
-               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/VOL*FNUM &
-                                 * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS*particles(JP)%Y
+               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/AREA/(ZMAX-ZMIN)*FNUM &
+                                 * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
             ELSE
-               J_FIELD(V1-1) = J_FIELD(V1-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI1DX + particles(JP)%VY*DPSI1DY)
-               J_FIELD(V2-1) = J_FIELD(V2-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI2DX + particles(JP)%VY*DPSI2DY)
-               J_FIELD(V3-1) = J_FIELD(V3-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI3DX + particles(JP)%VY*DPSI3DY)
+               J_FIELD(V1-1) = J_FIELD(V1-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI1DX + particles(JP)%VY*DPSI1DY)/(ZMAX-ZMIN)
+               J_FIELD(V2-1) = J_FIELD(V2-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI2DX + particles(JP)%VY*DPSI2DY)/(ZMAX-ZMIN)
+               J_FIELD(V3-1) = J_FIELD(V3-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI3DX + particles(JP)%VY*DPSI3DY)/(ZMAX-ZMIN)
 
-               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/VOL*FNUM &
+               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/AREA/(ZMAX-ZMIN)*FNUM &
                                  * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
             END IF
          ELSE

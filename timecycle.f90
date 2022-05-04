@@ -811,6 +811,7 @@ MODULE timecycle
                END DO
 
                IF (BOUNDCOLL .NE. -1) THEN
+                  IF (particles(IP)%Y == 0.d0 .AND. DTCOLL == 0.d0) WRITE(*,*) 'Here 1.'
                   CALL MOVE_PARTICLE(IP, DTCOLL)
                   particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
 
@@ -865,6 +866,7 @@ MODULE timecycle
                      !WRITE(*,*) 'moved particle to cell: ', IC
                   END IF
                ELSE
+                  IF (particles(IP)%Y == 0.d0 .AND. DTCOLL == 0.d0) WRITE(*,*) 'Here 2.'
                   CALL MOVE_PARTICLE(IP, particles(IP)%DTRIM)
                   particles(IP)%DTRIM = 0.d0
                END IF
@@ -1393,17 +1395,19 @@ MODULE timecycle
          ! Rotate velocity vector back to x-y plane.
          SINTHETA = particles(IP)%VZ*TIME / R
          COSTHETA = SIGN(SQRT(1.-SINTHETA*SINTHETA), particles(IP)%Y + particles(IP)%VY*TIME)
-         
+
          IF (GRID_TYPE == UNSTRUCTURED) THEN
             particles(IP)%Y = particles(IP)%Y + particles(IP)%VY * TIME
          ELSE
             particles(IP)%Y = R
          END IF
 
-         VZ = particles(IP)%VZ
-         VY = particles(IP)%VY
-         particles(IP)%VZ = COSTHETA*VZ - SINTHETA*VY
-         particles(IP)%VY = SINTHETA*VZ + COSTHETA*VY
+         IF (particles(IP)%Y .NE. 0.d0) THEN
+            VZ = particles(IP)%VZ
+            VY = particles(IP)%VY
+            particles(IP)%VZ = COSTHETA*VZ - SINTHETA*VY
+            particles(IP)%VY = SINTHETA*VZ + COSTHETA*VY
+         END IF
          
       ELSE
          particles(IP)%X = particles(IP)%X + particles(IP)%VX * TIME

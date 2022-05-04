@@ -1094,7 +1094,7 @@ MODULE postprocess
          ! WRITE(*,*) ' '
 
          OPEN(54331, FILE='conservation_checks', POSITION='append', STATUS='unknown', ACTION='write')
-         WRITE(54331,*) CURRENT_TIME, TOT_NUM, TOT_MOMENTUM, TOT_KE, TOT_IE, TOT_EE !TOT_FE, TOT_EE
+         WRITE(54331,*) CURRENT_TIME, TOT_NUM, TOT_MOMENTUM, TOT_KE, TOT_IE, TOT_EE, TOT_KE+TOT_IE+TOT_EE !TOT_FE, TOT_EE
          CLOSE(54331)
 
       ELSE

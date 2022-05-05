@@ -14,7 +14,7 @@
 Dimensions:
     2
 Axisymmetric:
-    .TRUE.
+    .FALSE.
 Number_of_cells:
     1    1    1
 Domain_limits:
@@ -49,7 +49,7 @@ Fluxes_dump_output:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.e16
+    1.e13
 Timestep:
     1.0e-9
 Number_of_timesteps:

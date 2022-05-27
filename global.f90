@@ -12,6 +12,7 @@ MODULE global
 
    REAL(KIND=8) :: PI   = 3.1415926535897932d0           ! https://dlmf.nist.gov/3.12
    REAL(KIND=8) :: EPS0 = 8.8541878128d-12               ! https://physics.nist.gov/cgi-bin/cuu/Value?ep0
+   REAL(KIND=8) :: MU0  = 1.25663706212d-6               ! https://physics.nist.gov/cgi-bin/cuu/Value?mu0
    REAL(KIND=8) :: KB   = 1.380649d-23                   ! https://physics.nist.gov/cgi-bin/cuu/Value?k
    REAL(KIND=8) :: QE   = 1.602176634d-19                ! https://physics.nist.gov/cgi-bin/cuu/Value?e
 
@@ -143,7 +144,7 @@ MODULE global
    LOGICAL :: BOOL_PIC_IMPLICIT = .FALSE.
 
    INTEGER :: NPX, NPY
-   REAL(KIND=8), DIMENSION(:, :, :), ALLOCATABLE :: E_FIELD
+   REAL(KIND=8), DIMENSION(:, :, :), ALLOCATABLE :: E_FIELD, B_FIELD
    REAL(KIND=8), DIMENSION(:, :, :), ALLOCATABLE :: EBAR_FIELD
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: PHI_FIELD
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: PHIBAR_FIELD
@@ -170,6 +171,20 @@ MODULE global
    END TYPE CC_MATRIX
 
    TYPE(CC_MATRIX) :: A_CC
+
+
+
+   ! This is used for defining static magnetic fields from solenoids.
+   INTEGER         :: N_SOLENOIDS = 0
+
+   TYPE SOLENOID
+      REAL(KIND=8) :: X1, Y1, X2, Y2
+      REAL(KIND=8) :: WIRE_CURRENT
+      INTEGER :: N_WIRES_X, N_WIRES_Y
+   END TYPE SOLENOID
+
+   TYPE(SOLENOID), DIMENSION(:), ALLOCATABLE :: SOLENOIDS
+
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Numerical settings !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

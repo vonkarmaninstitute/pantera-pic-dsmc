@@ -634,9 +634,9 @@ MODULE postprocess
 
                   WRITE(54321) 'POINT_DATA '//ITOA( NPOINTS )//ACHAR(10)
                   IF (BOOL_FLUID_ELECTRONS) THEN
-                     WRITE(54321) 'FIELD FieldData '//ITOA(4)//ACHAR(10)
+                     WRITE(54321) 'FIELD FieldData '//ITOA(7)//ACHAR(10)
                   ELSE
-                     WRITE(54321) 'FIELD FieldData '//ITOA(3)//ACHAR(10)
+                     WRITE(54321) 'FIELD FieldData '//ITOA(6)//ACHAR(10)
                   END IF
                
                   WRITE(54321) 'QRHO '//ITOA(1)//' '//ITOA( NPOINTS )//' double'//ACHAR(10)
@@ -647,6 +647,15 @@ MODULE postprocess
 
                   WRITE(54321) 'PHIBAR '//ITOA(1)//' '//ITOA( NPOINTS )//' double'//ACHAR(10)
                   WRITE(54321) PHIBAR_FIELD, ACHAR(10)
+
+                  WRITE(54321) 'B_X '//ITOA(1)//' '//ITOA( NPOINTS )//' double'//ACHAR(10)
+                  WRITE(54321) B_FIELD(:,:,1), ACHAR(10)
+
+                  WRITE(54321) 'B_Y '//ITOA(1)//' '//ITOA( NPOINTS )//' double'//ACHAR(10)
+                  WRITE(54321) B_FIELD(:,:,2), ACHAR(10)
+
+                  WRITE(54321) 'B_Z '//ITOA(1)//' '//ITOA( NPOINTS )//' double'//ACHAR(10)
+                  WRITE(54321) B_FIELD(:,:,3), ACHAR(10)
 
                   IF (BOOL_FLUID_ELECTRONS) THEN
                      WRITE(54321) 'NRHO_E_BOLTZ '//ITOA(1)//' '//ITOA( NPOINTS )//' double'//ACHAR(10)
@@ -839,7 +848,7 @@ MODULE postprocess
                   WRITE(54321,*) E_FIELD(:,:,3)
 
                   WRITE(54321,'(A,I10)') 'POINT_DATA', NPOINTS
-                  WRITE(54321,'(A,I10)') 'FIELD FieldData', 3
+                  WRITE(54321,'(A,I10)') 'FIELD FieldData', 6
                
                   WRITE(54321,'(A,I10,I10,A7)') 'QRHO', 1, NPOINTS, 'double'
                   WRITE(54321,*) RHS
@@ -849,6 +858,17 @@ MODULE postprocess
 
                   WRITE(54321,'(A,I10,I10,A7)') 'PHIBAR', 1, NPOINTS, 'double'
                   WRITE(54321,*) PHIBAR_FIELD
+
+                  WRITE(54321,'(A,I10,I10,A7)') 'B_X', 1, NPOINTS, 'double'
+                  WRITE(54321,*) B_FIELD(:,:,1)
+
+                  WRITE(54321,'(A,I10,I10,A7)') 'B_Y', 1, NPOINTS, 'double'
+                  WRITE(54321,*) B_FIELD(:,:,2)
+
+                  WRITE(54321,'(A,I10,I10,A7)') 'B_Z', 1, NPOINTS, 'double'
+                  WRITE(54321,*) B_FIELD(:,:,3)
+
+
                ELSE
                   IF (DIMS == 2) THEN
                      WRITE(54321,'(A,I10)') 'POINT_DATA', NPOINTS

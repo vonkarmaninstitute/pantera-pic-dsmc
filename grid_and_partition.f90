@@ -619,6 +619,7 @@ MODULE grid_and_partition
       WRITE(*,*) '==========================================='
       WRITE(*,*) 'Reading grid file in SU2 format.'
       WRITE(*,*) '==========================================='
+      
       DO
          READ(in5,*, IOSTAT=ReasonEOF) LINE, NUM
          IF (ReasonEOF < 0) EXIT 
@@ -643,11 +644,13 @@ MODULE grid_and_partition
             U2D_GRID%CELL_NODES = U2D_GRID%CELL_NODES + 1 ! Start indexing from 1.
 
             U2D_GRID%NUM_CELLS = NUM
+
+            ALLOCATE(U2D_GRID%CELL_EDGES_PG(U2D_GRID%NUM_CELLS, 3))
+            U2D_GRID%CELL_EDGES_PG = -1
+      
          ELSE IF (LINE == 'NMARK=') THEN
 
             ! Assign physical groups to cell edges.
-            ALLOCATE(U2D_GRID%CELL_EDGES_PG(U2D_GRID%NUM_CELLS, 3))
-            U2D_GRID%CELL_EDGES_PG = -1
 
             ALLOCATE(GRID_BC(NUM)) ! Append the physical group to the list
             N_GRID_BC = NUM

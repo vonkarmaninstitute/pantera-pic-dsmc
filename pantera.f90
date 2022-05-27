@@ -30,6 +30,7 @@ PROGRAM PANTERA
    CALL INITCOLLISIONS     ! Initialize variables for collisions
    CALL INITREACTIONS      ! Initialize variables for reactions
    CALL INITFIELDS         ! Initialize electromagnetic fields
+   CALL COMPUTE_B_FIELD_FROM_SOLENOIDS
 
    IF (BOOL_PIC) CALL ASSEMBLE_POISSON
    ! ========= Initial particles seed ======================

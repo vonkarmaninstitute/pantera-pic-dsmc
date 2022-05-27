@@ -5,6 +5,7 @@ MODULE fields
    USE mUMFPACK
    USE global
    USE screen
+   USE tools
 
    IMPLICIT NONE
 
@@ -1276,5 +1277,69 @@ MODULE fields
       END DO
 
    END SUBROUTINE ST_MATRIX_PRINT
+
+
+
+   SUBROUTINE COMPUTE_B_FIELD_FROM_SOLENOIDS()
+
+      IMPLICIT NONE
+
+      REAL(KIND=8) :: DTHETA, THETA, WIRER, WIREZ
+      REAL(KIND=8), DIMENSION(3) :: POINT, DL, RPRIME
+      INTEGER :: ICOIL, IN, IX, IY, ITHETA, NTHETA
+
+      NTHETA = 100
+
+      DTHETA = 2*PI/REAL(NTHETA)
+
+      IF (GRID_TYPE == UNSTRUCTURED) THEN
+
+         DO ICOIL = 1, N_SOLENOIDS
+            DO IN = 1, U2D_GRID%NUM_NODES
+               POINT = U2D_GRID%NODE_COORDS(IN, :)
+               DO IX = 1, SOLENOIDS(ICOIL)%N_WIRES_X
+                  
+                  IF (SOLENOIDS(ICOIL)%N_WIRES_X == 1) THEN
+                     WIREZ = SOLENOIDS(ICOIL)%X1
+                  ELSE
+                     WIREZ = SOLENOIDS(ICOIL)%X1 + (SOLENOIDS(ICOIL)%X2-SOLENOIDS(ICOIL)%X1)/ &
+                     REAL(SOLENOIDS(ICOIL)%N_WIRES_X-1)*REAL(IX-1)
+                  END IF
+
+                  DO IY = 1, SOLENOIDS(ICOIL)%N_WIRES_Y
+                     
+                     IF (SOLENOIDS(ICOIL)%N_WIRES_Y == 1) THEN
+                        WIRER = SOLENOIDS(ICOIL)%Y1
+                     ELSE
+                        WIRER = SOLENOIDS(ICOIL)%Y1 + (SOLENOIDS(ICOIL)%Y2-SOLENOIDS(ICOIL)%Y1)/ &
+                        REAL(SOLENOIDS(ICOIL)%N_WIRES_Y-1)*REAL(IY-1)
+                     END IF
+
+                     DO ITHETA = 1, NTHETA
+                        
+                        THETA = 2*PI/REAL(NTHETA)*REAL(ITHETA-1)
+                        
+                        DL(1) =  0.d0
+                        DL(2) = -WIRER*SIN(THETA)*DTHETA
+                        DL(3) =  WIRER*COS(THETA)*DTHETA
+                        
+                        RPRIME(1) = POINT(1) - WIREZ
+                        RPRIME(2) = POINT(2) - WIRER*COS(THETA)
+                        RPRIME(3) = POINT(3) - WIRER*SIN(THETA)
+                        
+                        B_FIELD(IN, 1, :) = B_FIELD(IN, 1, :) + MU0/(4*PI)*CROSS(DL, RPRIME) / &
+                        (RPRIME(1)*RPRIME(1) + RPRIME(2)*RPRIME(2) + RPRIME(3)*RPRIME(3))**1.5
+                     
+                     END DO
+                  END DO
+               END DO
+            END DO
+         END DO
+
+      ELSE
+         CALL ERROR_ABORT('Error! B field from solenoids is only implemented for unstructured grids!')
+      END IF
+
+   END SUBROUTINE COMPUTE_B_FIELD_FROM_SOLENOIDS
 
 END MODULE fields

@@ -1166,7 +1166,7 @@ MODULE initialization
          IF (ReasonEOF < 0) EXIT ! End of file reached
          
          ALLOCATE(TEMP_REACTIONS(N_REACTIONS+1)) ! Append the mixture to the list
-         TEMP_REACTIONS(1:N_REACTIONS) = REACTIONS
+         TEMP_REACTIONS(1:N_REACTIONS) = REACTIONS(1:N_REACTIONS)
          CALL MOVE_ALLOC(TEMP_REACTIONS, REACTIONS)
          N_REACTIONS = N_REACTIONS + 1
          REACTIONS(N_REACTIONS) = NEW_REACTION

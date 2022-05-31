@@ -732,6 +732,7 @@ MODULE timecycle
             !PHIBAR_FIELD = 0.d0
             !EBAR_FIELD = 0.d0
             CALL APPLY_E_FIELD(IP, E)
+            !CALL APPLY_RF_E_FIELD(IP, E)
             
 
 
@@ -800,7 +801,7 @@ MODULE timecycle
                      EDGE_X1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),1)
                      EDGE_Y1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),2)
 
-                     IF (U2D_GRID%EDGE_NORMAL(IC,I,2) == 0.d0) THEN
+                     IF (ABS(U2D_GRID%EDGE_NORMAL(IC,I,2)) < 1.d-10 ) THEN
                         ! Vertical wall
                         SOL1 = (EDGE_X1 - particles(IP)%X)/particles(IP)%VX
                         IF (SOL1 >= 0 .AND. SOL1 < DTCOLL) THEN
@@ -1432,25 +1433,25 @@ MODULE timecycle
    END SUBROUTINE ADVECT
 
 
-   SUBROUTINE UPDATE_VELOCITY_BORIS(DT, V_OLD, V_NEW, CHARGE, MASS, E, B)
+   SUBROUTINE UPDATE_VELOCITY_BORIS(DTIME, V_OLD, V_NEW, CHARGE, MASS, E, B)
 
       IMPLICIT NONE
 
       REAL(KIND=8), DIMENSION(3), INTENT(OUT) :: V_NEW
       REAL(KIND=8), DIMENSION(3), INTENT(IN) :: V_OLD, E, B
       REAL(KIND=8), DIMENSION(3) :: V_MINUS, V_PLUS, V_PRIME, T, S
-      REAL(KIND=8), INTENT(IN) :: DT, CHARGE, MASS
+      REAL(KIND=8), INTENT(IN) :: DTIME, CHARGE, MASS
       REAL(KIND=8) :: COULOMBCHARGE
 
       COULOMBCHARGE = CHARGE * QE
-      V_MINUS = V_OLD + 0.5*COULOMBCHARGE*E/MASS*DT
+      V_MINUS = V_OLD + 0.5*COULOMBCHARGE*E/MASS*DTIME
 
-      T = 0.5*COULOMBCHARGE*B/MASS*DT
+      T = 0.5*COULOMBCHARGE*B/MASS*DTIME
       V_PRIME = V_MINUS + CROSS(V_MINUS, T)
       S = 2.*T/(1.+( T(1)*T(1) + T(2)*T(2) + T(3)*T(3) ))
       V_PLUS = V_MINUS + CROSS(V_PRIME, S)
 
-      V_NEW = V_PLUS + 0.5*COULOMBCHARGE*E/MASS*DT
+      V_NEW = V_PLUS + 0.5*COULOMBCHARGE*E/MASS*DTIME
 
    END SUBROUTINE
 

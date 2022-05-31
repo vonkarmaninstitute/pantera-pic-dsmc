@@ -20,7 +20,7 @@ Number_of_cells:
 Domain_limits:
     -10.0    10.0    0.0    10.0    -3.14    3.14
 Mesh_file_SU2:
-    'TMPFG_v1.su2'
+    'TMPFG_v2.su2'
 Domain_periodicity:
     .FALSE.   .FALSE.   .TRUE.
 Domain_specular:
@@ -31,9 +31,9 @@ Boundary_temperature:
     300.0
     
 Bool_PIC:
-    .TRUE.
+    .FALSE.
 PIC_implicit:
-    .TRUE.
+    .FALSE.
 
 Bool_dump_moments:
     .FALSE.
@@ -49,9 +49,9 @@ Fluxes_dump_output:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.e13
+    2.5e1
 Timestep:
-    1.0e-9
+    3.687316e-9
 Number_of_timesteps:
     10000
 Stats_every:
@@ -72,7 +72,7 @@ Dump_grid_numavgs:
     1
 
 Perform_checks:
-    .TRUE.
+    .FALSE.
 
 ! ========= Multispecies ==============================
 
@@ -84,7 +84,13 @@ Def_mixture:
 
 Def_mixture:
     Plasma  Ar+ 0.5  e 0.5
-    
+
+Def_mixture:
+    All  Ar+ 0.3  e 0.3  Ar  0.4
+
+Def_mixture:
+    Neutrals  Ar 1.0
+
 ! ========= Collisions ==============================
 
 Collision_type: ! [MCC / DSMC / NONE]
@@ -92,16 +98,18 @@ Collision_type: ! [MCC / DSMC / NONE]
 
 MCC_background_dens:
   1.0e20
-MCC_cross_section:  
-  1.0e-18
-MCC_species: ! NOT IMPLEMENTED YET!
+MCC_background_Ttra:
+  300.0
+MCC_background_mixture:
+  Neutrals
 
-! DSMC VHS collisions  ! NOT IMPLEMENTED YET!
+
+! DSMC VHS collisions
 
 DSMC_collisions_mixture:
-    Plasma
+    All
 VSS_parameters_file:
-    arsimple.vss
+    ar.vss
 
 Thermal_bath_bool:
     .FALSE.
@@ -111,7 +119,7 @@ Thermal_bath_Ttr:
 
 ! ========= Reactions ==============================
 !Reactions_file:
-!    air.tce
+!    ar.react
 
 !Wall_reactions_file:
 !    ar.wall
@@ -120,9 +128,9 @@ Thermal_bath_Ttr:
 ! ========= Initial particle seed ===================
 
 Initial_particles_bool:
-    .FALSE.
+    .TRUE.
 Initial_particles_dens:
-    1.0e20
+    1.0e10
 Initial_particles_vel:
     0.  0.  0.
 Initial_particles_Ttra:
@@ -137,18 +145,20 @@ Initial_particles_mixture:
 
 
     
-!Boundary_condition:
-!    Outer    dirichlet    0.0
+Boundary_condition:
+    Grid    dirichlet    0.0
+
+Boundary_condition:
+    Axis    neumann    0.0
+
+Boundary_condition:
+    Dielectric    neumann    0.0
+
+Boundary_condition:
+    Wall    dirichlet    0.0
 
 !Boundary_condition:
-!    Axis    neumann    0.0
-
-!Boundary_condition:
-!    Sides    neumann    0.0
-
-
-!Boundary_condition:
-!    Outer    specular
+!    Grid    vacuum
 
 !Boundary_condition:
 !    Axis    specular
@@ -156,9 +166,12 @@ Initial_particles_mixture:
 !Boundary_condition:
 !    Sides    specular
 
+!Boundary_emit:
+!    Grid    Plasma    1.0e10    0.0    0.0    0.0    300.0    300.0    300.0
+
     
-Solenoid_field:
-    -0.035    0.055    -0.01    0.06    20    5    1.0
+!Solenoid_field:
+!    -0.035    0.055    -0.01    0.06    20    5    1.0
     
 ! ========= MPI parallelization =====================
 ! == Style for MPI domain partition can be:

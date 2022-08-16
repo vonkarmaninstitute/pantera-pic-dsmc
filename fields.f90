@@ -2,14 +2,113 @@
 
 MODULE fields
 
+#include <petsc/finclude/petscksp.h>
+
    USE mUMFPACK
    USE global
    USE screen
    USE tools
 
+
+   
+   USE petscksp
+
    IMPLICIT NONE
 
+   Mat Amat
+   Vec bvec, xvec, X_SEQ
+   VecScatter ctx
+   KSP ksp
+   PetscInt one,f9,f6,f30
+   PetscInt Istart, Iend
+   PetscReal val
+   PetscScalar, POINTER :: PHI_FIELD(:)
+   PetscScalar, POINTER :: PHIBAR_FIELD(:)
+   KSPConvergedReason reason
+   PC pc
+
    CONTAINS
+   
+
+
+   SUBROUTINE PETSC_INITIAL_TEST
+
+      IMPLICIT NONE
+!
+!  This example demonstrates basic use of the PETSc Fortran interface
+!  to vectors.
+!
+      PetscInt  n
+      PetscErrorCode ierr
+      PetscBool  flg
+      PetscScalar      one,two,three,dot
+      PetscReal        norm,rdot
+      Vec              x,y,w
+      PetscOptions     options
+
+      n     = 20
+      one   = 1.0
+      two   = 2.0
+      three = 3.0
+
+      call PetscInitialize(PETSC_NULL_CHARACTER,ierr)
+      if (ierr .ne. 0) then
+        print*,'Unable to initialize PETSc'
+        stop
+      endif
+      call PetscOptionsCreate(options,ierr)
+      call PetscOptionsGetInt(options,PETSC_NULL_CHARACTER,                  &
+    &                        '-n',n,flg,ierr)
+      call PetscOptionsDestroy(options,ierr)
+
+! Create a vector, then duplicate it
+      call VecCreate(PETSC_COMM_WORLD,x,ierr)
+      call VecSetSizes(x,PETSC_DECIDE,n,ierr)
+      call VecSetFromOptions(x,ierr)
+      call VecDuplicate(x,y,ierr)
+      call VecDuplicate(x,w,ierr)
+
+      call VecSet(x,one,ierr)
+      call VecSet(y,two,ierr)
+
+      call VecDot(x,y,dot,ierr)
+      rdot = PetscRealPart(dot)
+      write(6,100) rdot
+ 100  format('Result of inner product ',f10.4)
+
+      call VecScale(x,two,ierr)
+      call VecNorm(x,NORM_2,norm,ierr)
+      write(6,110) norm
+ 110  format('Result of scaling ',f10.4)
+
+      call VecCopy(x,w,ierr)
+      call VecNorm(w,NORM_2,norm,ierr)
+      write(6,120) norm
+ 120  format('Result of copy ',f10.4)
+
+      call VecAXPY(y,three,x,ierr)
+      call VecNorm(y,NORM_2,norm,ierr)
+      write(6,130) norm
+ 130  format('Result of axpy ',f10.4)
+
+      call VecDestroy(x,ierr)
+      call VecDestroy(y,ierr)
+      call VecDestroy(w,ierr)
+      call PetscFinalize(ierr)
+
+
+
+   END SUBROUTINE PETSC_INITIAL_TEST
+
+
+   SUBROUTINE PETSC_INIT
+
+      CALL PetscInitialize(PETSC_NULL_CHARACTER,ierr)
+      !PetscCallMPIA(MPI_Comm_size(PETSC_COMM_WORLD,size,ierr)) ---> N_MPI_THREADS
+      !PetscCallMPIA(MPI_Comm_rank(PETSC_COMM_WORLD,rank,ierr)) ---> PROC_ID
+
+   END SUBROUTINE PETSC_INIT
+
 
    
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -18,9 +117,11 @@ MODULE fields
 
    SUBROUTINE ASSEMBLE_POISSON
 
+      IMPLICIT NONE
+
       INTEGER :: STATUS
       INTEGER :: I, J
-      INTEGER :: IC, IS, IW, IN, IE
+      INTEGER :: ICENTER, INORTH, IEAST, ISOUTH, IWEST
       INTEGER :: MAXNNZ, SIZE
       REAL(KIND=8) :: HX, HY
       REAL(KIND=8) :: AX, AY, BX, BY, CX, CY, H1X, H2X, H1Y, H2Y, R
@@ -38,8 +139,8 @@ MODULE fields
       IF (.NOT. ALLOCATED(RHS)) ALLOCATE(RHS(0:SIZE-1))
       RHS = 0.d0
 
-      IF (.NOT. ALLOCATED(PHI_FIELD)) ALLOCATE(PHI_FIELD(0:SIZE-1))
-      PHI_FIELD = 0.d0
+      !IF (.NOT. ALLOCATED(PHI_FIELD)) ALLOCATE(PHI_FIELD(0:SIZE-1))
+      !PHI_FIELD = 0.d0
 
       IF (.NOT. ALLOCATED(DIRICHLET)) ALLOCATE(DIRICHLET(0:SIZE-1))
       IF (.NOT. ALLOCATED(IS_DIRICHLET)) ALLOCATE(IS_DIRICHLET(0:SIZE-1))
@@ -50,6 +151,30 @@ MODULE fields
       IF (.NOT. ALLOCATED(IS_NEUMANN)) ALLOCATE(IS_NEUMANN(0:SIZE-1))
       IS_NEUMANN = .FALSE.
 
+      f6 = 6
+      f9 = 9   
+      one = 1
+      f30 = 30
+
+      CALL MatCreate(PETSC_COMM_WORLD,Amat,ierr)
+      CALL MatSetSizes( Amat,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
+      CALL MatSetType( Amat, MATAIJ, ierr)
+      CALL MatSetOption(Amat,MAT_SPD,PETSC_TRUE,ierr)
+      IF (N_MPI_THREADS == 1) THEN
+         CALL MatSetType( Amat, MATAIJ, ierr)
+      ELSE
+         CALL MatSetType( Amat, MATMPIAIJ, ierr)
+      END IF
+      CALL MatMPIAIJSetPreallocation(Amat,f30,PETSC_NULL_INTEGER,f30,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
+      CALL MatSetFromOptions( Amat, ierr)
+      CALL MatSetUp( Amat, ierr)
+      CALL MatGetOwnershipRange( Amat, Istart, Iend, ierr)
+
+      WRITE(*,*) '============> Proc ', PROC_ID, 'owns range ', Istart, ':', Iend
+
+      CALL MatCreateVecs( Amat, PETSC_NULL_VEC, xvec, ierr)
+      CALL VecSetFromOptions( xvec, ierr)
+      CALL VecDuplicate( xvec, bvec, ierr)
 
       ! Create the matrix in Sparse Triplet format.
       ! Entries can be input in random order, but not duplicated.
@@ -132,26 +257,47 @@ MODULE fields
             END IF
 
             ! We need to ADD to a sparse matrix entry.
-            IF (IS_DIRICHLET(V1-1)) THEN
-               CALL ST_MATRIX_SET(A_ST, V1-1, V1-1, 1.d0)
-            ELSE !IF (.NOT. IS_NEUMANN(V1-1)) THEN
-               CALL ST_MATRIX_ADD(A_ST, V1-1, V1-1, K11)
-               CALL ST_MATRIX_ADD(A_ST, V1-1, V2-1, K12)
-               CALL ST_MATRIX_ADD(A_ST, V1-1, V3-1, K13)
+            IF (V1-1 >= Istart .AND. V1-1 <= Iend) THEN
+               IF (IS_DIRICHLET(V1-1)) THEN
+                  CALL MatSetValues(Amat,one,V1-1,one,V1-1,1.d0,ADD_VALUES,ierr)
+                  !CALL ST_MATRIX_SET(A_ST, V1-1, V1-1, 1.d0)
+               ELSE !IF (.NOT. IS_NEUMANN(V1-1)) THEN
+                  CALL MatSetValues(Amat,one,V1-1,one,V1-1,K11,ADD_VALUES,ierr)
+                  CALL MatSetValues(Amat,one,V1-1,one,V2-1,K12,ADD_VALUES,ierr)
+                  CALL MatSetValues(Amat,one,V1-1,one,V3-1,K13,ADD_VALUES,ierr)
+
+                  !CALL ST_MATRIX_ADD(A_ST, V1-1, V1-1, K11)
+                  !CALL ST_MATRIX_ADD(A_ST, V1-1, V2-1, K12)
+                  !CALL ST_MATRIX_ADD(A_ST, V1-1, V3-1, K13)
+               END IF
             END IF
-            IF (IS_DIRICHLET(V2-1)) THEN
-               CALL ST_MATRIX_SET(A_ST, V2-1, V2-1, 1.d0)
-            ELSE !IF (.NOT. IS_NEUMANN(V2-1)) THEN
-               CALL ST_MATRIX_ADD(A_ST, V2-1, V1-1, K12)
-               CALL ST_MATRIX_ADD(A_ST, V2-1, V3-1, K23)
-               CALL ST_MATRIX_ADD(A_ST, V2-1, V2-1, K22)
+            IF (V2-1 >= Istart .AND. V2-1 <= Iend) THEN
+               IF (IS_DIRICHLET(V2-1)) THEN
+                  CALL MatSetValues(Amat,one,V2-1,one,V2-1,1.d0,ADD_VALUES,ierr)
+                  !CALL ST_MATRIX_SET(A_ST, V2-1, V2-1, 1.d0)
+               ELSE !IF (.NOT. IS_NEUMANN(V2-1)) THEN
+                  CALL MatSetValues(Amat,one,V2-1,one,V1-1,K12,ADD_VALUES,ierr)
+                  CALL MatSetValues(Amat,one,V2-1,one,V3-1,K23,ADD_VALUES,ierr)
+                  CALL MatSetValues(Amat,one,V2-1,one,V2-1,K22,ADD_VALUES,ierr)
+                  
+                  !CALL ST_MATRIX_ADD(A_ST, V2-1, V1-1, K12)
+                  !CALL ST_MATRIX_ADD(A_ST, V2-1, V3-1, K23)
+                  !CALL ST_MATRIX_ADD(A_ST, V2-1, V2-1, K22)
+               END IF
             END IF
-            IF (IS_DIRICHLET(V3-1)) THEN
-               CALL ST_MATRIX_SET(A_ST, V3-1, V3-1, 1.d0)
-            ELSE !IF (.NOT. IS_NEUMANN(V3-1)) THEN
-               CALL ST_MATRIX_ADD(A_ST, V3-1, V1-1, K13)
-               CALL ST_MATRIX_ADD(A_ST, V3-1, V2-1, K23)
-               CALL ST_MATRIX_ADD(A_ST, V3-1, V3-1, K33)
+            IF (V3-1 >= Istart .AND. V3-1 <= Iend) THEN
+               IF (IS_DIRICHLET(V3-1)) THEN
+                  CALL MatSetValues(Amat,one,V3-1,one,V3-1,1.d0,ADD_VALUES,ierr)
+                  !CALL ST_MATRIX_SET(A_ST, V3-1, V3-1, 1.d0)
+               ELSE !IF (.NOT. IS_NEUMANN(V3-1)) THEN
+                  CALL MatSetValues(Amat,one,V3-1,one,V1-1,K13,ADD_VALUES,ierr)
+                  CALL MatSetValues(Amat,one,V3-1,one,V2-1,K23,ADD_VALUES,ierr)
+                  CALL MatSetValues(Amat,one,V3-1,one,V3-1,K33,ADD_VALUES,ierr)
+                  
+                  !CALL ST_MATRIX_ADD(A_ST, V3-1, V1-1, K13)
+                  !CALL ST_MATRIX_ADD(A_ST, V3-1, V2-1, K23)
+                  !CALL ST_MATRIX_ADD(A_ST, V3-1, V3-1, K33)
+               END IF
             END IF
 
             DO J = 1, 3
@@ -192,7 +338,7 @@ MODULE fields
 
          DO I = 1, U2D_GRID%NUM_NODES
             IF (IS_UNUSED(I-1)) THEN
-               CALL ST_MATRIX_SET(A_ST, I-1, I-1, 1.d0)
+               CALL MatSetValues(Amat,one,I-1,one,I-1,1.d0,ADD_VALUES,ierr)
                IS_DIRICHLET(I-1) = .TRUE.
                DIRICHLET(I-1) = 0.d0
             END IF
@@ -204,11 +350,11 @@ MODULE fields
             DO J = 0, NPY-1
 
 
-               IC = I+(NPX)*J
-               IE = I+(NPX)*J+1
-               IW = I+(NPX)*J-1
-               IN = I+(NPX)*(J+1)
-               IS = I+(NPX)*(J-1)
+               ICENTER = I+(NPX)*J
+               IEAST = I+(NPX)*J+1
+               IWEST = I+(NPX)*J-1
+               INORTH = I+(NPX)*(J+1)
+               ISOUTH = I+(NPX)*(J-1)
 
                HX = (XMAX-XMIN)/DBLE(NX)
                AX = 1./(HX*HX)
@@ -219,49 +365,12 @@ MODULE fields
                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                ! Plume 2d cartesian, full domain !
                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-               ! IF ((I == 0) .OR. (I == NPX-1) .OR. (J == 0) .OR. (J == NPY-1) .OR. &
-               ! ((I .GE. 10) .AND. (I .LE. 50) .AND. (J .GE. 50) .AND. (J .LE. 150)) ) THEN
-               !    ! Boundary point
-               !    CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
-
-               !    IF ((I == 50) .AND. (J .GE. 84) .AND. (J .LE. 116)) THEN
-               !       ! On the inlet surface.
-               !       DIRICHLET(IC) = 2.35d0
-               !    ELSE
-               !       ! On the boundary or on the rest of the PFG.
-               !       DIRICHLET(IC) = 0.d0
-               !    END IF
-               !    IS_DIRICHLET(IC) = .TRUE.
-               ! ELSE
-
-
-
-               !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-               ! Plume 2d axisymmetric (half domain) !
-               !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-               IF (J == 0) THEN
-                  ! Axis: zero radial gradient.
-                  CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
-                  DIRICHLET(IC) = 0.d0
-                  CALL ST_MATRIX_SET(A_ST, IC, IN, -1.d0)
-                  IS_DIRICHLET(IC) = .TRUE.
-               ELSE IF ((I == 0) .OR. (I == NPX-1) .OR. (J == NPY-1) .OR. &
-                  ((I .GE. 10) .AND. (I .LE. 30) .AND. (J .LE. 100)) ) THEN
-                  ! Boundary point.
-                  CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
-                  IF ((I == 30) .AND. (J .LE. 50)) THEN
-                  ! On the inlet surface.
-                     DIRICHLET(IC) = 2.35d0
-                  ELSE
-                     ! On the boundary or on the rest of the PFG.
-                     DIRICHLET(IC) = 0.d0
-                  END IF
-                  IS_DIRICHLET(IC) = .TRUE.
-
-
-
-
+               IF ((I == 0) .OR. (I == NPX-1) .OR. (J == 0) .OR. (J == NPY-1)) THEN
+                  ! Boundary point
+                  CALL MatSetValues(Amat,one,ICENTER,one,ICENTER,1.d0,INSERT_VALUES,ierr)
+                  ! On the boundary or on the rest of the PFG.
+                  DIRICHLET(ICENTER) = 0.d0
+                  IS_DIRICHLET(ICENTER) = .TRUE.
 
 
                ELSE
@@ -302,15 +411,15 @@ MODULE fields
                   END IF
                   
                   IF (DIMS == 2) THEN
-                     CALL ST_MATRIX_SET(A_ST, IC, IC, BX+BY)
-                     CALL ST_MATRIX_SET(A_ST, IC, IN, CY)
-                     CALL ST_MATRIX_SET(A_ST, IC, IS, AY)
-                     CALL ST_MATRIX_SET(A_ST, IC, IE, CX)
-                     CALL ST_MATRIX_SET(A_ST, IC, IW, AX)
+                     CALL MatSetValues(Amat,one,ICENTER,one,ICENTER,BX+BY,INSERT_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,ICENTER,one,INORTH,CY,INSERT_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,ICENTER,one,ISOUTH,AY,INSERT_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,ICENTER,one,IEAST,CX,INSERT_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,ICENTER,one,IWEST,AX,INSERT_VALUES,ierr)
                   ELSE
-                     CALL ST_MATRIX_SET(A_ST, IC, IC, BX)
-                     CALL ST_MATRIX_SET(A_ST, IC, IE, CX)
-                     CALL ST_MATRIX_SET(A_ST, IC, IW, AX)
+                     CALL MatSetValues(Amat,one,ICENTER,one,ICENTER,BX,INSERT_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,ICENTER,one,IEAST,CX,INSERT_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,ICENTER,one,IWEST,AX,INSERT_VALUES,ierr)
                   END IF
                END IF
 
@@ -329,14 +438,18 @@ MODULE fields
       ! ELSE
       !    CALL SLEEP(5)
       ! END IF
-      IF (PROC_ID .EQ. 0) THEN
-         CALL ST_MATRIX_TO_CC(A_ST, SIZE, A_CC)
-         CALL S_UMFPACK_SYMBOLIC(SIZE, SIZE, A_CC%AP, A_CC%AI, A_CC%AX, STATUS = STATUS)
-         WRITE(*,*) 'Status is = ', STATUS
-         CALL S_UMFPACK_NUMERIC(A_CC%AP, A_CC%AI, A_CC%AX, STATUS = STATUS)
-         WRITE(*,*) 'Status 1 is = ', STATUS
-         CALL S_UMFPACK_FREE_SYMBOLIC
-      END IF
+
+      CALL MatAssemblyBegin(Amat,MAT_FINAL_ASSEMBLY,ierr)
+      CALL MatAssemblyEnd(Amat,MAT_FINAL_ASSEMBLY,ierr)
+
+      ! IF (PROC_ID .EQ. 0) THEN
+      !    CALL ST_MATRIX_TO_CC(A_ST, SIZE, A_CC)
+      !    CALL S_UMFPACK_SYMBOLIC(SIZE, SIZE, A_CC%AP, A_CC%AI, A_CC%AX, STATUS = STATUS)
+      !    WRITE(*,*) 'Status is = ', STATUS
+      !    CALL S_UMFPACK_NUMERIC(A_CC%AP, A_CC%AI, A_CC%AX, STATUS = STATUS)
+      !    WRITE(*,*) 'Status 1 is = ', STATUS
+      !    CALL S_UMFPACK_FREE_SYMBOLIC
+      ! END IF
 
    END SUBROUTINE ASSEMBLE_POISSON
 
@@ -355,7 +468,7 @@ MODULE fields
       INTEGER :: I, J
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, AREA
       INTEGER :: V1, V2, V3, SIZE
-      INTEGER :: IC, IN, IS, IE, IW
+      INTEGER :: ICENTER, INORTH, ISOUTH, IEAST, IWEST
 
       HX = (XMAX-XMIN)/DBLE(NX)
       HY = (YMAX-YMIN)/DBLE(NY)
@@ -367,22 +480,28 @@ MODULE fields
          SIZE = NPX*NPY
       END IF
 
-      ALLOCATE(X(0:SIZE-1))
-
       ! Solve the linear system
-      IF (PROC_ID .EQ. 0) THEN
-         !WRITE(*,*) 'Solving poisson'
-         !WRITE(*,*) RHS
-         CALL S_UMFPACK_SOLVE(UMFPACK_A, A_CC%AP, A_CC%AI, A_CC%AX, X, RHS)
-         !WRITE(*,*) 'Solution:'
-         !WRITE(*,*) X
-         !X = 0.d0
-      END IF
- 
-      CALL MPI_BCAST(X, SIZE, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-      PHI_FIELD = X
-      PHIBAR_FIELD = X
-      DEALLOCATE(X)
+
+      CALL KSPCreate(PETSC_COMM_WORLD,ksp,ierr)
+      CALL KSPSetOperators(ksp,Amat,Amat,ierr)
+
+      ! Set solver type to direct (LU). Could be MUMPS but must install with --download-mumps
+      !CALL KSPGetPC(ksp,pc,ierr)
+      !CALL PCSetType(pc,PCLU,ierr)
+      !CALL KSPSetFromOptions(ksp,ierr)
+
+      CALL KSPSolve(ksp,bvec,xvec,ierr)
+
+      CALL KSPGetConvergedReason(ksp,reason,ierr)
+      IF (PROC_ID == 0) WRITE(*,*) 'KSPConvergedReason = ', reason
+
+      CALL VecScatterCreateToAll(xvec,ctx,X_SEQ,ierr)
+      CALL VecScatterBegin(ctx,xvec,X_SEQ,INSERT_VALUES,SCATTER_FORWARD)
+      CALL VecScatterEnd(ctx,xvec,X_SEQ,INSERT_VALUES,SCATTER_FORWARD)
+
+      CALL VecGetArrayReadF90(X_SEQ,PHI_FIELD,ierr)
+
+      PHIBAR_FIELD => PHI_FIELD
 
       ! Reshape the linear array into a 2D array
       IF (GRID_TYPE == UNSTRUCTURED) THEN
@@ -400,12 +519,12 @@ MODULE fields
             Y2 = U2D_GRID%NODE_COORDS(V2, 2)
             Y3 = U2D_GRID%NODE_COORDS(V3, 2)
 
-            E_FIELD(I,1,1) = -0.5/AREA*(  PHI_FIELD(V1-1)*(Y2-Y3) &
-                                        - PHI_FIELD(V2-1)*(Y1-Y3) &
-                                        - PHI_FIELD(V3-1)*(Y2-Y1))
-            E_FIELD(I,1,2) = -0.5/AREA*(- PHI_FIELD(V1-1)*(X2-X3) &
-                                        + PHI_FIELD(V2-1)*(X1-X3) &
-                                        + PHI_FIELD(V3-1)*(X2-X1))
+            E_FIELD(I,1,1) = -0.5/AREA*(  PHI_FIELD(V1)*(Y2-Y3) &
+                                        - PHI_FIELD(V2)*(Y1-Y3) &
+                                        - PHI_FIELD(V3)*(Y2-Y1))
+            E_FIELD(I,1,2) = -0.5/AREA*(- PHI_FIELD(V1)*(X2-X3) &
+                                        + PHI_FIELD(V2)*(X1-X3) &
+                                        + PHI_FIELD(V3)*(X2-X1))
             E_FIELD(I,1,3) = 0.d0
          END DO
 
@@ -415,44 +534,44 @@ MODULE fields
          DO I = 0, NPX-1
             DO J = 0, NPY-1
 
-               IC = I+1 + NPX*(J+1)
-               IE = I+2 + NPX*(J+1)
-               IW = I   + NPX*(J+1)
-               IN = I+1 + NPX*(J+2)
-               IS = I+1 + NPX*J
+               ICENTER = I+1 + NPX*(J+1)
+               IEAST = I+2 + NPX*(J+1)
+               IWEST = I   + NPX*(J+1)
+               INORTH = I+1 + NPX*(J+2)
+               ISOUTH = I+1 + NPX*J
 
                IF (I == 0) THEN ! Left boundary
                   IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(1)
-                  E_FIELD(I,J,1) = (PHI_FIELD(IC)-PHI_FIELD(IE))/HX
+                  E_FIELD(I,J,1) = (PHI_FIELD(ICENTER)-PHI_FIELD(IEAST))/HX
                ELSE IF (I == 30 .AND. (J .LE. 50)) THEN ! Right side of PFG
                   IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(I+1)
-                  E_FIELD(I,J,1) = (PHI_FIELD(IC)-PHI_FIELD(IE))/HX
+                  E_FIELD(I,J,1) = (PHI_FIELD(ICENTER)-PHI_FIELD(IEAST))/HX
                ELSE IF (I == NPX-1) THEN ! Right boundary
                   IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(NPX-1)
-                  E_FIELD(I,J,1) = (PHI_FIELD(IW)-PHI_FIELD(IC))/HX
+                  E_FIELD(I,J,1) = (PHI_FIELD(IWEST)-PHI_FIELD(ICENTER))/HX
                ELSE IF (I == 10 .AND. (J .LE. 50)) THEN ! Left side of PFG
                   IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(I)
-                  E_FIELD(I,J,1) = (PHI_FIELD(IW)-PHI_FIELD(IC))/HX
+                  E_FIELD(I,J,1) = (PHI_FIELD(IWEST)-PHI_FIELD(ICENTER))/HX
                ELSE ! Interior point
                   IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = 0.5*(XSIZE(I)+XSIZE(I+1))
-                  E_FIELD(I,J,1) = 0.5*(PHI_FIELD(IW)-PHI_FIELD(IE))/HX
+                  E_FIELD(I,J,1) = 0.5*(PHI_FIELD(IWEST)-PHI_FIELD(IEAST))/HX
                END IF
                IF (DIMS == 2) THEN
                   IF (J == 0) THEN ! Bottom boundary
                      IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(1)
-                     E_FIELD(I,J,2) = (PHI_FIELD(IC)-PHI_FIELD(IN))/HY
+                     E_FIELD(I,J,2) = (PHI_FIELD(ICENTER)-PHI_FIELD(INORTH))/HY
                   ELSE IF (J == 50 .AND. ((I.GE. 10) .AND. (I .LE. 30))) THEN ! Top side of PFG
                      IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(J+1)
-                     E_FIELD(I,J,2) = (PHI_FIELD(IC)-PHI_FIELD(IN))/HY
+                     E_FIELD(I,J,2) = (PHI_FIELD(ICENTER)-PHI_FIELD(INORTH))/HY
                   ELSE IF (J == NPY-1) THEN ! Top boundary
                      IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(NPY-1)
-                     E_FIELD(I,J,2) = (PHI_FIELD(IS)-PHI_FIELD(IC))/HY
+                     E_FIELD(I,J,2) = (PHI_FIELD(ISOUTH)-PHI_FIELD(ICENTER))/HY
                   ! ELSE IF (J == 50 .AND. ((I.GE. 10) .AND. (I .LE. 50))) THEN ! Bottom side of PFG
                   !    IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(J)
-                  !    E_FIELD(I,J,2) = (PHI_FIELD(IS)-PHI_FIELD(IC))/HY
+                  !    E_FIELD(I,J,2) = (PHI_FIELD(ISOUTH)-PHI_FIELD(ICENTER))/HY
                   ELSE ! Interior point
                      IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = 0.5*(YSIZE(J)+YSIZE(J+1))
-                     E_FIELD(I,J,2) = 0.5*(PHI_FIELD(IS)-PHI_FIELD(IN))/HY
+                     E_FIELD(I,J,2) = 0.5*(PHI_FIELD(ISOUTH)-PHI_FIELD(INORTH))/HY
                   END IF
                ELSE
                   E_FIELD(I,J,2) = 0.d0
@@ -462,6 +581,8 @@ MODULE fields
          END DO
          
       END IF
+
+      !CALL VecRestoreArrayReadF90(X_SEQ,PHI_FIELD,ierr)
 
    END SUBROUTINE SOLVE_POISSON
 
@@ -559,11 +680,18 @@ MODULE fields
 
       DO I = 0, SIZE-1
          IF (IS_DIRICHLET(I)) THEN
-            RHS(I)=DIRICHLET(I)
+            val = DIRICHLET(I)
          ELSE IF (IS_NEUMANN(I)) THEN
-            RHS(I)=RHS(I) + NEUMANN(I)
+            val = RHS(I) + NEUMANN(I)
+         ELSE
+            val = RHS(I)
          END IF
+         CALL VecSetValues(bvec,one,I,val,INSERT_VALUES,ierr)
       END DO
+
+
+      CALL VecAssemblyBegin(bvec,ierr)
+      CALL VecAssemblyEnd(bvec,ierr)
 
 
       ! RHS = 0
@@ -731,10 +859,26 @@ MODULE fields
 
 
       ! Create the matrix in Sparse Triplet format.
-  
-      CALL CC_MATRIX_DEALLOCATE(A_CC)
-      MAXNNZ = 10*SIZE
-      CALL ST_MATRIX_ALLOCATE(A_ST, MAXNNZ)
+
+      CALL MatDestroy(Amat,ierr)
+      CALL MatCreate(PETSC_COMM_WORLD,Amat,ierr)
+      CALL MatSetSizes( Amat,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
+      CALL MatSetType( Amat, MATAIJ, ierr)
+      CALL MatSetOption(Amat,MAT_SPD,PETSC_TRUE,ierr)
+      IF (N_MPI_THREADS == 1) THEN
+         CALL MatSetType( Amat, MATAIJ, ierr)
+      ELSE
+         CALL MatSetType( Amat, MATMPIAIJ, ierr)
+      END IF
+      CALL MatMPIAIJSetPreallocation(Amat,f9,PETSC_NULL_INTEGER,f6,PETSC_NULL_INTEGER, ierr)
+      CALL MatSetFromOptions( Amat, ierr)
+      CALL MatSetUp( Amat, ierr)
+      CALL MatGetOwnershipRange( Amat, Istart, Iend, ierr)
+
+      CALL MatCreateVecs( Amat, PETSC_NULL_VEC, xvec, ierr)
+      CALL VecSetFromOptions( xvec, ierr)
+      CALL VecDuplicate( xvec, bvec, ierr)
+
 
       ! At this point, populate the matrix
       IF (GRID_TYPE == UNSTRUCTURED) THEN
@@ -745,6 +889,11 @@ MODULE fields
             V1 = U2D_GRID%CELL_NODES(I,1)
             V2 = U2D_GRID%CELL_NODES(I,2)
             V3 = U2D_GRID%CELL_NODES(I,3)
+
+            IF ((V1-1 < Istart .OR. V1-1 > Iend) .AND. &
+                (V2-1 < Istart .OR. V2-1 > Iend) .AND. &
+                (V3-1 < Istart .OR. V3-1 > Iend)) CYCLE
+
             IS_UNUSED(V1-1) = .FALSE.; IS_UNUSED(V2-1) = .FALSE.; IS_UNUSED(V3-1) = .FALSE.
             DO J = 1, 3
                EDGE_PG = U2D_GRID%CELL_EDGES_PG(I, J)
@@ -782,10 +931,15 @@ MODULE fields
          !DIRICHLET(0) = 0.d0
 
          DO I = 1, U2D_GRID%NUM_CELLS
-            AREA = CELL_AREAS(I)
             V1 = U2D_GRID%CELL_NODES(I,1)
             V2 = U2D_GRID%CELL_NODES(I,2)
-            V3 = U2D_GRID%CELL_NODES(I,3)            
+            V3 = U2D_GRID%CELL_NODES(I,3)
+            
+            IF ((V1-1 < Istart .OR. V1-1 > Iend) .AND. &
+                (V2-1 < Istart .OR. V2-1 > Iend) .AND. &
+                (V3-1 < Istart .OR. V3-1 > Iend)) CYCLE
+
+            AREA = CELL_AREAS(I)
             X1 = U2D_GRID%NODE_COORDS(V1, 1)
             X2 = U2D_GRID%NODE_COORDS(V2, 1)
             X3 = U2D_GRID%NODE_COORDS(V3, 1)
@@ -806,52 +960,64 @@ MODULE fields
             K13TILDE = K13*(Y1+Y2+Y3)/3.
 
             ! We need to ADD to a sparse matrix entry.
-            IF (IS_DIRICHLET(V1-1)) THEN
-               CALL ST_MATRIX_SET(A_ST, V1-1, V1-1, 1.d0)
-            ELSE !IF (.NOT. IS_NEUMANN(V1-1)) THEN
-               IF (AXI) THEN
-                  CALL ST_MATRIX_ADD(A_ST, V1-1, V1-1, K11TILDE + MASS_MATRIX(I)*K11)
-                  CALL ST_MATRIX_ADD(A_ST, V1-1, V2-1, K12TILDE + MASS_MATRIX(I)*K12)
-                  CALL ST_MATRIX_ADD(A_ST, V1-1, V3-1, K13TILDE + MASS_MATRIX(I)*K13)
-                  RHS(V1-1) = RHS(V1-1) + PHI_FIELD(V1-1)*K11TILDE+PHI_FIELD(V2-1)*K12TILDE+PHI_FIELD(V3-1)*K13TILDE
-               ELSE
-                  CALL ST_MATRIX_ADD(A_ST, V1-1, V1-1, (MASS_MATRIX(I)+1.)*K11)
-                  CALL ST_MATRIX_ADD(A_ST, V1-1, V2-1, (MASS_MATRIX(I)+1.)*K12)
-                  CALL ST_MATRIX_ADD(A_ST, V1-1, V3-1, (MASS_MATRIX(I)+1.)*K13)
-                  RHS(V1-1) = RHS(V1-1) + PHI_FIELD(V1-1)*K11+PHI_FIELD(V2-1)*K12+PHI_FIELD(V3-1)*K13
+            IF (V1-1 >= Istart .AND. V1-1 <= Iend) THEN
+               IF (IS_DIRICHLET(V1-1)) THEN
+                  CALL MatSetValues(Amat,one,V1-1,one,V1-1,1.d0,INSERT_VALUES,ierr)
+               ELSE !IF (.NOT. IS_NEUMANN(V1-1)) THEN
+                  IF (AXI) THEN
+                     CALL MatSetValues(Amat,one,V1-1,one,V1-1,K11TILDE + MASS_MATRIX(I)*K11,ADD_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,V1-1,one,V2-1,K12TILDE + MASS_MATRIX(I)*K12,ADD_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,V1-1,one,V3-1,K13TILDE + MASS_MATRIX(I)*K13,ADD_VALUES,ierr)
+                     val = PHI_FIELD(V1-1)*K11TILDE+PHI_FIELD(V2-1)*K12TILDE+PHI_FIELD(V3-1)*K13TILDE
+                     CALL VecSetValues(bvec,one,V1-1,val,ADD_VALUES,ierr)
+                  ELSE
+                     CALL MatSetValues(Amat,one,V1-1,one,V1-1,(MASS_MATRIX(I)+1.)*K11,ADD_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,V1-1,one,V2-1,(MASS_MATRIX(I)+1.)*K12,ADD_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,V1-1,one,V3-1,(MASS_MATRIX(I)+1.)*K13,ADD_VALUES,ierr)
+                     val = PHI_FIELD(V1-1)*K11+PHI_FIELD(V2-1)*K12+PHI_FIELD(V3-1)*K13
+                     CALL VecSetValues(bvec,one,V1-1,val,ADD_VALUES,ierr)
+                  END IF
                END IF
             END IF
-            IF (IS_DIRICHLET(V2-1)) THEN
-               CALL ST_MATRIX_SET(A_ST, V2-1, V2-1, 1.d0)
-            ELSE !IF (.NOT. IS_NEUMANN(V2-1)) THEN
-               IF (AXI) THEN
-                  CALL ST_MATRIX_ADD(A_ST, V2-1, V1-1, K12TILDE + MASS_MATRIX(I)*K12)
-                  CALL ST_MATRIX_ADD(A_ST, V2-1, V3-1, K23TILDE + MASS_MATRIX(I)*K23)
-                  CALL ST_MATRIX_ADD(A_ST, V2-1, V2-1, K22TILDE + MASS_MATRIX(I)*K22)
-                  RHS(V2-1) = RHS(V2-1) + PHI_FIELD(V1-1)*K12TILDE+PHI_FIELD(V2-1)*K22TILDE+PHI_FIELD(V3-1)*K23TILDE
-               ELSE
-                  CALL ST_MATRIX_ADD(A_ST, V2-1, V1-1, (MASS_MATRIX(I)+1.)*K12)
-                  CALL ST_MATRIX_ADD(A_ST, V2-1, V3-1, (MASS_MATRIX(I)+1.)*K23)
-                  CALL ST_MATRIX_ADD(A_ST, V2-1, V2-1, (MASS_MATRIX(I)+1.)*K22)
-                  RHS(V2-1) = RHS(V2-1) + PHI_FIELD(V1-1)*K12+PHI_FIELD(V2-1)*K22+PHI_FIELD(V3-1)*K23
+            IF (V2-1 >= Istart .AND. V2-1 <= Iend) THEN
+               IF (IS_DIRICHLET(V2-1)) THEN
+                  CALL MatSetValues(Amat,one,V2-1,one,V2-1,1.d0,INSERT_VALUES,ierr)
+               ELSE !IF (.NOT. IS_NEUMANN(V2-1)) THEN
+                  IF (AXI) THEN
+                     CALL MatSetValues(Amat,one,V2-1,one,V1-1,K12TILDE + MASS_MATRIX(I)*K12,ADD_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,V2-1,one,V3-1,K23TILDE + MASS_MATRIX(I)*K23,ADD_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,V2-1,one,V2-1,K22TILDE + MASS_MATRIX(I)*K22,ADD_VALUES,ierr)
+                     val = PHI_FIELD(V1-1)*K12TILDE+PHI_FIELD(V2-1)*K22TILDE+PHI_FIELD(V3-1)*K23TILDE
+                     CALL VecSetValues(bvec,one,V2-1,val,ADD_VALUES,ierr)
+                  ELSE
+                     CALL MatSetValues(Amat,one,V2-1,one,V1-1,(MASS_MATRIX(I)+1.)*K12,ADD_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,V2-1,one,V3-1,(MASS_MATRIX(I)+1.)*K23,ADD_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,V2-1,one,V2-1,(MASS_MATRIX(I)+1.)*K22,ADD_VALUES,ierr)
+                     val = PHI_FIELD(V1-1)*K12+PHI_FIELD(V2-1)*K22+PHI_FIELD(V3-1)*K23
+                     CALL VecSetValues(bvec,one,V2-1,val,ADD_VALUES,ierr)
+                  END IF
                END IF
             END IF
-            IF (IS_DIRICHLET(V3-1)) THEN
-               CALL ST_MATRIX_SET(A_ST, V3-1, V3-1, 1.d0)
-            ELSE !IF (.NOT. IS_NEUMANN(V3-1)) THEN
-               IF (AXI) THEN
-                  CALL ST_MATRIX_ADD(A_ST, V3-1, V1-1, K13TILDE + MASS_MATRIX(I)*K13)
-                  CALL ST_MATRIX_ADD(A_ST, V3-1, V2-1, K23TILDE + MASS_MATRIX(I)*K23)
-                  CALL ST_MATRIX_ADD(A_ST, V3-1, V3-1, K33TILDE + MASS_MATRIX(I)*K33)
-                  RHS(V3-1) = RHS(V3-1) + PHI_FIELD(V1-1)*K13TILDE+PHI_FIELD(V2-1)*K23TILDE+PHI_FIELD(V3-1)*K33TILDE
-               ELSE
-                  CALL ST_MATRIX_ADD(A_ST, V3-1, V1-1, (MASS_MATRIX(I)+1.)*K13)
-                  CALL ST_MATRIX_ADD(A_ST, V3-1, V2-1, (MASS_MATRIX(I)+1.)*K23)
-                  CALL ST_MATRIX_ADD(A_ST, V3-1, V3-1, (MASS_MATRIX(I)+1.)*K33)
-                  RHS(V3-1) = RHS(V3-1) + PHI_FIELD(V1-1)*K13+PHI_FIELD(V2-1)*K23+PHI_FIELD(V3-1)*K33
-               END IF
-            END IF
+            IF (V3-1 >= Istart .AND. V3-1 <= Iend) THEN
+               IF (IS_DIRICHLET(V3-1)) THEN
+                  CALL MatSetValues(Amat,one,V3-1,one,V3-1,1.d0,INSERT_VALUES,ierr)
+               ELSE !IF (.NOT. IS_NEUMANN(V3-1)) THEN
+                  IF (AXI) THEN
+                     CALL MatSetValues(Amat,one,V3-1,one,V1-1,K13TILDE + MASS_MATRIX(I)*K13,ADD_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,V3-1,one,V2-1,K23TILDE + MASS_MATRIX(I)*K23,ADD_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,V3-1,one,V3-1,K33TILDE + MASS_MATRIX(I)*K33,ADD_VALUES,ierr)
+                     val = PHI_FIELD(V1-1)*K13TILDE+PHI_FIELD(V2-1)*K23TILDE+PHI_FIELD(V3-1)*K33TILDE
+                     CALL VecSetValues(bvec,one,V3-1,val,ADD_VALUES,ierr)
+                  ELSE
 
+                     CALL MatSetValues(Amat,one,V3-1,one,V1-1,(MASS_MATRIX(I)+1.)*K13,ADD_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,V3-1,one,V2-1,(MASS_MATRIX(I)+1.)*K23,ADD_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,V3-1,one,V3-1,(MASS_MATRIX(I)+1.)*K33,ADD_VALUES,ierr)
+                     val = PHI_FIELD(V1-1)*K13+PHI_FIELD(V2-1)*K23+PHI_FIELD(V3-1)*K33
+                     CALL VecSetValues(bvec,one,V3-1,val,ADD_VALUES,ierr)
+                  END IF
+               END IF
+            END IF
          ! Neumann part has to be included only if the derivative changes in time.
          !    DO J = 1, 3
          !       EDGE_PG = U2D_GRID%CELL_EDGES_PG(I, J)
@@ -889,13 +1055,14 @@ MODULE fields
 
          END DO
 
-         DO I = 0, U2D_GRID%NUM_NODES-1
+         DO I = Istart, Iend-1
             IF (IS_UNUSED(I)) THEN
-               CALL ST_MATRIX_SET(A_ST, I, I, 1.d0)
+               CALL MatSetValues(Amat,one,I,one,I,1.d0,INSERT_VALUES,ierr)
                IS_DIRICHLET(I) = .TRUE.
                DIRICHLET(I) = 0.d0
             ELSE IF (.NOT. IS_DIRICHLET(I) ) THEN
-               RHS(I) = RHS(I) + 0.5*DT/EPS0*J_FIELD(I)
+               val = 0.5*DT/EPS0*J_FIELD(I)
+               CALL VecSetValues(bvec,one,I,val,ADD_VALUES,ierr)
             END IF
          END DO
          DEALLOCATE(IS_UNUSED)
@@ -915,22 +1082,21 @@ MODULE fields
       !    CALL SLEEP(5)
       ! END IF
 
-      DO I = 0, SIZE-1
+      DO I = Istart, Iend-1
          IF (IS_DIRICHLET(I)) THEN
-            RHS(I)=DIRICHLET(I)
+            val = DIRICHLET(I)
+            CALL VecSetValues(bvec,one,I,val,INSERT_VALUES,ierr)
          ELSE IF (IS_NEUMANN(I)) THEN
-            RHS(I)=RHS(I) + NEUMANN(I)
+            val = NEUMANN(I)
+            CALL VecSetValues(bvec,one,I,val,ADD_VALUES,ierr)
          END IF
       END DO
 
-      IF (PROC_ID .EQ. 0) THEN
-         CALL ST_MATRIX_TO_CC(A_ST, SIZE, A_CC)
-         CALL S_UMFPACK_SYMBOLIC(SIZE, SIZE, A_CC%AP, A_CC%AI, A_CC%AX, STATUS = STATUS)
-         WRITE(*,*) 'Status is = ', STATUS
-         CALL S_UMFPACK_NUMERIC(A_CC%AP, A_CC%AI, A_CC%AX, STATUS = STATUS)
-         WRITE(*,*) 'Status 1 is = ', STATUS
-         CALL S_UMFPACK_FREE_SYMBOLIC
-      END IF
+
+      CALL MatAssemblyBegin(Amat,MAT_FINAL_ASSEMBLY,ierr)
+      CALL MatAssemblyEnd(Amat,MAT_FINAL_ASSEMBLY,ierr)
+      CALL VecAssemblyBegin(bvec,ierr)
+      CALL VecAssemblyEnd(bvec,ierr)
 
    END SUBROUTINE ASSEMBLE_AMPERE
 
@@ -1043,22 +1209,17 @@ MODULE fields
          SIZE = NPX*NPY
       END IF
 
-      ALLOCATE(X(0:SIZE-1))
 
-      ! Solve the linear system
-      IF (PROC_ID .EQ. 0) THEN
-         !WRITE(*,*) 'Solving poisson'
-         !WRITE(*,*) RHS
-         CALL S_UMFPACK_SOLVE(UMFPACK_A, A_CC%AP, A_CC%AI, A_CC%AX, X, RHS)
-         CALL S_UMFPACK_FREE_NUMERIC
-         !WRITE(*,*) 'Solution:'
-         !WRITE(*,*) X
-         !X = 0.d0
-      END IF
- 
-      CALL MPI_BCAST(X, SIZE, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-      PHIBAR_FIELD = X
-      DEALLOCATE(X)
+      CALL KSPCreate(PETSC_COMM_WORLD,ksp,ierr)
+      CALL KSPSetOperators(ksp,Amat,Amat,ierr)
+
+      CALL KSPSolve(ksp,bvec,xvec,ierr)
+
+      CALL VecScatterCreateToAll(xvec,ctx,X_SEQ,ierr)
+      CALL VecScatterBegin(ctx,xvec,X_SEQ,INSERT_VALUES,SCATTER_FORWARD)
+      CALL VecScatterEnd(ctx,xvec,X_SEQ,INSERT_VALUES,SCATTER_FORWARD)
+
+      CALL VecGetArrayF90(X_SEQ,PHIBAR_FIELD,ierr)
 
       PHI_FIELD = 2*PHIBAR_FIELD-PHI_FIELD
 

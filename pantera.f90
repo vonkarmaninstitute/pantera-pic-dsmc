@@ -19,6 +19,11 @@ PROGRAM PANTERA
    CALL MPI_COMM_RANK(MPI_COMM_WORLD, PROC_ID, ierr)
    CALL NEWTYPE ! Define new "particle" type for mpi
 
+
+   CALL ONLYMASTERPRINT1(PROC_ID, '> TESTING PETSC INIT...')
+   !CALL PETSC_INITIAL_TEST
+   CALL PETSC_INIT
+   CALL ONLYMASTERPRINT1(PROC_ID, '> PETSC INIT DONE!')
    ! ========= Print header (important things first) =======
    CALL PRINTTITLE(PROC_ID)
 

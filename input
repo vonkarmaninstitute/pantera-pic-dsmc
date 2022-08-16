@@ -14,13 +14,13 @@
 Dimensions:
     2
 Axisymmetric:
-    .TRUE.
+    .FALSE.
 Number_of_cells:
     1    1    1
 Domain_limits:
     -10.0    10.0    0.0    10.0    -3.14    3.14
 Mesh_file_SU2:
-    'TMPFG_v2.su2'
+    'rectsheath1.su2'
 Domain_periodicity:
     .FALSE.   .FALSE.   .TRUE.
 Domain_specular:
@@ -31,7 +31,7 @@ Boundary_temperature:
     300.0
     
 Bool_PIC:
-    .FALSE.
+    .TRUE.
 PIC_implicit:
     .FALSE.
 
@@ -49,11 +49,11 @@ Fluxes_dump_output:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    2.5e1
+    1.0e0
 Timestep:
-    3.687316e-9
+    1.0e-15
 Number_of_timesteps:
-    10000
+    100
 Stats_every:
     1
 
@@ -70,6 +70,9 @@ Dump_grid_avgevery:
     1
 Dump_grid_numavgs:
     1
+Dump_part_start:
+    10000000
+
 
 Perform_checks:
     .FALSE.
@@ -130,7 +133,7 @@ Thermal_bath_Ttr:
 Initial_particles_bool:
     .TRUE.
 Initial_particles_dens:
-    1.0e10
+    1.0e6
 Initial_particles_vel:
     0.  0.  0.
 Initial_particles_Ttra:
@@ -140,22 +143,22 @@ Initial_particles_Trot:
 Initial_particles_Tvib:
     0. 
 Initial_particles_mixture:
-    Plasma
+    Ions
 
 
 
     
-Boundary_condition:
-    Grid    dirichlet    0.0
+!Boundary_condition:
+!    Grid    dirichlet    0.0
+
+!Boundary_condition:
+!    Axis    neumann    0.0
+
+!Boundary_condition:
+!    Dielectric    neumann    0.0
 
 Boundary_condition:
-    Axis    neumann    0.0
-
-Boundary_condition:
-    Dielectric    neumann    0.0
-
-Boundary_condition:
-    Wall    dirichlet    0.0
+    Bound    dirichlet    0.0
 
 !Boundary_condition:
 !    Grid    vacuum

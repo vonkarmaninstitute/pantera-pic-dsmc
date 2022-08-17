@@ -16,15 +16,15 @@ Dimensions:
 Axisymmetric:
     .FALSE.
 Number_of_cells:
-    1    1    1
+    100    100    1
 Domain_limits:
-    -10.0    10.0    0.0    10.0    -3.14    3.14
-Mesh_file_SU2:
-    'rectsheath1.su2'
+    0.0    1.0    0.0    1.0    -0.5    0.5
+!Mesh_file_SU2:
+!    'rectsheath1.su2'
 Domain_periodicity:
     .FALSE.   .FALSE.   .TRUE.
 Domain_specular:
-    .FALSE.    .FALSE.    .TRUE.    .FALSE.
+    .FALSE.    .FALSE.    .FALSE.    .FALSE.
 Domain_diffuse:
     .FALSE.    .FALSE.    .FALSE.   .FALSE.
 Boundary_temperature:
@@ -49,11 +49,11 @@ Fluxes_dump_output:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0e0
+    1.0e3
 Timestep:
     1.0e-15
 Number_of_timesteps:
-    100
+    1000
 Stats_every:
     1
 
@@ -133,7 +133,7 @@ Thermal_bath_Ttr:
 Initial_particles_bool:
     .TRUE.
 Initial_particles_dens:
-    1.0e6
+    1.0e9
 Initial_particles_vel:
     0.  0.  0.
 Initial_particles_Ttra:
@@ -157,8 +157,8 @@ Initial_particles_mixture:
 !Boundary_condition:
 !    Dielectric    neumann    0.0
 
-Boundary_condition:
-    Bound    dirichlet    0.0
+!Boundary_condition:
+!    Bound    dirichlet    0.0
 
 !Boundary_condition:
 !    Grid    vacuum

@@ -170,8 +170,6 @@ MODULE fields
       CALL MatSetUp( Amat, ierr)
       CALL MatGetOwnershipRange( Amat, Istart, Iend, ierr)
 
-      WRITE(*,*) '============> Proc ', PROC_ID, 'owns range ', Istart, ':', Iend
-
       CALL MatCreateVecs( Amat, PETSC_NULL_VEC, xvec, ierr)
       CALL VecSetFromOptions( xvec, ierr)
       CALL VecDuplicate( xvec, bvec, ierr)
@@ -257,7 +255,7 @@ MODULE fields
             END IF
 
             ! We need to ADD to a sparse matrix entry.
-            IF (V1-1 >= Istart .AND. V1-1 <= Iend) THEN
+            IF (V1-1 >= Istart .AND. V1-1 < Iend) THEN
                IF (IS_DIRICHLET(V1-1)) THEN
                   CALL MatSetValues(Amat,one,V1-1,one,V1-1,1.d0,ADD_VALUES,ierr)
                   !CALL ST_MATRIX_SET(A_ST, V1-1, V1-1, 1.d0)
@@ -271,7 +269,7 @@ MODULE fields
                   !CALL ST_MATRIX_ADD(A_ST, V1-1, V3-1, K13)
                END IF
             END IF
-            IF (V2-1 >= Istart .AND. V2-1 <= Iend) THEN
+            IF (V2-1 >= Istart .AND. V2-1 < Iend) THEN
                IF (IS_DIRICHLET(V2-1)) THEN
                   CALL MatSetValues(Amat,one,V2-1,one,V2-1,1.d0,ADD_VALUES,ierr)
                   !CALL ST_MATRIX_SET(A_ST, V2-1, V2-1, 1.d0)
@@ -285,7 +283,7 @@ MODULE fields
                   !CALL ST_MATRIX_ADD(A_ST, V2-1, V2-1, K22)
                END IF
             END IF
-            IF (V3-1 >= Istart .AND. V3-1 <= Iend) THEN
+            IF (V3-1 >= Istart .AND. V3-1 < Iend) THEN
                IF (IS_DIRICHLET(V3-1)) THEN
                   CALL MatSetValues(Amat,one,V3-1,one,V3-1,1.d0,ADD_VALUES,ierr)
                   !CALL ST_MATRIX_SET(A_ST, V3-1, V3-1, 1.d0)
@@ -351,6 +349,7 @@ MODULE fields
 
 
                ICENTER = I+(NPX)*J
+               IF (ICENTER < Istart .OR. ICENTER >= Iend) CYCLE ! Each proc populates part of the matrix.
                IEAST = I+(NPX)*J+1
                IWEST = I+(NPX)*J-1
                INORTH = I+(NPX)*(J+1)
@@ -529,28 +528,21 @@ MODULE fields
          END DO
 
       ELSE
-         
          ! Compute the electric field at grid points
          DO I = 0, NPX-1
             DO J = 0, NPY-1
 
-               ICENTER = I+1 + NPX*(J+1)
-               IEAST = I+2 + NPX*(J+1)
-               IWEST = I   + NPX*(J+1)
-               INORTH = I+1 + NPX*(J+2)
-               ISOUTH = I+1 + NPX*J
+               ICENTER = I+1 + NPX*J
+               IEAST = I+2 + NPX*J
+               IWEST = I   + NPX*J
+               INORTH = I+1 + NPX*(J+1)
+               ISOUTH = I+1 + NPX*(J-1)
 
                IF (I == 0) THEN ! Left boundary
                   IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(1)
                   E_FIELD(I,J,1) = (PHI_FIELD(ICENTER)-PHI_FIELD(IEAST))/HX
-               ELSE IF (I == 30 .AND. (J .LE. 50)) THEN ! Right side of PFG
-                  IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(I+1)
-                  E_FIELD(I,J,1) = (PHI_FIELD(ICENTER)-PHI_FIELD(IEAST))/HX
                ELSE IF (I == NPX-1) THEN ! Right boundary
                   IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(NPX-1)
-                  E_FIELD(I,J,1) = (PHI_FIELD(IWEST)-PHI_FIELD(ICENTER))/HX
-               ELSE IF (I == 10 .AND. (J .LE. 50)) THEN ! Left side of PFG
-                  IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(I)
                   E_FIELD(I,J,1) = (PHI_FIELD(IWEST)-PHI_FIELD(ICENTER))/HX
                ELSE ! Interior point
                   IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = 0.5*(XSIZE(I)+XSIZE(I+1))
@@ -560,15 +552,9 @@ MODULE fields
                   IF (J == 0) THEN ! Bottom boundary
                      IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(1)
                      E_FIELD(I,J,2) = (PHI_FIELD(ICENTER)-PHI_FIELD(INORTH))/HY
-                  ELSE IF (J == 50 .AND. ((I.GE. 10) .AND. (I .LE. 30))) THEN ! Top side of PFG
-                     IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(J+1)
-                     E_FIELD(I,J,2) = (PHI_FIELD(ICENTER)-PHI_FIELD(INORTH))/HY
                   ELSE IF (J == NPY-1) THEN ! Top boundary
                      IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(NPY-1)
                      E_FIELD(I,J,2) = (PHI_FIELD(ISOUTH)-PHI_FIELD(ICENTER))/HY
-                  ! ELSE IF (J == 50 .AND. ((I.GE. 10) .AND. (I .LE. 50))) THEN ! Bottom side of PFG
-                  !    IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(J)
-                  !    E_FIELD(I,J,2) = (PHI_FIELD(ISOUTH)-PHI_FIELD(ICENTER))/HY
                   ELSE ! Interior point
                      IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = 0.5*(YSIZE(J)+YSIZE(J+1))
                      E_FIELD(I,J,2) = 0.5*(PHI_FIELD(ISOUTH)-PHI_FIELD(INORTH))/HY
@@ -677,8 +663,10 @@ MODULE fields
          CALL MPI_REDUCE(RHS,          RHS, SIZE, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
       END IF
 
+      CALL MPI_BCAST(RHS, SIZE, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 
-      DO I = 0, SIZE-1
+
+      DO I = Istart, Iend-1
          IF (IS_DIRICHLET(I)) THEN
             val = DIRICHLET(I)
          ELSE IF (IS_NEUMANN(I)) THEN
@@ -686,6 +674,7 @@ MODULE fields
          ELSE
             val = RHS(I)
          END IF
+
          CALL VecSetValues(bvec,one,I,val,INSERT_VALUES,ierr)
       END DO
 
@@ -1497,7 +1486,7 @@ MODULE fields
             END DO
          END DO
 
-      ELSE
+      ELSE IF (N_SOLENOIDS > 0) THEN
          CALL ERROR_ABORT('Error! B field from solenoids is only implemented for unstructured grids!')
       END IF
 

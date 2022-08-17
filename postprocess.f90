@@ -982,7 +982,7 @@ MODULE postprocess
          IF (GRID_TYPE == UNSTRUCTURED) THEN
             ALLOCATE(AVG_PHI(U2D_GRID%NUM_NODES))
          ELSE
-            ALLOCATE(AVG_PHI(NCELLS))
+            ALLOCATE(AVG_PHI(NPX*NPY))
          END IF
          AVG_PHI = 0
       END IF

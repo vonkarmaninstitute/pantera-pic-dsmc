@@ -2,30 +2,20 @@
 
 MODULE fields
 
+#include <petsc/finclude/petsc.h>
 #include <petsc/finclude/petscksp.h>
 
    USE mUMFPACK
    USE global
    USE screen
    USE tools
+   USE fully_implicit
 
 
-   
+   USE petsc
    USE petscksp
 
    IMPLICIT NONE
-
-   Mat Amat
-   Vec bvec, xvec, X_SEQ
-   VecScatter ctx
-   KSP ksp
-   PetscInt one,f9,f6,f30
-   PetscInt Istart, Iend
-   PetscReal val
-   PetscScalar, POINTER :: PHI_FIELD(:)
-   PetscScalar, POINTER :: PHIBAR_FIELD(:)
-   KSPConvergedReason reason
-   PC pc
 
    CONTAINS
    
@@ -119,7 +109,6 @@ MODULE fields
 
       IMPLICIT NONE
 
-      INTEGER :: STATUS
       INTEGER :: I, J
       INTEGER :: ICENTER, INORTH, IEAST, ISOUTH, IWEST
       INTEGER :: MAXNNZ, SIZE
@@ -454,246 +443,6 @@ MODULE fields
 
 
 
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   ! SUBROUTINE SOLVE_POISSON -> Solves the Poisson equation with the RHS RHS !
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-   SUBROUTINE SOLVE_POISSON
-
-      IMPLICIT NONE
-
-      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: X
-      REAL(KIND=8) :: HX, HY
-      INTEGER :: I, J
-      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, AREA
-      INTEGER :: V1, V2, V3, SIZE
-      INTEGER :: ICENTER, INORTH, ISOUTH, IEAST, IWEST
-
-      HX = (XMAX-XMIN)/DBLE(NX)
-      HY = (YMAX-YMIN)/DBLE(NY)
-
-
-      IF (GRID_TYPE == UNSTRUCTURED) THEN
-         SIZE = U2D_GRID%NUM_NODES
-      ELSE
-         SIZE = NPX*NPY
-      END IF
-
-      ! Solve the linear system
-
-      CALL KSPCreate(PETSC_COMM_WORLD,ksp,ierr)
-      CALL KSPSetOperators(ksp,Amat,Amat,ierr)
-
-      ! Set solver type to direct (LU). Could be MUMPS but must install with --download-mumps
-      !CALL KSPGetPC(ksp,pc,ierr)
-      !CALL PCSetType(pc,PCLU,ierr)
-      !CALL KSPSetFromOptions(ksp,ierr)
-
-      CALL KSPSolve(ksp,bvec,xvec,ierr)
-
-      CALL KSPGetConvergedReason(ksp,reason,ierr)
-      IF (PROC_ID == 0) WRITE(*,*) 'KSPConvergedReason = ', reason
-
-      CALL VecScatterCreateToAll(xvec,ctx,X_SEQ,ierr)
-      CALL VecScatterBegin(ctx,xvec,X_SEQ,INSERT_VALUES,SCATTER_FORWARD)
-      CALL VecScatterEnd(ctx,xvec,X_SEQ,INSERT_VALUES,SCATTER_FORWARD)
-
-      CALL VecGetArrayReadF90(X_SEQ,PHI_FIELD,ierr)
-
-      PHIBAR_FIELD => PHI_FIELD
-
-      ! Reshape the linear array into a 2D array
-      IF (GRID_TYPE == UNSTRUCTURED) THEN
-
-         ! Compute the electric field at grid points
-         DO I = 1, U2D_GRID%NUM_CELLS
-            AREA = CELL_AREAS(I)
-            V1 = U2D_GRID%CELL_NODES(I,1)
-            V2 = U2D_GRID%CELL_NODES(I,2)
-            V3 = U2D_GRID%CELL_NODES(I,3)            
-            X1 = U2D_GRID%NODE_COORDS(V1, 1)
-            X2 = U2D_GRID%NODE_COORDS(V2, 1)
-            X3 = U2D_GRID%NODE_COORDS(V3, 1)
-            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
-
-            E_FIELD(I,1,1) = -0.5/AREA*(  PHI_FIELD(V1)*(Y2-Y3) &
-                                        - PHI_FIELD(V2)*(Y1-Y3) &
-                                        - PHI_FIELD(V3)*(Y2-Y1))
-            E_FIELD(I,1,2) = -0.5/AREA*(- PHI_FIELD(V1)*(X2-X3) &
-                                        + PHI_FIELD(V2)*(X1-X3) &
-                                        + PHI_FIELD(V3)*(X2-X1))
-            E_FIELD(I,1,3) = 0.d0
-         END DO
-
-      ELSE
-         ! Compute the electric field at grid points
-         DO I = 0, NPX-1
-            DO J = 0, NPY-1
-
-               ICENTER = I+1 + NPX*J
-               IEAST = I+2 + NPX*J
-               IWEST = I   + NPX*J
-               INORTH = I+1 + NPX*(J+1)
-               ISOUTH = I+1 + NPX*(J-1)
-
-               IF (I == 0) THEN ! Left boundary
-                  IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(1)
-                  E_FIELD(I,J,1) = (PHI_FIELD(ICENTER)-PHI_FIELD(IEAST))/HX
-               ELSE IF (I == NPX-1) THEN ! Right boundary
-                  IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(NPX-1)
-                  E_FIELD(I,J,1) = (PHI_FIELD(IWEST)-PHI_FIELD(ICENTER))/HX
-               ELSE ! Interior point
-                  IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = 0.5*(XSIZE(I)+XSIZE(I+1))
-                  E_FIELD(I,J,1) = 0.5*(PHI_FIELD(IWEST)-PHI_FIELD(IEAST))/HX
-               END IF
-               IF (DIMS == 2) THEN
-                  IF (J == 0) THEN ! Bottom boundary
-                     IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(1)
-                     E_FIELD(I,J,2) = (PHI_FIELD(ICENTER)-PHI_FIELD(INORTH))/HY
-                  ELSE IF (J == NPY-1) THEN ! Top boundary
-                     IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(NPY-1)
-                     E_FIELD(I,J,2) = (PHI_FIELD(ISOUTH)-PHI_FIELD(ICENTER))/HY
-                  ELSE ! Interior point
-                     IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = 0.5*(YSIZE(J)+YSIZE(J+1))
-                     E_FIELD(I,J,2) = 0.5*(PHI_FIELD(ISOUTH)-PHI_FIELD(INORTH))/HY
-                  END IF
-               ELSE
-                  E_FIELD(I,J,2) = 0.d0
-               END IF
-               E_FIELD(I,J,3) = 0.d0
-            END DO
-         END DO
-         
-      END IF
-
-      !CALL VecRestoreArrayReadF90(X_SEQ,PHI_FIELD,ierr)
-
-   END SUBROUTINE SOLVE_POISSON
-
-
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   ! SUBROUTINE DEPOSIT_CHARGE -> Deposits the charge of particles on grid points !
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-   SUBROUTINE DEPOSIT_CHARGE
-      
-      IMPLICIT NONE
-
-      INTEGER :: JP, I, IC
-
-      REAL(KIND=8) :: K, RHO_Q, CHARGE
-      REAL(KIND=8) :: VOL, CFNUM, AREA
-      REAL(KIND=8), DIMENSION(4) :: WEIGHTS
-      INTEGER, DIMENSION(4) :: INDICES, INDI, INDJ
-      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, XP, YP
-      INTEGER :: V1, V2, V3, SIZE
-      REAL(KIND=8) :: PSI1, PSI2, PSI3
-
-      K = QE/(EPS0*EPS_SCALING**2) ! [V m] Elementary charge / Dielectric constant of vacuum
-
-      RHS = 0.d0
-
-      DO JP = 1, NP_PROC
-         CHARGE = SPECIES(particles(JP)%S_ID)%CHARGE
-         IF (ABS(CHARGE) .LT. 1.d-6) CYCLE
-
-         IF (GRID_TYPE == UNSTRUCTURED) THEN 
-            IC = particles(JP)%IC
-            AREA = CELL_AREAS(IC)
-            V1 = U2D_GRID%CELL_NODES(IC,1)
-            V2 = U2D_GRID%CELL_NODES(IC,2)
-            V3 = U2D_GRID%CELL_NODES(IC,3)            
-            X1 = U2D_GRID%NODE_COORDS(V1, 1)
-            X2 = U2D_GRID%NODE_COORDS(V2, 1)
-            X3 = U2D_GRID%NODE_COORDS(V3, 1)
-            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
-            XP = particles(JP)%X
-            YP = particles(JP)%Y
-            PSI1 = 0.5*( (Y2-Y3)*(XP-X3) - (X2-X3)*(YP-Y3))/AREA/(ZMAX-ZMIN)
-            PSI2 = 0.5*(-(Y1-Y3)*(XP-X3) + (X1-X3)*(YP-Y3))/AREA/(ZMAX-ZMIN)
-            PSI3 = 0.5*(-(Y2-Y1)*(XP-X1) + (X2-X1)*(YP-Y1))/AREA/(ZMAX-ZMIN)
-            
-            RHO_Q = K*CHARGE*FNUM
-            RHS(V1-1) = RHS(V1-1) + RHO_Q*PSI1
-            RHS(V2-1) = RHS(V2-1) + RHO_Q*PSI2
-            RHS(V3-1) = RHS(V3-1) + RHO_Q*PSI3
-
-         ELSE
-
-            CALL COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)
-
-            IF (GRID_TYPE == RECTILINEAR_UNIFORM .AND. .NOT. AXI) THEN
-               VOL = CELL_VOL
-            ELSE
-               VOL = CELL_VOLUMES(particles(JP)%IC)
-            END IF
-
-            CFNUM = FNUM
-            IF (BOOL_RADIAL_WEIGHTING) CFNUM = CELL_FNUM(particles(JP)%IC)         
-
-            RHO_Q = -K*CHARGE*CFNUM/VOL
-
-            IF (DIMS == 2) THEN
-               RHS(INDICES(1)) = RHS(INDICES(1)) + RHO_Q * WEIGHTS(1)
-               RHS(INDICES(2)) = RHS(INDICES(2)) + RHO_Q * WEIGHTS(2)
-               RHS(INDICES(3)) = RHS(INDICES(3)) + RHO_Q * WEIGHTS(3)
-               RHS(INDICES(4)) = RHS(INDICES(4)) + RHO_Q * WEIGHTS(4)            
-            ELSE
-               RHS(INDICES(1)) = RHS(INDICES(1)) + RHO_Q * WEIGHTS(1)
-               RHS(INDICES(2)) = RHS(INDICES(2)) + RHO_Q * WEIGHTS(2)
-            END IF
-
-         END IF
-      END DO
-
-
-      IF (GRID_TYPE == UNSTRUCTURED) THEN
-         SIZE = U2D_GRID%NUM_NODES
-      ELSE
-         SIZE = NPX*NPY
-      END IF
-
-      IF (PROC_ID .EQ. 0) THEN
-         CALL MPI_REDUCE(MPI_IN_PLACE, RHS, SIZE, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-      ELSE
-         CALL MPI_REDUCE(RHS,          RHS, SIZE, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-      END IF
-
-      CALL MPI_BCAST(RHS, SIZE, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-
-
-      DO I = Istart, Iend-1
-         IF (IS_DIRICHLET(I)) THEN
-            val = DIRICHLET(I)
-         ELSE IF (IS_NEUMANN(I)) THEN
-            val = RHS(I) + NEUMANN(I)
-         ELSE
-            val = RHS(I)
-         END IF
-
-         CALL VecSetValues(bvec,one,I,val,INSERT_VALUES,ierr)
-      END DO
-
-
-      CALL VecAssemblyBegin(bvec,ierr)
-      CALL VecAssemblyEnd(bvec,ierr)
-
-
-      ! RHS = 0
-      ! ALLOCATE(Q_TEMP(NPX,NPY))
-      ! Q_TEMP = 0
-      ! DO I = NPX/4, 3*NPX/4
-      !    DO J = NPY/4, 3*NPY/4
-      !       Q_TEMP(I,J) = 1.d0
-      !    END DO
-      ! END DO
-      ! RHS = PACK(Q_TEMP, .TRUE.)
-
-   END SUBROUTINE DEPOSIT_CHARGE
 
 
 
@@ -859,7 +608,7 @@ MODULE fields
       ELSE
          CALL MatSetType( Amat, MATMPIAIJ, ierr)
       END IF
-      CALL MatMPIAIJSetPreallocation(Amat,f9,PETSC_NULL_INTEGER,f6,PETSC_NULL_INTEGER, ierr)
+      CALL MatMPIAIJSetPreallocation(Amat,f30,PETSC_NULL_INTEGER,f30,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
       CALL MatSetFromOptions( Amat, ierr)
       CALL MatSetUp( Amat, ierr)
       CALL MatGetOwnershipRange( Amat, Istart, Iend, ierr)
@@ -879,9 +628,9 @@ MODULE fields
             V2 = U2D_GRID%CELL_NODES(I,2)
             V3 = U2D_GRID%CELL_NODES(I,3)
 
-            IF ((V1-1 < Istart .OR. V1-1 > Iend) .AND. &
-                (V2-1 < Istart .OR. V2-1 > Iend) .AND. &
-                (V3-1 < Istart .OR. V3-1 > Iend)) CYCLE
+            IF ((V1-1 < Istart .OR. V1-1 >= Iend) .AND. &
+                (V2-1 < Istart .OR. V2-1 >= Iend) .AND. &
+                (V3-1 < Istart .OR. V3-1 >= Iend)) CYCLE
 
             IS_UNUSED(V1-1) = .FALSE.; IS_UNUSED(V2-1) = .FALSE.; IS_UNUSED(V3-1) = .FALSE.
             DO J = 1, 3
@@ -924,9 +673,9 @@ MODULE fields
             V2 = U2D_GRID%CELL_NODES(I,2)
             V3 = U2D_GRID%CELL_NODES(I,3)
             
-            IF ((V1-1 < Istart .OR. V1-1 > Iend) .AND. &
-                (V2-1 < Istart .OR. V2-1 > Iend) .AND. &
-                (V3-1 < Istart .OR. V3-1 > Iend)) CYCLE
+            IF ((V1-1 < Istart .OR. V1-1 >= Iend) .AND. &
+                (V2-1 < Istart .OR. V2-1 >= Iend) .AND. &
+                (V3-1 < Istart .OR. V3-1 >= Iend)) CYCLE
 
             AREA = CELL_AREAS(I)
             X1 = U2D_GRID%NODE_COORDS(V1, 1)
@@ -949,7 +698,7 @@ MODULE fields
             K13TILDE = K13*(Y1+Y2+Y3)/3.
 
             ! We need to ADD to a sparse matrix entry.
-            IF (V1-1 >= Istart .AND. V1-1 <= Iend) THEN
+            IF (V1-1 >= Istart .AND. V1-1 < Iend) THEN
                IF (IS_DIRICHLET(V1-1)) THEN
                   CALL MatSetValues(Amat,one,V1-1,one,V1-1,1.d0,INSERT_VALUES,ierr)
                ELSE !IF (.NOT. IS_NEUMANN(V1-1)) THEN
@@ -963,12 +712,12 @@ MODULE fields
                      CALL MatSetValues(Amat,one,V1-1,one,V1-1,(MASS_MATRIX(I)+1.)*K11,ADD_VALUES,ierr)
                      CALL MatSetValues(Amat,one,V1-1,one,V2-1,(MASS_MATRIX(I)+1.)*K12,ADD_VALUES,ierr)
                      CALL MatSetValues(Amat,one,V1-1,one,V3-1,(MASS_MATRIX(I)+1.)*K13,ADD_VALUES,ierr)
-                     val = PHI_FIELD(V1-1)*K11+PHI_FIELD(V2-1)*K12+PHI_FIELD(V3-1)*K13
+                     val = PHI_FIELD(V1)*K11+PHI_FIELD(V2)*K12+PHI_FIELD(V3)*K13
                      CALL VecSetValues(bvec,one,V1-1,val,ADD_VALUES,ierr)
                   END IF
                END IF
             END IF
-            IF (V2-1 >= Istart .AND. V2-1 <= Iend) THEN
+            IF (V2-1 >= Istart .AND. V2-1 < Iend) THEN
                IF (IS_DIRICHLET(V2-1)) THEN
                   CALL MatSetValues(Amat,one,V2-1,one,V2-1,1.d0,INSERT_VALUES,ierr)
                ELSE !IF (.NOT. IS_NEUMANN(V2-1)) THEN
@@ -976,18 +725,18 @@ MODULE fields
                      CALL MatSetValues(Amat,one,V2-1,one,V1-1,K12TILDE + MASS_MATRIX(I)*K12,ADD_VALUES,ierr)
                      CALL MatSetValues(Amat,one,V2-1,one,V3-1,K23TILDE + MASS_MATRIX(I)*K23,ADD_VALUES,ierr)
                      CALL MatSetValues(Amat,one,V2-1,one,V2-1,K22TILDE + MASS_MATRIX(I)*K22,ADD_VALUES,ierr)
-                     val = PHI_FIELD(V1-1)*K12TILDE+PHI_FIELD(V2-1)*K22TILDE+PHI_FIELD(V3-1)*K23TILDE
+                     val = PHI_FIELD(V1)*K12TILDE+PHI_FIELD(V2)*K22TILDE+PHI_FIELD(V3)*K23TILDE
                      CALL VecSetValues(bvec,one,V2-1,val,ADD_VALUES,ierr)
                   ELSE
                      CALL MatSetValues(Amat,one,V2-1,one,V1-1,(MASS_MATRIX(I)+1.)*K12,ADD_VALUES,ierr)
                      CALL MatSetValues(Amat,one,V2-1,one,V3-1,(MASS_MATRIX(I)+1.)*K23,ADD_VALUES,ierr)
                      CALL MatSetValues(Amat,one,V2-1,one,V2-1,(MASS_MATRIX(I)+1.)*K22,ADD_VALUES,ierr)
-                     val = PHI_FIELD(V1-1)*K12+PHI_FIELD(V2-1)*K22+PHI_FIELD(V3-1)*K23
+                     val = PHI_FIELD(V1)*K12+PHI_FIELD(V2)*K22+PHI_FIELD(V3)*K23
                      CALL VecSetValues(bvec,one,V2-1,val,ADD_VALUES,ierr)
                   END IF
                END IF
             END IF
-            IF (V3-1 >= Istart .AND. V3-1 <= Iend) THEN
+            IF (V3-1 >= Istart .AND. V3-1 < Iend) THEN
                IF (IS_DIRICHLET(V3-1)) THEN
                   CALL MatSetValues(Amat,one,V3-1,one,V3-1,1.d0,INSERT_VALUES,ierr)
                ELSE !IF (.NOT. IS_NEUMANN(V3-1)) THEN
@@ -995,14 +744,14 @@ MODULE fields
                      CALL MatSetValues(Amat,one,V3-1,one,V1-1,K13TILDE + MASS_MATRIX(I)*K13,ADD_VALUES,ierr)
                      CALL MatSetValues(Amat,one,V3-1,one,V2-1,K23TILDE + MASS_MATRIX(I)*K23,ADD_VALUES,ierr)
                      CALL MatSetValues(Amat,one,V3-1,one,V3-1,K33TILDE + MASS_MATRIX(I)*K33,ADD_VALUES,ierr)
-                     val = PHI_FIELD(V1-1)*K13TILDE+PHI_FIELD(V2-1)*K23TILDE+PHI_FIELD(V3-1)*K33TILDE
+                     val = PHI_FIELD(V1)*K13TILDE+PHI_FIELD(V2)*K23TILDE+PHI_FIELD(V3)*K33TILDE
                      CALL VecSetValues(bvec,one,V3-1,val,ADD_VALUES,ierr)
                   ELSE
 
                      CALL MatSetValues(Amat,one,V3-1,one,V1-1,(MASS_MATRIX(I)+1.)*K13,ADD_VALUES,ierr)
                      CALL MatSetValues(Amat,one,V3-1,one,V2-1,(MASS_MATRIX(I)+1.)*K23,ADD_VALUES,ierr)
                      CALL MatSetValues(Amat,one,V3-1,one,V3-1,(MASS_MATRIX(I)+1.)*K33,ADD_VALUES,ierr)
-                     val = PHI_FIELD(V1-1)*K13+PHI_FIELD(V2-1)*K23+PHI_FIELD(V3-1)*K33
+                     val = PHI_FIELD(V1)*K13+PHI_FIELD(V2)*K23+PHI_FIELD(V3)*K33
                      CALL VecSetValues(bvec,one,V3-1,val,ADD_VALUES,ierr)
                   END IF
                END IF
@@ -1046,7 +795,7 @@ MODULE fields
 
          DO I = Istart, Iend-1
             IF (IS_UNUSED(I)) THEN
-               CALL MatSetValues(Amat,one,I,one,I,1.d0,INSERT_VALUES,ierr)
+               CALL MatSetValues(Amat,one,I,one,I,1.d0,ADD_VALUES,ierr)
                IS_DIRICHLET(I) = .TRUE.
                DIRICHLET(I) = 0.d0
             ELSE IF (.NOT. IS_DIRICHLET(I) ) THEN
@@ -1074,7 +823,7 @@ MODULE fields
       DO I = Istart, Iend-1
          IF (IS_DIRICHLET(I)) THEN
             val = DIRICHLET(I)
-            CALL VecSetValues(bvec,one,I,val,INSERT_VALUES,ierr)
+            CALL VecSetValues(bvec,one,I,val,ADD_VALUES,ierr)
          ELSE IF (IS_NEUMANN(I)) THEN
             val = NEUMANN(I)
             CALL VecSetValues(bvec,one,I,val,ADD_VALUES,ierr)
@@ -1167,6 +916,7 @@ MODULE fields
          CALL MPI_REDUCE(J_FIELD,      J_FIELD, SIZE, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
       END IF
 
+      CALL MPI_BCAST(J_FIELD, SIZE, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 
       IF (PROC_ID .EQ. 0) THEN
          CALL MPI_REDUCE(MPI_IN_PLACE, MASS_MATRIX, SIZEC, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
@@ -1174,6 +924,7 @@ MODULE fields
          CALL MPI_REDUCE(MASS_MATRIX,  MASS_MATRIX, SIZEC, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
       END IF
 
+      CALL MPI_BCAST(MASS_MATRIX, SIZEC, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 
    END SUBROUTINE DEPOSIT_CURRENT
 
@@ -1203,16 +954,20 @@ MODULE fields
       CALL KSPSetOperators(ksp,Amat,Amat,ierr)
 
       CALL KSPSolve(ksp,bvec,xvec,ierr)
-
+      
+      CALL KSPGetConvergedReason(ksp,reason,ierr)
+      IF (PROC_ID == 0) WRITE(*,*) 'KSPConvergedReason = ', reason
+      
       CALL VecScatterCreateToAll(xvec,ctx,X_SEQ,ierr)
       CALL VecScatterBegin(ctx,xvec,X_SEQ,INSERT_VALUES,SCATTER_FORWARD)
       CALL VecScatterEnd(ctx,xvec,X_SEQ,INSERT_VALUES,SCATTER_FORWARD)
 
-      CALL VecGetArrayF90(X_SEQ,PHIBAR_FIELD,ierr)
+      CALL VecGetArrayReadF90(X_SEQ,PHI_FIELD_TEMP,ierr)
+      ALLOCATE(PHIBAR_FIELD, SOURCE = PHI_FIELD_TEMP)
+      CALL VecRestoreArrayReadF90(X_SEQ,PHI_FIELD_TEMP,ierr)
 
       PHI_FIELD = 2*PHIBAR_FIELD-PHI_FIELD
 
-      ! Reshape the linear array into a 2D array
       IF (GRID_TYPE == UNSTRUCTURED) THEN
 
          ! Compute the electric field at grid points
@@ -1228,20 +983,20 @@ MODULE fields
             Y2 = U2D_GRID%NODE_COORDS(V2, 2)
             Y3 = U2D_GRID%NODE_COORDS(V3, 2)
 
-            E_FIELD(I,1,1) = -0.5/AREA*(  PHI_FIELD(V1-1)*(Y2-Y3) &
-                                        - PHI_FIELD(V2-1)*(Y1-Y3) &
-                                        - PHI_FIELD(V3-1)*(Y2-Y1))
-            E_FIELD(I,1,2) = -0.5/AREA*(- PHI_FIELD(V1-1)*(X2-X3) &
-                                        + PHI_FIELD(V2-1)*(X1-X3) &
-                                        + PHI_FIELD(V3-1)*(X2-X1))
+            E_FIELD(I,1,1) = -0.5/AREA*(  PHI_FIELD(V1)*(Y2-Y3) &
+                                        - PHI_FIELD(V2)*(Y1-Y3) &
+                                        - PHI_FIELD(V3)*(Y2-Y1))
+            E_FIELD(I,1,2) = -0.5/AREA*(- PHI_FIELD(V1)*(X2-X3) &
+                                        + PHI_FIELD(V2)*(X1-X3) &
+                                        + PHI_FIELD(V3)*(X2-X1))
             E_FIELD(I,1,3) = 0.d0
 
-            EBAR_FIELD(I,1,1) = -0.5/AREA*(  PHIBAR_FIELD(V1-1)*(Y2-Y3) &
-                                           - PHIBAR_FIELD(V2-1)*(Y1-Y3) &
-                                           - PHIBAR_FIELD(V3-1)*(Y2-Y1))
-            EBAR_FIELD(I,1,2) = -0.5/AREA*(- PHIBAR_FIELD(V1-1)*(X2-X3) &
-                                           + PHIBAR_FIELD(V2-1)*(X1-X3) &
-                                           + PHIBAR_FIELD(V3-1)*(X2-X1))
+            EBAR_FIELD(I,1,1) = -0.5/AREA*(  PHIBAR_FIELD(V1)*(Y2-Y3) &
+                                           - PHIBAR_FIELD(V2)*(Y1-Y3) &
+                                           - PHIBAR_FIELD(V3)*(Y2-Y1))
+            EBAR_FIELD(I,1,2) = -0.5/AREA*(- PHIBAR_FIELD(V1)*(X2-X3) &
+                                           + PHIBAR_FIELD(V2)*(X1-X3) &
+                                           + PHIBAR_FIELD(V3)*(X2-X1))
             EBAR_FIELD(I,1,3) = 0.d0
          END DO
 
@@ -1255,129 +1010,6 @@ MODULE fields
 
 
 
-   SUBROUTINE COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)
-
-      IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: JP
-      REAL(KIND=8), DIMENSION(4), INTENT(OUT) :: WEIGHTS
-      INTEGER, DIMENSION(4), INTENT(OUT) :: INDICES, INDI, INDJ
-      REAL(KIND=8) :: XP, YP, CELL_XMIN, CELL_YMIN, FX, FY, HX, HY
-      INTEGER :: IC, I, J
-
-      XP = particles(JP)%X
-      YP = particles(JP)%Y
-      ! This is where we need the cell properties based on particle position
-      ! With rectilinear non-uniform grid this has to be changed.
-      IC = particles(JP)%IC
-      IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
-         HX = (XMAX-XMIN)/DBLE(NX)
-         HY = (YMAX-YMIN)/DBLE(NY)
-         I = MOD(IC-1, NX)
-         J = (IC-1)/NX
-         CELL_XMIN = I * HX + XMIN
-         CELL_YMIN = J * HY + YMIN
-      ELSE
-         I = MOD(IC-1, NX)
-         J = (IC-1)/NX
-         HX = XSIZE(I+1)
-         HY = YSIZE(J+1)
-         CELL_XMIN = XCOORD(I+1)
-         CELL_YMIN = YCOORD(J+1)
-      END IF
-      FX = (particles(JP)%X - CELL_XMIN)/HX
-      FY = (particles(JP)%Y - CELL_YMIN)/HY
-
-      !WRITE(*,*) 'FX=', FX, ', FY=', FY ! DBDBDBDBDBDBDBDDBDBDBDBD
-      !IF ((FX .LT. 0.) .OR. (FX .GT. 1.) .OR. (FY .LT. 0.) .OR. (FY .GT. 1.)) WRITE(*,*) 'Whoops!'
-
-      ! Nodes numbering
-      !     _________
-      !  3 |         | 4   ^ Y
-      !    |   CELL  |     |
-      !    |    IC   |     |
-      !  1 |_________| 2   |------> X
-      !
-
-      IF (DIMS == 2) THEN
-         ! Row and column indices, starting from 0
-         INDI(1) = I
-         INDI(2) = I + 1
-         INDI(3) = I
-         INDI(4) = I + 1
-
-         INDJ(1) = J
-         INDJ(2) = J
-         INDJ(3) = J + 1
-         INDJ(4) = J + 1
-         
-         INDICES(1) = IC+J-1
-         INDICES(2) = INDICES(1) + 1
-         INDICES(3) = INDICES(1) + NX + 1
-         INDICES(4) = INDICES(3) + 1
-
-         WEIGHTS(1) = (1.-FX)*(1.-FY)
-         WEIGHTS(2) = FX*(1.-FY)
-         WEIGHTS(3) = (1.-FX)*FY
-         WEIGHTS(4) = FX*FY
-
-      ELSE
-         ! Row and column indices, starting from 0
-         INDI(1) = I
-         INDI(2) = I + 1
-         INDI(3) = -1
-         INDI(4) = -1
-
-         INDJ(1) = 0
-         INDJ(2) = 0
-         INDJ(3) = -1
-         INDJ(4) = -1
-      
-         ! Left, right
-         INDICES(1) = IC
-         INDICES(2) = IC + 1
-         INDICES(4) = -1
-         INDICES(3) = -1
-
-         ! Left, right
-         WEIGHTS(1) = (1.-FX)
-         WEIGHTS(2) = FX
-         WEIGHTS(3) = -1
-         WEIGHTS(4) = -1
-      END IF
-   END SUBROUTINE COMPUTE_WEIGHTS
-
-
-   SUBROUTINE APPLY_E_FIELD(JP, E)
-
-      IMPLICIT NONE
-
-      REAL(KIND=8), DIMENSION(3), INTENT(OUT) :: E
-      INTEGER, INTENT(IN) :: JP
-      REAL(KIND=8), DIMENSION(4) :: WEIGHTS
-      INTEGER, DIMENSION(4) :: INDICES, INDI, INDJ
-
-      IF (GRID_TYPE == UNSTRUCTURED) THEN
-         IF (BOOL_PIC_IMPLICIT) THEN
-            E = EBAR_FIELD(particles(JP)%IC, 1, :)
-         ELSE
-            E = E_FIELD(particles(JP)%IC, 1, :)
-         END IF
-      ELSE
-
-         CALL COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)
-         IF (DIMS == 2) THEN
-            E = WEIGHTS(1)*E_FIELD(INDI(1), INDJ(1), :) + &
-            WEIGHTS(2)*E_FIELD(INDI(2), INDJ(2), :) + &
-            WEIGHTS(3)*E_FIELD(INDI(3), INDJ(3), :) + &
-            WEIGHTS(4)*E_FIELD(INDI(4), INDJ(4), :)
-         ELSE
-            E = WEIGHTS(1)*E_FIELD(INDI(1), INDJ(1), :) + &
-            WEIGHTS(2)*E_FIELD(INDI(2), INDJ(2), :)
-         END IF
-
-      END IF
-   END SUBROUTINE APPLY_E_FIELD
 
 
    SUBROUTINE APPLY_POTENTIAL(JP, PHI)

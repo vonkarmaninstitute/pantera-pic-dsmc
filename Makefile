@@ -11,7 +11,7 @@ OPTF = -O3 -Wall -Wextra -fimplicit-none -fbacktrace -fcheck=all -ffpe-trap=inva
 #OPTF = -Ofast -march=native -Wall -Wextra -fimplicit-none -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow -mcmodel=medium # Aggressive optimization options 
 
 # Objects: list of all objects *.o
-OBJS = mpi_common.o  global.o  screen.o  tools.o  initialization.o  timecycle.o  grid_and_partition.o  particle.o  collisions.o  postprocess.o  fields.o  umfpack.o  mt19937.o
+OBJS = mpi_common.o  global.o  screen.o  tools.o  initialization.o  timecycle.o  grid_and_partition.o  particle.o  collisions.o  postprocess.o  fields.o  umfpack.o  mt19937.o  fully_implicit.o
 #OBJDSMC = mpi_common.o tools.o screen.o global.o postprocess.o initialization.o timecycle.o
 
 
@@ -49,13 +49,16 @@ pantera.exe: pantera.o $(OBJS)
 	            -o pantera.exe -L/usr/lib -lumfpack $(LDFLAGS) $(LDLIBS) -I/home/pietro/petsc/petsc--openmpi/include
 
 # Objects generation
-pantera.o: pantera.f90 $(OBJS) 
+pantera.o: pantera.f90  $(OBJS) 
 	$(CMPF) $(OPTF) pantera.f90
 
-global.o: global.f90 mpi_common.o particle.o
+global.o: global.f90  mpi_common.o  particle.o
 	$(CMPF) $(OPTF) global.f90
 
-timecycle.o: timecycle.f90  global.o  particle.o  screen.o  collisions.o  postprocess.o  fields.o
+fully_implicit.o: fully_implicit.f90  global.o  screen.o  tools.o
+	$(CMPF) $(OPTF) fully_implicit.f90
+
+timecycle.o: timecycle.f90  global.o  particle.o  screen.o  collisions.o  postprocess.o  fields.o  fully_implicit.o
 	$(CMPF) $(OPTF) timecycle.f90
 
 initialization.o: initialization.f90  global.o  tools.o  grid_and_partition.o
@@ -64,7 +67,7 @@ initialization.o: initialization.f90  global.o  tools.o  grid_and_partition.o
 tools.o: tools.f90  mpi_common.o  global.o  mt19937.o
 	$(CMPF) $(OPTF) tools.f90
 
-grid_and_partition.o: grid_and_partition.f90 mpi_common.o  global.o  tools.o
+grid_and_partition.o: grid_and_partition.f90  mpi_common.o  global.o  tools.o
 	$(CMPF) $(OPTF) grid_and_partition.f90
 
 screen.o: screen.f90
@@ -79,10 +82,10 @@ particle.o: particle.f90
 collisions.o: collisions.f90
 	$(CMPF) $(OPTF) collisions.f90
 	
-postprocess.o: postprocess.f90 fields.o
+postprocess.o: postprocess.f90  fields.o
 	$(CMPF) $(OPTF) postprocess.f90
 
-fields.o: fields.f90  umfpack.o
+fields.o: fields.f90  umfpack.o  fully_implicit.o
 	$(CMPF) $(OPTF) fields.f90
 
 umfpack.o: umfpack.f90
@@ -90,6 +93,7 @@ umfpack.o: umfpack.f90
 	
 mt19937.o: mt19937.f90
 	$(CMPF) $(OPTF) mt19937.f90
+
 	
 # Cleaning command
 clean: 

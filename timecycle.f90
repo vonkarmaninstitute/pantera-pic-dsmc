@@ -7,6 +7,7 @@ MODULE timecycle
    USE collisions
    USE postprocess
    USE fields
+   USE fully_implicit
 
    CONTAINS
 
@@ -40,6 +41,9 @@ MODULE timecycle
             CALL DEPOSIT_CURRENT
             CALL ASSEMBLE_AMPERE
             CALL SOLVE_AMPERE
+         ELSE IF (BOOL_PIC_FULLY_IMPLICIT) THEN
+            !CALL SOLVE_POISSON_FULLY_IMPLICIT
+            ! We get here no problem.
          END IF
       END IF
       
@@ -91,7 +95,9 @@ MODULE timecycle
 
          ! ########### Advect particles ############################################
 
-         CALL ADVECT 
+         IF (.NOT. BOOL_PIC_FULLY_IMPLICIT) THEN
+            CALL ADVECT
+         END IF
 
          ! ########### Exchange particles among processes ##########################
 
@@ -146,6 +152,13 @@ MODULE timecycle
                CALL DEPOSIT_CURRENT
                CALL ASSEMBLE_AMPERE
                CALL SOLVE_AMPERE
+            ELSE IF (BOOL_PIC_FULLY_IMPLICIT) THEN
+               CALL SOLVE_POISSON_FULLY_IMPLICIT
+               ALLOCATE(part_adv, SOURCE = particles)
+               CALL ADVECT_CN(.TRUE.)
+               DEALLOCATE(particles)
+               ALLOCATE(particles, SOURCE = part_adv)
+               DEALLOCATE(part_adv)
             ELSE
                CALL DEPOSIT_CHARGE
                IF (BOOL_FLUID_ELECTRONS) THEN
@@ -1497,45 +1510,7 @@ MODULE timecycle
    END SUBROUTINE MOVE_PARTICLE
 
 
-   SUBROUTINE WALL_REACT(IP, REMOVE)
-      
-      IMPLICIT NONE
 
-      INTEGER, INTENT(IN) :: IP
-      LOGICAL, INTENT(OUT) :: REMOVE
-      INTEGER :: JS, JR, JP
-      REAL(KIND=8) :: PROB_SCALE, VEL_SCALE
-
-      JS = particles(IP)%S_ID
-      PROB_SCALE = 1.
-      REMOVE = .FALSE.
-      DO JR = 1, N_WALL_REACTIONS
-         IF (WALL_REACTIONS(JR)%R_SP_ID == JS) THEN
-            IF ( rf() .LE. WALL_REACTIONS(JR)%PROB/PROB_SCALE ) THEN
-               
-               IF (WALL_REACTIONS(JR)%N_PROD == 0) THEN
-                  REMOVE = .TRUE.
-                  particles(IP)%DTRIM = 0.
-               ELSE IF (WALL_REACTIONS(JR)%N_PROD == 1) THEN
-                  JP = WALL_REACTIONS(JR)%P1_SP_ID
-                  particles(IP)%S_ID = JP
-                  VEL_SCALE = SPECIES(JS)%MOLECULAR_MASS/SPECIES(JP)%MOLECULAR_MASS
-                  particles(IP)%VX = particles(IP)%VX*VEL_SCALE
-                  particles(IP)%VY = particles(IP)%VY*VEL_SCALE
-                  particles(IP)%VZ = particles(IP)%VZ*VEL_SCALE
-               ELSE
-                  CALL ERROR_ABORT('Number of products in wall reaction not supported.')
-               END IF
-
-            ELSE
-               PROB_SCALE = PROB_SCALE - WALL_REACTIONS(JR)%PROB
-            END IF
-
-         END IF
-      END DO
-
-
-   END SUBROUTINE WALL_REACT
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE MCC_COLLISIONS -> perform MCC collisions !!!!!!!!!!!!!!!!!!!!!!

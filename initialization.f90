@@ -107,6 +107,7 @@ MODULE initialization
          IF (line=='Bool_PIC:')                READ(in1,*) BOOL_PIC
          IF (line=='Epsilon_scaling:')         READ(in1,*) EPS_SCALING
          IF (line=='PIC_implicit:')            READ(in1,*) BOOL_PIC_IMPLICIT
+         IF (line=='PIC_fully_implicit:')      READ(in1,*) BOOL_PIC_FULLY_IMPLICIT
          
          IF (line=='Bool_fluid_electrons:')    READ(in1,*) BOOL_FLUID_ELECTRONS
          IF (line=='Fluid_electrons_n0:')      READ(in1,*) BOLTZ_N0

@@ -16,11 +16,11 @@ Dimensions:
 Axisymmetric:
     .FALSE.
 Number_of_cells:
-    100    100    1
+    1    1    1
 Domain_limits:
-    0.0    1.0    0.0    1.0    -0.5    0.5
-!Mesh_file_SU2:
-!    'rectsheath1.su2'
+    -10.0    10.0    -10.0    10.0    -0.5    0.5
+Mesh_file_SU2:
+    'rectsheath1.su2'
 Domain_periodicity:
     .FALSE.   .FALSE.   .TRUE.
 Domain_specular:
@@ -32,8 +32,8 @@ Boundary_temperature:
     
 Bool_PIC:
     .TRUE.
-PIC_implicit:
-    .FALSE.
+PIC_fully_implicit:
+    .TRUE.
 
 Bool_dump_moments:
     .FALSE.
@@ -49,9 +49,9 @@ Fluxes_dump_output:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0e3
+    1.0e0
 Timestep:
-    1.0e-15
+    1.0e-12
 Number_of_timesteps:
     1000
 Stats_every:
@@ -133,7 +133,7 @@ Thermal_bath_Ttr:
 Initial_particles_bool:
     .TRUE.
 Initial_particles_dens:
-    1.0e9
+    1.0e5
 Initial_particles_vel:
     0.  0.  0.
 Initial_particles_Ttra:
@@ -143,7 +143,7 @@ Initial_particles_Trot:
 Initial_particles_Tvib:
     0. 
 Initial_particles_mixture:
-    Ions
+    Plasma
 
 
 

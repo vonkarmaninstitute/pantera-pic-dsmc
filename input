@@ -20,7 +20,7 @@ Number_of_cells:
 Domain_limits:
     -10.0    10.0    -10.0    10.0    -0.5    0.5
 Mesh_file_SU2:
-    'rectsheath1.su2'
+    'rect_medium.su2'
 Domain_periodicity:
     .FALSE.   .FALSE.   .TRUE.
 Domain_specular:
@@ -49,9 +49,9 @@ Fluxes_dump_output:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0e0
+    1.0e5
 Timestep:
-    1.0e-12
+    1.0e-7
 Number_of_timesteps:
     1000
 Stats_every:
@@ -75,7 +75,7 @@ Dump_part_start:
 
 
 Perform_checks:
-    .FALSE.
+    .TRUE.
 
 ! ========= Multispecies ==============================
 
@@ -133,7 +133,7 @@ Thermal_bath_Ttr:
 Initial_particles_bool:
     .TRUE.
 Initial_particles_dens:
-    1.0e5
+    1.0e10
 Initial_particles_vel:
     0.  0.  0.
 Initial_particles_Ttra:
@@ -157,8 +157,8 @@ Initial_particles_mixture:
 !Boundary_condition:
 !    Dielectric    neumann    0.0
 
-!Boundary_condition:
-!    Bound    dirichlet    0.0
+Boundary_condition:
+    Bound    dirichlet    0.0
 
 !Boundary_condition:
 !    Grid    vacuum

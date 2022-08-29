@@ -16,7 +16,7 @@ MODULE fully_implicit
    IMPLICIT NONE
 
    Mat Amat
-   Vec bvec, xvec, X_SEQ, rvec
+   Vec bvec, xvec, x_seq, solvec_seq, xvec_seq, rvec, solvec
    VecScatter ctx
    KSP ksp, kspnk
    PetscInt one,f9,f6,f30
@@ -144,13 +144,13 @@ MODULE fully_implicit
 
    SUBROUTINE SOLVE_POISSON_FULLY_IMPLICIT
 
-      PetscScalar, POINTER :: xvec_l(:)
+      PetscScalar, POINTER :: solvec_l(:)
 
       CALL SNESCreate(PETSC_COMM_WORLD,snes,ierr)
       CALL VecCreate(PETSC_COMM_WORLD,rvec,ierr)
       CALL VecSetSizes(rvec,PETSC_DECIDE,U2D_GRID%NUM_NODES,ierr)
       CALL VecSetFromOptions(rvec, ierr)
-      CALL VecDuplicate(rvec, xvec, ierr)
+      CALL VecDuplicate(rvec, solvec, ierr)
 
       CALL SNESSetFunction(snes,rvec,FormFunction,0,ierr)
 
@@ -168,32 +168,30 @@ MODULE fully_implicit
       !  this vector to zero by calling VecSet().
       CALL DEPOSIT_CHARGE
       CALL SOLVE_POISSON
-      CALL VecGetOwnershipRange(xvec,Istart,Iend,ierr)
-      CALL VecGetArrayF90(xvec,xvec_l,ierr)
-      WRITE(*,*) 'ON PROC ', PROC_ID, ' Istart ', Istart, ' Iend= ', Iend
-      xvec_l = PHI_FIELD(Istart+1:Iend)
-      CALL VecRestoreArrayF90(xvec,xvec_l,ierr)
+      CALL VecGetOwnershipRange(solvec,Istart,Iend,ierr)
+      CALL VecGetArrayF90(solvec,solvec_l,ierr)
+      !WRITE(*,*) 'ON PROC ', PROC_ID, ' Istart ', Istart, ' Iend= ', Iend
+      solvec_l = PHI_FIELD(Istart+1:Iend)
+      CALL VecRestoreArrayF90(solvec,solvec_l,ierr)
 
-      CALL SNESSolve(snes,PETSC_NULL_VEC,xvec,ierr)
+      CALL SNESSolve(snes,PETSC_NULL_VEC,solvec,ierr)
 
-      CALL VecScatterCreateToAll(xvec,ctx,X_SEQ,ierr)
-      CALL VecScatterBegin(ctx,xvec,X_SEQ,INSERT_VALUES,SCATTER_FORWARD)
-      CALL VecScatterEnd(ctx,xvec,X_SEQ,INSERT_VALUES,SCATTER_FORWARD)
+      CALL VecScatterCreateToAll(solvec,ctx,solvec_seq,ierr)
+      CALL VecScatterBegin(ctx,solvec,solvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
+      CALL VecScatterEnd(ctx,solvec,solvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
 
-      CALL VecGetArrayReadF90(X_SEQ,PHI_FIELD_TEMP,ierr)
+      CALL VecGetArrayReadF90(solvec_seq,PHI_FIELD_TEMP,ierr)
       IF (ALLOCATED(PHI_FIELD)) DEALLOCATE(PHI_FIELD)
       ALLOCATE(PHI_FIELD, SOURCE = PHI_FIELD_TEMP)
-      CALL VecRestoreArrayReadF90(X_SEQ,PHI_FIELD_TEMP,ierr)
+      CALL VecRestoreArrayReadF90(solvec_seq,PHI_FIELD_TEMP,ierr)
 
-      !CALL VecGetArrayReadF90(xvec,xvec_l,ierr)
-      !PHI_FIELD = xvec_l
-      !CALL VecRestoreArrayReadF90(xvec,xvec_l,ierr)
-
-      CALL VecDestroy(xvec, ierr)
+      CALL VecDestroy(solvec, ierr)
       CALL VecDestroy(rvec, ierr)
       CALL SNESDestroy(snes, ierr)
 
-      WRITE(*,*) 'We get here on PROC ', PROC_ID
+      !WRITE(*,*) 'We get here on PROC ', PROC_ID
+
+
    END SUBROUTINE SOLVE_POISSON_FULLY_IMPLICIT
 
 
@@ -209,15 +207,15 @@ MODULE fully_implicit
       INTEGER dummy(*)
       PetscScalar, POINTER :: RESIDUAL(:)
 
-      CALL VecScatterCreateToAll(x,ctx,X_SEQ,ierr)
-      CALL VecScatterBegin(ctx,x,X_SEQ,INSERT_VALUES,SCATTER_FORWARD)
-      CALL VecScatterEnd(ctx,x,X_SEQ,INSERT_VALUES,SCATTER_FORWARD)
+      CALL VecScatterCreateToAll(x,ctx,x_seq,ierr)
+      CALL VecScatterBegin(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
+      CALL VecScatterEnd(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
 
       ! CALL VecGetArrayReadF90(X_SEQ,PHI_FIELD,ierr)
-      CALL VecGetArrayReadF90(X_SEQ,PHI_FIELD_TEMP,ierr)
+      CALL VecGetArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
       IF (ALLOCATED(PHI_FIELD)) DEALLOCATE(PHI_FIELD)
       ALLOCATE(PHI_FIELD, SOURCE = PHI_FIELD_TEMP)
-      CALL VecRestoreArrayReadF90(X_SEQ,PHI_FIELD_TEMP,ierr)
+      CALL VecRestoreArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
 
       !  Advect the particles using the guessed new potential
       ALLOCATE(part_adv, SOURCE = particles)
@@ -236,10 +234,11 @@ MODULE fully_implicit
       RESIDUAL = PHI_FIELD_OLD(Istart+1:Iend) - PHI_FIELD(Istart+1:Iend)
       CALL VecRestoreArrayF90(f,RESIDUAL,ierr_l)
 
-      WRITE(*,*) 'On PROC ', PROC_ID, ' PHI_FIELD = ', PHI_FIELD
-
       CALL VecNorm(f,NORM_2,norm,ierr)
-      WRITE(*,*) 'FormFunction Called, ||RESIDUAL|| = ', norm
+      IF (PROC_ID == 0) THEN
+         !WRITE(*,*) ' PHI_FIELD = ', PHI_FIELD
+         WRITE(*,*) 'FormFunction Called, ||RESIDUAL|| = ', norm
+      END IF
 
       DEALLOCATE(PHI_FIELD_OLD)
 
@@ -710,7 +709,7 @@ MODULE fully_implicit
 
       IMPLICIT NONE
 
-      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: X
+      !REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: X
       REAL(KIND=8) :: HX, HY
       INTEGER :: I, J
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, AREA
@@ -742,14 +741,14 @@ MODULE fully_implicit
       CALL KSPGetConvergedReason(ksp,reason,ierr)
       IF (PROC_ID == 0) WRITE(*,*) 'KSPConvergedReason = ', reason
 
-      CALL VecScatterCreateToAll(xvec,ctx,X_SEQ,ierr)
-      CALL VecScatterBegin(ctx,xvec,X_SEQ,INSERT_VALUES,SCATTER_FORWARD)
-      CALL VecScatterEnd(ctx,xvec,X_SEQ,INSERT_VALUES,SCATTER_FORWARD)
+      CALL VecScatterCreateToAll(xvec,ctx,xvec_seq,ierr)
+      CALL VecScatterBegin(ctx,xvec,xvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
+      CALL VecScatterEnd(ctx,xvec,xvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
 
-      CALL VecGetArrayReadF90(X_SEQ,PHI_FIELD_TEMP,ierr)
+      CALL VecGetArrayReadF90(xvec_seq,PHI_FIELD_TEMP,ierr)
       IF (ALLOCATED(PHI_FIELD)) DEALLOCATE(PHI_FIELD)
       ALLOCATE(PHI_FIELD, SOURCE = PHI_FIELD_TEMP)
-      CALL VecRestoreArrayReadF90(X_SEQ,PHI_FIELD_TEMP,ierr)
+      CALL VecRestoreArrayReadF90(xvec_seq,PHI_FIELD_TEMP,ierr)
 
       PHIBAR_FIELD = PHI_FIELD
 

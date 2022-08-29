@@ -1430,6 +1430,8 @@ MODULE initialization
                   YP = V1(2) + (V2(2)-V1(2))*XI + (V3(2)-V1(2))*ETA
                   ZP = ZMIN + (ZMAX-ZMIN)*rf()
 
+                  IF (XP > 0.25 .OR. XP < -0.25 .OR. YP > 0.25 .OR. YP < -0.25) CYCLE
+
                   ! Assign velocity and energy following a Boltzmann distribution
                   M = SPECIES(S_ID)%MOLECULAR_MASS
                   CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &

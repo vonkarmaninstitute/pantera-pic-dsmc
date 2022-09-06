@@ -19,13 +19,14 @@ MODULE fully_implicit
    Vec bvec, xvec, x_seq, solvec_seq, xvec_seq, rvec, solvec
    VecScatter ctx
    KSP ksp, kspnk
-   PetscInt one,f9,f6,f30
+   PetscInt one,f9,f6,f30, maxit, maxf
    PetscInt Istart, Iend
-   PetscReal val, norm
+   PetscReal val, norm, f0, stol, rtol, abstol
    PetscScalar, POINTER :: PHI_FIELD_TEMP(:)
    !PetscScalar, POINTER :: PHIBAR_FIELD(:)
    !PetscScalar, POINTER :: PHI_FIELD_OLD(:)
    KSPConvergedReason reason
+   SNESConvergedReason snesreason
    PC pc, pcnk
    SNES snes
 
@@ -154,36 +155,53 @@ MODULE fully_implicit
 
       CALL SNESSetFunction(snes,rvec,FormFunction,0,ierr)
 
+      ! abstol = 1.d-15
+      ! rtol = 1.d-15
+      ! stol = 1.d-15
+      ! maxit = 50
+      ! maxf = 1000
+      ! CALL SNESSetTolerances(snes, abstol, rtol, stol, maxit, maxf, ierr)
 
       CALL SNESGetKSP(snes,kspnk,ierr)
       CALL KSPGetPC(kspnk,pcnk,ierr)
       CALL PCSetType(pcnk,PCNONE,ierr)
       ! tol = 1.e-4
       ! CALL KSPSetTolerances(ksp,tol,PETSC_DEFAULT_REAL,PETSC_DEFAULT_REAL,i20,ierr)
+      !CALL KSPMonitorCancel(kspnk,ierr)
       !CALL SNESSetFromOptions(snes,ierr)
 
       !  Note: The user should initialize the vector, x, with the initial guess
       !  for the nonlinear solver prior to calling SNESSolve().  In particular,
       !  to employ an initial guess of zero, the user should explicitly set
       !  this vector to zero by calling VecSet().
-      CALL DEPOSIT_CHARGE
-      CALL SOLVE_POISSON
+      !CALL DEPOSIT_CHARGE
+      !CALL SOLVE_POISSON
+
       CALL VecGetOwnershipRange(solvec,Istart,Iend,ierr)
       CALL VecGetArrayF90(solvec,solvec_l,ierr)
       !WRITE(*,*) 'ON PROC ', PROC_ID, ' Istart ', Istart, ' Iend= ', Iend
       solvec_l = PHI_FIELD(Istart+1:Iend)
       CALL VecRestoreArrayF90(solvec,solvec_l,ierr)
 
+      !f0 = 0.d0
+      !CALL VecSet(solvec,0.d0,ierr)
+
       CALL SNESSolve(snes,PETSC_NULL_VEC,solvec,ierr)
+      CALL SNESGetConvergedReason(snes,snesreason,ierr)
+      IF (PROC_ID == 0) WRITE(*,*) 'SNESConvergedReason = ', snesreason
 
       CALL VecScatterCreateToAll(solvec,ctx,solvec_seq,ierr)
       CALL VecScatterBegin(ctx,solvec,solvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
       CALL VecScatterEnd(ctx,solvec,solvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
 
       CALL VecGetArrayReadF90(solvec_seq,PHI_FIELD_TEMP,ierr)
-      IF (ALLOCATED(PHI_FIELD)) DEALLOCATE(PHI_FIELD)
-      ALLOCATE(PHI_FIELD, SOURCE = PHI_FIELD_TEMP)
+      IF (ALLOCATED(PHIBAR_FIELD)) DEALLOCATE(PHIBAR_FIELD)
+      ALLOCATE(PHIBAR_FIELD, SOURCE = PHI_FIELD_TEMP)
       CALL VecRestoreArrayReadF90(solvec_seq,PHI_FIELD_TEMP,ierr)
+
+      PHI_FIELD = 2.*PHIBAR_FIELD - PHI_FIELD
+
+      CALL COMPUTE_E_FIELD
 
       CALL VecDestroy(solvec, ierr)
       CALL VecDestroy(rvec, ierr)
@@ -213,9 +231,12 @@ MODULE fully_implicit
 
       ! CALL VecGetArrayReadF90(X_SEQ,PHI_FIELD,ierr)
       CALL VecGetArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
-      IF (ALLOCATED(PHI_FIELD)) DEALLOCATE(PHI_FIELD)
-      ALLOCATE(PHI_FIELD, SOURCE = PHI_FIELD_TEMP)
+      IF (ALLOCATED(PHIBAR_FIELD)) DEALLOCATE(PHIBAR_FIELD)
+      ALLOCATE(PHIBAR_FIELD, SOURCE = PHI_FIELD_TEMP)
       CALL VecRestoreArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
+
+
+      CALL COMPUTE_E_FIELD
 
       !  Advect the particles using the guessed new potential
       ALLOCATE(part_adv, SOURCE = particles)
@@ -223,16 +244,18 @@ MODULE fully_implicit
       CALL DEPOSIT_CHARGE_CN
       DEALLOCATE(part_adv)
 
-      ALLOCATE(PHI_FIELD_OLD, SOURCE = PHI_FIELD)
       ! Compute the new potential from the charge distribution
+      ALLOCATE(PHI_FIELD_OLD, SOURCE = PHI_FIELD)
       CALL SOLVE_POISSON
 
       ! Compute the residual
       CALL VecGetOwnershipRange(f,Istart,Iend,ierr)
 
       CALL VecGetArrayF90(f,RESIDUAL,ierr_l)
-      RESIDUAL = PHI_FIELD_OLD(Istart+1:Iend) - PHI_FIELD(Istart+1:Iend)
+      RESIDUAL = PHI_FIELD(Istart+1:Iend) + PHI_FIELD_OLD(Istart+1:Iend) - 2.*PHIBAR_FIELD(Istart+1:Iend)
       CALL VecRestoreArrayF90(f,RESIDUAL,ierr_l)
+
+      PHI_FIELD = PHI_FIELD_OLD
 
       CALL VecNorm(f,NORM_2,norm,ierr)
       IF (PROC_ID == 0) THEN
@@ -272,7 +295,7 @@ MODULE fully_implicit
 
       LOGICAL, INTENT(IN) :: FINAL
 
-      INTEGER      :: IP, IC, I, J, SOL, OLD_IC
+      INTEGER      :: IP, IC, I, J, SOL, OLD_IC, II, JJ
       INTEGER      :: BOUNDCOLL, WALLCOLL, GOODSOL, EDGE_PG
       REAL(KIND=8) :: DTCOLL, TOTDTCOLL, CANDIDATE_DTCOLL, rfp
       REAL(KIND=8) :: COEFA, COEFB, COEFC, DELTA, SOL1, SOL2, ALPHA, BETA, GAMMA
@@ -400,15 +423,23 @@ MODULE fully_implicit
                   EDGE_Y1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),2)
                   EDGE_X2 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,J),1)
                   EDGE_Y2 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,J),2)
-                  IF (EDGE_X2 == EDGE_X1) THEN
-                     COEFB = 0; COEFA = 1; COEFC = - EDGE_X1
-                  ELSE IF (EDGE_Y2 == EDGE_Y1) THEN
-                     COEFA = 0; COEFB = 1; COEFC = - EDGE_Y1
-                  ELSE
-                     COEFA = 1
-                     COEFB = (EDGE_X1-EDGE_X2)/(EDGE_Y2-EDGE_Y1)
-                     COEFC = - COEFB * EDGE_Y1 - EDGE_X1
-                  END IF
+                  !IF (EDGE_X2 == EDGE_X1) THEN
+                  !   COEFB = 0; COEFA = 1; COEFC = - EDGE_X1
+                  !ELSE IF (EDGE_Y2 == EDGE_Y1) THEN
+                  !   COEFA = 0; COEFB = 1; COEFC = - EDGE_Y1
+                  !ELSE
+                  !   COEFA = (EDGE_Y2-EDGE_Y1)
+                  !   COEFB = (EDGE_X1-EDGE_X2)
+                  !   COEFC = (EDGE_X2 - EDGE_X1) * EDGE_Y1 - (EDGE_Y2 - EDGE_Y1) * EDGE_X1
+                  !   !COEFA = 1
+                  !   !COEFB = (EDGE_X1-EDGE_X2)/(EDGE_Y2-EDGE_Y1)
+                  !   !COEFC = - COEFB * EDGE_Y1 - EDGE_X1
+                  !END IF
+
+                  COEFA = (EDGE_Y2-EDGE_Y1)
+                  COEFB = (EDGE_X1-EDGE_X2)
+                  !COEFC = (EDGE_X2 - EDGE_X1) * EDGE_Y1 - (EDGE_Y2 - EDGE_Y1) * EDGE_X1
+                  COEFC = EDGE_Y1*EDGE_X2 - EDGE_X1*EDGE_Y2
 
                   IF (BOOL_PIC) THEN
                      CALL APPLY_E_FIELD(IP, E)
@@ -422,7 +453,7 @@ MODULE fully_implicit
                   GAMMA = COEFA*part_adv(IP)%X + COEFB*part_adv(IP)%Y + COEFC
 
                   IF (ALPHA == 0.d0) THEN
-                     COLLTIMES(2*(I-1) + 1) = GAMMA/BETA
+                     COLLTIMES(2*(I-1) + 1) = - GAMMA/BETA
                      COLLTIMES(2*I) = - 1.d0
                   ELSE
                      DELTA = BETA*BETA - 4.0*ALPHA*GAMMA
@@ -443,6 +474,22 @@ MODULE fully_implicit
                   IF (COLLTIMES(I) > 0 .AND. COLLTIMES(I) < DTCOLL) THEN
                      CALL MOVE_PARTICLE_CN(IP, E, COLLTIMES(I))
                      J = EDGEINDEX(I)
+
+
+                     ! ! A small check that we actually found an intersection.
+
+                     ! JJ = NEXTVERT(J)
+                     ! EDGE_X1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,J),1)
+                     ! EDGE_Y1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,J),2)
+                     ! EDGE_X2 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,JJ),1)
+                     ! EDGE_Y2 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,JJ),2)
+
+                     ! COEFA = (EDGE_Y2-EDGE_Y1)
+                     ! COEFB = (EDGE_X1-EDGE_X2)
+                     ! COEFC = (EDGE_X2 - EDGE_X1) * EDGE_Y1 - (EDGE_Y2 - EDGE_Y1) * EDGE_X1
+                     ! WRITE(*,*) (COEFA*part_adv(IP)%X + COEFB*part_adv(IP)%Y + COEFC)/(ABS(COEFA)+ABS(COEFB)+ABS(COEFC))
+                     ! ! End of the small check.
+                     
                      IF ((part_adv(IP)%VX*U2D_GRID%EDGE_NORMAL(IC,J,1) + part_adv(IP)%VY*U2D_GRID%EDGE_NORMAL(IC,J,2)) > 0) THEN
                         DTCOLL = COLLTIMES(I)
                         BOUNDCOLL = J
@@ -536,10 +583,6 @@ MODULE fully_implicit
       END DO ! End loop: DO IP = 1,NP_PROC
 
 
-      ! Before removing the particles we record the charge displacement.
-      CALL DEPOSIT_CHARGE_CN
-
-
       ! ==============
       ! ========= Now remove part_adv that are out of the domain and reorder the array. 
       ! ========= Do this in the end of the advection step, since reordering the array 
@@ -617,13 +660,13 @@ MODULE fully_implicit
 
       ACC = E*SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS
 
-      part_adv(IP)%VX = part_adv(IP)%VX + ACC(1) * TIME
-      part_adv(IP)%VY = part_adv(IP)%VY + ACC(2) * TIME
-      part_adv(IP)%VZ = part_adv(IP)%VZ + ACC(3) * TIME
-
       part_adv(IP)%X = part_adv(IP)%X + part_adv(IP)%VX*TIME + 0.5*ACC(1)*TIME*TIME
       part_adv(IP)%Y = part_adv(IP)%Y + part_adv(IP)%VY*TIME + 0.5*ACC(2)*TIME*TIME
       part_adv(IP)%Z = part_adv(IP)%Z + part_adv(IP)%VZ*TIME + 0.5*ACC(3)*TIME*TIME
+
+      part_adv(IP)%VX = part_adv(IP)%VX + ACC(1) * TIME
+      part_adv(IP)%VY = part_adv(IP)%VY + ACC(2) * TIME
+      part_adv(IP)%VZ = part_adv(IP)%VZ + ACC(3) * TIME
 
    END SUBROUTINE MOVE_PARTICLE_CN
 
@@ -637,7 +680,7 @@ MODULE fully_implicit
       INTEGER, DIMENSION(4) :: INDICES, INDI, INDJ
 
       IF (GRID_TYPE == UNSTRUCTURED) THEN
-         IF (BOOL_PIC_IMPLICIT) THEN
+         IF (BOOL_PIC_IMPLICIT .OR. BOOL_PIC_FULLY_IMPLICIT) THEN
             E = EBAR_FIELD(particles(JP)%IC, 1, :)
          ELSE
             E = E_FIELD(particles(JP)%IC, 1, :)
@@ -709,24 +752,7 @@ MODULE fully_implicit
 
       IMPLICIT NONE
 
-      !REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: X
-      REAL(KIND=8) :: HX, HY
-      INTEGER :: I, J
-      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, AREA
-      INTEGER :: V1, V2, V3, SIZE
-      INTEGER :: ICENTER, INORTH, ISOUTH, IEAST, IWEST
-
-      HX = (XMAX-XMIN)/DBLE(NX)
-      HY = (YMAX-YMIN)/DBLE(NY)
-
-
-      IF (GRID_TYPE == UNSTRUCTURED) THEN
-         SIZE = U2D_GRID%NUM_NODES
-      ELSE
-         SIZE = NPX*NPY
-      END IF
-
-      ! Solve the linear system
+      ! Solve the linear system  (Amat*PHI_FIELD = bvec)
 
       CALL KSPCreate(PETSC_COMM_WORLD,ksp,ierr)
       CALL KSPSetOperators(ksp,Amat,Amat,ierr)
@@ -750,8 +776,30 @@ MODULE fully_implicit
       ALLOCATE(PHI_FIELD, SOURCE = PHI_FIELD_TEMP)
       CALL VecRestoreArrayReadF90(xvec_seq,PHI_FIELD_TEMP,ierr)
 
-      PHIBAR_FIELD = PHI_FIELD
+      !CALL VecRestoreArrayReadF90(X_SEQ,PHI_FIELD,ierr)
 
+   END SUBROUTINE SOLVE_POISSON
+
+
+   SUBROUTINE COMPUTE_E_FIELD
+      
+      IMPLICIT NONE
+
+      REAL(KIND=8) :: HX, HY
+      INTEGER :: I, J
+      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, AREA
+      INTEGER :: V1, V2, V3, SIZE
+      INTEGER :: ICENTER, INORTH, ISOUTH, IEAST, IWEST
+
+      HX = (XMAX-XMIN)/DBLE(NX)
+      HY = (YMAX-YMIN)/DBLE(NY)
+
+
+      IF (GRID_TYPE == UNSTRUCTURED) THEN
+         SIZE = U2D_GRID%NUM_NODES
+      ELSE
+         SIZE = NPX*NPY
+      END IF
       ! Reshape the linear array into a 2D array
       IF (GRID_TYPE == UNSTRUCTURED) THEN
 
@@ -775,6 +823,15 @@ MODULE fully_implicit
                                         + PHI_FIELD(V2)*(X1-X3) &
                                         + PHI_FIELD(V3)*(X2-X1))
             E_FIELD(I,1,3) = 0.d0
+
+            EBAR_FIELD(I,1,1) = -0.5/AREA*(  PHIBAR_FIELD(V1)*(Y2-Y3) &
+                                           - PHIBAR_FIELD(V2)*(Y1-Y3) &
+                                           - PHIBAR_FIELD(V3)*(Y2-Y1))
+            EBAR_FIELD(I,1,2) = -0.5/AREA*(- PHIBAR_FIELD(V1)*(X2-X3) &
+                                           + PHIBAR_FIELD(V2)*(X1-X3) &
+                                           + PHIBAR_FIELD(V3)*(X2-X1))
+            EBAR_FIELD(I,1,3) = 0.d0
+
          END DO
 
       ELSE
@@ -818,9 +875,7 @@ MODULE fully_implicit
          
       END IF
 
-      !CALL VecRestoreArrayReadF90(X_SEQ,PHI_FIELD,ierr)
-
-   END SUBROUTINE SOLVE_POISSON
+   END SUBROUTINE COMPUTE_E_FIELD
 
 
    SUBROUTINE COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)

@@ -36,6 +36,8 @@ MODULE timecycle
             CALL SOLVE_POISSON_NONLINEAR
          ELSE
             CALL SOLVE_POISSON
+            PHIBAR_FIELD = PHI_FIELD
+            CALL COMPUTE_E_FIELD
          END IF
          IF (BOOL_PIC_IMPLICIT) THEN
             CALL DEPOSIT_CURRENT

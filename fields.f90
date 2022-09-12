@@ -245,10 +245,7 @@ MODULE fields
 
             ! We need to ADD to a sparse matrix entry.
             IF (V1-1 >= Istart .AND. V1-1 < Iend) THEN
-               IF (IS_DIRICHLET(V1-1)) THEN
-                  CALL MatSetValues(Amat,one,V1-1,one,V1-1,1.d0,ADD_VALUES,ierr)
-                  !CALL ST_MATRIX_SET(A_ST, V1-1, V1-1, 1.d0)
-               ELSE !IF (.NOT. IS_NEUMANN(V1-1)) THEN
+               IF (.NOT. IS_DIRICHLET(V1-1)) THEN
                   CALL MatSetValues(Amat,one,V1-1,one,V1-1,K11,ADD_VALUES,ierr)
                   CALL MatSetValues(Amat,one,V1-1,one,V2-1,K12,ADD_VALUES,ierr)
                   CALL MatSetValues(Amat,one,V1-1,one,V3-1,K13,ADD_VALUES,ierr)
@@ -259,10 +256,7 @@ MODULE fields
                END IF
             END IF
             IF (V2-1 >= Istart .AND. V2-1 < Iend) THEN
-               IF (IS_DIRICHLET(V2-1)) THEN
-                  CALL MatSetValues(Amat,one,V2-1,one,V2-1,1.d0,ADD_VALUES,ierr)
-                  !CALL ST_MATRIX_SET(A_ST, V2-1, V2-1, 1.d0)
-               ELSE !IF (.NOT. IS_NEUMANN(V2-1)) THEN
+               IF (.NOT. IS_DIRICHLET(V2-1)) THEN
                   CALL MatSetValues(Amat,one,V2-1,one,V1-1,K12,ADD_VALUES,ierr)
                   CALL MatSetValues(Amat,one,V2-1,one,V3-1,K23,ADD_VALUES,ierr)
                   CALL MatSetValues(Amat,one,V2-1,one,V2-1,K22,ADD_VALUES,ierr)
@@ -273,10 +267,7 @@ MODULE fields
                END IF
             END IF
             IF (V3-1 >= Istart .AND. V3-1 < Iend) THEN
-               IF (IS_DIRICHLET(V3-1)) THEN
-                  CALL MatSetValues(Amat,one,V3-1,one,V3-1,1.d0,ADD_VALUES,ierr)
-                  !CALL ST_MATRIX_SET(A_ST, V3-1, V3-1, 1.d0)
-               ELSE !IF (.NOT. IS_NEUMANN(V3-1)) THEN
+               IF (.NOT. IS_DIRICHLET(V3-1)) THEN
                   CALL MatSetValues(Amat,one,V3-1,one,V1-1,K13,ADD_VALUES,ierr)
                   CALL MatSetValues(Amat,one,V3-1,one,V2-1,K23,ADD_VALUES,ierr)
                   CALL MatSetValues(Amat,one,V3-1,one,V3-1,K33,ADD_VALUES,ierr)
@@ -426,6 +417,13 @@ MODULE fields
       ! ELSE
       !    CALL SLEEP(5)
       ! END IF
+
+      CALL MatAssemblyBegin(Amat,MAT_FLUSH_ASSEMBLY,ierr)
+      CALL MatAssemblyEnd(Amat,MAT_FLUSH_ASSEMBLY,ierr)
+
+      DO I = Istart, Iend-1
+         IF (IS_DIRICHLET(I)) CALL MatSetValues(Amat,one,I,one,I,1.d0,INSERT_VALUES,ierr)
+      END DO
 
       CALL MatAssemblyBegin(Amat,MAT_FINAL_ASSEMBLY,ierr)
       CALL MatAssemblyEnd(Amat,MAT_FINAL_ASSEMBLY,ierr)
@@ -1020,14 +1018,38 @@ MODULE fields
       INTEGER, INTENT(IN) :: JP
       REAL(KIND=8), DIMENSION(4) :: WEIGHTS
       INTEGER, DIMENSION(4) :: INDICES, INDI, INDJ
+      INTEGER :: IC, V1, V2, V3
+      REAL(KIND=8) :: AREA, X1, X2, X3, Y1, Y2, Y3, XP, YP, PSI1, PSI2, PSI3
 
-      CALL COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)
       IF (DIMS == 2) THEN
-         PHI = WEIGHTS(1)*PHI_FIELD(INDI(1)+1+NPX*(INDJ(1)+1)) + &
-         WEIGHTS(2)*PHI_FIELD(INDI(2)+1 +NPX*(INDJ(2)+1)) + &
-         WEIGHTS(3)*PHI_FIELD(INDI(3)+1 +NPX*(INDJ(3)+1)) + &
-         WEIGHTS(4)*PHI_FIELD(INDI(4)+1 +NPX*(INDJ(4)+1))
+         IF (GRID_TYPE == UNSTRUCTURED) THEN
+            IC = particles(JP)%IC
+            AREA = CELL_AREAS(IC)
+            V1 = U2D_GRID%CELL_NODES(IC,1)
+            V2 = U2D_GRID%CELL_NODES(IC,2)
+            V3 = U2D_GRID%CELL_NODES(IC,3)            
+            X1 = U2D_GRID%NODE_COORDS(V1, 1)
+            X2 = U2D_GRID%NODE_COORDS(V2, 1)
+            X3 = U2D_GRID%NODE_COORDS(V3, 1)
+            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
+            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
+            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
+            XP = particles(JP)%X
+            YP = particles(JP)%Y
+            PSI1 = 0.5*( (Y2-Y3)*(XP-X3) - (X2-X3)*(YP-Y3))/AREA/(ZMAX-ZMIN)
+            PSI2 = 0.5*(-(Y1-Y3)*(XP-X3) + (X1-X3)*(YP-Y3))/AREA/(ZMAX-ZMIN)
+            PSI3 = 0.5*(-(Y2-Y1)*(XP-X1) + (X2-X1)*(YP-Y1))/AREA/(ZMAX-ZMIN)
+
+            PHI = PSI1*PHI_FIELD(V1) + PSI2*PHI_FIELD(V2) + PSI3*PHI_FIELD(V3)
+         ELSE
+            CALL COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)
+            PHI = WEIGHTS(1)*PHI_FIELD(INDI(1)+1+NPX*(INDJ(1)+1)) + &
+            WEIGHTS(2)*PHI_FIELD(INDI(2)+1 +NPX*(INDJ(2)+1)) + &
+            WEIGHTS(3)*PHI_FIELD(INDI(3)+1 +NPX*(INDJ(3)+1)) + &
+            WEIGHTS(4)*PHI_FIELD(INDI(4)+1 +NPX*(INDJ(4)+1))
+         END IF
       ELSE
+         CALL COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)
          PHI = WEIGHTS(1)*PHI_FIELD(INDI(1)+1 +NPX*(INDJ(1)+1)) + &
          WEIGHTS(2)*PHI_FIELD(INDI(2)+1 +NPX*(INDJ(2)+1))
       END IF

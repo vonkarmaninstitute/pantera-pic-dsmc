@@ -1074,7 +1074,7 @@ MODULE postprocess
          !END IF
          IF (BOOL_PIC .AND. (GRID_TYPE .NE. UNSTRUCTURED)) THEN
             CALL APPLY_POTENTIAL(JP, PHI)
-            TOT_EE  = TOT_EE + PHI*1.602176634e-19*SPECIES(JS)%CHARGE * CFNUM
+            TOT_EE  = TOT_EE + 0.5*PHI*QE*SPECIES(JS)%CHARGE * CFNUM
          END IF
 
       END DO

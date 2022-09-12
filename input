@@ -20,7 +20,7 @@ Number_of_cells:
 Domain_limits:
     -10.0    10.0    -10.0    10.0    -0.5    0.5
 Mesh_file_SU2:
-    'rect_small.su2'
+    'rect_medium.su2'
 Domain_periodicity:
     .FALSE.   .FALSE.   .TRUE.
 Domain_specular:
@@ -49,11 +49,11 @@ Fluxes_dump_output:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0e10
+    1.0e8
 Timestep:
-    2.0e-9
+    2.0e-8
 Number_of_timesteps:
-    1000
+    10
 Stats_every:
     1
 
@@ -133,7 +133,7 @@ Thermal_bath_Ttr:
 Initial_particles_bool:
     .TRUE.
 Initial_particles_dens:
-    1.0e15
+    1.0e14
 Initial_particles_vel:
     0.  0.  0.
 Initial_particles_Ttra:

@@ -157,7 +157,7 @@ MODULE timecycle
             ELSE IF (BOOL_PIC_FULLY_IMPLICIT) THEN
                CALL SOLVE_POISSON_FULLY_IMPLICIT
                ALLOCATE(part_adv, SOURCE = particles)
-               CALL ADVECT_CN(.TRUE.)
+               CALL ADVECT_CN(.TRUE., .FALSE., Jmat)
                DEALLOCATE(particles)
                ALLOCATE(particles, SOURCE = part_adv)
                DEALLOCATE(part_adv)

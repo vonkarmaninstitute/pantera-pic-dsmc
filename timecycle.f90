@@ -87,7 +87,7 @@ MODULE timecycle
          CALL LINE_SOURCE_INJECT
          CALL BOUNDARIES_EMIT
 
-         !CALL FIXED_IONIZATION
+         CALL FIXED_IONIZATION
 
          ! ########### Advect particles ############################################
 
@@ -266,10 +266,10 @@ MODULE timecycle
       REAL(KIND=8)  :: M
       INTEGER       :: S_ID, i
 
-      REAL(KIND=8)  :: NDOT = 1.d12
+      REAL(KIND=8)  :: NDOT = 2.225142d21
 
       ! Print message 
-      CALL ONLYMASTERPRINT1(PROC_ID, '> SEEDING IONIZED PARTICLES IN THE DOMAIN...')
+!      CALL ONLYMASTERPRINT1(PROC_ID, '> SEEDING IONIZED PARTICLES IN THE DOMAIN...')
      
       ! Compute number of particles to be seeded
       !NP_INIT = NINT(NRHO_INIT/FNUM*(XMAX-XMIN)*(YMAX-YMIN)*(ZMAX-ZMIN))
@@ -308,13 +308,22 @@ MODULE timecycle
 
                   XP = V1(1) + (V2(1)-V1(1))*XI + (V3(1)-V1(1))*ETA
                   YP = V1(2) + (V2(2)-V1(2))*XI + (V3(2)-V1(2))*ETA
+
+                  IF (XP*XP+YP*YP > 2.5d-5) CYCLE   ! only inject within radius 5e-3
+
                   ZP = ZMIN + (ZMAX-ZMIN)*rf()
 
                   ! Assign velocity and energy following a Boltzmann distribution
                   M = SPECIES(S_ID)%MOLECULAR_MASS
-                  CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
-                               TTRAX_INIT, TTRAY_INIT, TTRAZ_INIT, &
-                               VXP, VYP, VZP, M)
+                  IF (S_ID == 1) THEN
+                     CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
+                                  290.113d0, 290.113d0, 290.113d0, &
+                                  VXP, VYP, VZP, M)
+                  ELSE IF (S_ID == 2) THEN
+                     CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
+                                  174067.77d0, 174067.77d0, 174067.77d0, &
+                                  VXP, VYP, VZP, M)
+                  END IF
 
                   CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, TROT_INIT, EROT)
                   CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, TVIB_INIT, EVIB)
@@ -332,7 +341,7 @@ MODULE timecycle
             ELSE
                DOMAIN_VOLUME = (XMAX-XMIN)*(YMAX-YMIN)*(ZMAX-ZMIN)
             END IF
-            NP_INIT = NINT(NDOT/FNUM*DOMAIN_VOLUME*DT* &
+            NP_INIT = RANDINT(NDOT/FNUM*DOMAIN_VOLUME*DT* &
                         MIXTURES(MIX_INIT)%COMPONENTS(i)%MOLFRAC/N_MPI_THREADS)
             IF (NP_INIT == 0) CYCLE
             DO IP = 1, NP_INIT
@@ -348,18 +357,21 @@ MODULE timecycle
                   YP = YMIN + (YMAX-YMIN)*rf()
                   ZP = ZMIN + (ZMAX-ZMIN)*rf()
                END IF
+
+               IF (XP*XP+YP*YP > 2.5d-5) CYCLE   ! only inject within radius 5e-3
             
                ! Assign velocity and energy following a Boltzmann distribution
                M = SPECIES(S_ID)%MOLECULAR_MASS
-               IF (S_ID == 15) THEN
+               IF (S_ID == 1) THEN
                   CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
-                           3.d-2, 3.d-2, 3.d-2, &
-                           VXP, VYP, VZP, M)
-               ELSE
+                               290.113d0, 290.113d0, 290.113d0, &
+                               VXP, VYP, VZP, M)
+               ELSE IF (S_ID == 2) THEN
                   CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
-                              TTRAX_INIT, TTRAY_INIT, TTRAZ_INIT, &
-                              VXP, VYP, VZP, M)
+                               174067.77d0, 174067.77d0, 174067.77d0, &
+                               VXP, VYP, VZP, M)
                END IF
+
 
                CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, TROT_INIT, EROT)
                CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, TVIB_INIT, EVIB)
@@ -699,7 +711,7 @@ MODULE timecycle
       TOL = 1e-15
 
       !E = [0.d0, 0.d0, 0.d0]
-      B = [0.d0, 0.d0, 0.d0]
+      B = [0.d0, 0.d0, 1.0d-2]
 
 
       NORMX = [ 1., -1., 0., 0. ]

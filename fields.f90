@@ -237,31 +237,13 @@ MODULE fields
 
 
                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-               ! Plume 2d axisymmetric (half domain) !
+               ! Grounded wall for Penning discharge !
                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-               IF (J == 0) THEN
-                  ! Axis: zero radial gradient.
+               IF ((I == 0) .OR. (J == 0) .OR. (I == NPX-1) .OR. (J == NPY-1)) THEN
+                  ! Boundary point
                   CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
                   DIRICHLET(IC) = 0.d0
-                  CALL ST_MATRIX_SET(A_ST, IC, IN, -1.d0)
                   IS_DIRICHLET(IC) = .TRUE.
-               ELSE IF ((I == 0) .OR. (I == NPX-1) .OR. (J == NPY-1) .OR. &
-                  ((I .GE. 10) .AND. (I .LE. 30) .AND. (J .LE. 100)) ) THEN
-                  ! Boundary point.
-                  CALL ST_MATRIX_SET(A_ST, IC, IC, 1.d0)
-                  IF ((I == 30) .AND. (J .LE. 50)) THEN
-                  ! On the inlet surface.
-                     DIRICHLET(IC) = 2.35d0
-                  ELSE
-                     ! On the boundary or on the rest of the PFG.
-                     DIRICHLET(IC) = 0.d0
-                  END IF
-                  IS_DIRICHLET(IC) = .TRUE.
-
-
-
-
 
 
                ELSE
@@ -415,23 +397,17 @@ MODULE fields
          DO I = 0, NPX-1
             DO J = 0, NPY-1
 
-               IC = I+1 + NPX*(J+1)
-               IE = I+2 + NPX*(J+1)
-               IW = I   + NPX*(J+1)
-               IN = I+1 + NPX*(J+2)
-               IS = I+1 + NPX*J
+               IC = I   + NPX*J
+               IE = I+1 + NPX*J
+               IW = I-1 + NPX*J
+               IN = I   + NPX*(J+1)
+               IS = I   + NPX*(J-1)
 
                IF (I == 0) THEN ! Left boundary
                   IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(1)
                   E_FIELD(I,J,1) = (PHI_FIELD(IC)-PHI_FIELD(IE))/HX
-               ELSE IF (I == 30 .AND. (J .LE. 50)) THEN ! Right side of PFG
-                  IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(I+1)
-                  E_FIELD(I,J,1) = (PHI_FIELD(IC)-PHI_FIELD(IE))/HX
                ELSE IF (I == NPX-1) THEN ! Right boundary
                   IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(NPX-1)
-                  E_FIELD(I,J,1) = (PHI_FIELD(IW)-PHI_FIELD(IC))/HX
-               ELSE IF (I == 10 .AND. (J .LE. 50)) THEN ! Left side of PFG
-                  IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = XSIZE(I)
                   E_FIELD(I,J,1) = (PHI_FIELD(IW)-PHI_FIELD(IC))/HX
                ELSE ! Interior point
                   IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HX = 0.5*(XSIZE(I)+XSIZE(I+1))
@@ -441,15 +417,9 @@ MODULE fields
                   IF (J == 0) THEN ! Bottom boundary
                      IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(1)
                      E_FIELD(I,J,2) = (PHI_FIELD(IC)-PHI_FIELD(IN))/HY
-                  ELSE IF (J == 50 .AND. ((I.GE. 10) .AND. (I .LE. 30))) THEN ! Top side of PFG
-                     IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(J+1)
-                     E_FIELD(I,J,2) = (PHI_FIELD(IC)-PHI_FIELD(IN))/HY
                   ELSE IF (J == NPY-1) THEN ! Top boundary
                      IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(NPY-1)
                      E_FIELD(I,J,2) = (PHI_FIELD(IS)-PHI_FIELD(IC))/HY
-                  ! ELSE IF (J == 50 .AND. ((I.GE. 10) .AND. (I .LE. 50))) THEN ! Bottom side of PFG
-                  !    IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = YSIZE(J)
-                  !    E_FIELD(I,J,2) = (PHI_FIELD(IS)-PHI_FIELD(IC))/HY
                   ELSE ! Interior point
                      IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) HY = 0.5*(YSIZE(J)+YSIZE(J+1))
                      E_FIELD(I,J,2) = 0.5*(PHI_FIELD(IS)-PHI_FIELD(IN))/HY

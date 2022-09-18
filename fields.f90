@@ -316,7 +316,7 @@ MODULE fields
 
          DO I = 1, U2D_GRID%NUM_NODES
             IF (IS_UNUSED(I-1)) THEN
-               CALL MatSetValues(Amat,one,I-1,one,I-1,1.d0,ADD_VALUES,ierr)
+               !CALL MatSetValues(Amat,one,I-1,one,I-1,1.d0,ADD_VALUES,ierr)
                IS_DIRICHLET(I-1) = .TRUE.
                DIRICHLET(I-1) = 0.d0
             END IF
@@ -346,7 +346,7 @@ MODULE fields
                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                IF ((I == 0) .OR. (I == NPX-1) .OR. (J == 0) .OR. (J == NPY-1)) THEN
                   ! Boundary point
-                  CALL MatSetValues(Amat,one,ICENTER,one,ICENTER,1.d0,INSERT_VALUES,ierr)
+                  ! CALL MatSetValues(Amat,one,ICENTER,one,ICENTER,1.d0,INSERT_VALUES,ierr)
                   ! On the boundary or on the rest of the PFG.
                   DIRICHLET(ICENTER) = 0.d0
                   IS_DIRICHLET(ICENTER) = .TRUE.
@@ -565,10 +565,8 @@ MODULE fields
 
    SUBROUTINE ASSEMBLE_AMPERE
 
-      INTEGER :: STATUS
       INTEGER :: I, J
       INTEGER :: MAXNNZ, SIZE
-      TYPE(ST_MATRIX) :: A_ST
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA
       REAL(KIND=8) :: K11TILDE, K22TILDE, K33TILDE, K12TILDE, K23TILDE, K13TILDE
       INTEGER :: V1, V2, V3
@@ -626,9 +624,9 @@ MODULE fields
             V2 = U2D_GRID%CELL_NODES(I,2)
             V3 = U2D_GRID%CELL_NODES(I,3)
 
-            IF ((V1-1 < Istart .OR. V1-1 >= Iend) .AND. &
-                (V2-1 < Istart .OR. V2-1 >= Iend) .AND. &
-                (V3-1 < Istart .OR. V3-1 >= Iend)) CYCLE
+            !IF ((V1-1 < Istart .OR. V1-1 >= Iend) .AND. &
+            !    (V2-1 < Istart .OR. V2-1 >= Iend) .AND. &
+            !    (V3-1 < Istart .OR. V3-1 >= Iend)) CYCLE
 
             IS_UNUSED(V1-1) = .FALSE.; IS_UNUSED(V2-1) = .FALSE.; IS_UNUSED(V3-1) = .FALSE.
             DO J = 1, 3
@@ -671,9 +669,9 @@ MODULE fields
             V2 = U2D_GRID%CELL_NODES(I,2)
             V3 = U2D_GRID%CELL_NODES(I,3)
             
-            IF ((V1-1 < Istart .OR. V1-1 >= Iend) .AND. &
-                (V2-1 < Istart .OR. V2-1 >= Iend) .AND. &
-                (V3-1 < Istart .OR. V3-1 >= Iend)) CYCLE
+            !IF ((V1-1 < Istart .OR. V1-1 >= Iend) .AND. &
+            !    (V2-1 < Istart .OR. V2-1 >= Iend) .AND. &
+            !    (V3-1 < Istart .OR. V3-1 >= Iend)) CYCLE
 
             AREA = CELL_AREAS(I)
             X1 = U2D_GRID%NODE_COORDS(V1, 1)
@@ -697,9 +695,7 @@ MODULE fields
 
             ! We need to ADD to a sparse matrix entry.
             IF (V1-1 >= Istart .AND. V1-1 < Iend) THEN
-               IF (IS_DIRICHLET(V1-1)) THEN
-                  CALL MatSetValues(Amat,one,V1-1,one,V1-1,1.d0,INSERT_VALUES,ierr)
-               ELSE !IF (.NOT. IS_NEUMANN(V1-1)) THEN
+               IF (.NOT. IS_DIRICHLET(V1-1)) THEN
                   IF (AXI) THEN
                      CALL MatSetValues(Amat,one,V1-1,one,V1-1,K11TILDE + MASS_MATRIX(I)*K11,ADD_VALUES,ierr)
                      CALL MatSetValues(Amat,one,V1-1,one,V2-1,K12TILDE + MASS_MATRIX(I)*K12,ADD_VALUES,ierr)
@@ -716,9 +712,7 @@ MODULE fields
                END IF
             END IF
             IF (V2-1 >= Istart .AND. V2-1 < Iend) THEN
-               IF (IS_DIRICHLET(V2-1)) THEN
-                  CALL MatSetValues(Amat,one,V2-1,one,V2-1,1.d0,INSERT_VALUES,ierr)
-               ELSE !IF (.NOT. IS_NEUMANN(V2-1)) THEN
+               IF (.NOT. IS_DIRICHLET(V2-1)) THEN
                   IF (AXI) THEN
                      CALL MatSetValues(Amat,one,V2-1,one,V1-1,K12TILDE + MASS_MATRIX(I)*K12,ADD_VALUES,ierr)
                      CALL MatSetValues(Amat,one,V2-1,one,V3-1,K23TILDE + MASS_MATRIX(I)*K23,ADD_VALUES,ierr)
@@ -735,9 +729,7 @@ MODULE fields
                END IF
             END IF
             IF (V3-1 >= Istart .AND. V3-1 < Iend) THEN
-               IF (IS_DIRICHLET(V3-1)) THEN
-                  CALL MatSetValues(Amat,one,V3-1,one,V3-1,1.d0,INSERT_VALUES,ierr)
-               ELSE !IF (.NOT. IS_NEUMANN(V3-1)) THEN
+               IF (.NOT. IS_DIRICHLET(V3-1)) THEN
                   IF (AXI) THEN
                      CALL MatSetValues(Amat,one,V3-1,one,V1-1,K13TILDE + MASS_MATRIX(I)*K13,ADD_VALUES,ierr)
                      CALL MatSetValues(Amat,one,V3-1,one,V2-1,K23TILDE + MASS_MATRIX(I)*K23,ADD_VALUES,ierr)
@@ -793,7 +785,7 @@ MODULE fields
 
          DO I = Istart, Iend-1
             IF (IS_UNUSED(I)) THEN
-               CALL MatSetValues(Amat,one,I,one,I,1.d0,ADD_VALUES,ierr)
+               !CALL MatSetValues(Amat,one,I,one,I,1.d0,ADD_VALUES,ierr)
                IS_DIRICHLET(I) = .TRUE.
                DIRICHLET(I) = 0.d0
             ELSE IF (.NOT. IS_DIRICHLET(I) ) THEN
@@ -804,7 +796,7 @@ MODULE fields
          DEALLOCATE(IS_UNUSED)
 
       ELSE
-         CALL ERROR_ABORT('Implicit with cartesian grid not implemented!')
+         CALL ERROR_ABORT('Semi-implicit with cartesian grid not implemented!')
       END IF
 
       ! Factorize the matrix for later solution
@@ -818,8 +810,13 @@ MODULE fields
       !    CALL SLEEP(5)
       ! END IF
 
+      CALL MatAssemblyBegin(Amat,MAT_FLUSH_ASSEMBLY,ierr)
+      CALL MatAssemblyEnd(Amat,MAT_FLUSH_ASSEMBLY,ierr)
+
       DO I = Istart, Iend-1
          IF (IS_DIRICHLET(I)) THEN
+            CALL MatSetValues(Amat,one,I,one,I,1.d0,INSERT_VALUES,ierr)
+
             val = DIRICHLET(I)
             CALL VecSetValues(bvec,one,I,val,ADD_VALUES,ierr)
          ELSE IF (IS_NEUMANN(I)) THEN
@@ -827,7 +824,6 @@ MODULE fields
             CALL VecSetValues(bvec,one,I,val,ADD_VALUES,ierr)
          END IF
       END DO
-
 
       CALL MatAssemblyBegin(Amat,MAT_FINAL_ASSEMBLY,ierr)
       CALL MatAssemblyEnd(Amat,MAT_FINAL_ASSEMBLY,ierr)
@@ -931,23 +927,6 @@ MODULE fields
 
       IMPLICIT NONE
 
-      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: X
-      REAL(KIND=8) :: HX, HY
-      INTEGER :: I
-      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, AREA
-      INTEGER :: V1, V2, V3, SIZE
-
-      HX = (XMAX-XMIN)/DBLE(NX)
-      HY = (YMAX-YMIN)/DBLE(NY)
-
-
-      IF (GRID_TYPE == UNSTRUCTURED) THEN
-         SIZE = U2D_GRID%NUM_NODES
-      ELSE
-         SIZE = NPX*NPY
-      END IF
-
-
       CALL KSPCreate(PETSC_COMM_WORLD,ksp,ierr)
       CALL KSPSetOperators(ksp,Amat,Amat,ierr)
 
@@ -961,48 +940,11 @@ MODULE fields
       CALL VecScatterEnd(ctx,xvec,X_SEQ,INSERT_VALUES,SCATTER_FORWARD)
 
       CALL VecGetArrayReadF90(X_SEQ,PHI_FIELD_TEMP,ierr)
+      DEALLOCATE(PHIBAR_FIELD)
       ALLOCATE(PHIBAR_FIELD, SOURCE = PHI_FIELD_TEMP)
       CALL VecRestoreArrayReadF90(X_SEQ,PHI_FIELD_TEMP,ierr)
 
       PHI_FIELD = 2*PHIBAR_FIELD-PHI_FIELD
-
-      IF (GRID_TYPE == UNSTRUCTURED) THEN
-
-         ! Compute the electric field at grid points
-         DO I = 1, U2D_GRID%NUM_CELLS
-            AREA = CELL_AREAS(I)
-            V1 = U2D_GRID%CELL_NODES(I,1)
-            V2 = U2D_GRID%CELL_NODES(I,2)
-            V3 = U2D_GRID%CELL_NODES(I,3)            
-            X1 = U2D_GRID%NODE_COORDS(V1, 1)
-            X2 = U2D_GRID%NODE_COORDS(V2, 1)
-            X3 = U2D_GRID%NODE_COORDS(V3, 1)
-            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
-
-            E_FIELD(I,1,1) = -0.5/AREA*(  PHI_FIELD(V1)*(Y2-Y3) &
-                                        - PHI_FIELD(V2)*(Y1-Y3) &
-                                        - PHI_FIELD(V3)*(Y2-Y1))
-            E_FIELD(I,1,2) = -0.5/AREA*(- PHI_FIELD(V1)*(X2-X3) &
-                                        + PHI_FIELD(V2)*(X1-X3) &
-                                        + PHI_FIELD(V3)*(X2-X1))
-            E_FIELD(I,1,3) = 0.d0
-
-            EBAR_FIELD(I,1,1) = -0.5/AREA*(  PHIBAR_FIELD(V1)*(Y2-Y3) &
-                                           - PHIBAR_FIELD(V2)*(Y1-Y3) &
-                                           - PHIBAR_FIELD(V3)*(Y2-Y1))
-            EBAR_FIELD(I,1,2) = -0.5/AREA*(- PHIBAR_FIELD(V1)*(X2-X3) &
-                                           + PHIBAR_FIELD(V2)*(X1-X3) &
-                                           + PHIBAR_FIELD(V3)*(X2-X1))
-            EBAR_FIELD(I,1,3) = 0.d0
-         END DO
-
-      ELSE
-         
-         CALL ERROR_ABORT('Not implemented.')
-         
-      END IF
 
    END SUBROUTINE SOLVE_AMPERE
 

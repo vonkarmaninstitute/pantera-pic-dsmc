@@ -270,13 +270,26 @@ CONTAINS
       WRITE(filename, "(A,A,I0.5,A6,I0.8)") TRIM(ADJUSTL(PARTDUMP_SAVE_PATH)), "proc_", PROC_ID, "_time_", TIMESTEP ! Compose filename
 
       ! Open file for writing
-      OPEN(10, FILE=filename )
+      IF (BOOL_BINARY_OUTPUT) THEN
+         OPEN(10, FILE=filename, ACCESS='STREAM', FORM='UNFORMATTED', STATUS='NEW', CONVERT='BIG_ENDIAN')
+         DO IP = 1, NP_PROC
+            WRITE(10) TIMESTEP, particles(IP)%X, particles(IP)%Y, particles(IP)%Z, &
+            particles(IP)%VX, particles(IP)%VY, particles(IP)%VZ, particles(IP)%EROT, particles(IP)%EVIB, &
+            particles(IP)%S_ID, PROC_ID
+         END DO
+         CLOSE(10)
+      ELSE
+         OPEN(10, FILE=filename )
+         WRITE(10,*) '% Timestep | X | Y | Z | VX | VY | VZ | EROT | EVIB | S_ID | proc_ID'
+         DO IP = 1, NP_PROC
+            WRITE(10,*) TIMESTEP, particles(IP)%X, particles(IP)%Y, particles(IP)%Z, &
+            particles(IP)%VX, particles(IP)%VY, particles(IP)%VZ, particles(IP)%EROT, particles(IP)%EVIB, &
+            particles(IP)%S_ID, PROC_ID
+         END DO
+         CLOSE(10)
+      END IF
 
-      WRITE(10,*) '% Timestep | X | Y | Z | VX | VY | VZ | EROT | EVIB | S_ID | proc_ID'
-      DO IP = 1, NP_PROC
-         WRITE(10,*) TIMESTEP, particles(IP)%X, particles(IP)%Y, particles(IP)%Z, &
-         particles(IP)%VX, particles(IP)%VY, particles(IP)%VZ, particles(IP)%EROT, particles(IP)%EVIB, particles(IP)%S_ID, PROC_ID
-      END DO
+
 
    END SUBROUTINE DUMP_PARTICLES_FILE
 

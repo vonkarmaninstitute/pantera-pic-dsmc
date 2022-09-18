@@ -30,26 +30,24 @@ MODULE timecycle
 
       ! ########### Compute poisson ##########################################
 
-      IF (BOOL_PIC) THEN
+      IF (PIC_TYPE .NE. NONE) THEN
+
          CALL DEPOSIT_CHARGE
-         IF (BOOL_FLUID_ELECTRONS) THEN
-            CALL SOLVE_POISSON_NONLINEAR
-         ELSE
-            CALL SOLVE_POISSON
-            PHIBAR_FIELD = PHI_FIELD
-            CALL COMPUTE_E_FIELD
-         END IF
-         IF (BOOL_PIC_IMPLICIT) THEN
-            CALL DEPOSIT_CURRENT
-            CALL ASSEMBLE_AMPERE
-            CALL SOLVE_AMPERE
-         ELSE IF (BOOL_PIC_FULLY_IMPLICIT) THEN
-            !CALL SOLVE_POISSON_FULLY_IMPLICIT
-            ! We get here no problem.
-         END IF
+         CALL SOLVE_POISSON
+         PHIBAR_FIELD = PHI_FIELD
+         CALL COMPUTE_E_FIELD
+
+         !IF (PIC_TYPE == SEMIIMPLICIT) THEN
+         !   CALL DEPOSIT_CURRENT
+         !   CALL ASSEMBLE_AMPERE
+         !   CALL SOLVE_AMPERE
+         !ELSE IF (PIC_TYPE == FULLYIMPLICIT) THEN
+         !   !CALL SOLVE_POISSON_FULLY_IMPLICIT
+         !   ! We get here no problem.
+         !END IF
       END IF
       
-      ! Dump particles and flowfield before the first time step, but after the initial seeding
+      ! ########### Dump particles and flowfield after the initial seeding ##########################################
       IF (DUMP_START .EQ. 0) THEN
          CALL DUMP_PARTICLES_FILE(0)
       END IF
@@ -60,7 +58,11 @@ MODULE timecycle
          CALL GRID_RESET
       END IF
 
+      ! ########### Perform the conservation checks ###################################
+      IF (PERFORM_CHECKS .AND. MOD(tID, CHECKS_EVERY) .EQ. 0) CALL CHECKS
 
+
+      ! ########### Start the time loop #################################
       tID = 1
       CALL CPU_TIME(START_CPU_TIME)
       DO WHILE (tID .LE. NT)
@@ -95,15 +97,48 @@ MODULE timecycle
 
          !CALL FIXED_IONIZATION
 
-         ! ########### Advect particles ############################################
+         ! ########### Advect particles and update field ############################################
 
-         IF (.NOT. BOOL_PIC_FULLY_IMPLICIT) THEN
+         ! ########### Exchange particles among processes ##########################
+
+         CALL EXCHANGE
+
+
+         IF (PIC_TYPE == EXPLICIT) THEN
+
             CALL ADVECT
+
+            CALL DEPOSIT_CHARGE
+            CALL SOLVE_POISSON
+            CALL COMPUTE_E_FIELD
+         
+         ELSE IF (PIC_TYPE == SEMIIMPLICIT) THEN
+         
+            CALL DEPOSIT_CURRENT
+            CALL ASSEMBLE_AMPERE
+            CALL SOLVE_AMPERE
+            CALL COMPUTE_E_FIELD
+
+            CALL ADVECT
+
+         ELSE IF (PIC_TYPE == FULLYIMPLICIT) THEN
+
+            CALL SOLVE_POISSON_FULLY_IMPLICIT
+            CALL COMPUTE_E_FIELD
+            
+            !DBDBDBDBDBDBDBDBDDBDBDBDBDB I have to do this stupid copy of particle array!
+            ALLOCATE(part_adv, SOURCE = particles)
+            CALL ADVECT_CN(.TRUE., .FALSE., Jmat)
+            DEALLOCATE(particles)
+            ALLOCATE(particles, SOURCE = part_adv)
+            DEALLOCATE(part_adv)
+
          END IF
 
          ! ########### Exchange particles among processes ##########################
 
          CALL EXCHANGE
+         
 
          ! ########### Perform collisions ##########################################
 
@@ -116,6 +151,9 @@ MODULE timecycle
 
          IF (BOOL_THERMAL_BATH) CALL THERMAL_BATH
 
+
+
+
          ! ########### Dump particles ##############################################
          IF (tID .GE. DUMP_START) THEN
             IF (MOD(tID-DUMP_START, DUMP_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
@@ -124,7 +162,7 @@ MODULE timecycle
          ! ########### Dump flowfield ##############################################
          IF (tID .GT. DUMP_GRID_START) THEN
             ! If we are in the grid save timestep, average, then dump the cumulated averages
-            IF (tID .NE. DUMP_GRID_START .AND. MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY*DUMP_GRID_N_AVG) .EQ. 0) THEN
+            IF (MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY*DUMP_GRID_N_AVG) .EQ. 0) THEN
                CALL GRID_AVG
                CALL GRID_SAVE
                CALL GRID_RESET
@@ -140,37 +178,15 @@ MODULE timecycle
          ! ########### Dump individual particle ###################################
          CALL DUMP_TRAJECTORY_FILE(tID)
 
-         ! ~~~~~ Hmm that's it! ~~~~~
-
-         ! Perform the conservation checks
+         ! ########### Perform the conservation checks ###################################
          IF (PERFORM_CHECKS .AND. MOD(tID, CHECKS_EVERY) .EQ. 0) CALL CHECKS
 
+
+         ! ~~~~~ Hmm that's it! ~~~~~
+
+         
          tID = tID + 1
 
-         ! ########### Compute poisson ##########################################
-
-         IF (BOOL_PIC) THEN
-            IF (BOOL_PIC_IMPLICIT) THEN
-               CALL DEPOSIT_CURRENT
-               CALL ASSEMBLE_AMPERE
-               CALL SOLVE_AMPERE
-            ELSE IF (BOOL_PIC_FULLY_IMPLICIT) THEN
-               CALL SOLVE_POISSON_FULLY_IMPLICIT
-               ALLOCATE(part_adv, SOURCE = particles)
-               CALL ADVECT_CN(.TRUE., .FALSE., Jmat)
-               DEALLOCATE(particles)
-               ALLOCATE(particles, SOURCE = part_adv)
-               DEALLOCATE(part_adv)
-            ELSE
-               CALL DEPOSIT_CHARGE
-               IF (BOOL_FLUID_ELECTRONS) THEN
-                  CALL SOLVE_POISSON_NONLINEAR
-               ELSE
-                  CALL SOLVE_POISSON
-               END IF
-            END IF
-         END IF
-         
       END DO
 
    END SUBROUTINE TIME_LOOP
@@ -713,7 +729,7 @@ MODULE timecycle
 
       TOL = 1e-15
 
-      !E = [0.d0, 0.d0, 0.d0]
+      E = [0.d0, 0.d0, 0.d0]
       B = [0.d0, 0.d0, 0.d0]
 
 
@@ -743,7 +759,7 @@ MODULE timecycle
          V_NEW(2) = particles(IP)%VY
          V_NEW(3) = particles(IP)%VZ
 
-         IF (BOOL_PIC) THEN
+         IF (PIC_TYPE .NE. NONE) THEN
             !PHIBAR_FIELD = 0.d0
             !EBAR_FIELD = 0.d0
             CALL APPLY_E_FIELD(IP, E)

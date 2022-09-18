@@ -28,7 +28,7 @@ MODULE initialization
 
       CHARACTER*512      :: MIXTURE_DEFINITION, VSS_PARAMS_FILENAME, LINESOURCE_DEFINITION, WALL_DEFINITION
       CHARACTER*512      :: BC_DEFINITION, SOLENOID_DEFINITION
-      CHARACTER*64       :: MIX_INIT_NAME, MIX_BOUNDINJECT_NAME, DSMC_COLL_MIX_NAME, MCC_BG_MIX_NAME
+      CHARACTER*64       :: MIX_INIT_NAME, MIX_BOUNDINJECT_NAME, DSMC_COLL_MIX_NAME, MCC_BG_MIX_NAME, PIC_TYPE_STRING
 
       ! Open input file for reading
       OPEN(UNIT=in1,FILE='input', STATUS='old',IOSTAT=ios)
@@ -104,10 +104,21 @@ MODULE initialization
          IF (line=='Perform_checks:')          READ(in1,*) PERFORM_CHECKS
          IF (line=='Checks_every:')            READ(in1,*) CHECKS_EVERY
          IF (line=='Stats_every:')             READ(in1,*) STATS_EVERY
-         IF (line=='Bool_PIC:')                READ(in1,*) BOOL_PIC
          IF (line=='Epsilon_scaling:')         READ(in1,*) EPS_SCALING
-         IF (line=='PIC_implicit:')            READ(in1,*) BOOL_PIC_IMPLICIT
-         IF (line=='PIC_fully_implicit:')      READ(in1,*) BOOL_PIC_FULLY_IMPLICIT
+         IF (line=='PIC_type:') THEN
+            READ(in1,*) PIC_TYPE_STRING
+            IF (PIC_TYPE_STRING == "none") THEN
+               PIC_TYPE = NONE
+            ELSE IF (PIC_TYPE_STRING == "explicit") THEN
+               PIC_TYPE = EXPLICIT
+            ELSE IF (PIC_TYPE_STRING == "fullyimplicit") THEN
+               PIC_TYPE = FULLYIMPLICIT
+            ELSE IF (PIC_TYPE_STRING == "semiimplicit") THEN
+               PIC_TYPE = SEMIIMPLICIT
+            ELSE
+               CALL ERROR_ABORT('PIC type is not specified correctly in input script.')
+            END IF
+         END IF
          
          IF (line=='Bool_fluid_electrons:')    READ(in1,*) BOOL_FLUID_ELECTRONS
          IF (line=='Fluid_electrons_n0:')      READ(in1,*) BOLTZ_N0
@@ -1634,7 +1645,7 @@ MODULE initialization
       IF (GRID_TYPE == UNSTRUCTURED) THEN
          ALLOCATE(E_FIELD(U2D_GRID%NUM_CELLS, 1, 3))
          ALLOCATE(B_FIELD(U2D_GRID%NUM_NODES, 1, 3))
-         IF (BOOL_PIC_IMPLICIT .OR. BOOL_PIC_FULLY_IMPLICIT) ALLOCATE(EBAR_FIELD(U2D_GRID%NUM_CELLS, 1, 3))
+         ALLOCATE(EBAR_FIELD(U2D_GRID%NUM_CELLS, 1, 3))
       ELSE
          NPX = NX + 1
          IF (DIMS == 2) THEN

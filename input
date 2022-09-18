@@ -30,15 +30,13 @@ Domain_diffuse:
 Boundary_temperature:
     300.0
     
-Bool_PIC:
-    .TRUE.
-PIC_fully_implicit:
-    .TRUE.
+PIC_type:
+    explicit
 
 Bool_dump_moments:
     .FALSE.
 Bool_dump_fluxes:
-    .TRUE.
+    .FALSE.
     
 Flowfield_output:
     './dumps/'
@@ -49,21 +47,21 @@ Fluxes_dump_output:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0e8
+    1.0e9
 Timestep:
-    2.0e-8
+    1.0e-8
 Number_of_timesteps:
-    10
+    100
 Stats_every:
     1
 
 RNG_seed:
     65645
 Dump_part_every:
-    1000000
+    10000000
 
 Binary_output:
-    .FALSE.
+    .TRUE.
 Dump_grid_start:
     0
 Dump_grid_avgevery:
@@ -133,7 +131,7 @@ Thermal_bath_Ttr:
 Initial_particles_bool:
     .TRUE.
 Initial_particles_dens:
-    1.0e14
+    1.0e13
 Initial_particles_vel:
     0.  0.  0.
 Initial_particles_Ttra:
@@ -163,8 +161,8 @@ Boundary_condition:
 !Boundary_condition:
 !    Grid    vacuum
 
-!Boundary_condition:
-!    Axis    specular
+Boundary_condition:
+    Bound    specular
 
 !Boundary_condition:
 !    Sides    specular

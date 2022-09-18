@@ -38,7 +38,7 @@ PROGRAM PANTERA
    CALL INITFIELDS         ! Initialize electromagnetic fields
    CALL COMPUTE_B_FIELD_FROM_SOLENOIDS
 
-   IF (BOOL_PIC) CALL ASSEMBLE_POISSON
+   IF (PIC_TYPE .NE. NONE) CALL ASSEMBLE_POISSON
    ! ========= Initial particles seed ======================
    IF (BOOL_INITIAL_SEED)   CALL INITIAL_SEED
    ! CALL DUMP_PARTICLES_SCREEN

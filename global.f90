@@ -140,9 +140,11 @@ MODULE global
    !!!!!!!!! Electromagnetic fields !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-   LOGICAL :: BOOL_PIC = .FALSE.
-   LOGICAL :: BOOL_PIC_IMPLICIT = .FALSE.
-   LOGICAL :: BOOL_PIC_FULLY_IMPLICIT = .FALSE.
+
+   ENUM, BIND(C)
+      ENUMERATOR NONE, EXPLICIT, SEMIIMPLICIT, FULLYIMPLICIT
+   END ENUM
+   INTEGER(KIND(EXPLICIT)) :: PIC_TYPE = NONE
 
    INTEGER :: NPX, NPY
    REAL(KIND=8), DIMENSION(:, :, :), ALLOCATABLE :: E_FIELD, B_FIELD

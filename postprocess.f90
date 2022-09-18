@@ -330,13 +330,13 @@ MODULE postprocess
          END IF
       END IF
 
-      IF (BOOL_PIC) TIMESTEP_PHI = PHI_FIELD
+      IF (PIC_TYPE .NE. NONE) TIMESTEP_PHI = PHI_FIELD
 
       ! Add to cumulated average
       DBLE_AVG_CUMULATED = DBLE(AVG_CUMULATED)
       AVG_NP =   (AVG_NP*DBLE_AVG_CUMULATED + DBLE(TIMESTEP_NP))/(AVG_CUMULATED + 1.)
       
-      IF (BOOL_PIC) AVG_PHI = (AVG_PHI*DBLE_AVG_CUMULATED + TIMESTEP_PHI)/(AVG_CUMULATED + 1.)
+      IF (PIC_TYPE .NE. NONE) AVG_PHI = (AVG_PHI*DBLE_AVG_CUMULATED + TIMESTEP_PHI)/(AVG_CUMULATED + 1.)
 
       AVG_CUMULATED = AVG_CUMULATED + 1
 
@@ -406,7 +406,7 @@ MODULE postprocess
 
       IF (BOOL_DUMP_MOMENTS) DEALLOCATE(TIMESTEP_MOMENTS)
 
-      IF (BOOL_PIC) DEALLOCATE(TIMESTEP_PHI)
+      IF (PIC_TYPE .NE. NONE) DEALLOCATE(TIMESTEP_PHI)
       
    END SUBROUTINE GRID_AVG
 
@@ -620,7 +620,7 @@ MODULE postprocess
          
             END DO
 
-            IF (BOOL_PIC) THEN
+            IF (PIC_TYPE .NE. NONE) THEN
                IF (GRID_TYPE == UNSTRUCTURED) THEN
                   WRITE(54321) 'FIELD FieldData '//ITOA(3)//ACHAR(10)
                   WRITE(54321) 'E_X '//ITOA(1)//' '//ITOA( NCELLS )//' double'//ACHAR(10)
@@ -834,7 +834,7 @@ MODULE postprocess
          
             END DO
 
-            IF (BOOL_PIC) THEN
+            IF (PIC_TYPE .NE. NONE) THEN
                IF (GRID_TYPE == UNSTRUCTURED) THEN
                   WRITE(54321,'(A,I10)') 'FIELD FieldData', 3
 
@@ -978,7 +978,7 @@ MODULE postprocess
          AVG_MOMENTS = 0
       END IF
 
-      IF (BOOL_PIC) THEN
+      IF (PIC_TYPE .NE. NONE) THEN
          IF (GRID_TYPE == UNSTRUCTURED) THEN
             ALLOCATE(AVG_PHI(U2D_GRID%NUM_NODES))
          ELSE
@@ -1033,7 +1033,7 @@ MODULE postprocess
       INTEGER                            :: TOT_NUM
 
       REAL(KIND=8), DIMENSION(3)         :: TOT_MOMENTUM
-      REAL(KIND=8)                       :: TOT_KE, TOT_IE, TOT_FE, TOT_EE, HX, HY, PHI, CURRENT_TIME
+      REAL(KIND=8)                       :: TOT_KE, TOT_IE, TOT_FE, TOT_EE, PHI, CURRENT_TIME
       REAL(KIND=8)                       :: CFNUM
 
 
@@ -1072,7 +1072,7 @@ MODULE postprocess
          !IF (JS == 4) THEN
          !  TOT_FE = TOT_FE + 15.63e-19/2.
          !END IF
-         IF (BOOL_PIC .AND. (GRID_TYPE .NE. UNSTRUCTURED)) THEN
+         IF ((PIC_TYPE .NE. NONE) .AND. (GRID_TYPE .NE. UNSTRUCTURED)) THEN
             CALL APPLY_POTENTIAL(JP, PHI)
             TOT_EE  = TOT_EE + 0.5*PHI*QE*SPECIES(JS)%CHARGE * CFNUM
          END IF
@@ -1098,8 +1098,8 @@ MODULE postprocess
          END IF
          !CALL MPI_REDUCE(MPI_IN_PLACE,  TOT_FE,       1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
 
-         HX = (XMAX-XMIN)/DBLE(NX)
-         HY = (YMAX-YMIN)/DBLE(NY)
+         !HX = (XMAX-XMIN)/DBLE(NX)
+         !HY = (YMAX-YMIN)/DBLE(NY)
          !TOT_EE = -HX*HY*8.8541878128E-12*SUM( RHS*PACK(PHI_FIELD, .TRUE.) )/FNUM
 
          ! WRITE(*,*) ' '

@@ -34,123 +34,6 @@ MODULE fully_implicit
    CONTAINS
    
 
-   SUBROUTINE DEPOSIT_CHARGE_CN()
-      
-      IMPLICIT NONE
-
-      INTEGER :: JP, I, IC
-
-      REAL(KIND=8) :: K, RHO_Q, CHARGE
-      REAL(KIND=8) :: VOL, CFNUM, AREA
-      REAL(KIND=8), DIMENSION(4) :: WEIGHTS
-      INTEGER, DIMENSION(4) :: INDICES, INDI, INDJ
-      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, XP, YP
-      INTEGER :: V1, V2, V3, SIZE
-      REAL(KIND=8) :: PSI1, PSI2, PSI3
-
-      K = QE/(EPS0*EPS_SCALING**2) ! [V m] Elementary charge / Dielectric constant of vacuum
-
-      RHS = 0.d0
-
-      DO JP = 1, NP_PROC
-         CHARGE = SPECIES(part_adv(JP)%S_ID)%CHARGE
-         IF (ABS(CHARGE) .LT. 1.d-6) CYCLE
-
-         IF (GRID_TYPE == UNSTRUCTURED) THEN 
-            IC = part_adv(JP)%IC
-            AREA = CELL_AREAS(IC)
-            V1 = U2D_GRID%CELL_NODES(IC,1)
-            V2 = U2D_GRID%CELL_NODES(IC,2)
-            V3 = U2D_GRID%CELL_NODES(IC,3)            
-            X1 = U2D_GRID%NODE_COORDS(V1, 1)
-            X2 = U2D_GRID%NODE_COORDS(V2, 1)
-            X3 = U2D_GRID%NODE_COORDS(V3, 1)
-            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
-            XP = part_adv(JP)%X
-            YP = part_adv(JP)%Y
-            PSI1 = 0.5*( (Y2-Y3)*(XP-X3) - (X2-X3)*(YP-Y3))/AREA/(ZMAX-ZMIN)
-            PSI2 = 0.5*(-(Y1-Y3)*(XP-X3) + (X1-X3)*(YP-Y3))/AREA/(ZMAX-ZMIN)
-            PSI3 = 0.5*(-(Y2-Y1)*(XP-X1) + (X2-X1)*(YP-Y1))/AREA/(ZMAX-ZMIN)
-            
-            RHO_Q = K*CHARGE*FNUM
-            RHS(V1-1) = RHS(V1-1) + RHO_Q*PSI1
-            RHS(V2-1) = RHS(V2-1) + RHO_Q*PSI2
-            RHS(V3-1) = RHS(V3-1) + RHO_Q*PSI3
-
-         ELSE
-
-            CALL COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)
-
-            IF (GRID_TYPE == RECTILINEAR_UNIFORM .AND. .NOT. AXI) THEN
-               VOL = CELL_VOL
-            ELSE
-               VOL = CELL_VOLUMES(part_adv(JP)%IC)
-            END IF
-
-            CFNUM = FNUM
-            IF (BOOL_RADIAL_WEIGHTING) CFNUM = CELL_FNUM(part_adv(JP)%IC)         
-
-            RHO_Q = -K*CHARGE*CFNUM/VOL
-
-            IF (DIMS == 2) THEN
-               RHS(INDICES(1)) = RHS(INDICES(1)) + RHO_Q * WEIGHTS(1)
-               RHS(INDICES(2)) = RHS(INDICES(2)) + RHO_Q * WEIGHTS(2)
-               RHS(INDICES(3)) = RHS(INDICES(3)) + RHO_Q * WEIGHTS(3)
-               RHS(INDICES(4)) = RHS(INDICES(4)) + RHO_Q * WEIGHTS(4)            
-            ELSE
-               RHS(INDICES(1)) = RHS(INDICES(1)) + RHO_Q * WEIGHTS(1)
-               RHS(INDICES(2)) = RHS(INDICES(2)) + RHO_Q * WEIGHTS(2)
-            END IF
-
-         END IF
-      END DO
-
-
-      IF (GRID_TYPE == UNSTRUCTURED) THEN
-         SIZE = U2D_GRID%NUM_NODES
-      ELSE
-         SIZE = NPX*NPY
-      END IF
-
-      IF (PROC_ID .EQ. 0) THEN
-         CALL MPI_REDUCE(MPI_IN_PLACE, RHS, SIZE, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-      ELSE
-         CALL MPI_REDUCE(RHS,          RHS, SIZE, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-      END IF
-
-      CALL MPI_BCAST(RHS, SIZE, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-
-
-      DO I = Istart, Iend-1
-         IF (IS_DIRICHLET(I)) THEN
-            val = DIRICHLET(I)
-         ELSE IF (IS_NEUMANN(I)) THEN
-            val = RHS(I) + NEUMANN(I)
-         ELSE
-            val = RHS(I)
-         END IF
-
-         CALL VecSetValues(bvec,one,I,val,INSERT_VALUES,ierr)
-      END DO
-
-
-      CALL VecAssemblyBegin(bvec,ierr)
-      CALL VecAssemblyEnd(bvec,ierr)
-
-
-      DO I = 0, U2D_GRID%NUM_NODES-1
-         IF (IS_DIRICHLET(I)) THEN
-            RHS(I) = DIRICHLET(I)
-         ELSE IF (IS_NEUMANN(I)) THEN
-            RHS(I) = RHS(I) + NEUMANN(I)
-         END IF
-      END DO
-
-   END SUBROUTINE DEPOSIT_CHARGE_CN
-
-
 
    SUBROUTINE SOLVE_POISSON_FULLY_IMPLICIT
 
@@ -181,7 +64,7 @@ MODULE fully_implicit
       
       !CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobianDUMMY,0,ierr)
       !CALL SNESSetJacobian(snes,Jmat,Jmat,PETSC_NULL_FUNCTION,0,ierr)
-      !CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobian,0,ierr)
+      CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobian,0,ierr)
 
       !abstol = 1.d-5
       !rtol = 1.d-5
@@ -230,7 +113,7 @@ MODULE fully_implicit
 
       CALL SNESSolve(snes,PETSC_NULL_VEC,solvec,ierr)
       CALL SNESGetConvergedReason(snes,snesreason,ierr)
-      IF (PROC_ID == 0) WRITE(*,*) 'SNESConvergedReason = ', snesreason, ' solution is: '
+      IF (PROC_ID == 0) WRITE(*,*) 'SNESConvergedReason = ', snesreason
       !CALL VecView(solvec,PETSC_VIEWER_STDOUT_WORLD,ierr)
       !IF (PROC_ID == 0) WRITE(*,*) 'PHI_FIELD was: ', PHI_FIELD
 
@@ -244,8 +127,6 @@ MODULE fully_implicit
       CALL VecRestoreArrayReadF90(solvec_seq,PHI_FIELD_TEMP,ierr)
 
       PHI_FIELD = 2.*PHIBAR_FIELD - PHI_FIELD
-
-      CALL COMPUTE_E_FIELD
 
       CALL VecDestroy(solvec, ierr)
       CALL VecDestroy(rvec, ierr)
@@ -643,7 +524,7 @@ MODULE fully_implicit
          ! V_NEW(2) = part_adv(IP)%VY
          ! V_NEW(3) = part_adv(IP)%VZ
 
-         ! IF (BOOL_PIC) THEN
+         ! IF (PIC_TYPE .NE. NONE) THEN
          !    !PHIBAR_FIELD = 0.d0
          !    !EBAR_FIELD = 0.d0
          !    CALL APPLY_E_FIELD(IP, E)
@@ -701,7 +582,7 @@ MODULE fully_implicit
 
             DTCOLL = part_adv(IP)%DTRIM ! Looking for collisions within the remaining time
             ! ______ ADVECTION ______
-            IF (BOOL_PIC) THEN
+            IF (PIC_TYPE .NE. NONE) THEN
                E = EBAR_FIELD(IC, 1, :) ! CALL APPLY_E_FIELD(IP, E)
             ELSE
                E = 0.d0
@@ -738,7 +619,7 @@ MODULE fully_implicit
                   !COEFC = (EDGE_X2 - EDGE_X1) * EDGE_Y1 - (EDGE_Y2 - EDGE_Y1) * EDGE_X1
                   COEFC = EDGE_Y1*EDGE_X2 - EDGE_X1*EDGE_Y2
 
-                  IF (BOOL_PIC) THEN
+                  IF (PIC_TYPE .NE. NONE) THEN
                      ALPHA = 0.5*SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS* &
                              (COEFA*E(1) + COEFB*E(2))
                   ELSE
@@ -1125,7 +1006,7 @@ MODULE fully_implicit
       INTEGER, DIMENSION(4) :: INDICES, INDI, INDJ
 
       IF (GRID_TYPE == UNSTRUCTURED) THEN
-         IF (BOOL_PIC_IMPLICIT .OR. BOOL_PIC_FULLY_IMPLICIT) THEN
+         IF (PIC_TYPE == SEMIIMPLICIT .OR. PIC_TYPE == FULLYIMPLICIT) THEN
             E = EBAR_FIELD(particles(JP)%IC, 1, :)
          ELSE
             E = E_FIELD(particles(JP)%IC, 1, :)
@@ -1542,5 +1423,124 @@ MODULE fully_implicit
       END DO
 
    END SUBROUTINE DEPOSIT_CHARGE
+
+
+   ! Same as DEPOSIT_CHARGE but uses part_adv
+   SUBROUTINE DEPOSIT_CHARGE_CN()
+      
+      IMPLICIT NONE
+
+      INTEGER :: JP, I, IC
+
+      REAL(KIND=8) :: K, RHO_Q, CHARGE
+      REAL(KIND=8) :: VOL, CFNUM, AREA
+      REAL(KIND=8), DIMENSION(4) :: WEIGHTS
+      INTEGER, DIMENSION(4) :: INDICES, INDI, INDJ
+      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, XP, YP
+      INTEGER :: V1, V2, V3, SIZE
+      REAL(KIND=8) :: PSI1, PSI2, PSI3
+
+      K = QE/(EPS0*EPS_SCALING**2) ! [V m] Elementary charge / Dielectric constant of vacuum
+
+      RHS = 0.d0
+
+      DO JP = 1, NP_PROC
+         CHARGE = SPECIES(part_adv(JP)%S_ID)%CHARGE
+         IF (ABS(CHARGE) .LT. 1.d-6) CYCLE
+
+         IF (GRID_TYPE == UNSTRUCTURED) THEN 
+            IC = part_adv(JP)%IC
+            AREA = CELL_AREAS(IC)
+            V1 = U2D_GRID%CELL_NODES(IC,1)
+            V2 = U2D_GRID%CELL_NODES(IC,2)
+            V3 = U2D_GRID%CELL_NODES(IC,3)            
+            X1 = U2D_GRID%NODE_COORDS(V1, 1)
+            X2 = U2D_GRID%NODE_COORDS(V2, 1)
+            X3 = U2D_GRID%NODE_COORDS(V3, 1)
+            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
+            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
+            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
+            XP = part_adv(JP)%X
+            YP = part_adv(JP)%Y
+            PSI1 = 0.5*( (Y2-Y3)*(XP-X3) - (X2-X3)*(YP-Y3))/AREA/(ZMAX-ZMIN)
+            PSI2 = 0.5*(-(Y1-Y3)*(XP-X3) + (X1-X3)*(YP-Y3))/AREA/(ZMAX-ZMIN)
+            PSI3 = 0.5*(-(Y2-Y1)*(XP-X1) + (X2-X1)*(YP-Y1))/AREA/(ZMAX-ZMIN)
+            
+            RHO_Q = K*CHARGE*FNUM
+            RHS(V1-1) = RHS(V1-1) + RHO_Q*PSI1
+            RHS(V2-1) = RHS(V2-1) + RHO_Q*PSI2
+            RHS(V3-1) = RHS(V3-1) + RHO_Q*PSI3
+
+         ELSE
+
+            CALL COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)
+
+            IF (GRID_TYPE == RECTILINEAR_UNIFORM .AND. .NOT. AXI) THEN
+               VOL = CELL_VOL
+            ELSE
+               VOL = CELL_VOLUMES(part_adv(JP)%IC)
+            END IF
+
+            CFNUM = FNUM
+            IF (BOOL_RADIAL_WEIGHTING) CFNUM = CELL_FNUM(part_adv(JP)%IC)         
+
+            RHO_Q = -K*CHARGE*CFNUM/VOL
+
+            IF (DIMS == 2) THEN
+               RHS(INDICES(1)) = RHS(INDICES(1)) + RHO_Q * WEIGHTS(1)
+               RHS(INDICES(2)) = RHS(INDICES(2)) + RHO_Q * WEIGHTS(2)
+               RHS(INDICES(3)) = RHS(INDICES(3)) + RHO_Q * WEIGHTS(3)
+               RHS(INDICES(4)) = RHS(INDICES(4)) + RHO_Q * WEIGHTS(4)            
+            ELSE
+               RHS(INDICES(1)) = RHS(INDICES(1)) + RHO_Q * WEIGHTS(1)
+               RHS(INDICES(2)) = RHS(INDICES(2)) + RHO_Q * WEIGHTS(2)
+            END IF
+
+         END IF
+      END DO
+
+
+      IF (GRID_TYPE == UNSTRUCTURED) THEN
+         SIZE = U2D_GRID%NUM_NODES
+      ELSE
+         SIZE = NPX*NPY
+      END IF
+
+      IF (PROC_ID .EQ. 0) THEN
+         CALL MPI_REDUCE(MPI_IN_PLACE, RHS, SIZE, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      ELSE
+         CALL MPI_REDUCE(RHS,          RHS, SIZE, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      END IF
+
+      CALL MPI_BCAST(RHS, SIZE, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+
+
+      DO I = Istart, Iend-1
+         IF (IS_DIRICHLET(I)) THEN
+            val = DIRICHLET(I)
+         ELSE IF (IS_NEUMANN(I)) THEN
+            val = RHS(I) + NEUMANN(I)
+         ELSE
+            val = RHS(I)
+         END IF
+
+         CALL VecSetValues(bvec,one,I,val,INSERT_VALUES,ierr)
+      END DO
+
+
+      CALL VecAssemblyBegin(bvec,ierr)
+      CALL VecAssemblyEnd(bvec,ierr)
+
+
+      DO I = 0, U2D_GRID%NUM_NODES-1
+         IF (IS_DIRICHLET(I)) THEN
+            RHS(I) = DIRICHLET(I)
+         ELSE IF (IS_NEUMANN(I)) THEN
+            RHS(I) = RHS(I) + NEUMANN(I)
+         END IF
+      END DO
+
+   END SUBROUTINE DEPOSIT_CHARGE_CN
+
 
 END MODULE fully_implicit

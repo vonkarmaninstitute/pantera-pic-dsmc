@@ -1030,12 +1030,13 @@ MODULE postprocess
 
       INTEGER                            :: JP, JS, JC
    
-      INTEGER                            :: TOT_NUM
+      INTEGER, ALLOCATABLE, DIMENSION(:) :: TOT_NUM
 
       REAL(KIND=8), DIMENSION(3)         :: TOT_MOMENTUM
       REAL(KIND=8)                       :: TOT_KE, TOT_IE, TOT_FE, TOT_EE, PHI, CURRENT_TIME
       REAL(KIND=8)                       :: CFNUM
 
+      ALLOCATE(TOT_NUM(N_SPECIES))
 
       TOT_NUM = 0
       TOT_MOMENTUM = 0
@@ -1048,9 +1049,10 @@ MODULE postprocess
 
       ! Number of particles
       DO JP = 1, NP_PROC
-         TOT_NUM = TOT_NUM + 1
 
          JS = particles(JP)%S_ID
+
+         TOT_NUM(JS) = TOT_NUM(JS) + 1
 
          IF (BOOL_RADIAL_WEIGHTING) THEN
             CFNUM = CELL_FNUM(particles(JP)%IC)
@@ -1082,7 +1084,7 @@ MODULE postprocess
 
       ! Collect data from all the processes and print it
       IF (PROC_ID .EQ. 0) THEN
-         CALL MPI_REDUCE(MPI_IN_PLACE,  TOT_NUM,      1, MPI_INTEGER,          MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         CALL MPI_REDUCE(MPI_IN_PLACE,  TOT_NUM,      N_SPECIES, MPI_INTEGER,  MPI_SUM, 0, MPI_COMM_WORLD, ierr)
          CALL MPI_REDUCE(MPI_IN_PLACE,  TOT_MOMENTUM, 3, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
          CALL MPI_REDUCE(MPI_IN_PLACE,  TOT_KE,       1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
          CALL MPI_REDUCE(MPI_IN_PLACE,  TOT_IE,       1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
@@ -1118,7 +1120,7 @@ MODULE postprocess
          CLOSE(54331)
 
       ELSE
-         CALL MPI_REDUCE(TOT_NUM,       TOT_NUM,      1, MPI_INTEGER,          MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         CALL MPI_REDUCE(TOT_NUM,       TOT_NUM,      N_SPECIES, MPI_INTEGER,  MPI_SUM, 0, MPI_COMM_WORLD, ierr)
          CALL MPI_REDUCE(TOT_MOMENTUM,  TOT_MOMENTUM, 3, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
          CALL MPI_REDUCE(TOT_KE,        TOT_KE,       1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
          CALL MPI_REDUCE(TOT_IE,        TOT_IE,       1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)

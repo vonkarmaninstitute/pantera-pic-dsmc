@@ -295,9 +295,9 @@ MODULE timecycle
 
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
       REAL(KIND=8)  :: M
-      INTEGER       :: S_ID, i
+      INTEGER       :: S_ID, I
 
-      REAL(KIND=8)  :: NDOT = 1.d12
+      REAL(KIND=8)  :: NDOT = 1.d16
 
       ! Print message 
       CALL ONLYMASTERPRINT1(PROC_ID, '> SEEDING IONIZED PARTICLES IN THE DOMAIN...')
@@ -311,9 +311,9 @@ MODULE timecycle
       !NPPP_INIT = INT(NP_INIT/N_MPI_THREADS) 
 
       ! Create particles in the domain
-      DO i = 1, MIXTURES(MIX_INIT)%N_COMPONENTS
+      DO I = 1, MIXTURES(MIX_INIT)%N_COMPONENTS
          
-         S_ID = MIXTURES(MIX_INIT)%COMPONENTS(i)%ID
+         S_ID = MIXTURES(MIX_INIT)%COMPONENTS(I)%ID
          IF (GRID_TYPE == UNSTRUCTURED) THEN
             DO IC = 1, U2D_GRID%NUM_CELLS
                ! Compute number of particles of this species per process to be created in this cell.
@@ -343,9 +343,15 @@ MODULE timecycle
 
                   ! Assign velocity and energy following a Boltzmann distribution
                   M = SPECIES(S_ID)%MOLECULAR_MASS
-                  CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
+                  IF (S_ID == 2) THEN
+                     CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
+                                 1.0d5, 1.0d5, 1.0d5, &
+                                 VXP, VYP, VZP, M)
+                  ELSE
+                     CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
                                TTRAX_INIT, TTRAY_INIT, TTRAZ_INIT, &
                                VXP, VYP, VZP, M)
+                  END IF
 
                   CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, TROT_INIT, EROT)
                   CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, TVIB_INIT, EVIB)
@@ -404,8 +410,7 @@ MODULE timecycle
             END DO
          END IF
       END DO
-      ! ~~~~~~ At this point, exchange particles among processes ~~~~~~
-      CALL EXCHANGE
+      
 
    END SUBROUTINE FIXED_IONIZATION
 

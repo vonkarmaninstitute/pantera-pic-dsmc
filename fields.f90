@@ -946,6 +946,8 @@ MODULE fields
 
       PHI_FIELD = 2*PHIBAR_FIELD-PHI_FIELD
 
+      CALL KSPDestroy(ksp,ierr)
+
    END SUBROUTINE SOLVE_AMPERE
 
 

@@ -69,13 +69,14 @@ MODULE fully_implicit
       !abstol = 1.d-5
       !rtol = 1.d-5
       !stol = 1.d0
-      !maxit = 500
-      !maxf = 1000
+      maxit = 10
+      maxf = 30
       !CALL SNESSetTolerances(snes, abstol, rtol, stol, maxit, maxf, ierr)
+      CALL SNESSetTolerances(snes, PETSC_DEFAULT_REAL, PETSC_DEFAULT_REAL, PETSC_DEFAULT_REAL, maxit, maxf, ierr)
 
-      CALL SNESGetKSP(snes,kspnk,ierr)
-      CALL KSPGetPC(kspnk,pcnk,ierr)
-      CALL PCSetType(pcnk,PCNONE,ierr)
+      !CALL SNESGetKSP(snes,kspnk,ierr)
+      !CALL KSPGetPC(kspnk,pcnk,ierr)
+      !CALL PCSetType(pcnk,PCNONE,ierr)
 
       !CALL KSPSetTolerances(kspnk,rtol,abstol,PETSC_DEFAULT_REAL,maxit,ierr)
       ! tol = 1.e-4
@@ -513,11 +514,14 @@ MODULE fully_implicit
          REMOVE_PART(IP) = .FALSE.
          IC = part_adv(IP)%IC
 
+         IF (COMPUTE_JACOBIAN) THEN
+            DVDEBAR = 0.d0
+            DXDEBAR = 0.d0
+            DXDPHIBAR = 0.d0
+            DRHODPHIBAR = 0.d0
+         END IF
 
-         DVDEBAR = 0.d0
-         DXDEBAR = 0.d0
-         DXDPHIBAR = 0.d0
-         DRHODPHIBAR = 0.d0
+
          ! ! Update velocity
 
          ! V_NEW(1) = part_adv(IP)%VX
@@ -698,12 +702,14 @@ MODULE fully_implicit
                   CALL MOVE_PARTICLE_CN(IP, E, DTCOLL)
                   part_adv(IP)%DTRIM = part_adv(IP)%DTRIM - DTCOLL
 
-                  ! Accumulate approximate Jacobian of the motion
-                  DXDEBAR = DXDEBAR + DVDEBAR*DTCOLL
-                  DXDEBAR(IC) = DXDEBAR(IC) &
-                  + 0.5*SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS*DTCOLL*DTCOLL
-                  DVDEBAR(IC) = DVDEBAR(IC) &
-                  + SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS*DTCOLL
+                  IF (COMPUTE_JACOBIAN) THEN
+                     ! Accumulate approximate Jacobian of the motion
+                     DXDEBAR = DXDEBAR + DVDEBAR*DTCOLL
+                     DXDEBAR(IC) = DXDEBAR(IC) &
+                     + 0.5*SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS*DTCOLL*DTCOLL
+                     DVDEBAR(IC) = DVDEBAR(IC) &
+                     + SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS*DTCOLL
+                  END IF
 
                   ! Move to new cell
                   IF (U2D_GRID%CELL_NEIGHBORS(IC, BOUNDCOLL) == -1) THEN
@@ -759,13 +765,15 @@ MODULE fully_implicit
                   END IF
                ELSE
                   ! The particle stays within the current cell. End of the motion.
-                  ! Accumulate approximate Jacobian of the motion
-                  DXDEBAR = DXDEBAR + DVDEBAR*part_adv(IP)%DTRIM
-                  DXDEBAR(IC) = DXDEBAR(IC) &
-                  + 0.5*SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS &
-                  * part_adv(IP)%DTRIM*part_adv(IP)%DTRIM
-                  DVDEBAR(IC) = DVDEBAR(IC) &
-                  + SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS*part_adv(IP)%DTRIM
+                  IF (COMPUTE_JACOBIAN) THEN
+                     ! Accumulate approximate Jacobian of the motion
+                     DXDEBAR = DXDEBAR + DVDEBAR*part_adv(IP)%DTRIM
+                     DXDEBAR(IC) = DXDEBAR(IC) &
+                     + 0.5*SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS &
+                     * part_adv(IP)%DTRIM*part_adv(IP)%DTRIM
+                     DVDEBAR(IC) = DVDEBAR(IC) &
+                     + SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS*part_adv(IP)%DTRIM
+                  END IF
 
                   CALL MOVE_PARTICLE_CN(IP, E, part_adv(IP)%DTRIM)
                   part_adv(IP)%DTRIM = 0.d0
@@ -794,116 +802,118 @@ MODULE fully_implicit
          part_adv(IP)%DTRIM = DT ! For the next timestep.
 
 
-         ! Accumulate Jacobian
-         DO I = 1, U2D_GRID%NUM_CELLS
-            IF (DXDEBAR(I) .NE. 0.d0) THEN
-               AREA = CELL_AREAS(I)
-               V1 = U2D_GRID%CELL_NODES(I,1)
-               V2 = U2D_GRID%CELL_NODES(I,2)
-               V3 = U2D_GRID%CELL_NODES(I,3)            
-               X1 = U2D_GRID%NODE_COORDS(V1, 1)
-               X2 = U2D_GRID%NODE_COORDS(V2, 1)
-               X3 = U2D_GRID%NODE_COORDS(V3, 1)
-               Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-               Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-               Y3 = U2D_GRID%NODE_COORDS(V3, 2)
-               DPSI1DX =  0.5*(Y2-Y3)/AREA
-               DPSI2DX = -0.5*(Y1-Y3)/AREA
-               DPSI3DX = -0.5*(Y2-Y1)/AREA
-               DPSI1DY = -0.5*(X2-X3)/AREA
-               DPSI2DY =  0.5*(X1-X3)/AREA
-               DPSI3DY =  0.5*(X2-X1)/AREA
-               
-               DXDPHIBAR(V1, 1) = DXDPHIBAR(V1, 1) - DPSI1DX * DXDEBAR(I)
-               DXDPHIBAR(V1, 2) = DXDPHIBAR(V1, 2) - DPSI1DY * DXDEBAR(I)
-               DXDPHIBAR(V2, 1) = DXDPHIBAR(V2, 1) - DPSI2DX * DXDEBAR(I)
-               DXDPHIBAR(V2, 2) = DXDPHIBAR(V2, 2) - DPSI2DY * DXDEBAR(I)
-               DXDPHIBAR(V3, 1) = DXDPHIBAR(V3, 1) - DPSI3DX * DXDEBAR(I)
-               DXDPHIBAR(V3, 2) = DXDPHIBAR(V3, 2) - DPSI3DY * DXDEBAR(I)
-            END IF
-         END DO
+         IF (COMPUTE_JACOBIAN) THEN
+            ! Accumulate Jacobian
+            DO I = 1, U2D_GRID%NUM_CELLS
+               IF (DXDEBAR(I) .NE. 0.d0) THEN
+                  AREA = CELL_AREAS(I)
+                  V1 = U2D_GRID%CELL_NODES(I,1)
+                  V2 = U2D_GRID%CELL_NODES(I,2)
+                  V3 = U2D_GRID%CELL_NODES(I,3)            
+                  X1 = U2D_GRID%NODE_COORDS(V1, 1)
+                  X2 = U2D_GRID%NODE_COORDS(V2, 1)
+                  X3 = U2D_GRID%NODE_COORDS(V3, 1)
+                  Y1 = U2D_GRID%NODE_COORDS(V1, 2)
+                  Y2 = U2D_GRID%NODE_COORDS(V2, 2)
+                  Y3 = U2D_GRID%NODE_COORDS(V3, 2)
+                  DPSI1DX =  0.5*(Y2-Y3)/AREA
+                  DPSI2DX = -0.5*(Y1-Y3)/AREA
+                  DPSI3DX = -0.5*(Y2-Y1)/AREA
+                  DPSI1DY = -0.5*(X2-X3)/AREA
+                  DPSI2DY =  0.5*(X1-X3)/AREA
+                  DPSI3DY =  0.5*(X2-X1)/AREA
+                  
+                  DXDPHIBAR(V1, 1) = DXDPHIBAR(V1, 1) - DPSI1DX * DXDEBAR(I)
+                  DXDPHIBAR(V1, 2) = DXDPHIBAR(V1, 2) - DPSI1DY * DXDEBAR(I)
+                  DXDPHIBAR(V2, 1) = DXDPHIBAR(V2, 1) - DPSI2DX * DXDEBAR(I)
+                  DXDPHIBAR(V2, 2) = DXDPHIBAR(V2, 2) - DPSI2DY * DXDEBAR(I)
+                  DXDPHIBAR(V3, 1) = DXDPHIBAR(V3, 1) - DPSI3DX * DXDEBAR(I)
+                  DXDPHIBAR(V3, 2) = DXDPHIBAR(V3, 2) - DPSI3DY * DXDEBAR(I)
+               END IF
+            END DO
 
-         AREA = CELL_AREAS(IC)
-         V1 = U2D_GRID%CELL_NODES(IC,1)
-         V2 = U2D_GRID%CELL_NODES(IC,2)
-         V3 = U2D_GRID%CELL_NODES(IC,3)
-         X1 = U2D_GRID%NODE_COORDS(V1, 1)
-         X2 = U2D_GRID%NODE_COORDS(V2, 1)
-         X3 = U2D_GRID%NODE_COORDS(V3, 1)
-         Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-         Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-         Y3 = U2D_GRID%NODE_COORDS(V3, 2)
-         DPSI1DX =  0.5*(Y2-Y3)/AREA
-         DPSI2DX = -0.5*(Y1-Y3)/AREA
-         DPSI3DX = -0.5*(Y2-Y1)/AREA
-         DPSI1DY = -0.5*(X2-X3)/AREA
-         DPSI2DY =  0.5*(X1-X3)/AREA
-         DPSI3DY =  0.5*(X2-X1)/AREA
+            AREA = CELL_AREAS(IC)
+            V1 = U2D_GRID%CELL_NODES(IC,1)
+            V2 = U2D_GRID%CELL_NODES(IC,2)
+            V3 = U2D_GRID%CELL_NODES(IC,3)
+            X1 = U2D_GRID%NODE_COORDS(V1, 1)
+            X2 = U2D_GRID%NODE_COORDS(V2, 1)
+            X3 = U2D_GRID%NODE_COORDS(V3, 1)
+            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
+            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
+            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
+            DPSI1DX =  0.5*(Y2-Y3)/AREA
+            DPSI2DX = -0.5*(Y1-Y3)/AREA
+            DPSI3DX = -0.5*(Y2-Y1)/AREA
+            DPSI1DY = -0.5*(X2-X3)/AREA
+            DPSI2DY =  0.5*(X1-X3)/AREA
+            DPSI3DY =  0.5*(X2-X1)/AREA
 
-         IF (ALLOCATED(DRHODPHIBAR_NZ)) DEALLOCATE(DRHODPHIBAR_NZ)
-         IF (ALLOCATED(COLINDICES)) DEALLOCATE(COLINDICES)
-         DRHODPHIBAR = 1.0/EPS0/(ZMAX-ZMIN)*FNUM*SPECIES(part_adv(IP)%S_ID)%CHARGE*QE &
-         *(DPSI1DX*DXDPHIBAR(:,1) + DPSI1DY*DXDPHIBAR(:,2))
-         COUNTER = 0
-         DO I = 1, SIZE
-            IF (DRHODPHIBAR(I) .NE. 0.d0) COUNTER = COUNTER + 1
-         END DO
-         ALLOCATE(COLINDICES(COUNTER))
-         ALLOCATE(DRHODPHIBAR_NZ(COUNTER))
-         J = 1
-         DO I = 1, SIZE
-            IF (DRHODPHIBAR(I) .NE. 0.d0) THEN
-               COLINDICES(J) = I - 1
-               DRHODPHIBAR_NZ(J) = DRHODPHIBAR(I)
-               J = J + 1
+            IF (ALLOCATED(DRHODPHIBAR_NZ)) DEALLOCATE(DRHODPHIBAR_NZ)
+            IF (ALLOCATED(COLINDICES)) DEALLOCATE(COLINDICES)
+            DRHODPHIBAR = 1.0/EPS0/(ZMAX-ZMIN)*FNUM*SPECIES(part_adv(IP)%S_ID)%CHARGE*QE &
+            *(DPSI1DX*DXDPHIBAR(:,1) + DPSI1DY*DXDPHIBAR(:,2))
+            COUNTER = 0
+            DO I = 1, SIZE
+               IF (DRHODPHIBAR(I) .NE. 0.d0) COUNTER = COUNTER + 1
+            END DO
+            ALLOCATE(COLINDICES(COUNTER))
+            ALLOCATE(DRHODPHIBAR_NZ(COUNTER))
+            J = 1
+            DO I = 1, SIZE
+               IF (DRHODPHIBAR(I) .NE. 0.d0) THEN
+                  COLINDICES(J) = I - 1
+                  DRHODPHIBAR_NZ(J) = DRHODPHIBAR(I)
+                  J = J + 1
+               END IF
+            END DO
+            IF (COUNTER > 0 .AND. COMPUTE_JACOBIAN .AND. .NOT. IS_DIRICHLET(V1-1)) THEN
+               CALL MatSetValues(jac,1,V1-1,COUNTER,COLINDICES,DRHODPHIBAR_NZ,ADD_VALUES,ierr)
             END IF
-         END DO
-         IF (COUNTER > 0 .AND. COMPUTE_JACOBIAN .AND. .NOT. IS_DIRICHLET(V1-1)) THEN
-            CALL MatSetValues(jac,1,V1-1,COUNTER,COLINDICES,DRHODPHIBAR_NZ,ADD_VALUES,ierr)
-         END IF
-         
-         DRHODPHIBAR = 1.0/EPS0/(ZMAX-ZMIN)*FNUM*SPECIES(part_adv(IP)%S_ID)%CHARGE*QE &
-         *(DPSI2DX*DXDPHIBAR(:,1) + DPSI2DY*DXDPHIBAR(:,2))
-         COUNTER = 0
-         DO I = 1, SIZE
-            IF (DRHODPHIBAR(I) .NE. 0.d0) COUNTER = COUNTER + 1
-         END DO
-         DEALLOCATE(COLINDICES)
-         ALLOCATE(COLINDICES(COUNTER))
-         DEALLOCATE(DRHODPHIBAR_NZ)
-         ALLOCATE(DRHODPHIBAR_NZ(COUNTER))
-         J = 1
-         DO I = 1, SIZE
-            IF (DRHODPHIBAR(I) .NE. 0.d0) THEN
-               COLINDICES(J) = I - 1
-               DRHODPHIBAR_NZ(J) = DRHODPHIBAR(I)
-               J = J + 1
+            
+            DRHODPHIBAR = 1.0/EPS0/(ZMAX-ZMIN)*FNUM*SPECIES(part_adv(IP)%S_ID)%CHARGE*QE &
+            *(DPSI2DX*DXDPHIBAR(:,1) + DPSI2DY*DXDPHIBAR(:,2))
+            COUNTER = 0
+            DO I = 1, SIZE
+               IF (DRHODPHIBAR(I) .NE. 0.d0) COUNTER = COUNTER + 1
+            END DO
+            DEALLOCATE(COLINDICES)
+            ALLOCATE(COLINDICES(COUNTER))
+            DEALLOCATE(DRHODPHIBAR_NZ)
+            ALLOCATE(DRHODPHIBAR_NZ(COUNTER))
+            J = 1
+            DO I = 1, SIZE
+               IF (DRHODPHIBAR(I) .NE. 0.d0) THEN
+                  COLINDICES(J) = I - 1
+                  DRHODPHIBAR_NZ(J) = DRHODPHIBAR(I)
+                  J = J + 1
+               END IF
+            END DO
+            IF (COUNTER > 0 .AND. COMPUTE_JACOBIAN .AND. .NOT. IS_DIRICHLET(V2-1)) THEN
+               CALL MatSetValues(jac,1,V2-1,COUNTER,COLINDICES,DRHODPHIBAR_NZ,ADD_VALUES,ierr)
             END IF
-         END DO
-         IF (COUNTER > 0 .AND. COMPUTE_JACOBIAN .AND. .NOT. IS_DIRICHLET(V2-1)) THEN
-            CALL MatSetValues(jac,1,V2-1,COUNTER,COLINDICES,DRHODPHIBAR_NZ,ADD_VALUES,ierr)
-         END IF
-         
-         DRHODPHIBAR = 1.0/EPS0/(ZMAX-ZMIN)*FNUM*SPECIES(part_adv(IP)%S_ID)%CHARGE*QE &
-         *(DPSI3DX*DXDPHIBAR(:,1) + DPSI3DY*DXDPHIBAR(:,2))
-         COUNTER = 0
-         DO I = 1, SIZE
-            IF (DRHODPHIBAR(I) .NE. 0.d0) COUNTER = COUNTER + 1
-         END DO
-         DEALLOCATE(COLINDICES)
-         ALLOCATE(COLINDICES(COUNTER))
-         DEALLOCATE(DRHODPHIBAR_NZ)
-         ALLOCATE(DRHODPHIBAR_NZ(COUNTER))
-         J = 1
-         DO I = 1, SIZE
-            IF (DRHODPHIBAR(I) .NE. 0.d0) THEN
-               COLINDICES(J) = I - 1
-               DRHODPHIBAR_NZ(J) = DRHODPHIBAR(I)
-               J = J + 1
+            
+            DRHODPHIBAR = 1.0/EPS0/(ZMAX-ZMIN)*FNUM*SPECIES(part_adv(IP)%S_ID)%CHARGE*QE &
+            *(DPSI3DX*DXDPHIBAR(:,1) + DPSI3DY*DXDPHIBAR(:,2))
+            COUNTER = 0
+            DO I = 1, SIZE
+               IF (DRHODPHIBAR(I) .NE. 0.d0) COUNTER = COUNTER + 1
+            END DO
+            DEALLOCATE(COLINDICES)
+            ALLOCATE(COLINDICES(COUNTER))
+            DEALLOCATE(DRHODPHIBAR_NZ)
+            ALLOCATE(DRHODPHIBAR_NZ(COUNTER))
+            J = 1
+            DO I = 1, SIZE
+               IF (DRHODPHIBAR(I) .NE. 0.d0) THEN
+                  COLINDICES(J) = I - 1
+                  DRHODPHIBAR_NZ(J) = DRHODPHIBAR(I)
+                  J = J + 1
+               END IF
+            END DO
+            IF (COUNTER > 0 .AND. COMPUTE_JACOBIAN .AND. .NOT. IS_DIRICHLET(V3-1)) THEN
+               CALL MatSetValues(jac,1,V3-1,COUNTER,COLINDICES,DRHODPHIBAR_NZ,ADD_VALUES,ierr)
             END IF
-         END DO
-         IF (COUNTER > 0 .AND. COMPUTE_JACOBIAN .AND. .NOT. IS_DIRICHLET(V3-1)) THEN
-            CALL MatSetValues(jac,1,V3-1,COUNTER,COLINDICES,DRHODPHIBAR_NZ,ADD_VALUES,ierr)
          END IF
          
 
@@ -1106,6 +1116,8 @@ MODULE fully_implicit
       IF (ALLOCATED(PHI_FIELD)) DEALLOCATE(PHI_FIELD)
       ALLOCATE(PHI_FIELD, SOURCE = PHI_FIELD_TEMP)
       CALL VecRestoreArrayReadF90(xvec_seq,PHI_FIELD_TEMP,ierr)
+
+      CALL KSPDestroy(ksp,ierr)
 
       !CALL VecRestoreArrayReadF90(X_SEQ,PHI_FIELD,ierr)
 

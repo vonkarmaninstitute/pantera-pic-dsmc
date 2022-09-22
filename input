@@ -20,7 +20,7 @@ Number_of_cells:
 Domain_limits:
     -10.0    10.0    -10.0    10.0    -0.5    0.5
 Mesh_file_SU2:
-    'rect_medium.su2'
+    'rect_1cm_10cm.su2'
 Domain_periodicity:
     .FALSE.   .FALSE.   .TRUE.
 Domain_specular:
@@ -31,7 +31,7 @@ Boundary_temperature:
     300.0
     
 PIC_type:
-    explicit
+    fullyimplicit
 
 Bool_dump_moments:
     .FALSE.
@@ -47,11 +47,11 @@ Fluxes_dump_output:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0e9
+    1.0e7
 Timestep:
-    1.0e-8
+    2.0e-8
 Number_of_timesteps:
-    100
+    50
 Stats_every:
     1
 
@@ -78,19 +78,13 @@ Perform_checks:
 ! ========= Multispecies ==============================
 
 Species_file:
-    ar.species
+    hydrogenmod.species
 
 Def_mixture:
-    Ions Ar+ 1.0
+    Ions H+ 1.0
 
 Def_mixture:
-    Plasma  Ar+ 0.5  e 0.5
-
-Def_mixture:
-    All  Ar+ 0.3  e 0.3  Ar  0.4
-
-Def_mixture:
-    Neutrals  Ar 1.0
+    Plasma  H+ 0.5  e 0.5
 
 ! ========= Collisions ==============================
 
@@ -107,10 +101,10 @@ MCC_background_mixture:
 
 ! DSMC VHS collisions
 
-DSMC_collisions_mixture:
-    All
-VSS_parameters_file:
-    ar.vss
+!DSMC_collisions_mixture:
+!    Plasma
+!VSS_parameters_file:
+!    ar.vss
 
 Thermal_bath_bool:
     .FALSE.
@@ -161,8 +155,8 @@ Boundary_condition:
 !Boundary_condition:
 !    Grid    vacuum
 
-Boundary_condition:
-    Bound    specular
+!Boundary_condition:
+!    Bound    specular
 
 !Boundary_condition:
 !    Sides    specular

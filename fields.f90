@@ -111,7 +111,7 @@ MODULE fields
 
       INTEGER :: I, J
       INTEGER :: ICENTER, INORTH, IEAST, ISOUTH, IWEST
-      INTEGER :: MAXNNZ, SIZE
+      INTEGER :: SIZE
       REAL(KIND=8) :: HX, HY
       REAL(KIND=8) :: AX, AY, BX, BY, CX, CY, H1X, H2X, H1Y, H2Y, R
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA, EDGELENGTH
@@ -147,13 +147,8 @@ MODULE fields
 
       CALL MatCreate(PETSC_COMM_WORLD,Amat,ierr)
       CALL MatSetSizes( Amat,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
-      CALL MatSetType( Amat, MATAIJ, ierr)
+      CALL MatSetType( Amat, MATMPIAIJ, ierr)
       CALL MatSetOption(Amat,MAT_SPD,PETSC_TRUE,ierr)
-      IF (N_MPI_THREADS == 1) THEN
-         CALL MatSetType( Amat, MATAIJ, ierr)
-      ELSE
-         CALL MatSetType( Amat, MATMPIAIJ, ierr)
-      END IF
       CALL MatMPIAIJSetPreallocation(Amat,f30,PETSC_NULL_INTEGER,f30,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
       CALL MatSetFromOptions( Amat, ierr)
       CALL MatSetUp( Amat, ierr)
@@ -163,14 +158,6 @@ MODULE fields
       CALL VecSetFromOptions( xvec, ierr)
       CALL VecDuplicate( xvec, bvec, ierr)
 
-      ! Create the matrix in Sparse Triplet format.
-      ! Entries can be input in random order, but not duplicated.
-      ! We have to allocate the ST matrix, but in this case
-      ! it is not a problem, since each point takes at most 5 entries,
-      ! we can use this as an upper limit.
-      ! (We use a 5 point stencil for interior points)
-      MAXNNZ = 10*SIZE
-      CALL ST_MATRIX_ALLOCATE(A_ST, MAXNNZ)
 
       ! At this point, populate the matrix
       IF (GRID_TYPE == UNSTRUCTURED) THEN
@@ -334,9 +321,6 @@ MODULE fields
                IWEST = I+(NPX)*J-1
                INORTH = I+(NPX)*(J+1)
                ISOUTH = I+(NPX)*(J-1)
-
-               HX = (XMAX-XMIN)/DBLE(NX)
-               AX = 1./(HX*HX)
 
 
                ! Various configurations go here.

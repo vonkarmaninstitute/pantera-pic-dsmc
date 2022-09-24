@@ -1455,6 +1455,10 @@ MODULE initialization
                                VXP, VYP, VZP, M)
                   END IF
 
+                  !CALL MAXWELL(UX_INIT, UY_INIT, UZ_INIT, &
+                  !TTRAX_INIT, TTRAY_INIT, TTRAZ_INIT, &
+                  !VXP, VYP, VZP, M)
+
                   CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, TROT_INIT, EROT)
                   CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, TVIB_INIT, EVIB)
 

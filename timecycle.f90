@@ -730,10 +730,6 @@ MODULE timecycle
       REAL(KIND=8) :: WEIGHT_RATIO
       TYPE(PARTICLE_DATA_STRUCTURE) :: NEWparticle
 
-      REAL(KIND=8) :: TOL
-
-      TOL = 1e-15
-
       E = [0.d0, 0.d0, 0.d0]
       B = [0.d0, 0.d0, 0.d0]
 

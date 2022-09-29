@@ -57,6 +57,8 @@ MODULE fully_implicit
 
       CALL MatCreate(PETSC_COMM_WORLD,Jmat,ierr)
       CALL MatSetSizes(Jmat,PETSC_DECIDE,PETSC_DECIDE,SIZE,SIZE,ierr)
+      CALL MatSetType(Jmat, MATMPIAIJ, ierr)
+      !CALL MatSetOption(Jmat,MAT_SPD,PETSC_TRUE,ierr)
       CALL MatMPIAIJSetPreallocation(Jmat,f30,PETSC_NULL_INTEGER,f30,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
       CALL MatSetFromOptions(Jmat,ierr)
       CALL MatSetUp(Jmat,ierr)
@@ -489,8 +491,8 @@ MODULE fully_implicit
          f500 = 500
          CALL MatCreate(PETSC_COMM_WORLD,dxde,ierr)
          CALL MatSetSizes(dxde,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
-         CALL MatSetType(dxde, MATAIJ, ierr)
-         CALL MatSetOption(dxde,MAT_SPD,PETSC_TRUE,ierr)
+         CALL MatSetType(dxde, MATMPIAIJ, ierr)
+         !CALL MatSetOption(dxde,MAT_SPD,PETSC_TRUE,ierr)
          CALL MatMPIAIJSetPreallocation(dxde,f500,PETSC_NULL_INTEGER,f500,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
          CALL MatSetFromOptions(dxde, ierr)
          CALL MatSetUp(dxde,ierr)

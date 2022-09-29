@@ -148,7 +148,7 @@ MODULE fields
       CALL MatCreate(PETSC_COMM_WORLD,Amat,ierr)
       CALL MatSetSizes( Amat,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
       CALL MatSetType( Amat, MATMPIAIJ, ierr)
-      CALL MatSetOption(Amat,MAT_SPD,PETSC_TRUE,ierr)
+      !CALL MatSetOption(Amat,MAT_SPD,PETSC_TRUE,ierr)
       CALL MatMPIAIJSetPreallocation(Amat,f30,PETSC_NULL_INTEGER,f30,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
       CALL MatSetFromOptions( Amat, ierr)
       CALL MatSetUp( Amat, ierr)
@@ -582,7 +582,7 @@ MODULE fields
       CALL MatCreate(PETSC_COMM_WORLD,Amat,ierr)
       CALL MatSetSizes( Amat,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
       CALL MatSetType( Amat, MATAIJ, ierr)
-      CALL MatSetOption(Amat,MAT_SPD,PETSC_TRUE,ierr)
+      !CALL MatSetOption(Amat,MAT_SPD,PETSC_TRUE,ierr)
       IF (N_MPI_THREADS == 1) THEN
          CALL MatSetType( Amat, MATAIJ, ierr)
       ELSE

@@ -18,11 +18,9 @@ Axisymmetric:
 Number_of_cells:
     1    1    1
 Domain_limits:
-    -10.0    10.0    -10.0    10.0    -0.5    0.5
-Mesh_file_SU2:
-    'rect_1cm_10cm.su2'
+    -0.5    0.5    -0.5    0.5    -0.5    0.5
 Domain_periodicity:
-    .FALSE.   .FALSE.   .TRUE.
+    .TRUE.   .TRUE.   .TRUE.
 Domain_specular:
     .FALSE.    .FALSE.    .FALSE.    .FALSE.
 Domain_diffuse:
@@ -31,10 +29,10 @@ Boundary_temperature:
     300.0
     
 PIC_type:
-    fullyimplicit
+    none
 
 Bool_dump_moments:
-    .FALSE.
+    .TRUE.
 Bool_dump_fluxes:
     .FALSE.
     
@@ -47,11 +45,11 @@ Fluxes_dump_output:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0e7
+    1.0e13
 Timestep:
-    2.0e-8
+    1.0e-6
 Number_of_timesteps:
-    50
+    1000
 Stats_every:
     1
 
@@ -78,26 +76,25 @@ Perform_checks:
 ! ========= Multispecies ==============================
 
 Species_file:
-    hydrogenmod.species
+    arbgk.species
 
 Def_mixture:
-    Ions H+ 1.0
-
-Def_mixture:
-    Plasma  H+ 0.5  e 0.5
+    Argon Ar 1.0
 
 ! ========= Collisions ==============================
 
-Collision_type: ! [MCC / DSMC / NONE]
-  NONE
+Collision_type: ! [MCC / DSMC / BGK / NONE]
+  BGK
 
-MCC_background_dens:
-  1.0e20
-MCC_background_Ttra:
-  300.0
-MCC_background_mixture:
-  Neutrals
+!MCC_background_dens:
+!  1.0e20
+!MCC_background_Ttra:
+!  300.0
+!MCC_background_mixture:
+!  Neutrals
 
+BGK_sigma:
+   1.0e-19
 
 ! DSMC VHS collisions
 
@@ -122,21 +119,12 @@ Thermal_bath_Ttr:
 
 ! ========= Initial particle seed ===================
 
-Initial_particles_bool:
-    .TRUE.
-Initial_particles_dens:
-    1.0e13
-Initial_particles_vel:
-    0.  0.  0.
-Initial_particles_Ttra:
-    300.0 300.0 300.0
-Initial_particles_Trot:
-    0.
-Initial_particles_Tvib:
-    0. 
-Initial_particles_mixture:
-    Plasma
 
+Initial_particles:
+    Argon    1.0e20    1000.    0.    0.    1000.0    1000.0    1000.0    0.    0.
+
+Initial_particles:
+    Argon    0.5e20    -800.    0.    0.    800.0    800.0    800.0    0.    0.
 
 
     
@@ -149,8 +137,8 @@ Initial_particles_mixture:
 !Boundary_condition:
 !    Dielectric    neumann    0.0
 
-Boundary_condition:
-    Bound    dirichlet    0.0
+!Boundary_condition:
+!    Bound    dirichlet    0.0
 
 !Boundary_condition:
 !    Grid    vacuum

@@ -40,7 +40,7 @@ PROGRAM PANTERA
 
    IF (PIC_TYPE .NE. NONE) CALL ASSEMBLE_POISSON
    ! ========= Initial particles seed ======================
-   IF (BOOL_INITIAL_SEED)   CALL INITIAL_SEED
+   CALL INITIAL_SEED
    ! CALL DUMP_PARTICLES_SCREEN
 
    ! ========= Time loop ===================================

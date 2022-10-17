@@ -136,6 +136,19 @@ MODULE global
    INTEGER :: N_EMIT_TASKS
    
 
+
+
+   TYPE INITIAL_PARTICLES_DATA_STRUCTURE
+      REAL(KIND=8) :: NRHO
+      REAL(KIND=8) :: UX, UY, UZ
+      REAL(KIND=8) :: TTRAX, TTRAY, TTRAZ, TROT, TVIB
+      INTEGER      :: MIX_ID
+   END TYPE INITIAL_PARTICLES_DATA_STRUCTURE
+
+   TYPE(INITIAL_PARTICLES_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: INITIAL_PARTICLES_TASKS
+   INTEGER :: N_INITIAL_PARTICLES_TASKS
+   
+
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Electromagnetic fields !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -229,19 +242,9 @@ MODULE global
    LOGICAL           :: BOOL_THERMAL_BATH = .FALSE.
    REAL(KIND=8)      :: TBATH
 
-   INTEGER           :: BGK_MODEL_TYPE_INT = 2
+   INTEGER           :: BGK_MODEL_TYPE_INT = 0
    REAL(KIND=8)      :: BGK_BG_DENS, BGK_SIGMA, BGK_BG_MASS
 
-
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   !!!!!!!!! Initial particles seed !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-   LOGICAL      :: BOOL_INITIAL_SEED = .FALSE. ! Assign default value!
-   REAL(KIND=8) :: NRHO_INIT
-   REAL(KIND=8) :: UX_INIT, UY_INIT, UZ_INIT
-   REAL(KIND=8) :: TTRAX_INIT, TTRAY_INIT, TTRAZ_INIT, TROT_INIT, TVIB_INIT
-   INTEGER      :: MIX_INIT
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Particles injection from boundaries !!!!!!!!!!!!!!!!

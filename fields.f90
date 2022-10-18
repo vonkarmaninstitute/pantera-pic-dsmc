@@ -915,8 +915,8 @@ MODULE fields
       IF (PROC_ID == 0) WRITE(*,*) 'KSPConvergedReason = ', reason
       
       CALL VecScatterCreateToAll(xvec,ctx,X_SEQ,ierr)
-      CALL VecScatterBegin(ctx,xvec,X_SEQ,INSERT_VALUES,SCATTER_FORWARD)
-      CALL VecScatterEnd(ctx,xvec,X_SEQ,INSERT_VALUES,SCATTER_FORWARD)
+      CALL VecScatterBegin(ctx,xvec,X_SEQ,INSERT_VALUES,SCATTER_FORWARD,ierr)
+      CALL VecScatterEnd(ctx,xvec,X_SEQ,INSERT_VALUES,SCATTER_FORWARD,ierr)
 
       CALL VecGetArrayReadF90(X_SEQ,PHI_FIELD_TEMP,ierr)
       DEALLOCATE(PHIBAR_FIELD)

@@ -133,6 +133,10 @@ MODULE timecycle
             ALLOCATE(particles, SOURCE = part_adv)
             DEALLOCATE(part_adv)
 
+         ELSE
+
+            CALL ADVECT
+            
          END IF
 
          ! ########### Exchange particles among processes ##########################

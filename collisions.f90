@@ -705,7 +705,7 @@ MODULE collisions
    ! IOF => index of first particle in a cell (it indicates the offset in IND). 
    !        Conceptually: IOF = cumsum(NPC).
 
-      INTEGER, DIMENSION(NX*NY)          :: NPC, IOF
+      INTEGER, ALLOCATABLE, DIMENSION(:) :: NPC, IOF
       INTEGER, DIMENSION(:), ALLOCATABLE :: IND
       INTEGER                            :: JP, JC, NCELLS, IDX
    
@@ -716,8 +716,7 @@ MODULE collisions
       REAL(KIND=8) :: VX_NOW, VY_NOW, VZ_NOW, V2_NOW, EI_NOW
       REAL(KIND=8) :: Etot_cell, Etot_tra_cell, Ekin_cell, E_SUM, Etr_SUM
       REAL(KIND=8) :: Q, CHI, COS_TH, SIN_TH, COS_CHI, SIN_CHI
-   
-   
+
       ! Check that the gas is composed by only one species
       IF (SIZE(SPECIES) .NE. 1) THEN ! Print an error 
          PRINT*
@@ -733,17 +732,25 @@ MODULE collisions
    
       ! =========== Here, create vectors of particle indices ===========
    
+      IF (GRID_TYPE == UNSTRUCTURED) THEN
+         NCELLS = U2D_GRID%NUM_CELLS
+      ELSE
+         NCELLS = NX*NY
+      END IF
+
+
+      ALLOCATE(NPC(NCELLS))
+      ALLOCATE(IOF(NCELLS))
+
+
+
       NPC = 0
       DO JP = 1, NP_PROC
          JC = particles(JP)%IC
          NPC(JC) = NPC(JC) + 1
       END DO
    
-      IF (GRID_TYPE == UNSTRUCTURED) THEN
-         NCELLS = U2D_GRID%NUM_CELLS
-      ELSE
-         NCELLS = NX*NY
-      END IF
+
    
       IOF = -1
       IDX = 1
@@ -907,6 +914,8 @@ MODULE collisions
       END DO
    
       DEALLOCATE(IND)
+      DEALLOCATE(NPC)
+      DEALLOCATE(IOF)
    
    END SUBROUTINE BGK_COLLISIONS
 

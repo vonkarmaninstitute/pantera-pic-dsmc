@@ -149,6 +149,17 @@ MODULE global
    INTEGER :: N_INITIAL_PARTICLES_TASKS
    
 
+   TYPE VOLUME_INJECT_DATA_STRUCTURE
+      REAL(KIND=8) :: NRHODOT
+      REAL(KIND=8) :: UX, UY, UZ
+      REAL(KIND=8) :: TTRAX, TTRAY, TTRAZ, TROT, TVIB
+      INTEGER      :: MIX_ID
+   END TYPE VOLUME_INJECT_DATA_STRUCTURE
+
+   TYPE(VOLUME_INJECT_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: VOLUME_INJECT_TASKS
+   INTEGER :: N_VOLUME_INJECT_TASKS
+   
+
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Electromagnetic fields !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

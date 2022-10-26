@@ -94,6 +94,7 @@ MODULE timecycle
          CALL BOUNDARIES_INJECT
          CALL LINE_SOURCE_INJECT
          CALL BOUNDARIES_EMIT
+         CALL VOLUME_INJECT
 
          !CALL FIXED_IONIZATION
 
@@ -282,6 +283,142 @@ MODULE timecycle
       END DO
 
    END SUBROUTINE BOUNDARIES_EMIT
+
+
+
+
+
+   SUBROUTINE VOLUME_INJECT
+      
+      IMPLICIT NONE
+
+      INTEGER            :: IP, NP_INIT, IC
+      REAL(KIND=8)       :: Xp, Yp, Zp, VXp, VYp, VZp, EROT, EVIB, DOMAIN_VOLUME
+      INTEGER            :: CID
+
+      REAL(KIND=8), DIMENSION(3) :: V1, V2, V3
+      REAL(KIND=8)       :: XI, ETA, ETATEMP
+
+      TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
+      REAL(KIND=8)  :: M
+      INTEGER       :: S_ID, i, ITASK
+     
+      ! Compute number of particles to be seeded
+      !NP_INIT = NINT(NRHO_INIT/FNUM*(XMAX-XMIN)*(YMAX-YMIN)*(ZMAX-ZMIN))
+
+      !CALL ONLYMASTERPRINT2(PROC_ID, '   Particles to be seeded', REAL(NP_INIT, KIND=8))
+ 
+      ! Compute number of particles to be seeded by every process
+      !NPPP_INIT = INT(NP_INIT/N_MPI_THREADS) 
+
+      DO ITASK = 1, N_VOLUME_INJECT_TASKS
+         ! Create particles in the domain
+         DO i = 1, MIXTURES(VOLUME_INJECT_TASKS(ITASK)%MIX_ID)%N_COMPONENTS
+            
+            S_ID = MIXTURES(VOLUME_INJECT_TASKS(ITASK)%MIX_ID)%COMPONENTS(i)%ID
+            IF (GRID_TYPE == UNSTRUCTURED) THEN
+               DO IC = 1, U2D_GRID%NUM_CELLS
+                  ! Compute number of particles of this species per process to be created in this cell.
+                  NP_INIT = RANDINT(DT*VOLUME_INJECT_TASKS(ITASK)%NRHODOT/(FNUM*SPECIES(S_ID)%SPWT)*CELL_VOLUMES(IC)* &
+                              MIXTURES(VOLUME_INJECT_TASKS(ITASK)%MIX_ID)%COMPONENTS(i)%MOLFRAC/N_MPI_THREADS)
+                  IF (NP_INIT == 0) CYCLE
+
+                  V1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,1),:)
+                  V2 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,2),:)
+                  V3 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,3),:)
+
+                  DO IP = 1, NP_INIT
+
+                     ! Create particle position randomly in the cell
+                     XI = rf()
+                     ETATEMP = rf()
+                     IF (ETATEMP > 1-XI) THEN
+                        ETA = 1-XI
+                        XI = 1-ETATEMP
+                     ELSE
+                        ETA = ETATEMP
+                     END IF
+
+                     XP = V1(1) + (V2(1)-V1(1))*XI + (V3(1)-V1(1))*ETA
+                     YP = V1(2) + (V2(2)-V1(2))*XI + (V3(2)-V1(2))*ETA
+                     ZP = ZMIN + (ZMAX-ZMIN)*rf()
+
+                     !IF (XP > 0.25 .OR. XP < -0.25 .OR. YP > 0.25 .OR. YP < -0.25) CYCLE
+
+                     ! Assign velocity and energy following a Boltzmann distribution
+                     M = SPECIES(S_ID)%MOLECULAR_MASS
+                     CALL MAXWELL(VOLUME_INJECT_TASKS(ITASK)%UX, &
+                                  VOLUME_INJECT_TASKS(ITASK)%UY, &
+                                  VOLUME_INJECT_TASKS(ITASK)%UZ, &
+                                  VOLUME_INJECT_TASKS(ITASK)%TTRAX, &
+                                  VOLUME_INJECT_TASKS(ITASK)%TTRAY, &
+                                  VOLUME_INJECT_TASKS(ITASK)%TTRAZ, &
+                                  VXP, VYP, VZP, M)
+
+                     CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, VOLUME_INJECT_TASKS(ITASK)%TROT, EROT)
+                     CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, VOLUME_INJECT_TASKS(ITASK)%TVIB, EVIB)
+
+                     CALL INIT_PARTICLE(XP,YP,ZP,VXP,VYP,VZP,EROT,EVIB,S_ID,IC,DT, particleNOW) ! Save in particle
+                     CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
+                  END DO
+               END DO
+            ELSE ! Structured grid
+               ! Compute number of particles of this species per process to be created.
+               !IF (AXI) THEN
+               !   DOMAIN_VOLUME = 0.5*(XMAX-XMIN)*(YMAX**2-YMIN**2)*(ZMAX-ZMIN)
+               !ELSE
+               !   DOMAIN_VOLUME = (XMAX-XMIN)*(YMAX-YMIN)*(ZMAX-ZMIN)
+               !END IF
+               DOMAIN_VOLUME = 1.d-4
+
+               NP_INIT = RANDINT(DT*VOLUME_INJECT_TASKS(ITASK)%NRHODOT/(FNUM*SPECIES(S_ID)%SPWT)*DOMAIN_VOLUME* &
+                           MIXTURES(VOLUME_INJECT_TASKS(ITASK)%MIX_ID)%COMPONENTS(i)%MOLFRAC/N_MPI_THREADS)
+               IF (NP_INIT == 0) CYCLE
+               DO IP = 1, NP_INIT
+
+                  ! Create particle position randomly in the domain
+                  !XP = XMIN + (XMAX-XMIN)*rf()
+
+                  !IF (AXI .AND. (.NOT. BOOL_RADIAL_WEIGHTING)) THEN
+                  !   YP = SQRT(YMIN*YMIN + rf()*(YMAX*YMAX - YMIN*YMIN))
+                  !   ZP = 0
+                  !ELSE
+                  !   YP = YMIN + (YMAX-YMIN)*rf()
+                  !   ZP = ZMIN + (ZMAX-ZMIN)*rf()
+                  !END IF
+
+                  XP = -0.005 + 0.01*rf()
+                  YP = -0.005 + 0.01*rf()
+                  ZP = rf() - 0.5
+                  IF ((XP*XP+YP*YP) > 2.5d-5) CYCLE
+
+
+               
+                  ! Assign velocity and energy following a Boltzmann distribution
+                  M = SPECIES(S_ID)%MOLECULAR_MASS
+                  CALL MAXWELL(VOLUME_INJECT_TASKS(ITASK)%UX, &
+                               VOLUME_INJECT_TASKS(ITASK)%UY, &
+                               VOLUME_INJECT_TASKS(ITASK)%UZ, &
+                               VOLUME_INJECT_TASKS(ITASK)%TTRAX, &
+                               VOLUME_INJECT_TASKS(ITASK)%TTRAY, &
+                               VOLUME_INJECT_TASKS(ITASK)%TTRAZ, &
+                               VXP, VYP, VZP, M)
+
+                  CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, VOLUME_INJECT_TASKS(ITASK)%TROT, EROT)
+                  CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, VOLUME_INJECT_TASKS(ITASK)%TVIB, EVIB)
+
+                  CALL CELL_FROM_POSITION(XP,YP,  CID) ! Find cell containing particle
+
+                  CALL INIT_PARTICLE(XP,YP,ZP,VXP,VYP,VZP,EROT,EVIB,S_ID,CID,DT, particleNOW) ! Save in particle
+                  CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
+               END DO
+            END IF
+         END DO
+      END DO
+      ! ~~~~~~ At this point, exchange particles among processes ~~~~~~
+
+   END SUBROUTINE VOLUME_INJECT
+
 
 
 

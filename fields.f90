@@ -5,7 +5,6 @@ MODULE fields
 #include <petsc/finclude/petsc.h>
 #include <petsc/finclude/petscksp.h>
 
-   USE mUMFPACK
    USE global
    USE screen
    USE tools
@@ -236,10 +235,6 @@ MODULE fields
                   CALL MatSetValues(Amat,one,V1-1,one,V1-1,K11,ADD_VALUES,ierr)
                   CALL MatSetValues(Amat,one,V1-1,one,V2-1,K12,ADD_VALUES,ierr)
                   CALL MatSetValues(Amat,one,V1-1,one,V3-1,K13,ADD_VALUES,ierr)
-
-                  !CALL ST_MATRIX_ADD(A_ST, V1-1, V1-1, K11)
-                  !CALL ST_MATRIX_ADD(A_ST, V1-1, V2-1, K12)
-                  !CALL ST_MATRIX_ADD(A_ST, V1-1, V3-1, K13)
                END IF
             END IF
             IF (V2-1 >= Istart .AND. V2-1 < Iend) THEN
@@ -247,10 +242,6 @@ MODULE fields
                   CALL MatSetValues(Amat,one,V2-1,one,V1-1,K12,ADD_VALUES,ierr)
                   CALL MatSetValues(Amat,one,V2-1,one,V3-1,K23,ADD_VALUES,ierr)
                   CALL MatSetValues(Amat,one,V2-1,one,V2-1,K22,ADD_VALUES,ierr)
-                  
-                  !CALL ST_MATRIX_ADD(A_ST, V2-1, V1-1, K12)
-                  !CALL ST_MATRIX_ADD(A_ST, V2-1, V3-1, K23)
-                  !CALL ST_MATRIX_ADD(A_ST, V2-1, V2-1, K22)
                END IF
             END IF
             IF (V3-1 >= Istart .AND. V3-1 < Iend) THEN
@@ -258,10 +249,6 @@ MODULE fields
                   CALL MatSetValues(Amat,one,V3-1,one,V1-1,K13,ADD_VALUES,ierr)
                   CALL MatSetValues(Amat,one,V3-1,one,V2-1,K23,ADD_VALUES,ierr)
                   CALL MatSetValues(Amat,one,V3-1,one,V3-1,K33,ADD_VALUES,ierr)
-                  
-                  !CALL ST_MATRIX_ADD(A_ST, V3-1, V1-1, K13)
-                  !CALL ST_MATRIX_ADD(A_ST, V3-1, V2-1, K23)
-                  !CALL ST_MATRIX_ADD(A_ST, V3-1, V3-1, K33)
                END IF
             END IF
 
@@ -391,16 +378,6 @@ MODULE fields
          END DO
       END IF
 
-      ! Factorize the matrix for later solution
-      !IF (PROC_ID .EQ. 0) CALL ST_MATRIX_PRINT(A_ST, SIZE)
-
-      ! IF (PROC_ID == 0) THEN
-      !    DO J = 0, A_ST%NNZ-1
-      !       WRITE(*,*) 'R ',  A_ST%RIDX(J), ' C ', A_ST%CIDX(J), ' V ', A_ST%VALUE(J)
-      !    END DO
-      ! ELSE
-      !    CALL SLEEP(5)
-      ! END IF
 
       CALL MatAssemblyBegin(Amat,MAT_FLUSH_ASSEMBLY,ierr)
       CALL MatAssemblyEnd(Amat,MAT_FLUSH_ASSEMBLY,ierr)
@@ -412,139 +389,10 @@ MODULE fields
       CALL MatAssemblyBegin(Amat,MAT_FINAL_ASSEMBLY,ierr)
       CALL MatAssemblyEnd(Amat,MAT_FINAL_ASSEMBLY,ierr)
 
-      ! IF (PROC_ID .EQ. 0) THEN
-      !    CALL ST_MATRIX_TO_CC(A_ST, SIZE, A_CC)
-      !    CALL S_UMFPACK_SYMBOLIC(SIZE, SIZE, A_CC%AP, A_CC%AI, A_CC%AX, STATUS = STATUS)
-      !    WRITE(*,*) 'Status is = ', STATUS
-      !    CALL S_UMFPACK_NUMERIC(A_CC%AP, A_CC%AI, A_CC%AX, STATUS = STATUS)
-      !    WRITE(*,*) 'Status 1 is = ', STATUS
-      !    CALL S_UMFPACK_FREE_SYMBOLIC
-      ! END IF
 
    END SUBROUTINE ASSEMBLE_POISSON
 
 
-
-
-
-
-   SUBROUTINE SOLVE_POISSON_NONLINEAR
-      
-      IMPLICIT NONE
-
-      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AX, YK, FK, BK, DBDPHI, PHIK
-      REAL(KIND=8) :: RESIDUAL
-      TYPE(ST_MATRIX) :: JAC_ST
-      TYPE(CC_MATRIX) :: JAC_CC
-      INTEGER :: J, IC, IN, SIZE, ITERATION, STATUS
-      INTEGER :: I
-      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, AREA
-      INTEGER :: V1, V2, V3
-
-      SIZE = U2D_GRID%NUM_NODES
-
-      IF (PROC_ID .EQ. 0) THEN
-
-         ALLOCATE(PHIK, SOURCE = PHI_FIELD)
-         ALLOCATE(BK(0:SIZE-1))
-         ALLOCATE(DBDPHI(0:SIZE-1))
-         ALLOCATE(YK(0:SIZE-1))
-         IF (.NOT. ALLOCATED(BOLTZ_NRHOE)) ALLOCATE(BOLTZ_NRHOE(SIZE))
-
-         DO ITERATION = 1, 10
-            WRITE(*,*) '---> Starting iteration ', ITERATION
-            
-            !WRITE(*,*) PHIK
-            DO IN = 1, SIZE
-               BOLTZ_NRHOE(IN) = BOLTZ_N0*EXP( QE*(PHIK(IN-1) - BOLTZ_PHI0) / (KB*BOLTZ_TE) )
-            END DO
-
-            BK = 0.d0
-            DBDPHI = 0.d0
-            DO IC = 1, U2D_GRID%NUM_CELLS
-               DO J = 1, 3
-                  IN = U2D_GRID%CELL_NODES(IC,J)
-                  IF (.NOT. IS_DIRICHLET(IN-1)) THEN
-                     BK(IN-1) = BK(IN-1) + QE/EPS0*CELL_AREAS(IC)/3*BOLTZ_NRHOE(IN)
-                     DBDPHI(IN-1) = DBDPHI(IN-1) + QE*QE/(EPS0*KB*BOLTZ_TE)*CELL_AREAS(IC)/3*BOLTZ_NRHOE(IN)
-                     !DBDPHI(IN-1) = DBDPHI(IN-1) + QE*QE/(EPS0*KB*BOLTZ_TE)*CELL_AREAS(IC)/3*BOLTZ_N0
-                  END IF
-               END DO
-            END DO
-
-            !CALL ST_MATRIX_MULT(A_ST, PHIK, AX)
-            ALLOCATE( AX(0:SIZE-1) )
-            AX = 0.d0
-      
-            DO J = 0, A_ST%NNZ-1
-               AX(A_ST%RIDX(J)) = AX(A_ST%RIDX(J)) + A_ST%VALUE(J)*PHIK(A_ST%CIDX(J))
-            END DO
-
-            ALLOCATE(FK(0:SIZE-1))
-            FK = AX - RHS - BK
-            DEALLOCATE(AX)
-
-            JAC_ST%NNZ = A_ST%NNZ
-            ALLOCATE(JAC_ST%VALUE, SOURCE = A_ST%VALUE)
-            ALLOCATE(JAC_ST%RIDX, SOURCE = A_ST%RIDX)
-            ALLOCATE(JAC_ST%CIDX, SOURCE = A_ST%CIDX)
-
-            DO IN = 1, SIZE
-               CALL ST_MATRIX_ADD(JAC_ST, IN-1, IN-1, -DBDPHI(IN-1))
-            END DO
-
-            CALL ST_MATRIX_TO_CC(JAC_ST, SIZE, JAC_CC)
-            CALL S_UMFPACK_SYMBOLIC(SIZE, SIZE, JAC_CC%AP, JAC_CC%AI, JAC_CC%AX, STATUS = STATUS)
-            CALL S_UMFPACK_NUMERIC(JAC_CC%AP, JAC_CC%AI, JAC_CC%AX, STATUS = STATUS)
-            CALL S_UMFPACK_FREE_SYMBOLIC
-            CALL S_UMFPACK_SOLVE(UMFPACK_A, JAC_CC%AP, JAC_CC%AI, JAC_CC%AX, YK, FK)
-            DEALLOCATE(FK)
-            PHIK = PHIK - YK
-            CALL S_UMFPACK_FREE_NUMERIC
-
-            CALL ST_MATRIX_DEALLOCATE(JAC_ST)
-            CALL CC_MATRIX_DEALLOCATE(JAC_CC)
-
-            RESIDUAL = NORM2(YK)
-            WRITE(*,*) 'Residual of this iteration is: ', RESIDUAL
-            IF (RESIDUAL < 1.d-6) EXIT
-         END DO
-         PHI_FIELD = PHIK
-
-         DEALLOCATE(BK)
-         DEALLOCATE(DBDPHI)
-         DEALLOCATE(PHIK)
-         DEALLOCATE(YK)
-
-      END IF
-
-      CALL MPI_BCAST(PHI_FIELD, SIZE, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-
-      PHIBAR_FIELD = PHI_FIELD
-      ! Compute the electric field at grid points
-      DO I = 1, U2D_GRID%NUM_CELLS
-         AREA = CELL_AREAS(I)
-         V1 = U2D_GRID%CELL_NODES(I,1)
-         V2 = U2D_GRID%CELL_NODES(I,2)
-         V3 = U2D_GRID%CELL_NODES(I,3)            
-         X1 = U2D_GRID%NODE_COORDS(V1, 1)
-         X2 = U2D_GRID%NODE_COORDS(V2, 1)
-         X3 = U2D_GRID%NODE_COORDS(V3, 1)
-         Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-         Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-         Y3 = U2D_GRID%NODE_COORDS(V3, 2)
-
-         E_FIELD(I,1,1) = -0.5/AREA*(  PHI_FIELD(V1-1)*(Y2-Y3) &
-                                     - PHI_FIELD(V2-1)*(Y1-Y3) &
-                                     - PHI_FIELD(V3-1)*(Y2-Y1))
-         E_FIELD(I,1,2) = -0.5/AREA*(- PHI_FIELD(V1-1)*(X2-X3) &
-                                     + PHI_FIELD(V2-1)*(X1-X3) &
-                                     + PHI_FIELD(V3-1)*(X2-X1))
-         E_FIELD(I,1,3) = 0.d0
-      END DO
-
-
-   END SUBROUTINE SOLVE_POISSON_NONLINEAR
 
 
    SUBROUTINE ASSEMBLE_AMPERE
@@ -778,16 +626,6 @@ MODULE fields
          CALL ERROR_ABORT('Semi-implicit with cartesian grid not implemented!')
       END IF
 
-      ! Factorize the matrix for later solution
-      !IF (PROC_ID .EQ. 0) CALL ST_MATRIX_PRINT(A_ST, SIZE)
-
-      ! IF (PROC_ID == 0) THEN
-      !    DO J = 0, A_ST%NNZ-1
-      !       WRITE(*,*) 'R ',  A_ST%RIDX(J), ' C ', A_ST%CIDX(J), ' V ', A_ST%VALUE(J)
-      !    END DO
-      ! ELSE
-      !    CALL SLEEP(5)
-      ! END IF
 
       CALL MatAssemblyBegin(Amat,MAT_FLUSH_ASSEMBLY,ierr)
       CALL MatAssemblyEnd(Amat,MAT_FLUSH_ASSEMBLY,ierr)
@@ -979,31 +817,6 @@ MODULE fields
       
    END SUBROUTINE APPLY_POTENTIAL
 
-
-   SUBROUTINE ST_MATRIX_PRINT(THIS, SIZE)
-
-      TYPE(ST_MATRIX) :: THIS
-      INTEGER, INTENT(IN) :: SIZE
-      INTEGER :: I, J, IDX
-      LOGICAL :: FOUND
-
-      WRITE(*,*) 'Printing matrix with ', THIS%NNZ, ' non-zero entries.'
-      DO I = 0, (SIZE-1)
-         DO J = 0, (SIZE-1)
-            FOUND = .FALSE.
-            DO IDX = 0, THIS%NNZ-1
-               IF (THIS%RIDX(IDX) == I .AND. THIS%CIDX(IDX) == J) THEN
-                  WRITE(*,'(ES10.3)', ADVANCE = 'no') THIS%VALUE(IDX)
-                  FOUND = .TRUE.
-                  EXIT
-               END IF
-            END DO
-            IF (.NOT. FOUND)  WRITE(*,'(ES10.3)', ADVANCE = 'no') 0.d0
-         END DO
-         WRITE(*,*)
-      END DO
-
-   END SUBROUTINE ST_MATRIX_PRINT
 
 
 

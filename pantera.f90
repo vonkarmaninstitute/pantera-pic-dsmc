@@ -8,7 +8,6 @@ PROGRAM PANTERA
    USE initialization
    USE timecycle
    USE grid_and_partition
-   USE mUMFPACK
    USE fields
    USE fully_implicit
 

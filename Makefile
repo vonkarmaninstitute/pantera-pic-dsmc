@@ -5,13 +5,13 @@
 # GNU Compiler
 CMPF  = mpifort -c -cpp -I/home/pietro/petsc/petsc--openmpi/include -pg -g
 LNK   = mpifort -cpp -pg -g
-#-I/usr/include/suitesparse  -L/usr/lib -lumfpack
+
 #OPTF = -O0 -Wall -Wextra -Warray-temporaries -ggdb3 -pedantic -fimplicit-none -fcheck=all -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow -mcmodel=medium # Debug options
 OPTF = -O3 -Wall -Wextra -fimplicit-none -fbacktrace -fcheck=all -ffpe-trap=invalid,zero,overflow -mcmodel=medium # Standard optimization options 
 #OPTF = -Ofast -march=native -Wall -Wextra -fimplicit-none -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow -mcmodel=medium # Aggressive optimization options 
 
 # Objects: list of all objects *.o
-OBJS = mpi_common.o  global.o  screen.o  tools.o  initialization.o  timecycle.o  grid_and_partition.o  particle.o  collisions.o  postprocess.o  fields.o  umfpack.o  mt19937.o  fully_implicit.o
+OBJS = mpi_common.o  global.o  screen.o  tools.o  initialization.o  timecycle.o  grid_and_partition.o  particle.o  collisions.o  postprocess.o  fields.o  mt19937.o  fully_implicit.o
 #OBJDSMC = mpi_common.o tools.o screen.o global.o postprocess.o initialization.o timecycle.o
 
 
@@ -46,7 +46,7 @@ CUDA_INCLUDE := $(shell pkg-config --variable=cudainclude $(PACKAGES))
 # Executable generation by the linker
 pantera.exe: pantera.o $(OBJS) 
 	$(LNK) $(OPTF) pantera.o $(OBJS) \
-	            -o pantera.exe -L/usr/lib -lumfpack $(LDFLAGS) $(LDLIBS) -I/home/pietro/petsc/petsc--openmpi/include
+	            -o pantera.exe -L/usr/lib $(LDFLAGS) $(LDLIBS) -I/home/pietro/petsc/petsc--openmpi/include
 
 # Objects generation
 pantera.o: pantera.f90  $(OBJS) 
@@ -85,11 +85,8 @@ collisions.o: collisions.f90
 postprocess.o: postprocess.f90  fields.o
 	$(CMPF) $(OPTF) postprocess.f90
 
-fields.o: fields.f90  umfpack.o  fully_implicit.o
+fields.o: fields.f90  fully_implicit.o
 	$(CMPF) $(OPTF) fields.f90
-
-umfpack.o: umfpack.f90
-	$(CMPF) $(OPTF) umfpack.f90
 	
 mt19937.o: mt19937.f90
 	$(CMPF) $(OPTF) mt19937.f90

@@ -10,15 +10,18 @@
 !!!! All units are SI [m, kg, s, ...]                                      !!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+Restart:
+    200
+
 ! ========= Computational domain and grid ===========
 Dimensions:
     2
 Axisymmetric:
     .FALSE.
 Number_of_cells:
-    1    1    1
+    50    50    1
 Domain_limits:
-    -10.0    10.0    -10.0    10.0    -0.5    0.5
+    -1.0    1.0    -1.0    1.0    -0.5    0.5
 Domain_periodicity:
     .FALSE.   .FALSE.   .FALSE.
 Domain_specular:
@@ -29,11 +32,11 @@ Boundary_temperature:
     300.0
     
 PIC_type:
-    none
-Mesh_file_SU2:
-    'plate_5mm_big.su2'
+    explicit
+!Mesh_file_SU2:
+!    'plate_5mm_big.su2'
 Bool_dump_moments:
-    .TRUE.
+    .FALSE.
 Bool_dump_fluxes:
     .FALSE.
     
@@ -46,46 +49,46 @@ Fluxes_dump_output:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0e14
+    1.0e7
 Timestep:
-    5.0e-6
+    1.0e-9
 Number_of_timesteps:
-    10000
+    1000
 Stats_every:
     1
 
 RNG_seed:
     65645
 Dump_part_every:
-    10000000
+    100
 
 Binary_output:
-    .FALSE.
+    .TRUE.
 Dump_grid_start:
     0
 Dump_grid_avgevery:
-    10
-Dump_grid_numavgs:
     100
+Dump_grid_numavgs:
+    1
 Dump_part_start:
-    10000000
+    0
 
 
 Perform_checks:
-    .FALSE.
+    .TRUE.
 
 ! ========= Multispecies ==============================
 
 Species_file:
-    arbgk.species
+    ar.species
 
 Def_mixture:
-    Argon Ar 1.0
+    Plasma Ar+ 0.5 e 0.5
 
 ! ========= Collisions ==============================
 
 Collision_type: ! [MCC / DSMC / BGK / NONE]
-    BGK
+    NONE
 
 !MCC_background_dens:
 !  1.0e20
@@ -122,7 +125,7 @@ Thermal_bath_Ttr:
 
 
 Initial_particles:
-    Argon    7.0711e18    3226.0    0.    0.    300.0    300.0    300.0    0.    0.
+    Plasma   1.0e12    0.0    0.    0.    11600.0    11600.0    11600.0    0.    0.
 
     
 !Boundary_condition:
@@ -140,14 +143,14 @@ Initial_particles:
 !Boundary_condition:
 !    Grid    vacuum
 
-Boundary_condition:
-    Axis    specular
+!Boundary_condition:
+!    Axis    specular
 
-Boundary_condition:
-    Plate    specular
+!Boundary_condition:
+!    Plate    specular
 
-Boundary_emit:
-    Flow    Argon    7.0711e18    3226.0    0.0    0.0    300.0    300.0    300.0
+!Boundary_emit:
+!    Flow    Argon    7.0711e18    3226.0    0.0    0.0    300.0    300.0    300.0
 
     
 !Solenoid_field:

@@ -48,14 +48,17 @@ MODULE timecycle
       END IF
       
       ! ########### Dump particles and flowfield after the initial seeding ##########################################
-      IF (DUMP_START .EQ. 0) THEN
-         CALL DUMP_PARTICLES_FILE(0)
+      IF ((tID .GE. DUMP_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
+         IF (MOD(tID-DUMP_START, DUMP_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
       END IF
 
-      IF (DUMP_GRID_START .EQ. 0 .AND. DUMP_GRID_N_AVG .EQ. 1) THEN
-         CALL GRID_AVG
-         CALL GRID_SAVE
-         CALL GRID_RESET
+      IF ((tID .GT. DUMP_GRID_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
+         ! If we are in the grid save timestep, average, then dump the cumulated averages
+         IF (MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY*DUMP_GRID_N_AVG) .EQ. 0) THEN
+            CALL GRID_AVG
+            CALL GRID_SAVE
+            CALL GRID_RESET
+         END IF
       END IF
 
       ! ########### Perform the conservation checks ###################################
@@ -63,7 +66,7 @@ MODULE timecycle
 
 
       ! ########### Start the time loop #################################
-      tID = 1
+      tID = tID + 1
       CALL CPU_TIME(START_CPU_TIME)
       DO WHILE (tID .LE. NT)
 
@@ -72,7 +75,7 @@ MODULE timecycle
          CURRENT_TIME = tID*DT
          CALL CPU_TIME(CURRENT_CPU_TIME)
          CURRENT_CPU_TIME = CURRENT_CPU_TIME - START_CPU_TIME 
-         EST_TIME = DBLE(NT-tID)/tID*CURRENT_CPU_TIME/3600.d0
+         EST_TIME = DBLE(NT-tID)/DBLE(tID-RESTART_TIMESTEP)*CURRENT_CPU_TIME/3600.d0
 
          IF (MOD(tID, STATS_EVERY) .EQ. 0) THEN
             CALL MPI_REDUCE(NP_PROC, NP_TOT, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)

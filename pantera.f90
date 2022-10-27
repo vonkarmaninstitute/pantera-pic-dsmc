@@ -40,7 +40,14 @@ PROGRAM PANTERA
 
    IF (PIC_TYPE .NE. NONE) CALL ASSEMBLE_POISSON
    ! ========= Initial particles seed ======================
-   CALL INITIAL_SEED
+   IF (RESTART_TIMESTEP > 0) THEN
+      CALL READ_PARTICLES_FILE(RESTART_TIMESTEP)
+      tID = RESTART_TIMESTEP
+   ELSE
+      tID = 0
+      RESTART_TIMESTEP = 0
+      CALL INITIAL_SEED
+   END IF
    ! CALL DUMP_PARTICLES_SCREEN
 
    ! ========= Time loop ===================================

@@ -271,20 +271,20 @@ CONTAINS
 
       ! Open file for writing
       IF (BOOL_BINARY_OUTPUT) THEN
-         OPEN(10, FILE=filename, ACCESS='STREAM', FORM='UNFORMATTED', STATUS='NEW', CONVERT='BIG_ENDIAN')
+         OPEN(10, FILE=filename, ACCESS='SEQUENTIAL', FORM='UNFORMATTED', STATUS='NEW', CONVERT='BIG_ENDIAN', RECL=80)
          DO IP = 1, NP_PROC
-            WRITE(10) TIMESTEP, particles(IP)%X, particles(IP)%Y, particles(IP)%Z, &
+            WRITE(10) particles(IP)%X, particles(IP)%Y, particles(IP)%Z, &
             particles(IP)%VX, particles(IP)%VY, particles(IP)%VZ, particles(IP)%EROT, particles(IP)%EVIB, &
-            particles(IP)%S_ID, PROC_ID
+            particles(IP)%S_ID, particles(IP)%IC, particles(IP)%DTRIM
          END DO
          CLOSE(10)
       ELSE
          OPEN(10, FILE=filename )
-         WRITE(10,*) '% Timestep | X | Y | Z | VX | VY | VZ | EROT | EVIB | S_ID | proc_ID'
+         !WRITE(10,*) '% X | Y | Z | VX | VY | VZ | EROT | EVIB | S_ID | IC'
          DO IP = 1, NP_PROC
-            WRITE(10,*) TIMESTEP, particles(IP)%X, particles(IP)%Y, particles(IP)%Z, &
+            WRITE(10,*) particles(IP)%X, particles(IP)%Y, particles(IP)%Z, &
             particles(IP)%VX, particles(IP)%VY, particles(IP)%VZ, particles(IP)%EROT, particles(IP)%EVIB, &
-            particles(IP)%S_ID, PROC_ID
+            particles(IP)%S_ID, particles(IP)%IC, particles(IP)%DTRIM
          END DO
          CLOSE(10)
       END IF
@@ -292,6 +292,63 @@ CONTAINS
 
 
    END SUBROUTINE DUMP_PARTICLES_FILE
+
+
+   SUBROUTINE READ_PARTICLES_FILE(TIMESTEP)
+
+      USE global
+      USE mpi_common
+
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN) :: TIMESTEP
+      CHARACTER(LEN=512)  :: filename
+      INTEGER :: ios
+
+      REAL(KIND=8) :: XP, YP, ZP, VX, VY, VZ, EROT, EVIB, DTRIM
+      INTEGER      :: S_ID, IC
+      TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
+
+      WRITE(filename, "(A,A,I0.5,A6,I0.8)") TRIM(ADJUSTL(PARTDUMP_SAVE_PATH)), "proc_", PROC_ID, "_time_", TIMESTEP ! Compose filename
+
+      ! Open file for reading
+      IF (BOOL_BINARY_OUTPUT) THEN
+         OPEN(1010, FILE=filename, ACCESS='SEQUENTIAL', FORM='UNFORMATTED', STATUS='OLD', &
+         CONVERT='BIG_ENDIAN', RECL=80, IOSTAT=ios)
+
+         IF (ios .NE. 0) THEN
+            CALL ERROR_ABORT('Attention, particle restart file not found! ABORTING.')
+         ENDIF
+
+         DO
+            READ(1010, IOSTAT=ios) XP, YP, ZP, VX, VY, VZ, EROT, EVIB, S_ID, IC, DTRIM
+
+            IF (ios < 0) EXIT
+            CALL INIT_PARTICLE(XP,YP,ZP,VX,VY,VZ,EROT,EVIB,S_ID,IC,DTRIM, particleNOW) ! Save in particle
+            CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
+         END DO
+
+         CLOSE(1010)
+      ELSE
+         OPEN(1010, FILE=filename, STATUS='OLD', IOSTAT=ios)
+         
+         IF (ios .NE. 0) THEN
+            CALL ERROR_ABORT('Attention, particle restart file not found! ABORTING.')
+         ENDIF
+
+         DO
+            READ(1010,*,IOSTAT=ios) XP, YP, ZP, VX, VY, VZ, EROT, EVIB, S_ID, IC, DTRIM
+            IF (ios < 0) EXIT
+            CALL INIT_PARTICLE(XP,YP,ZP,VX,VY,VZ,EROT,EVIB,S_ID,IC,DTRIM, particleNOW) ! Save in particle
+            CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
+         END DO
+
+         CLOSE(1010)
+      END IF
+
+
+
+   END SUBROUTINE READ_PARTICLES_FILE
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE DUMP_TRAJECTORY_FILE -> dumps particle trajectory to file !

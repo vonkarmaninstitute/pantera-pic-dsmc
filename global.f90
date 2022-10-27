@@ -221,6 +221,7 @@ MODULE global
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    INTEGER      :: NT, tID
+   INTEGER      :: RESTART_TIMESTEP = 0
    REAL(KIND=8) :: FNUM, DT, START_CPU_TIME
    INTEGER(KIND=8) :: RNG_SEED_GLOBAL, RNG_SEED_LOCAL
    INTEGER      :: DUMP_EVERY = 1

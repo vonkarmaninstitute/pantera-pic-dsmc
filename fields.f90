@@ -966,15 +966,15 @@ MODULE fields
             PHI = PSI1*PHI_FIELD(V1) + PSI2*PHI_FIELD(V2) + PSI3*PHI_FIELD(V3)
          ELSE
             CALL COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)
-            PHI = WEIGHTS(1)*PHI_FIELD(INDI(1)+1+NPX*(INDJ(1)+1)) + &
-            WEIGHTS(2)*PHI_FIELD(INDI(2)+1 +NPX*(INDJ(2)+1)) + &
-            WEIGHTS(3)*PHI_FIELD(INDI(3)+1 +NPX*(INDJ(3)+1)) + &
-            WEIGHTS(4)*PHI_FIELD(INDI(4)+1 +NPX*(INDJ(4)+1))
+            PHI = WEIGHTS(1)*PHI_FIELD(INDICES(1)+1) + &
+                  WEIGHTS(2)*PHI_FIELD(INDICES(2)+1) + &
+                  WEIGHTS(3)*PHI_FIELD(INDICES(3)+1) + &
+                  WEIGHTS(4)*PHI_FIELD(INDICES(4)+1)
          END IF
       ELSE
          CALL COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)
-         PHI = WEIGHTS(1)*PHI_FIELD(INDI(1)+1 +NPX*(INDJ(1)+1)) + &
-         WEIGHTS(2)*PHI_FIELD(INDI(2)+1 +NPX*(INDJ(2)+1))
+         PHI = WEIGHTS(1)*PHI_FIELD(INDICES(1)+1) + &
+               WEIGHTS(2)*PHI_FIELD(INDICES(2)+1)
       END IF
       
    END SUBROUTINE APPLY_POTENTIAL

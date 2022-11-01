@@ -78,7 +78,13 @@ MODULE initialization
 
          IF (line=='Mesh_file_SU2:') THEN
             READ(in1,*) MESH_FILENAME
-            CALL READ_UNSTRUCTURED_GRID_SU2(MESH_FILENAME)
+            IF (DIMS == 2) THEN
+               CALL READ_2D_UNSTRUCTURED_GRID_SU2(MESH_FILENAME)
+            ELSE IF (DIMS == 3) THEN
+               CALL READ_3D_UNSTRUCTURED_GRID_SU2(MESH_FILENAME)
+            ELSE
+               CALL ERROR_ABORT('Asked to read SU2 grid file but dimensions are not set to 2 or 3.')
+            END IF
             GRID_TYPE = UNSTRUCTURED
          END IF
 

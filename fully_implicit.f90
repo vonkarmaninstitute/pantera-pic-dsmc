@@ -1158,6 +1158,9 @@ MODULE fully_implicit
       ALLOCATE(PHI_FIELD, SOURCE = PHI_FIELD_TEMP)
       CALL VecRestoreArrayReadF90(xvec_seq,PHI_FIELD_TEMP,ierr)
 
+      CALL VecScatterDestroy(ctx,ierr)
+      CALL VecDestroy(xvec_seq,ierr)
+
       CALL KSPDestroy(ksp,ierr)
 
       !CALL VecRestoreArrayReadF90(X_SEQ,PHI_FIELD,ierr)

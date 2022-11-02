@@ -206,9 +206,10 @@ MODULE timecycle
       IMPLICIT NONE
    
       INTEGER      :: IP, IC, IS, NFS, ITASK
-      REAL(KIND=8) :: DTFRAC, Vdummy, V_NORM, V_PARA, X1, X2, Y1, Y2, R, NORMX, NORMY
+      REAL(KIND=8) :: DTFRAC, Vdummy, V_NORM, V_TANG1, V_TANG2, X1, X2, Y1, Y2, R, P, Q, S, T
       REAL(KIND=8) :: X, Y, Z, VX, VY, VZ, EROT, EVIB 
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
+      REAL(KIND=8), DIMENSION(3) :: FACE_NORMAL, FACE_TANG1, FACE_TANG2, V1, V2, V3
    
       INTEGER :: S_ID
       REAL(KIND=8) :: M
@@ -218,12 +219,26 @@ MODULE timecycle
       DO ITASK = 1, N_EMIT_TASKS
          EMIT_TASK = EMIT_TASKS(ITASK)
 
-         X1 = U2D_GRID%NODE_COORDS(EMIT_TASK%IV1, 1)
-         Y1 = U2D_GRID%NODE_COORDS(EMIT_TASK%IV1, 2)
-         X2 = U2D_GRID%NODE_COORDS(EMIT_TASK%IV2, 1)
-         Y2 = U2D_GRID%NODE_COORDS(EMIT_TASK%IV2, 2)
-
          IC = EMIT_TASK%IC
+
+         IF (DIMS == 2) THEN
+            X1 = U2D_GRID%NODE_COORDS(EMIT_TASK%IV1, 1)
+            Y1 = U2D_GRID%NODE_COORDS(EMIT_TASK%IV1, 2)
+            X2 = U2D_GRID%NODE_COORDS(EMIT_TASK%IV2, 1)
+            Y2 = U2D_GRID%NODE_COORDS(EMIT_TASK%IV2, 2)
+
+            FACE_NORMAL = U2D_GRID%EDGE_NORMAL(IC,EMIT_TASK%IFACE,:)
+            FACE_TANG1 = [-FACE_NORMAL(2), FACE_NORMAL(1), 0.d0]
+            FACE_TANG2 = [0.d0, 0.d0, 1.d0]
+         ELSE IF (DIMS == 3) THEN
+            FACE_NORMAL = U3D_GRID%FACE_NORMAL(IC,EMIT_TASK%IFACE,:)
+            FACE_TANG1 = U3D_GRID%FACE_TANG1(IC,EMIT_TASK%IFACE,:)
+            FACE_TANG2 = U3D_GRID%FACE_TANG2(IC,EMIT_TASK%IFACE,:)
+
+            V1 = U3D_GRID%NODE_COORDS(U3D_GRID%FACE_NODES(IC,EMIT_TASK%IFACE,1),:)
+            V2 = U3D_GRID%NODE_COORDS(U3D_GRID%FACE_NODES(IC,EMIT_TASK%IFACE,2),:)
+            V3 = U3D_GRID%NODE_COORDS(U3D_GRID%FACE_NODES(IC,EMIT_TASK%IFACE,3),:)
+         END IF
 
          DO IS = 1, MIXTURES(EMIT_TASK%MIX_ID)%N_COMPONENTS ! Loop on mixture components
 
@@ -239,41 +254,63 @@ MODULE timecycle
 
                CALL MAXWELL(0.d0, 0.d0, 0.d0, &
                            EMIT_TASK%TTRA, EMIT_TASK%TTRA, EMIT_TASK%TTRA, &
-                           Vdummy, V_PARA, VZ, M)
+                           Vdummy, V_TANG1, V_TANG2, M)
 
                CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, EMIT_TASK%TROT, EROT)
                CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, EMIT_TASK%TVIB, EVIB)
 
                V_NORM = FLX(EMIT_TASK%S_NORM, EMIT_TASK%TTRA, M)
 
-               NORMX = -U2D_GRID%EDGE_NORMAL(EMIT_TASK%IC,EMIT_TASK%IEDGE,1)
-               NORMY = -U2D_GRID%EDGE_NORMAL(EMIT_TASK%IC,EMIT_TASK%IEDGE,2)
-
-               VX = V_NORM*NORMX - V_PARA*NORMY + EMIT_TASK%UX
-               VY = V_PARA*NORMX + V_NORM*NORMY + EMIT_TASK%UY
-               VZ = VZ + EMIT_TASK%UZ
+               VX = EMIT_TASK%UX &
+                  - V_NORM*FACE_NORMAL(1) &
+                  - V_TANG1*FACE_TANG1(1) &
+                  - V_TANG2*FACE_TANG2(1)
+               VY = EMIT_TASK%UY &
+                  - V_NORM*FACE_NORMAL(2) &
+                  - V_TANG1*FACE_TANG1(2) &
+                  - V_TANG2*FACE_TANG2(2)
+               VZ = EMIT_TASK%UZ &
+                  - V_NORM*FACE_NORMAL(3) &
+                  - V_TANG1*FACE_TANG1(3) &
+                  - V_TANG2*FACE_TANG2(3)
 
                DTFRAC = rf()*DT
 
-               R = rf()
-               IF (AXI) THEN
-                  IF (Y1 == Y2) THEN
-                     Y = Y1
-                     X = X1 + R*(X2-X1)
-                     Z = 0
-                  ELSE IF (Y1 < Y2) THEN
-                     Y = SQRT(Y1*Y1 + R*(Y2*Y2 - Y1*Y1))
-                     X = X1 + (Y-Y1)/(Y2-Y1)*(X2-X1)
-                     Z = 0
+               IF (DIMS == 2) THEN
+                  R = rf()
+                  IF (AXI) THEN
+                     IF (Y1 == Y2) THEN
+                        Y = Y1
+                        X = X1 + R*(X2-X1)
+                        Z = 0
+                     ELSE IF (Y1 < Y2) THEN
+                        Y = SQRT(Y1*Y1 + R*(Y2*Y2 - Y1*Y1))
+                        X = X1 + (Y-Y1)/(Y2-Y1)*(X2-X1)
+                        Z = 0
+                     ELSE
+                        Y = SQRT(Y2*Y2 + R*(Y1*Y1 - Y2*Y2))
+                        X = X2 + (Y-Y2)/(Y1-Y2)*(X1-X2)
+                        Z = 0
+                     END IF
                   ELSE
-                     Y = SQRT(Y2*Y2 + R*(Y1*Y1 - Y2*Y2))
-                     X = X2 + (Y-Y2)/(Y1-Y2)*(X1-X2)
-                     Z = 0
+                     X = X1 + R*(X2-X1)
+                     Y = Y1 + R*(Y2-Y1)
+                     Z = ZMIN + (ZMAX-ZMIN)*rf()
                   END IF
-               ELSE
-                  X = X1 + R*(X2-X1)
-                  Y = Y1 + R*(Y2-Y1)
-                  Z = ZMIN + (ZMAX-ZMIN)*rf()
+               ELSE IF (DIMS == 3) THEN
+                  S = rf()
+                  T = rf()
+                  
+                  IF (S > 1-T) THEN
+                     Q = 1-T
+                     P = 1-S
+                  ELSE
+                     Q = S
+                  END IF
+
+                  X = V1(1) + (V2(1)-V1(1))*P + (V3(1)-V1(1))*Q
+                  Y = V1(2) + (V2(2)-V1(2))*P + (V3(2)-V1(2))*Q
+                  Z = V1(3) + (V2(3)-V1(3))*P + (V3(3)-V1(3))*Q
                END IF
 
                ! Init a particle object and assign it to the local vector of particles
@@ -721,7 +758,7 @@ MODULE timecycle
       IMPLICIT NONE
 
       INTEGER      :: IP, IC, i, SOL, OLD_IC
-      INTEGER      :: BOUNDCOLL, WALLCOLL, GOODSOL, EDGE_PG
+      INTEGER      :: BOUNDCOLL, WALLCOLL, GOODSOL, FACE_PG, NEIGHBOR
       REAL(KIND=8) :: DTCOLL, TOTDTCOLL, CANDIDATE_DTCOLL, rfp
       REAL(KIND=8) :: COEFA, COEFB, COEFC, DELTA, SOL1, SOL2, ALPHA, BETA
       REAL(KIND=8), DIMENSION(2) :: TEST
@@ -731,7 +768,8 @@ MODULE timecycle
       LOGICAL, DIMENSION(:), ALLOCATABLE :: REMOVE_PART
       REAL(KIND=8), DIMENSION(3) :: V_OLD, V_NEW
       REAL(KIND=8), DIMENSION(3) :: E, B
-      REAL(KIND=8) :: V_NORM, V_PARA, V_PERP, VZ, VDUMMY, EROT, EVIB, VDOTN, WALL_TEMP
+      REAL(KIND=8), DIMENSION(3) :: FACE_NORMAL, FACE_TANG1, FACE_TANG2
+      REAL(KIND=8) :: V_NORM, V_TANG1, V_TANG2, V_PERP, VZ, VDUMMY, EROT, EVIB, VDOTN, WALL_TEMP
       INTEGER :: S_ID
       LOGICAL :: HASCOLLIDED
       REAL(KIND=8) :: XCOLL, YCOLL, COLLDIST, EDGE_X1, EDGE_Y1
@@ -832,9 +870,10 @@ MODULE timecycle
                !' velocity: ', particles(IP)%VX, particles(IP)%VY
                ! For unstructured, we only need to check the boundaries of the cell.
                BOUNDCOLL = -1
-               DO I = 1, 3
+               
                   
-                  IF (AXI) THEN
+               IF (AXI) THEN
+                  DO I = 1, 3
                      !!!! DBDBDBDBDDBBDBDBDBDBDBDBDBDBDBDDB work on this. To be adapted to the three sides of the cell.
                      ! We are axisymmetric
                      CANDIDATE_DTCOLL = DTCOLL
@@ -914,68 +953,110 @@ MODULE timecycle
                            CALL MOVE_PARTICLE(IP, -TEST(SOL))
                         END DO
                      END IF
+                  END DO
+               ELSE
+                  ! We are not axisymmetric (valid also for simplified axisymmetric procedure)
+                  IF (DIMS == 2) THEN
+                     DO I = 1, 3
+                        VN = particles(IP)%VX * U2D_GRID%EDGE_NORMAL(IC,I,1) &
+                           + particles(IP)%VY * U2D_GRID%EDGE_NORMAL(IC,I,2)
+                        ! Compute the distance from the boundary
+                        DX = (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),1) - particles(IP)%X) * U2D_GRID%EDGE_NORMAL(IC,I,1) &
+                           + (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),2) - particles(IP)%Y) * U2D_GRID%EDGE_NORMAL(IC,I,2)
+                        ! Check if a collision happens (sooner than previously calculated)
+                        IF (VN .GE. 0. .AND. VN * DTCOLL .GT. DX) THEN
 
-                  ELSE
-                     ! We are not axisymmetric (valid also for simplified axisymmetric procedure)
+                           DTCOLL = DX/VN
+                           BOUNDCOLL = I
+                           TOTDTCOLL = TOTDTCOLL + DTCOLL  
+                           HASCOLLIDED = .TRUE.     
 
-                     VN = particles(IP)%VX * U2D_GRID%EDGE_NORMAL(IC,I,1) &
-                        + particles(IP)%VY * U2D_GRID%EDGE_NORMAL(IC,I,2)
-                     ! Compute the distance from the boundary
-                     DX = (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),1) - particles(IP)%X) * U2D_GRID%EDGE_NORMAL(IC,I,1) &
-                        + (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),2) - particles(IP)%Y) * U2D_GRID%EDGE_NORMAL(IC,I,2)
-                     ! Check if a collision happens (sooner than previously calculated)
-                     IF (VN .GE. 0. .AND. VN * DTCOLL .GT. DX) THEN
+                        END IF
+                     END DO
+                  ELSE IF (DIMS == 3) THEN
+                     DO I = 1, 4
+                        VN = particles(IP)%VX * U3D_GRID%FACE_NORMAL(IC,I,1) &
+                           + particles(IP)%VY * U3D_GRID%FACE_NORMAL(IC,I,2) &
+                           + particles(IP)%VZ * U3D_GRID%FACE_NORMAL(IC,I,3)
+                        ! Compute the distance from the boundary
+                        DX = (U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(IC,I),1) - particles(IP)%X) * U3D_GRID%FACE_NORMAL(IC,I,1) &
+                           + (U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(IC,I),2) - particles(IP)%Y) * U3D_GRID%FACE_NORMAL(IC,I,2) &
+                           + (U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(IC,I),3) - particles(IP)%Z) * U3D_GRID%FACE_NORMAL(IC,I,3)
+                        ! Check if a collision happens (sooner than previously calculated)
+                        IF (VN .GE. 0. .AND. VN * DTCOLL .GT. DX) THEN
 
-                        DTCOLL = DX/VN
-                        BOUNDCOLL = I
-                        TOTDTCOLL = TOTDTCOLL + DTCOLL  
-                        HASCOLLIDED = .TRUE.     
+                           DTCOLL = DX/VN
+                           BOUNDCOLL = I
+                           TOTDTCOLL = TOTDTCOLL + DTCOLL  
+                           HASCOLLIDED = .TRUE.     
 
-                     END IF
+                        END IF
+                     END DO
                   END IF
 
-               END DO
+               END IF
 
                IF (BOUNDCOLL .NE. -1) THEN
                   IF (particles(IP)%Y == 0.d0 .AND. DTCOLL == 0.d0) WRITE(*,*) 'Here 1.'
                   CALL MOVE_PARTICLE(IP, DTCOLL)
                   particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
 
+                  IF (DIMS == 2) THEN
+                     NEIGHBOR = U2D_GRID%CELL_NEIGHBORS(IC, BOUNDCOLL)
+                     FACE_PG = U2D_GRID%CELL_EDGES_PG(IC, BOUNDCOLL)
+                     FACE_NORMAL = U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,:)
+                     FACE_TANG1 = [-FACE_NORMAL(2), FACE_NORMAL(1), 0.d0]
+                     FACE_TANG2 = [0.d0, 0.d0, 1.d0]
+                  ELSE IF (DIMS == 3) THEN
+                     NEIGHBOR = U3D_GRID%CELL_NEIGHBORS(IC, BOUNDCOLL)
+                     FACE_PG = U3D_GRID%CELL_FACES_PG(IC, BOUNDCOLL)
+                     FACE_NORMAL = U3D_GRID%FACE_NORMAL(IC,BOUNDCOLL,:)
+                     FACE_TANG1 = U3D_GRID%FACE_TANG1(IC,BOUNDCOLL,:)
+                     FACE_TANG2 = U3D_GRID%FACE_TANG2(IC,BOUNDCOLL,:)
+                  END IF
+
                   ! Move to new cell
-                  IF (U2D_GRID%CELL_NEIGHBORS(IC, BOUNDCOLL) == -1) THEN
-                     EDGE_PG = U2D_GRID%CELL_EDGES_PG(IC, BOUNDCOLL)
-                     IF (EDGE_PG .NE. -1) THEN
+                  IF (NEIGHBOR == -1) THEN
+                     IF (FACE_PG .NE. -1) THEN
                         ! Apply particle boundary condition
-                        IF (GRID_BC(EDGE_PG)%PARTICLE_BC == SPECULAR) THEN
-                           IF (GRID_BC(EDGE_PG)%REACT) THEN
+                        IF (GRID_BC(FACE_PG)%PARTICLE_BC == SPECULAR) THEN
+                           IF (GRID_BC(FACE_PG)%REACT) THEN
                               CALL WALL_REACT(IP, REMOVE_PART(IP))
                            END IF
                            
-                           VDOTN = particles(IP)%VX*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,1) &
-                                 + particles(IP)%VY*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,2)
-                           particles(IP)%VX = particles(IP)%VX - 2.*VDOTN*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,1)
-                           particles(IP)%VY = particles(IP)%VY - 2.*VDOTN*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,2)
-                        ELSE IF (GRID_BC(EDGE_PG)%PARTICLE_BC == DIFFUSE) THEN
-                           IF (GRID_BC(EDGE_PG)%REACT) THEN
+                           VDOTN = particles(IP)%VX*FACE_NORMAL(1) &
+                                 + particles(IP)%VY*FACE_NORMAL(2) &
+                                 + particles(IP)%VZ*FACE_NORMAL(3)
+                           particles(IP)%VX = particles(IP)%VX - 2.*VDOTN*FACE_NORMAL(1)
+                           particles(IP)%VY = particles(IP)%VY - 2.*VDOTN*FACE_NORMAL(2)
+                           particles(IP)%VZ = particles(IP)%VZ - 2.*VDOTN*FACE_NORMAL(3)
+                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == DIFFUSE) THEN
+                           IF (GRID_BC(FACE_PG)%REACT) THEN
                               CALL WALL_REACT(IP, REMOVE_PART(IP))
                            END IF
 
                            S_ID = particles(IP)%S_ID
-                           WALL_TEMP = GRID_BC(EDGE_PG)%WALL_TEMP
+                           WALL_TEMP = GRID_BC(FACE_PG)%WALL_TEMP
                            CALL MAXWELL(0.d0, 0.d0, 0.d0, &
                            WALL_TEMP, WALL_TEMP, WALL_TEMP, &
-                           VDUMMY, V_PARA, VZ, SPECIES(S_ID)%MOLECULAR_MASS)
+                           VDUMMY, V_TANG1, V_TANG2, SPECIES(S_ID)%MOLECULAR_MASS)
 
                            CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, WALL_TEMP, EROT)
                            CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, WALL_TEMP, EVIB)
                                           
                            V_PERP = FLX(0.d0, WALL_TEMP, SPECIES(S_ID)%MOLECULAR_MASS)
 
-                           particles(IP)%VX = - V_PERP*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,1) &
-                                            - V_PARA*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,2)
-                           particles(IP)%VY = - V_PERP*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,2) &
-                                            + V_PARA*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,1)
-                           particles(IP)%VZ = VZ
+
+                           particles(IP)%VX = - V_PERP*FACE_NORMAL(1) &
+                                              - V_TANG1*FACE_TANG1(1) &
+                                              - V_TANG2*FACE_TANG2(1)
+                           particles(IP)%VY = - V_PERP*FACE_NORMAL(2) &
+                                              - V_TANG1*FACE_TANG1(2) &
+                                              - V_TANG2*FACE_TANG2(2)
+                           particles(IP)%VZ = - V_PERP*FACE_NORMAL(3) &
+                                              - V_TANG1*FACE_TANG1(3) &
+                                              - V_TANG2*FACE_TANG2(3)
+                           
                            particles(IP)%EROT = EROT
                            particles(IP)%EVIB = EVIB
                         ELSE
@@ -987,8 +1068,8 @@ MODULE timecycle
                         particles(IP)%DTRIM = 0.d0
                      END IF
                   ELSE
-                     particles(IP)%IC = U2D_GRID%CELL_NEIGHBORS(IC, BOUNDCOLL)
-                     IC = particles(IP)%IC
+                     particles(IP)%IC = NEIGHBOR
+                     IC = NEIGHBOR
                      !WRITE(*,*) 'moved particle to cell: ', IC
                   END IF
                ELSE

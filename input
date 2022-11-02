@@ -10,16 +10,16 @@
 !!!! All units are SI [m, kg, s, ...]                                      !!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Restart:
-    200
+!Restart:
+!    200
 
 ! ========= Computational domain and grid ===========
 Dimensions:
-    2
+    3
 Axisymmetric:
     .FALSE.
 Number_of_cells:
-    50    50    1
+    1    1    1
 Domain_limits:
     -1.0    1.0    -1.0    1.0    -0.5    0.5
 Domain_periodicity:
@@ -32,9 +32,9 @@ Boundary_temperature:
     300.0
     
 PIC_type:
-    explicit
-!Mesh_file_SU2:
-!    'plate_5mm_big.su2'
+    none
+Mesh_file_SU2:
+    '3dtest.su2'
 Bool_dump_moments:
     .FALSE.
 Bool_dump_fluxes:
@@ -49,11 +49,11 @@ Fluxes_dump_output:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0e7
+    1.0e4
 Timestep:
-    1.0e-9
+    1.0e-5
 Number_of_timesteps:
-    1000
+    100
 Stats_every:
     1
 
@@ -67,15 +67,15 @@ Binary_output:
 Dump_grid_start:
     0
 Dump_grid_avgevery:
-    100
+    10
 Dump_grid_numavgs:
     1
 Dump_part_start:
-    0
+    10000
 
 
 Perform_checks:
-    .TRUE.
+    .FALSE.
 
 ! ========= Multispecies ==============================
 
@@ -83,7 +83,7 @@ Species_file:
     ar.species
 
 Def_mixture:
-    Plasma Ar+ 0.5 e 0.5
+    Argon Ar 1.0
 
 ! ========= Collisions ==============================
 
@@ -124,8 +124,8 @@ Thermal_bath_Ttr:
 ! ========= Initial particle seed ===================
 
 
-Initial_particles:
-    Plasma   1.0e12    0.0    0.    0.    11600.0    11600.0    11600.0    0.    0.
+!Initial_particles:
+!    Plasma   1.0e12    0.0    0.    0.    11600.0    11600.0    11600.0    0.    0.
 
     
 !Boundary_condition:
@@ -143,14 +143,14 @@ Initial_particles:
 !Boundary_condition:
 !    Grid    vacuum
 
-!Boundary_condition:
-!    Axis    specular
+Boundary_condition:
+    OuterWall    vacuum
 
-!Boundary_condition:
-!    Plate    specular
+Boundary_condition:
+    PFGWall    diffuse    50.0
 
-!Boundary_emit:
-!    Flow    Argon    7.0711e18    3226.0    0.0    0.0    300.0    300.0    300.0
+Boundary_emit:
+    Emitter    Argon    1.0e15    0.0    0.0    0.0    300.0    300.0    300.0
 
     
 !Solenoid_field:

@@ -731,12 +731,6 @@ MODULE collisions
       END IF
    
       ! =========== Here, create vectors of particle indices ===========
-   
-      IF (GRID_TYPE == UNSTRUCTURED) THEN
-         NCELLS = U2D_GRID%NUM_CELLS
-      ELSE
-         NCELLS = NX*NY
-      END IF
 
 
       ALLOCATE(NPC(NCELLS))

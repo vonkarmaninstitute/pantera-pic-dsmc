@@ -136,7 +136,7 @@ MODULE grid_and_partition
       INTEGER, INTENT(IN)     :: IDCELL
       INTEGER, INTENT(OUT)     :: IDPROC
 
-      INTEGER :: NCELLS, NCELLSPP
+      INTEGER :: NCELLSPP
       
       IF (N_MPI_THREADS == 1) THEN ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ Serial operation
 
@@ -150,10 +150,12 @@ MODULE grid_and_partition
       ! The domain partition is thus in strips along the "x" axis, as the cells are assumed 
       ! to be numbered along x.
          IF (GRID_TYPE == UNSTRUCTURED) THEN
-            IDPROC = U2D_GRID%CELL_PROC(IDCELL)
-         ELSE
-            NCELLS = NX*NY
-            
+            IF (DIMS == 2) THEN
+               IDPROC = U2D_GRID%CELL_PROC(IDCELL)
+            ELSE
+               IDPROC = U3D_GRID%CELL_PROC(IDCELL)
+            END IF
+         ELSE            
             NCELLSPP = CEILING(REAL(NCELLS)/REAL(N_MPI_THREADS))
 
             ! 3) Here is the process ID 
@@ -850,6 +852,9 @@ MODULE grid_and_partition
 
       DEALLOCATE(ORDER)
 
+      NCELLS = U2D_GRID%NUM_CELLS
+      NNODES = U2D_GRID%NUM_NODES
+
    END SUBROUTINE READ_2D_UNSTRUCTURED_GRID_SU2
 
 
@@ -865,27 +870,25 @@ MODULE grid_and_partition
 
       CHARACTER*256, INTENT(IN) :: FILENAME
 
-      CHARACTER*256 :: LINE, GROUPNAME
+      CHARACTER*256 :: LINE, GROUPNAME, DUMMYLINE
 
       INTEGER, PARAMETER :: in5 = 2385
       INTEGER            :: ios
       INTEGER            :: ReasonEOF
 
-      INTEGER            :: NUM, I, J, FOUND, V1, V2, V3, ELEM_TYPE, NUMELEMS, IC
+      INTEGER            :: NUM, I, J, FOUND, V1, V2, V3, ELEM_TYPE, NUMELEMS
       INTEGER, DIMENSION(4,3) :: IND
-      REAL(KIND=8)       :: X1, X2, Y1, Y2, AREA, VOL, RAD
       REAL(KIND=8), DIMENSION(3) :: XYZ, A, B, C, CROSSP
 
       INTEGER, DIMENSION(:,:), ALLOCATABLE      :: TEMP_CELL_NEIGHBORS
 
       INTEGER, DIMENSION(3) :: VLIST, WHICH1, WHICH2
 
-      INTEGER :: NCELLSPP
-
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CENTROID
-      INTEGER, DIMENSION(:), ALLOCATABLE      :: ORDER
-      INTEGER :: IMIN, TEMP1
-      REAL(KIND=8) :: TEMP2
+      REAL(KIND=8) :: COORDMAX, COORDMIN
+
+      INTEGER, DIMENSION(:), ALLOCATABLE :: N_CELLS_WITH_NODE, CELL_WITH_NODE, IOF
+      INTEGER :: IDX, JN, JC1, JC2
 
 
       ! Open input file for reading
@@ -926,7 +929,78 @@ MODULE grid_and_partition
 
             ALLOCATE(U3D_GRID%CELL_FACES_PG(U3D_GRID%NUM_CELLS, 4))
             U3D_GRID%CELL_FACES_PG = -1
+         ELSE IF (LINE == 'NMARK=') THEN
+            DO I = 1, NUM
+               READ(in5,*, IOSTAT=ReasonEOF) LINE, GROUPNAME
+               IF (LINE .NE. 'MARKER_TAG=') THEN
+                  WRITE(*,*) 'Error! did not find marker name.'
+               ELSE
+                  WRITE(*,*) 'Found marker tag, with groupname: ', GROUPNAME
+               END IF
+
+               READ(in5,*, IOSTAT=ReasonEOF) LINE, NUMELEMS
+               IF (LINE .NE. 'MARKER_ELEMS=') THEN
+                  WRITE(*,*) 'Error! did not find marker elements.'
+               ELSE
+                  WRITE(*,*) 'Found marker elements, with number of elements: ', NUMELEMS
+               END IF
+
+               DO J = 1, NUMELEMS
+                  READ(in5,*, IOSTAT=ReasonEOF) DUMMYLINE
+               END DO
+            END DO
+         END IF
+      END DO
+
+      REWIND(in5)
+
+
+
+      ALLOCATE(N_CELLS_WITH_NODE(U3D_GRID%NUM_NODES))
+      ALLOCATE(IOF(U3D_GRID%NUM_NODES))
+
+      N_CELLS_WITH_NODE = 0
+      DO I = 1, U3D_GRID%NUM_CELLS
+         DO V1 = 1, 4
+            JN = U3D_GRID%CELL_NODES(I,V1)
+            N_CELLS_WITH_NODE(JN) = N_CELLS_WITH_NODE(JN) + 1
+         END DO
+      END DO
+   
+      IOF = -1
+      IDX = 1
+      DO JN = 1, U3D_GRID%NUM_NODES
+         IF (N_CELLS_WITH_NODE(JN) .NE. 0) THEN
+            IOF(JN) = IDX
+            IDX = IDX + N_CELLS_WITH_NODE(JN)
+         END IF
+      END DO
+   
+      ALLOCATE(CELL_WITH_NODE(IDX))
       
+      N_CELLS_WITH_NODE = 0
+      DO I = 1, U3D_GRID%NUM_CELLS
+         DO V1 = 1, 4
+            JN = U3D_GRID%CELL_NODES(I,V1)
+            CELL_WITH_NODE(IOF(JN) + N_CELLS_WITH_NODE(JN)) = I
+            N_CELLS_WITH_NODE(JN) = N_CELLS_WITH_NODE(JN) + 1
+         END DO
+      END DO
+
+
+      DO
+         READ(in5,*, IOSTAT=ReasonEOF) LINE, NUM
+         IF (ReasonEOF < 0) EXIT 
+         WRITE(*,*) 'Read line:', LINE, ' number ', NUM
+         
+         IF (LINE == 'NPOIN=') THEN
+            DO I = 1, NUM
+               READ(in5,*, IOSTAT=ReasonEOF) DUMMYLINE
+            END DO
+         ELSE IF (LINE == 'NELEM=') THEN
+            DO I = 1, NUM
+               READ(in5,*, IOSTAT=ReasonEOF) DUMMYLINE
+            END DO
          ELSE IF (LINE == 'NMARK=') THEN
 
             ! Assign physical groups to cell edges.
@@ -957,25 +1031,38 @@ MODULE grid_and_partition
                   READ(in5,*, IOSTAT=ReasonEOF) ELEM_TYPE, VLIST
                   IF (ELEM_TYPE .NE. 5) WRITE(*,*) 'Error! element type was not triangle.'
                   VLIST = VLIST + 1
-                  DO IC = 1, U3D_GRID%NUM_CELLS
-                     IF      (ANY(VLIST == U3D_GRID%CELL_NODES(IC, 1)) .AND. &
-                              ANY(VLIST == U3D_GRID%CELL_NODES(IC, 3)) .AND. &
-                              ANY(VLIST == U3D_GRID%CELL_NODES(IC, 2))) THEN
-                        U3D_GRID%CELL_FACES_PG(IC, 1) = I
-                     ELSE IF (ANY(VLIST == U3D_GRID%CELL_NODES(IC, 1)) .AND. &
-                              ANY(VLIST == U3D_GRID%CELL_NODES(IC, 2)) .AND. &
-                              ANY(VLIST == U3D_GRID%CELL_NODES(IC, 4))) THEN
-                        U3D_GRID%CELL_FACES_PG(IC, 2) = I
-                     ELSE IF (ANY(VLIST == U3D_GRID%CELL_NODES(IC, 2)) .AND. &
-                              ANY(VLIST == U3D_GRID%CELL_NODES(IC, 3)) .AND. &
-                              ANY(VLIST == U3D_GRID%CELL_NODES(IC, 4))) THEN
-                        U3D_GRID%CELL_FACES_PG(IC, 3) = I
-                     ELSE IF (ANY(VLIST == U3D_GRID%CELL_NODES(IC, 1)) .AND. &
-                              ANY(VLIST == U3D_GRID%CELL_NODES(IC, 4)) .AND. &
-                              ANY(VLIST == U3D_GRID%CELL_NODES(IC, 3))) THEN
-                        U3D_GRID%CELL_FACES_PG(IC, 4) = I
-                     END IF
-                  END DO
+
+                  JN = VLIST(1)
+                  IF (N_CELLS_WITH_NODE(JN) > 0) THEN
+                     DO IDX = 0, N_CELLS_WITH_NODE(JN) - 1
+                        JC1 = CELL_WITH_NODE(IOF(JN) + IDX)
+                        FOUND = 0
+                        DO V1 = 1, 4
+                           IF (ANY(VLIST == U3D_GRID%CELL_NODES(JC1,V1))) THEN
+                              FOUND = FOUND + 1
+                              WHICH1(FOUND) = V1
+                           END IF
+                        END DO
+         
+                        IF (FOUND == 3) THEN
+            
+                           IF (ANY(WHICH1 == 1)) THEN
+                              IF (ANY(WHICH1 == 2)) THEN
+                                 IF (ANY(WHICH1 == 3))  THEN
+                                    U3D_GRID%CELL_FACES_PG(JC1, 1) = I
+                                 ELSE IF (ANY(WHICH1 == 4)) THEN
+                                    U3D_GRID%CELL_FACES_PG(JC1, 2) = I
+                                 END IF
+                              ELSE IF (ANY(WHICH1 == 3)) THEN
+                                 IF (ANY(WHICH1 == 4)) U3D_GRID%CELL_FACES_PG(JC1, 4) = I
+                              END IF
+                           ELSE IF (ANY(WHICH1 == 2)) THEN
+                              IF (ANY(WHICH1 == 3) .AND. ANY(WHICH1 == 4)) U3D_GRID%CELL_FACES_PG(JC1, 3) = I
+                           END IF
+
+                        END IF
+                     END DO
+                  END IF
 
                END DO
             END DO
@@ -996,6 +1083,10 @@ MODULE grid_and_partition
       !   WRITE(*,*) U3D_GRID%CELL_NODES(I,:)
       !END DO
 
+      WRITE(*,*) '==========================================='
+      WRITE(*,*) 'Computing cell volumes.'
+      WRITE(*,*) '==========================================='
+
       ! Compute cell volumes
       ALLOCATE(CELL_VOLUMES(U3D_GRID%NUM_CELLS))
       DO I = 1, U3D_GRID%NUM_CELLS
@@ -1006,45 +1097,81 @@ MODULE grid_and_partition
          CELL_VOLUMES(I) = ABS(C(1)*(A(2)*B(3)-A(3)*B(2)) + C(2)*(A(3)*B(1)-A(1)*B(3)) + C(3)*(A(1)*B(2)-A(2)*B(1))) / 6.
       END DO
 
-      ! Find cell connectivity
+      WRITE(*,*) '==========================================='
+      WRITE(*,*) 'Computing grid connectivity.'
+      WRITE(*,*) '==========================================='
+
+
+
       ALLOCATE(TEMP_CELL_NEIGHBORS(U3D_GRID%NUM_CELLS, 4))
       TEMP_CELL_NEIGHBORS = -1
-      DO I = 1, U3D_GRID%NUM_CELLS
-         DO J = I, U3D_GRID%NUM_CELLS
-            IF (I == J) CYCLE
-            FOUND = 0
-            DO V1 = 1, 4
-               DO V2 = 1, 4
-                  IF (U3D_GRID%CELL_NODES(I,V1) == U3D_GRID%CELL_NODES(J,V2)) THEN
-                     FOUND = FOUND + 1
-                     IF (FOUND .GT. 3) CALL ERROR_ABORT('Error! Found duplicate cells in the mesh!')
-                     WHICH1(FOUND) = V1
-                     WHICH2(FOUND) = V2
+
+      DO JN = 1, U3D_GRID%NUM_NODES
+         !IF (PROC_ID == 0) WRITE(*,*) 'Checking node ', JN, ' of ',  U3D_GRID%NUM_NODES
+         IF (N_CELLS_WITH_NODE(JN) > 1) THEN
+            DO I = 0, N_CELLS_WITH_NODE(JN) - 1
+               DO J = I, N_CELLS_WITH_NODE(JN) - 1
+                  IF (I == J) CYCLE
+                  JC1 = CELL_WITH_NODE(IOF(JN) + I)
+                  JC2 = CELL_WITH_NODE(IOF(JN) + J)
+
+
+                  FOUND = 0
+                  DO V1 = 1, 4
+                     DO V2 = 1, 4
+                        IF (U3D_GRID%CELL_NODES(JC1,V1) == U3D_GRID%CELL_NODES(JC2,V2)) THEN
+                           FOUND = FOUND + 1
+                           IF (FOUND .GT. 3) CALL ERROR_ABORT('Error! Found duplicate cells in the mesh!')
+                           WHICH1(FOUND) = V1
+                           WHICH2(FOUND) = V2
+                        END IF
+                     END DO
+                  END DO
+
+                  IF (FOUND == 3) THEN
+      
+                     IF (ANY(WHICH1 == 1)) THEN
+                        IF (ANY(WHICH1 == 2)) THEN
+                           IF (ANY(WHICH1 == 3))  THEN
+                              TEMP_CELL_NEIGHBORS(JC1, 1) = JC2
+                           ELSE IF (ANY(WHICH1 == 4)) THEN
+                              TEMP_CELL_NEIGHBORS(JC1, 2) = JC2
+                           END IF
+                        ELSE IF (ANY(WHICH1 == 3)) THEN
+                           IF (ANY(WHICH1 == 4)) TEMP_CELL_NEIGHBORS(JC1, 4) = JC2
+                        END IF
+                     ELSE IF (ANY(WHICH1 == 2)) THEN
+                        IF (ANY(WHICH1 == 3) .AND. ANY(WHICH1 == 4)) TEMP_CELL_NEIGHBORS(JC1, 3) = JC2
+                     END IF
+      
+      
+                     IF (ANY(WHICH2 == 1)) THEN
+                        IF (ANY(WHICH2 == 2)) THEN
+                           IF (ANY(WHICH2 == 3))  THEN
+                              TEMP_CELL_NEIGHBORS(JC2, 1) = JC1
+                           ELSE IF (ANY(WHICH2 == 4)) THEN
+                              TEMP_CELL_NEIGHBORS(JC2, 2) = JC1
+                           END IF
+                        ELSE IF (ANY(WHICH2 == 3)) THEN
+                           IF (ANY(WHICH2 == 4)) TEMP_CELL_NEIGHBORS(JC2, 4) = JC1
+                        END IF
+                     ELSE IF (ANY(WHICH2 == 2)) THEN
+                        IF (ANY(WHICH2 == 3) .AND. ANY(WHICH2 == 4)) TEMP_CELL_NEIGHBORS(JC2, 3) = JC1
+                     END IF
+      
                   END IF
+
+
                END DO
             END DO
-            IF (FOUND == 3) THEN
-               IF (ANY(WHICH1 == 1) .AND. ANY(WHICH1 == 3) .AND. ANY(WHICH1 == 2)) TEMP_CELL_NEIGHBORS(I, 1) = J
-               IF (ANY(WHICH1 == 1) .AND. ANY(WHICH1 == 2) .AND. ANY(WHICH1 == 4)) TEMP_CELL_NEIGHBORS(I, 2) = J
-               IF (ANY(WHICH1 == 2) .AND. ANY(WHICH1 == 3) .AND. ANY(WHICH1 == 4)) TEMP_CELL_NEIGHBORS(I, 3) = J
-               IF (ANY(WHICH1 == 1) .AND. ANY(WHICH1 == 4) .AND. ANY(WHICH1 == 3)) TEMP_CELL_NEIGHBORS(I, 4) = J
-
-               IF (ANY(WHICH2 == 1) .AND. ANY(WHICH2 == 3) .AND. ANY(WHICH2 == 2)) TEMP_CELL_NEIGHBORS(J, 1) = I
-               IF (ANY(WHICH2 == 1) .AND. ANY(WHICH2 == 2) .AND. ANY(WHICH2 == 4)) TEMP_CELL_NEIGHBORS(J, 2) = I
-               IF (ANY(WHICH2 == 2) .AND. ANY(WHICH2 == 3) .AND. ANY(WHICH2 == 4)) TEMP_CELL_NEIGHBORS(J, 3) = I
-               IF (ANY(WHICH2 == 1) .AND. ANY(WHICH2 == 4) .AND. ANY(WHICH2 == 3)) TEMP_CELL_NEIGHBORS(J, 4) = I
-            END IF
-         END DO
+         END IF
       END DO
 
       U3D_GRID%CELL_NEIGHBORS = TEMP_CELL_NEIGHBORS
 
-
-      !WRITE(*,*) 'Generated grid connectivity. '
-      !DO I = 1, U2D_GRID%NUM_CELLS
-      !   WRITE(*,*) 'Cell ', I, ' neighbors cells ', TEMP_CELL_NEIGHBORS(I, :)
-      !END DO
-
+      WRITE(*,*) '==========================================='
+      WRITE(*,*) 'Computing face normals.'
+      WRITE(*,*) '==========================================='
 
       ! Compute cell edge normals
       IND(1,:) = [1,3,2]
@@ -1052,26 +1179,54 @@ MODULE grid_and_partition
       IND(3,:) = [2,3,4]
       IND(4,:) = [1,4,3]
       ALLOCATE(U3D_GRID%FACE_NORMAL(U3D_GRID%NUM_CELLS, 4, 3))
+      ALLOCATE(U3D_GRID%FACE_TANG1(U3D_GRID%NUM_CELLS, 4, 3))
+      ALLOCATE(U3D_GRID%FACE_TANG2(U3D_GRID%NUM_CELLS, 4, 3))
+      ALLOCATE(U3D_GRID%FACE_NODES(U3D_GRID%NUM_CELLS, 4, 3))
+      ALLOCATE(U3D_GRID%CELL_FACES_COEFFS(U3D_GRID%NUM_CELLS, 4, 4))
       ALLOCATE(U3D_GRID%FACE_AREA(U3D_GRID%NUM_CELLS, 4))
+
       DO I = 1, U3D_GRID%NUM_CELLS
          DO J = 1, 4
+            V1 = U3D_GRID%CELL_NODES(I,IND(J,1))
+            V2 = U3D_GRID%CELL_NODES(I,IND(J,2))
+            V3 = U3D_GRID%CELL_NODES(I,IND(J,3))
 
-            A = U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,IND(J,2)), :) &
-              - U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,IND(J,1)), :)
-            B = U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,IND(J,3)), :) &
-              - U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,IND(J,1)), :)
+            U3D_GRID%FACE_NODES(I,J,1) = V1
+            U3D_GRID%FACE_NODES(I,J,2) = V2
+            U3D_GRID%FACE_NODES(I,J,3) = V3
+
+            A = U3D_GRID%NODE_COORDS(V1,:)
+            B = U3D_GRID%NODE_COORDS(V2,:)
+            C = U3D_GRID%NODE_COORDS(V3,:)
             
-            CROSSP = CROSS(A,B)
+            CROSSP = CROSS(B-A,C-A)
             U3D_GRID%FACE_NORMAL(I,J,:) = CROSSP/NORM2(CROSSP)
             U3D_GRID%FACE_AREA(I,J) = 0.5*NORM2(CROSSP)
+            
+            U3D_GRID%FACE_TANG1(I,J,:) = (B-A)/NORM2(B-A)
+            U3D_GRID%FACE_TANG2(I,J,:) = CROSS(U3D_GRID%FACE_NORMAL(I,J,:), U3D_GRID%FACE_TANG1(I,J,:))
+
+
+            ! The coefficients (a,b,c,d) of a*x + b*y + c*z + d = 0
+            U3D_GRID%CELL_FACES_COEFFS(I,J,1) =  A(2)*B(3)-B(2)*A(3) &
+                                                +B(2)*C(3)-C(2)*B(3) &
+                                                +C(2)*A(3)-A(2)*C(3)
+            U3D_GRID%CELL_FACES_COEFFS(I,J,2) = -A(1)*B(3)+B(1)*A(3) &
+                                                -B(1)*C(3)+C(1)*B(3) &
+                                                -C(1)*A(3)+A(1)*C(3)
+            U3D_GRID%CELL_FACES_COEFFS(I,J,3) =  A(1)*B(2)-B(1)*A(2) &
+                                                +B(1)*C(2)-C(1)*B(2) &
+                                                +C(1)*A(2)-A(1)*C(2)
+            U3D_GRID%CELL_FACES_COEFFS(I,J,4) = -A(1)*B(2)*C(3) &
+                                                +A(1)*C(2)*B(3) &
+                                                +B(1)*A(2)*C(3) &
+                                                -B(1)*C(2)*A(3) &
+                                                -C(1)*A(2)*B(3) &
+                                                +C(1)*B(2)*A(3)
 
          END DO
       END DO
 
-
-      WRITE(*,*) '==========================================='
-      WRITE(*,*) 'Done reading grid file.'
-      WRITE(*,*) '==========================================='
 
       WRITE(*,*) '==========================================='
       WRITE(*,*) 'Partitioning domain.'
@@ -1085,31 +1240,22 @@ MODULE grid_and_partition
                      +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,4), 2)) / 4.
       END DO
 
-      ALLOCATE(ORDER(U3D_GRID%NUM_CELLS))
+      COORDMAX = MAXVAL(U3D_GRID%NODE_COORDS(:,2))
+      COORDMIN = MINVAL(U3D_GRID%NODE_COORDS(:,2))
 
-      DO I = 1, U3D_GRID%NUM_CELLS
-         ORDER(I) = I
-      END DO
-      DO I = 1, U3D_GRID%NUM_CELLS-1
-         ! find ith smallest in 'a'
-         IMIN = MINLOC(CENTROID(I:), 1) + I - 1
-         ! swap to position i in 'a' and 'b', if not already there
-         IF (IMIN .NE. I) THEN
-            TEMP2 = CENTROID(I); CENTROID(I) = CENTROID(IMIN); CENTROID(IMIN) = TEMP2
-            TEMP1 = ORDER(I); ORDER(I) = ORDER(IMIN); ORDER(IMIN) = TEMP1
-         END IF
-      END DO
-
-      DEALLOCATE(CENTROID)
-
-      ! Distributing cells over MPI processes
-      NCELLSPP = CEILING(REAL(U3D_GRID%NUM_CELLS)/REAL(N_MPI_THREADS))
       ALLOCATE(U3D_GRID%CELL_PROC(U3D_GRID%NUM_CELLS))
       DO I = 1, U3D_GRID%NUM_CELLS
-         U3D_GRID%CELL_PROC(ORDER(I)) = INT((I-1)/NCELLSPP)
+         U3D_GRID%CELL_PROC(I) = INT((CENTROID(I)-COORDMIN)/(COORDMAX-COORDMIN)*REAL(N_MPI_THREADS))
       END DO
 
-      DEALLOCATE(ORDER)
+      NCELLS = U3D_GRID%NUM_CELLS
+      NNODES = U3D_GRID%NUM_NODES
+
+
+      WRITE(*,*) '==========================================='
+      WRITE(*,*) 'Done reading grid file.'
+      WRITE(*,*) '==========================================='
+
 
    END SUBROUTINE READ_3D_UNSTRUCTURED_GRID_SU2
 

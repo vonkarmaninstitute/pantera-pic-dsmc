@@ -1002,42 +1002,70 @@ MODULE initialization
 
       WRITE(*,*) 'Read boundary emit definition. Parameters: ', IPG, ', ', MIX_NAME, ', ', MIX_ID, ', ', NRHO, ', ',&
        UX, ', ', UY, ', ', UZ, ', ', TTRA, ', ', TROT, ', ', TVIB
-
-      DO IC = 1, U2D_GRID%NUM_CELLS
-         DO I = 1, 3
-            IF (U2D_GRID%CELL_EDGES_PG(IC,I) == IPG) THEN
-               
-               ALLOCATE(TEMP_EMIT_TASKS(N_EMIT_TASKS+1)) ! Append the mixture to the list
-               TEMP_EMIT_TASKS(1:N_EMIT_TASKS) = EMIT_TASKS(1:N_EMIT_TASKS)
-               CALL MOVE_ALLOC(TEMP_EMIT_TASKS, EMIT_TASKS)
-               N_EMIT_TASKS = N_EMIT_TASKS + 1
-
-               EMIT_TASKS(N_EMIT_TASKS)%NRHO = NRHO
-               EMIT_TASKS(N_EMIT_TASKS)%UX = UX
-               EMIT_TASKS(N_EMIT_TASKS)%UY = UY
-               EMIT_TASKS(N_EMIT_TASKS)%UZ = UZ
-               EMIT_TASKS(N_EMIT_TASKS)%TTRA = TTRA
-               EMIT_TASKS(N_EMIT_TASKS)%TROT = TROT
-               EMIT_TASKS(N_EMIT_TASKS)%TVIB = TVIB
-               EMIT_TASKS(N_EMIT_TASKS)%MIX_ID = MIX_ID
-               EMIT_TASKS(N_EMIT_TASKS)%IC = IC
-               EMIT_TASKS(N_EMIT_TASKS)%IEDGE = I
-
-               IF (I == 1) THEN
-                  EMIT_TASKS(N_EMIT_TASKS)%IV1 = U2D_GRID%CELL_NODES(IC,1)
-                  EMIT_TASKS(N_EMIT_TASKS)%IV2 = U2D_GRID%CELL_NODES(IC,2)
-               ELSE IF (I == 2) THEN
-                  EMIT_TASKS(N_EMIT_TASKS)%IV1 = U2D_GRID%CELL_NODES(IC,2)
-                  EMIT_TASKS(N_EMIT_TASKS)%IV2 = U2D_GRID%CELL_NODES(IC,3)
-               ELSE
-                  EMIT_TASKS(N_EMIT_TASKS)%IV1 = U2D_GRID%CELL_NODES(IC,3)
-                  EMIT_TASKS(N_EMIT_TASKS)%IV2 = U2D_GRID%CELL_NODES(IC,1)
+      IF (DIMS == 2) THEN 
+         DO IC = 1, NCELLS
+            DO I = 1, 3
+               IF (U2D_GRID%CELL_EDGES_PG(IC,I) == IPG) THEN
+                  
+                  ALLOCATE(TEMP_EMIT_TASKS(N_EMIT_TASKS+1)) ! Append the mixture to the list
+                  TEMP_EMIT_TASKS(1:N_EMIT_TASKS) = EMIT_TASKS(1:N_EMIT_TASKS)
+                  CALL MOVE_ALLOC(TEMP_EMIT_TASKS, EMIT_TASKS)
+                  N_EMIT_TASKS = N_EMIT_TASKS + 1
+   
+                  EMIT_TASKS(N_EMIT_TASKS)%NRHO = NRHO
+                  EMIT_TASKS(N_EMIT_TASKS)%UX = UX
+                  EMIT_TASKS(N_EMIT_TASKS)%UY = UY
+                  EMIT_TASKS(N_EMIT_TASKS)%UZ = UZ
+                  EMIT_TASKS(N_EMIT_TASKS)%TTRA = TTRA
+                  EMIT_TASKS(N_EMIT_TASKS)%TROT = TROT
+                  EMIT_TASKS(N_EMIT_TASKS)%TVIB = TVIB
+                  EMIT_TASKS(N_EMIT_TASKS)%MIX_ID = MIX_ID
+                  EMIT_TASKS(N_EMIT_TASKS)%IC = IC
+                  EMIT_TASKS(N_EMIT_TASKS)%IFACE = I
+   
+                  
+                  IF (I == 1) THEN
+                     EMIT_TASKS(N_EMIT_TASKS)%IV1 = U2D_GRID%CELL_NODES(IC,1)
+                     EMIT_TASKS(N_EMIT_TASKS)%IV2 = U2D_GRID%CELL_NODES(IC,2)
+                  ELSE IF (I == 2) THEN
+                     EMIT_TASKS(N_EMIT_TASKS)%IV1 = U2D_GRID%CELL_NODES(IC,2)
+                     EMIT_TASKS(N_EMIT_TASKS)%IV2 = U2D_GRID%CELL_NODES(IC,3)
+                  ELSE
+                     EMIT_TASKS(N_EMIT_TASKS)%IV1 = U2D_GRID%CELL_NODES(IC,3)
+                     EMIT_TASKS(N_EMIT_TASKS)%IV2 = U2D_GRID%CELL_NODES(IC,1)
+                  END IF
+   
+                  ! NFS WILL BE INITIALIZED LATER.
                END IF
-
-               ! NFS WILL BE INITIALIZED LATER.
-            END IF
+            END DO
+         END DO      
+      ELSE IF (DIMS == 3) THEN
+         DO IC = 1, NCELLS
+            DO I = 1, 4
+               IF (U3D_GRID%CELL_FACES_PG(IC,I) == IPG) THEN
+                  ALLOCATE(TEMP_EMIT_TASKS(N_EMIT_TASKS+1)) ! Append the mixture to the list
+                  TEMP_EMIT_TASKS(1:N_EMIT_TASKS) = EMIT_TASKS(1:N_EMIT_TASKS)
+                  CALL MOVE_ALLOC(TEMP_EMIT_TASKS, EMIT_TASKS)
+                  N_EMIT_TASKS = N_EMIT_TASKS + 1
+   
+                  EMIT_TASKS(N_EMIT_TASKS)%NRHO = NRHO
+                  EMIT_TASKS(N_EMIT_TASKS)%UX = UX
+                  EMIT_TASKS(N_EMIT_TASKS)%UY = UY
+                  EMIT_TASKS(N_EMIT_TASKS)%UZ = UZ
+                  EMIT_TASKS(N_EMIT_TASKS)%TTRA = TTRA
+                  EMIT_TASKS(N_EMIT_TASKS)%TROT = TROT
+                  EMIT_TASKS(N_EMIT_TASKS)%TVIB = TVIB
+                  EMIT_TASKS(N_EMIT_TASKS)%MIX_ID = MIX_ID
+                  EMIT_TASKS(N_EMIT_TASKS)%IC = IC
+                  EMIT_TASKS(N_EMIT_TASKS)%IFACE = I
+   
+                  ! NFS WILL BE INITIALIZED LATER.
+               END IF
+            END DO
          END DO
-      END DO      
+      END IF
+
+      
 
 
    END SUBROUTINE DEF_BOUNDARY_EMIT
@@ -1485,8 +1513,8 @@ MODULE initialization
       REAL(KIND=8)       :: Xp, Yp, Zp, VXp, VYp, VZp, EROT, EVIB, DOMAIN_VOLUME
       INTEGER            :: CID
 
-      REAL(KIND=8), DIMENSION(3) :: V1, V2, V3
-      REAL(KIND=8)       :: XI, ETA, ETATEMP
+      REAL(KIND=8), DIMENSION(3) :: V1, V2, V3, V4
+      REAL(KIND=8)       :: P, Q, R, S, T, U
 
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
       REAL(KIND=8)  :: M
@@ -1509,32 +1537,62 @@ MODULE initialization
             
             S_ID = MIXTURES(INITIAL_PARTICLES_TASKS(ITASK)%MIX_ID)%COMPONENTS(i)%ID
             IF (GRID_TYPE == UNSTRUCTURED) THEN
-               DO IC = 1, U2D_GRID%NUM_CELLS
+               DO IC = 1, NCELLS
                   ! Compute number of particles of this species per process to be created in this cell.
                   NP_INIT = RANDINT(INITIAL_PARTICLES_TASKS(ITASK)%NRHO/(FNUM*SPECIES(S_ID)%SPWT)*CELL_VOLUMES(IC)* &
                               MIXTURES(INITIAL_PARTICLES_TASKS(ITASK)%MIX_ID)%COMPONENTS(i)%MOLFRAC/N_MPI_THREADS)
                   IF (NP_INIT == 0) CYCLE
 
-                  V1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,1),:)
-                  V2 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,2),:)
-                  V3 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,3),:)
+                  IF (DIMS == 2) THEN
+                     V1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,1),:)
+                     V2 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,2),:)
+                     V3 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,3),:)
+                  ELSE IF (DIMS == 3) THEN
+                     V1 = U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(IC,1),:)
+                     V2 = U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(IC,2),:)
+                     V3 = U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(IC,3),:)
+                     V4 = U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(IC,4),:)
+                  END IF
 
                   DO IP = 1, NP_INIT
 
                      ! Create particle position randomly in the cell
-                     XI = rf()
-                     ETATEMP = rf()
-                     IF (ETATEMP > 1-XI) THEN
-                        ETA = 1-XI
-                        XI = 1-ETATEMP
-                     ELSE
-                        ETA = ETATEMP
+                     S = rf()
+                     T = rf()
+                     U = rf()
+                     IF (DIMS == 2) THEN
+                        IF (S > 1-T) THEN
+                           Q = 1-T
+                           P = 1-S
+                        ELSE
+                           Q = S
+                        END IF
+
+                        XP = V1(1) + (V2(1)-V1(1))*P + (V3(1)-V1(1))*Q
+                        YP = V1(2) + (V2(2)-V1(2))*P + (V3(2)-V1(2))*Q
+                        ZP = ZMIN + (ZMAX-ZMIN)*U
+                     ELSE IF (DIMS == 3) THEN
+                        ! http://vcg.isti.cnr.it/publications/papers/rndtetra_a.pdf
+                        IF (S+T+U .LE. 1) THEN
+                           P = S
+                           Q = T
+                           R = U
+                        ELSE
+                           IF (T+U .GT. 1) THEN
+                              P = S
+                              Q = 1-U
+                              R = 1-S-T
+                           ELSE
+                              P = 1-T-U
+                              Q = T
+                              R = S+T+U-1
+                           END IF
+                        END IF
+
+                        XP = V1(1) + (V2(1)-V1(1))*P + (V3(1)-V1(1))*Q + (V4(1)-V1(1))*R
+                        YP = V1(2) + (V2(2)-V1(2))*P + (V3(2)-V1(2))*Q + (V4(2)-V1(2))*R
+                        ZP = V1(3) + (V2(3)-V1(3))*P + (V3(3)-V1(3))*Q + (V4(3)-V1(3))*R
                      END IF
-
-                     XP = V1(1) + (V2(1)-V1(1))*XI + (V3(1)-V1(1))*ETA
-                     YP = V1(2) + (V2(2)-V1(2))*XI + (V3(2)-V1(2))*ETA
-                     ZP = ZMIN + (ZMAX-ZMIN)*rf()
-
                      !IF (XP > 0.25 .OR. XP < -0.25 .OR. YP > 0.25 .OR. YP < -0.25) CYCLE
 
                      ! Assign velocity and energy following a Boltzmann distribution
@@ -1731,6 +1789,13 @@ MODULE initialization
       ALLOCATE(LINE_EMIT_COUNT(N_LINESOURCES*N_SPECIES))
       LINE_EMIT_COUNT = 0
 
+      ! ~~~~~~~~ Initialize grid number of cells and nodes ~~~~~~~~~~
+
+      IF (.NOT. GRID_TYPE == UNSTRUCTURED) THEN
+         NCELLS = NX*NY
+         NNODES = (NX+1)*(NY+1)
+      END IF
+
    END SUBROUTINE INITVARIOUS
 
    
@@ -1739,9 +1804,9 @@ MODULE initialization
       IMPLICIT NONE
 
       IF (GRID_TYPE == UNSTRUCTURED) THEN
-         ALLOCATE(E_FIELD(U2D_GRID%NUM_CELLS, 1, 3))
-         ALLOCATE(B_FIELD(U2D_GRID%NUM_NODES, 1, 3))
-         ALLOCATE(EBAR_FIELD(U2D_GRID%NUM_CELLS, 1, 3))
+         ALLOCATE(E_FIELD(NCELLS, 1, 3))
+         ALLOCATE(B_FIELD(NNODES, 1, 3))
+         ALLOCATE(EBAR_FIELD(NCELLS, 1, 3))
       ELSE
          NPX = NX + 1
          IF (DIMS == 2) THEN
@@ -1787,7 +1852,7 @@ MODULE initialization
       IMPLICIT NONE
 
       REAL(KIND=8) :: BETA, FLUXBOUND, NtotINJECT, Snow
-      REAL(KIND=8) :: U_NORM, S_NORM, FLUXLINESOURCE, LINELENGTH, NORMX, NORMY, AREA
+      REAL(KIND=8) :: U_NORM, S_NORM, FLUXLINESOURCE, LINELENGTH, NORMX, NORMY, NORMZ, AREA
       REAL(KIND=8) :: PI2  
 
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: nfs_LINE
@@ -1968,17 +2033,40 @@ MODULE initialization
 
       ! =====================================================
       ! Injection from unstructured grid boundaries
-
+      WRITE(*,*) 'N emit tasks ', N_EMIT_TASKS
       DO ITASK = 1, N_EMIT_TASKS ! Loop on line sources
 
          N_COMP = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%N_COMPONENTS
          
          ALLOCATE(TASK_NFS(N_COMP))
 
-         X1 = U2D_GRID%NODE_COORDS(EMIT_TASKS(ITASK)%IV1, 1)
-         Y1 = U2D_GRID%NODE_COORDS(EMIT_TASKS(ITASK)%IV1, 2)
-         X2 = U2D_GRID%NODE_COORDS(EMIT_TASKS(ITASK)%IV2, 1)
-         Y2 = U2D_GRID%NODE_COORDS(EMIT_TASKS(ITASK)%IV2, 2)
+
+         IF (DIMS == 2) THEN
+
+            X1 = U2D_GRID%NODE_COORDS(EMIT_TASKS(ITASK)%IV1, 1)
+            Y1 = U2D_GRID%NODE_COORDS(EMIT_TASKS(ITASK)%IV1, 2)
+            X2 = U2D_GRID%NODE_COORDS(EMIT_TASKS(ITASK)%IV2, 1)
+            Y2 = U2D_GRID%NODE_COORDS(EMIT_TASKS(ITASK)%IV2, 2)
+
+            LINELENGTH = SQRT((X2-X1)**2 + (Y2-Y1)**2)
+
+            NORMX = -U2D_GRID%EDGE_NORMAL(EMIT_TASKS(ITASK)%IC, EMIT_TASKS(ITASK)%IFACE, 1)
+            NORMY = -U2D_GRID%EDGE_NORMAL(EMIT_TASKS(ITASK)%IC, EMIT_TASKS(ITASK)%IFACE, 2)
+            NORMZ = 0
+
+            IF (AXI) THEN
+               AREA = (ZMAX-ZMIN)*0.5*(Y1+Y2)*LINELENGTH
+            ELSE
+               AREA = LINELENGTH*(ZMAX-ZMIN)
+            END IF
+
+         ELSE IF (DIMS == 3) THEN
+            NORMX = -U3D_GRID%FACE_NORMAL(EMIT_TASKS(ITASK)%IC, EMIT_TASKS(ITASK)%IFACE, 1)
+            NORMY = -U3D_GRID%FACE_NORMAL(EMIT_TASKS(ITASK)%IC, EMIT_TASKS(ITASK)%IFACE, 2)
+            NORMZ = -U3D_GRID%FACE_NORMAL(EMIT_TASKS(ITASK)%IC, EMIT_TASKS(ITASK)%IFACE, 3)
+            
+            AREA = U3D_GRID%FACE_AREA(EMIT_TASKS(ITASK)%IC, EMIT_TASKS(ITASK)%IFACE)
+         END IF
 
 
          DO IS = 1, N_COMP ! Loop on mixture components
@@ -1987,13 +2075,8 @@ MODULE initialization
             M = SPECIES(S_ID)%MOLECULAR_MASS
             FRAC = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%COMPONENTS(IS)%MOLFRAC
             BETA = 1./SQRT(2.*KB/M*EMIT_TASKS(ITASK)%TTRA) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
-         
-            LINELENGTH = SQRT((X2-X1)**2 + (Y2-Y1)**2)
 
-            NORMX = -U2D_GRID%EDGE_NORMAL(EMIT_TASKS(ITASK)%IC, EMIT_TASKS(ITASK)%IEDGE, 1)
-            NORMY = -U2D_GRID%EDGE_NORMAL(EMIT_TASKS(ITASK)%IC, EMIT_TASKS(ITASK)%IEDGE, 2)
-
-            U_NORM = EMIT_TASKS(ITASK)%UX*NORMX + EMIT_TASKS(ITASK)%UY*NORMY ! Molecular speed ratio normal to boundary
+            U_NORM = EMIT_TASKS(ITASK)%UX*NORMX + EMIT_TASKS(ITASK)%UY*NORMY + EMIT_TASKS(ITASK)%UZ*NORMZ ! Molecular speed ratio normal to boundary
             S_NORM = U_NORM*BETA
             EMIT_TASKS(ITASK)%S_NORM = S_NORM
             Snow   = S_NORM     ! temp variable
@@ -2001,11 +2084,7 @@ MODULE initialization
             FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) &
                            + SQRT(PI)*Snow*(1.+ERF1(Snow)))      ! Tot number flux emitted
 
-            IF (AXI) THEN
-               AREA = (ZMAX-ZMIN)*0.5*(Y1+Y2)*LINELENGTH
-            ELSE
-               AREA = LINELENGTH*(ZMAX-ZMIN)
-            END IF
+
 
             NtotINJECT = FLUXLINESOURCE*AREA*DT/FNUM         ! Tot num of particles to be injected
 
@@ -2017,7 +2096,7 @@ MODULE initialization
                                                    &particles will be emitted at boundary.')
             END IF
          END DO
-
+         WRITE(*,*) 'Task NFS', TASK_NFS
          CALL MOVE_ALLOC(TASK_NFS, EMIT_TASKS(ITASK)%NFS)
 
       END DO

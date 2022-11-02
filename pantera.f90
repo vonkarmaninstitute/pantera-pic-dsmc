@@ -31,6 +31,7 @@ PROGRAM PANTERA
    CALL ONLYMASTERPRINT1(PROC_ID, '> READING INPUT DATA...')
    CALL READINPUT          ! Read input file
    CALL INITVARIOUS        ! Initialize some additional variables
+   WRITE(*,*) 'NCELLS ======' , NCELLS
    CALL INITINJECTION      ! Initialize variables for injection
    CALL INITCOLLISIONS     ! Initialize variables for collisions
    CALL INITREACTIONS      ! Initialize variables for reactions
@@ -42,6 +43,7 @@ PROGRAM PANTERA
    IF (RESTART_TIMESTEP > 0) THEN
       CALL READ_PARTICLES_FILE(RESTART_TIMESTEP)
       tID = RESTART_TIMESTEP
+      CALL EXCHANGE
    ELSE
       tID = 0
       RESTART_TIMESTEP = 0

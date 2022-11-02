@@ -587,4 +587,58 @@ CONTAINS
 
    END FUNCTION RANDINT
 
+
+   RECURSIVE SUBROUTINE QUICKSORT(A,ORDER,NA)
+
+      ! DUMMY ARGUMENTS
+      INTEGER, INTENT(IN) :: NA
+      INTEGER, DIMENSION(NA), INTENT(IN OUT) :: ORDER
+      REAL(KIND=8), DIMENSION(NA), INTENT(IN OUT) :: A
+
+      ! LOCAL VARIABLES
+      INTEGER :: LEFT, RIGHT
+      !REAL(KIND=8) :: RANDOM
+      REAL(KIND=8) :: PIVOT
+      INTEGER :: TEMPORDER
+      REAL(KIND=8) :: TEMPA
+      INTEGER :: MARKER
+
+      IF (NA > 1) THEN
+
+         !RANDOM = rf()
+         !PIVOT = A(INT(RANDOM*REAL(NA-1))+1)   ! Choice a random pivot (not best performance, but avoids worst-case)
+         PIVOT = A(INT(DBLE(NA-1)/2.)+1)   ! Choice a random pivot (not best performance, but avoids worst-case)
+         LEFT = 1
+         RIGHT = NA
+         ! Partition loop
+         DO
+            IF (LEFT >= RIGHT) EXIT
+            DO
+               IF (A(RIGHT) <= PIVOT) EXIT
+               RIGHT = RIGHT - 1
+            END DO
+            DO
+               IF (A(LEFT) >= PIVOT) EXIT
+               LEFT = LEFT + 1
+            END DO
+            IF (LEFT < RIGHT) THEN
+               TEMPA = A(LEFT); A(LEFT) = A(RIGHT); A(RIGHT) = TEMPA
+               TEMPORDER = ORDER(LEFT); ORDER(LEFT) = ORDER(RIGHT); ORDER(RIGHT) = TEMPORDER
+            END IF
+         END DO
+
+         IF (LEFT == RIGHT) THEN
+            MARKER = LEFT + 1
+         ELSE
+            MARKER = LEFT
+         END IF
+
+         CALL QUICKSORT(A(:MARKER-1),ORDER(:MARKER-1),MARKER-1)
+         CALL QUICKSORT(A(MARKER:),ORDER(:MARKER-1),NA-MARKER+1)
+
+      END IF
+
+   END SUBROUTINE QUICKSORT
+
+
 END MODULE tools

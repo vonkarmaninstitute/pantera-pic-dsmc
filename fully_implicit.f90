@@ -38,17 +38,10 @@ MODULE fully_implicit
    SUBROUTINE SOLVE_POISSON_FULLY_IMPLICIT
 
       PetscScalar, POINTER :: solvec_l(:)
-      INTEGER :: SIZE
-
-      IF (GRID_TYPE == UNSTRUCTURED) THEN
-         SIZE = U2D_GRID%NUM_NODES
-      ELSE
-         SIZE = NPX*NPY
-      END IF      
 
       CALL SNESCreate(PETSC_COMM_WORLD,snes,ierr)
       CALL VecCreate(PETSC_COMM_WORLD,rvec,ierr)
-      CALL VecSetSizes(rvec,PETSC_DECIDE,U2D_GRID%NUM_NODES,ierr)
+      CALL VecSetSizes(rvec,PETSC_DECIDE,NNODES,ierr)
       CALL VecSetFromOptions(rvec, ierr)
       CALL VecDuplicate(rvec, solvec, ierr)
 
@@ -56,7 +49,7 @@ MODULE fully_implicit
 
 
       CALL MatCreate(PETSC_COMM_WORLD,Jmat,ierr)
-      CALL MatSetSizes(Jmat,PETSC_DECIDE,PETSC_DECIDE,SIZE,SIZE,ierr)
+      CALL MatSetSizes(Jmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
       CALL MatSetType(Jmat, MATMPIAIJ, ierr)
       !CALL MatSetOption(Jmat,MAT_SPD,PETSC_TRUE,ierr)
       CALL MatMPIAIJSetPreallocation(Jmat,f30,PETSC_NULL_INTEGER,f30,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
@@ -104,7 +97,7 @@ MODULE fully_implicit
 
       ! Test the jacobian
       !CALL MatCreate(PETSC_COMM_WORLD,testJ,ierr)
-      !CALL MatSetSizes(testJ,PETSC_DECIDE,PETSC_DECIDE,SIZE,SIZE,ierr)
+      !CALL MatSetSizes(testJ,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
       !CALL MatSetFromOptions(testJ,ierr)
       !CALL MatSetUp(testJ,ierr)
       !CALL SNESComputeJacobianDefault(snes,solvec,testJ,testJ,ierr)
@@ -155,6 +148,8 @@ MODULE fully_implicit
 
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA
       INTEGER :: V1, V2, V3, I
+      INTEGER :: P, Q, VP, VQ
+      REAL(KIND=8) :: KPQ, VOLUME
 
       !CALL VecView(x,PETSC_VIEWER_STDOUT_WORLD,ierr)
 
@@ -174,38 +169,55 @@ MODULE fully_implicit
 
       ALLOCATE(RHS_NEW, SOURCE = RHS)
       RHS_NEW = 0.d0
-      DO I = 1, U2D_GRID%NUM_CELLS
-         AREA = CELL_AREAS(I)
-         V1 = U2D_GRID%CELL_NODES(I,1)
-         V2 = U2D_GRID%CELL_NODES(I,2)
-         V3 = U2D_GRID%CELL_NODES(I,3)            
-         X1 = U2D_GRID%NODE_COORDS(V1, 1)
-         X2 = U2D_GRID%NODE_COORDS(V2, 1)
-         X3 = U2D_GRID%NODE_COORDS(V3, 1)
-         Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-         Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-         Y3 = U2D_GRID%NODE_COORDS(V3, 2)
-         K11 = 0.25*((Y2-Y3)**2 + (X2-X3)**2)/AREA
-         K22 = 0.25*((Y1-Y3)**2 + (X1-X3)**2)/AREA
-         K33 = 0.25*((Y2-Y1)**2 + (X2-X1)**2)/AREA
-         K12 =-0.25*((Y2-Y3)*(Y1-Y3) + (X2-X3)*(X1-X3))/AREA
-         K23 = 0.25*((Y1-Y3)*(Y2-Y1) + (X1-X3)*(X2-X1))/AREA
-         K13 =-0.25*((Y2-Y3)*(Y2-Y1) + (X2-X3)*(X2-X1))/AREA
-         IF (AXI) THEN
-            K11 = K11*(Y1+Y2+Y3)/3.
-            K22 = K22*(Y1+Y2+Y3)/3.
-            K33 = K33*(Y1+Y2+Y3)/3.
-            K12 = K12*(Y1+Y2+Y3)/3.
-            K23 = K23*(Y1+Y2+Y3)/3.
-            K13 = K13*(Y1+Y2+Y3)/3.
-         END IF
 
-         RHS_NEW(V1-1) = RHS_NEW(V1-1) + K11*PHI_FIELD_NEW(V1) + K12*PHI_FIELD_NEW(V2) + K13*PHI_FIELD_NEW(V3)
-         RHS_NEW(V2-1) = RHS_NEW(V2-1) + K12*PHI_FIELD_NEW(V1) + K22*PHI_FIELD_NEW(V2) + K23*PHI_FIELD_NEW(V3)
-         RHS_NEW(V3-1) = RHS_NEW(V3-1) + K13*PHI_FIELD_NEW(V1) + K23*PHI_FIELD_NEW(V2) + K33*PHI_FIELD_NEW(V3)
-      END DO
+      IF (DIMS == 2) THEN
+         DO I = 1, NCELLS
+            AREA = CELL_AREAS(I)
+            V1 = U2D_GRID%CELL_NODES(I,1)
+            V2 = U2D_GRID%CELL_NODES(I,2)
+            V3 = U2D_GRID%CELL_NODES(I,3)            
+            X1 = U2D_GRID%NODE_COORDS(V1, 1)
+            X2 = U2D_GRID%NODE_COORDS(V2, 1)
+            X3 = U2D_GRID%NODE_COORDS(V3, 1)
+            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
+            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
+            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
+            K11 = 0.25*((Y2-Y3)**2 + (X2-X3)**2)/AREA
+            K22 = 0.25*((Y1-Y3)**2 + (X1-X3)**2)/AREA
+            K33 = 0.25*((Y2-Y1)**2 + (X2-X1)**2)/AREA
+            K12 =-0.25*((Y2-Y3)*(Y1-Y3) + (X2-X3)*(X1-X3))/AREA
+            K23 = 0.25*((Y1-Y3)*(Y2-Y1) + (X1-X3)*(X2-X1))/AREA
+            K13 =-0.25*((Y2-Y3)*(Y2-Y1) + (X2-X3)*(X2-X1))/AREA
+            IF (AXI) THEN
+               K11 = K11*(Y1+Y2+Y3)/3.
+               K22 = K22*(Y1+Y2+Y3)/3.
+               K33 = K33*(Y1+Y2+Y3)/3.
+               K12 = K12*(Y1+Y2+Y3)/3.
+               K23 = K23*(Y1+Y2+Y3)/3.
+               K13 = K13*(Y1+Y2+Y3)/3.
+            END IF
 
-      DO I = 0, U2D_GRID%NUM_NODES-1
+            RHS_NEW(V1-1) = RHS_NEW(V1-1) + K11*PHI_FIELD_NEW(V1) + K12*PHI_FIELD_NEW(V2) + K13*PHI_FIELD_NEW(V3)
+            RHS_NEW(V2-1) = RHS_NEW(V2-1) + K12*PHI_FIELD_NEW(V1) + K22*PHI_FIELD_NEW(V2) + K23*PHI_FIELD_NEW(V3)
+            RHS_NEW(V3-1) = RHS_NEW(V3-1) + K13*PHI_FIELD_NEW(V1) + K23*PHI_FIELD_NEW(V2) + K33*PHI_FIELD_NEW(V3)
+         END DO
+      ELSE IF (DIMS == 3) THEN
+         DO I = 1, NCELLS
+            VOLUME = CELL_VOLUMES(I)
+            DO P = 1, 4
+               VP = U3D_GRID%CELL_NODES(I,P)
+               DO Q = 1, 4
+                  VQ = U3D_GRID%CELL_NODES(I,Q)
+                  KPQ = VOLUME*(U3D_GRID%BASIS_COEFFS(I,P,1)*U3D_GRID%BASIS_COEFFS(I,Q,1) &
+                              + U3D_GRID%BASIS_COEFFS(I,P,2)*U3D_GRID%BASIS_COEFFS(I,Q,2) &
+                              + U3D_GRID%BASIS_COEFFS(I,P,3)*U3D_GRID%BASIS_COEFFS(I,Q,3))
+                  RHS_NEW(VQ-1) = RHS_NEW(VQ-1) + KPQ*PHI_FIELD_NEW(VP)
+               END DO
+            END DO
+         END DO 
+      END IF
+
+      DO I = 0, NNODES-1
          IF (IS_DIRICHLET(I)) THEN
             !RHS_NEW(I) = DIRICHLET(I)
             RHS_NEW(I) = PHI_FIELD_NEW(I+1)
@@ -213,8 +225,6 @@ MODULE fully_implicit
             RHS_NEW(I) = RHS_NEW(I) + NEUMANN(I)
          END IF
       END DO
-
-      
 
 
 
@@ -264,6 +274,8 @@ MODULE fully_implicit
 
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA
       INTEGER :: V1, V2, V3
+      INTEGER :: P, Q, VP, VQ
+      REAL(KIND=8) :: KPQ, VOLUME
 
       !CALL MatConvert(Amat,MATSAME,MAT_INITIAL_MATRIX,jac,ierr)
       mult = -2.d0
@@ -328,55 +340,78 @@ MODULE fully_implicit
 
       ! Accumulate Jacobian. All this is in principle not needed since we already have Amat.
 
-      DO I = 1, U2D_GRID%NUM_CELLS
-         AREA = CELL_AREAS(I)
-         V1 = U2D_GRID%CELL_NODES(I,1)
-         V2 = U2D_GRID%CELL_NODES(I,2)
-         V3 = U2D_GRID%CELL_NODES(I,3)            
-         X1 = U2D_GRID%NODE_COORDS(V1, 1)
-         X2 = U2D_GRID%NODE_COORDS(V2, 1)
-         X3 = U2D_GRID%NODE_COORDS(V3, 1)
-         Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-         Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-         Y3 = U2D_GRID%NODE_COORDS(V3, 2)
-         K11 = 0.25*((Y2-Y3)**2 + (X2-X3)**2)/AREA
-         K22 = 0.25*((Y1-Y3)**2 + (X1-X3)**2)/AREA
-         K33 = 0.25*((Y2-Y1)**2 + (X2-X1)**2)/AREA
-         K12 =-0.25*((Y2-Y3)*(Y1-Y3) + (X2-X3)*(X1-X3))/AREA
-         K23 = 0.25*((Y1-Y3)*(Y2-Y1) + (X1-X3)*(X2-X1))/AREA
-         K13 =-0.25*((Y2-Y3)*(Y2-Y1) + (X2-X3)*(X2-X1))/AREA
-         IF (AXI) THEN
-            K11 = K11*(Y1+Y2+Y3)/3.
-            K22 = K22*(Y1+Y2+Y3)/3.
-            K33 = K33*(Y1+Y2+Y3)/3.
-            K12 = K12*(Y1+Y2+Y3)/3.
-            K23 = K23*(Y1+Y2+Y3)/3.
-            K13 = K13*(Y1+Y2+Y3)/3.
-         END IF
+      IF (DIMS == 2) THEN
+         DO I = 1, NCELLS
+            AREA = CELL_AREAS(I)
+            V1 = U2D_GRID%CELL_NODES(I,1)
+            V2 = U2D_GRID%CELL_NODES(I,2)
+            V3 = U2D_GRID%CELL_NODES(I,3)            
+            X1 = U2D_GRID%NODE_COORDS(V1, 1)
+            X2 = U2D_GRID%NODE_COORDS(V2, 1)
+            X3 = U2D_GRID%NODE_COORDS(V3, 1)
+            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
+            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
+            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
+            K11 = 0.25*((Y2-Y3)**2 + (X2-X3)**2)/AREA
+            K22 = 0.25*((Y1-Y3)**2 + (X1-X3)**2)/AREA
+            K33 = 0.25*((Y2-Y1)**2 + (X2-X1)**2)/AREA
+            K12 =-0.25*((Y2-Y3)*(Y1-Y3) + (X2-X3)*(X1-X3))/AREA
+            K23 = 0.25*((Y1-Y3)*(Y2-Y1) + (X1-X3)*(X2-X1))/AREA
+            K13 =-0.25*((Y2-Y3)*(Y2-Y1) + (X2-X3)*(X2-X1))/AREA
+            IF (AXI) THEN
+               K11 = K11*(Y1+Y2+Y3)/3.
+               K22 = K22*(Y1+Y2+Y3)/3.
+               K33 = K33*(Y1+Y2+Y3)/3.
+               K12 = K12*(Y1+Y2+Y3)/3.
+               K23 = K23*(Y1+Y2+Y3)/3.
+               K13 = K13*(Y1+Y2+Y3)/3.
+            END IF
 
-         ! We need to ADD to a sparse matrix entry.
-         IF (V1-1 >= Istart .AND. V1-1 < Iend) THEN
-            IF (.NOT. IS_DIRICHLET(V1-1)) THEN
-               CALL MatSetValues(jac,one,V1-1,one,V1-1,-2.*K11,ADD_VALUES,ierr)
-               CALL MatSetValues(jac,one,V1-1,one,V2-1,-2.*K12,ADD_VALUES,ierr)
-               CALL MatSetValues(jac,one,V1-1,one,V3-1,-2.*K13,ADD_VALUES,ierr)
+            ! We need to ADD to a sparse matrix entry.
+            IF (V1-1 >= Istart .AND. V1-1 < Iend) THEN
+               IF (.NOT. IS_DIRICHLET(V1-1)) THEN
+                  CALL MatSetValues(jac,one,V1-1,one,V1-1,-2.*K11,ADD_VALUES,ierr)
+                  CALL MatSetValues(jac,one,V1-1,one,V2-1,-2.*K12,ADD_VALUES,ierr)
+                  CALL MatSetValues(jac,one,V1-1,one,V3-1,-2.*K13,ADD_VALUES,ierr)
+               END IF
             END IF
-         END IF
-         IF (V2-1 >= Istart .AND. V2-1 < Iend) THEN
-            IF (.NOT. IS_DIRICHLET(V2-1)) THEN
-               CALL MatSetValues(jac,one,V2-1,one,V1-1,-2.*K12,ADD_VALUES,ierr)
-               CALL MatSetValues(jac,one,V2-1,one,V3-1,-2.*K23,ADD_VALUES,ierr)
-               CALL MatSetValues(jac,one,V2-1,one,V2-1,-2.*K22,ADD_VALUES,ierr)
+            IF (V2-1 >= Istart .AND. V2-1 < Iend) THEN
+               IF (.NOT. IS_DIRICHLET(V2-1)) THEN
+                  CALL MatSetValues(jac,one,V2-1,one,V1-1,-2.*K12,ADD_VALUES,ierr)
+                  CALL MatSetValues(jac,one,V2-1,one,V3-1,-2.*K23,ADD_VALUES,ierr)
+                  CALL MatSetValues(jac,one,V2-1,one,V2-1,-2.*K22,ADD_VALUES,ierr)
+               END IF
             END IF
-         END IF
-         IF (V3-1 >= Istart .AND. V3-1 < Iend) THEN
-            IF (.NOT. IS_DIRICHLET(V3-1)) THEN
-               CALL MatSetValues(jac,one,V3-1,one,V1-1,-2.*K13,ADD_VALUES,ierr)
-               CALL MatSetValues(jac,one,V3-1,one,V2-1,-2.*K23,ADD_VALUES,ierr)
-               CALL MatSetValues(jac,one,V3-1,one,V3-1,-2.*K33,ADD_VALUES,ierr)
+            IF (V3-1 >= Istart .AND. V3-1 < Iend) THEN
+               IF (.NOT. IS_DIRICHLET(V3-1)) THEN
+                  CALL MatSetValues(jac,one,V3-1,one,V1-1,-2.*K13,ADD_VALUES,ierr)
+                  CALL MatSetValues(jac,one,V3-1,one,V2-1,-2.*K23,ADD_VALUES,ierr)
+                  CALL MatSetValues(jac,one,V3-1,one,V3-1,-2.*K33,ADD_VALUES,ierr)
+               END IF
             END IF
-         END IF
-      END DO
+         END DO
+      ELSE IF (DIMS == 3) THEN
+         DO I = 1, NCELLS
+            VOLUME = CELL_VOLUMES(I)
+            
+            ! We need to ADD to a sparse matrix entry.
+            DO P = 1, 4
+               VP = U3D_GRID%CELL_NODES(I,P)
+               IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(VP-1)) THEN
+                     DO Q = 1, 4
+                        VQ = U3D_GRID%CELL_NODES(I,Q)
+                        KPQ = VOLUME*(U3D_GRID%BASIS_COEFFS(I,P,1)*U3D_GRID%BASIS_COEFFS(I,Q,1) &
+                                    + U3D_GRID%BASIS_COEFFS(I,P,2)*U3D_GRID%BASIS_COEFFS(I,Q,2) &
+                                    + U3D_GRID%BASIS_COEFFS(I,P,3)*U3D_GRID%BASIS_COEFFS(I,Q,3))
+                        CALL MatSetValues(jac,one,VP-1,one,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
+                     END DO
+                  END IF
+               END IF
+            END DO
+
+         END DO
+      END IF
 
       CALL MatAssemblyBegin(jac,MAT_FLUSH_ASSEMBLY,ierr)
       CALL MatAssemblyEnd(jac,MAT_FLUSH_ASSEMBLY,ierr)
@@ -443,7 +478,7 @@ MODULE fully_implicit
       LOGICAL, INTENT(IN) :: FINAL, COMPUTE_JACOBIAN
 
       INTEGER      :: IP, IC, I, J, SOL, OLD_IC, II, JJ, SIZE
-      INTEGER      :: BOUNDCOLL, WALLCOLL, GOODSOL, EDGE_PG
+      INTEGER      :: BOUNDCOLL, WALLCOLL, GOODSOL, FACE_PG, NEIGHBOR
       REAL(KIND=8) :: DTCOLL, TOTDTCOLL, CANDIDATE_DTCOLL, rfp
       REAL(KIND=8) :: COEFA, COEFB, COEFC, DELTA, SOL1, SOL2, ALPHA, BETA, GAMMA
       REAL(KIND=8), DIMENSION(2) :: TEST
@@ -461,8 +496,8 @@ MODULE fully_implicit
       REAL(KIND=8) :: WEIGHT_RATIO
       TYPE(PARTICLE_DATA_STRUCTURE) :: NEWparticle
       INTEGER, DIMENSION(3) :: NEXTVERT
-      INTEGER, DIMENSION(6) :: EDGEINDEX
-      REAL(KIND=8), DIMENSION(6) :: COLLTIMES
+      INTEGER, DIMENSION(8) :: EDGEINDEX
+      REAL(KIND=8), DIMENSION(8) :: COLLTIMES
       INTEGER, DIMENSION(50) :: EBARIDX
       REAL(KIND=8), DIMENSION(50) :: DVDEBAR, DXDEBAR
       INTEGER :: LOC, NUMSTEPS
@@ -470,16 +505,15 @@ MODULE fully_implicit
       REAL(KIND=8) :: DPSI1DX, DPSI1DY, DPSI2DX, DPSI2DY, DPSI3DX, DPSI3DY, DPSJ1DX, DPSJ1DY, DPSJ2DX, DPSJ2DY, DPSJ3DX, DPSJ3DY
       INTEGER :: V1I, V2I, V3I, V1J, V2J, V3J, COUNTER
       REAL(KIND=8) :: X_TEMP, Y_TEMP, Z_TEMP, VX_TEMP, VY_TEMP, VZ_TEMP
+      REAL(KIND=8), DIMENSION(3) :: FACE_NORMAL, FACE_TANG1, FACE_TANG2
+      REAL(KIND=8) :: V_TANG1, V_TANG2
+      INTEGER :: NI, NJ, VNI, VNJ
 
       REAL(KIND=8) :: TOL
 
       TOL = 1e-15
 
-      IF (GRID_TYPE == UNSTRUCTURED) THEN
-         SIZE = U2D_GRID%NUM_CELLS
-      ELSE
-         SIZE = NX*NY
-      END IF  
+      SIZE = NCELLS
 
       !IF (ALLOCATED(DVDEBAR)) DEALLOCATE(DVDEBAR)
       !ALLOCATE(DVDEBAR(SIZE))
@@ -493,7 +527,7 @@ MODULE fully_implicit
          CALL MatSetSizes(dxde,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
          CALL MatSetType(dxde, MATMPIAIJ, ierr)
          !CALL MatSetOption(dxde,MAT_SPD,PETSC_TRUE,ierr)
-         CALL MatMPIAIJSetPreallocation(dxde,f500,PETSC_NULL_INTEGER,f500,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
+         CALL MatMPIAIJSetPreallocation(dxde,f500,PETSC_NULL_INTEGER,5000,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
          CALL MatSetFromOptions(dxde, ierr)
          CALL MatSetUp(dxde,ierr)
       END IF
@@ -504,7 +538,7 @@ MODULE fully_implicit
       B = [0.d0, 0.d0, 0.d0]
 
       NEXTVERT = [2,3,1]
-      EDGEINDEX = [1,1,2,2,3,3]
+      EDGEINDEX = [1,1,2,2,3,3,4,4]
 
       NORMX = [ 1., -1., 0., 0. ]
       NORMY = [ 0., 0., 1., -1. ]
@@ -611,103 +645,170 @@ MODULE fully_implicit
                ! For unstructured, we only need to check the boundaries of the cell.
 
                ! The new C-N procedure with uniform E field.
-               DO I = 1, 3
-                  J = NEXTVERT(I)
-                  EDGE_X1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),1)
-                  EDGE_Y1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),2)
-                  EDGE_X2 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,J),1)
-                  EDGE_Y2 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,J),2)
-                  !IF (EDGE_X2 == EDGE_X1) THEN
-                  !   COEFB = 0; COEFA = 1; COEFC = - EDGE_X1
-                  !ELSE IF (EDGE_Y2 == EDGE_Y1) THEN
-                  !   COEFA = 0; COEFB = 1; COEFC = - EDGE_Y1
-                  !ELSE
-                  !   COEFA = (EDGE_Y2-EDGE_Y1)
-                  !   COEFB = (EDGE_X1-EDGE_X2)
-                  !   COEFC = (EDGE_X2 - EDGE_X1) * EDGE_Y1 - (EDGE_Y2 - EDGE_Y1) * EDGE_X1
-                  !   !COEFA = 1
-                  !   !COEFB = (EDGE_X1-EDGE_X2)/(EDGE_Y2-EDGE_Y1)
-                  !   !COEFC = - COEFB * EDGE_Y1 - EDGE_X1
-                  !END IF
+               IF (DIMS == 2) THEN
+                  DO I = 1, 3
+                     J = NEXTVERT(I)
+                     EDGE_X1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),1)
+                     EDGE_Y1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),2)
+                     EDGE_X2 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,J),1)
+                     EDGE_Y2 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,J),2)
+                     !IF (EDGE_X2 == EDGE_X1) THEN
+                     !   COEFB = 0; COEFA = 1; COEFC = - EDGE_X1
+                     !ELSE IF (EDGE_Y2 == EDGE_Y1) THEN
+                     !   COEFA = 0; COEFB = 1; COEFC = - EDGE_Y1
+                     !ELSE
+                     !   COEFA = (EDGE_Y2-EDGE_Y1)
+                     !   COEFB = (EDGE_X1-EDGE_X2)
+                     !   COEFC = (EDGE_X2 - EDGE_X1) * EDGE_Y1 - (EDGE_Y2 - EDGE_Y1) * EDGE_X1
+                     !   !COEFA = 1
+                     !   !COEFB = (EDGE_X1-EDGE_X2)/(EDGE_Y2-EDGE_Y1)
+                     !   !COEFC = - COEFB * EDGE_Y1 - EDGE_X1
+                     !END IF
 
-                  COEFA = (EDGE_Y2-EDGE_Y1)
-                  COEFB = (EDGE_X1-EDGE_X2)
-                  !COEFC = (EDGE_X2 - EDGE_X1) * EDGE_Y1 - (EDGE_Y2 - EDGE_Y1) * EDGE_X1
-                  COEFC = EDGE_Y1*EDGE_X2 - EDGE_X1*EDGE_Y2
+                     COEFA = (EDGE_Y2-EDGE_Y1)
+                     COEFB = (EDGE_X1-EDGE_X2)
+                     !COEFC = (EDGE_X2 - EDGE_X1) * EDGE_Y1 - (EDGE_Y2 - EDGE_Y1) * EDGE_X1
+                     COEFC = EDGE_Y1*EDGE_X2 - EDGE_X1*EDGE_Y2
 
-                  IF (PIC_TYPE .NE. NONE) THEN
-                     ALPHA = 0.5*SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS* &
-                             (COEFA*E(1) + COEFB*E(2))
-                  ELSE
-                     ALPHA = 0.d0
-                  END IF
-
-                  BETA = COEFA*part_adv(IP)%VX + COEFB*part_adv(IP)%VY
-                  GAMMA = COEFA*part_adv(IP)%X + COEFB*part_adv(IP)%Y + COEFC
-
-                  IF (ALPHA == 0.d0) THEN
-                     COLLTIMES(2*(I-1) + 1) = - GAMMA/BETA
-                     COLLTIMES(2*I) = - 1.d0
-                  ELSE
-                     DELTA = BETA*BETA - 4.0*ALPHA*GAMMA
-                     IF (DELTA >= 0.d0) THEN
-                        COLLTIMES(2*(I-1) + 1) = 0.5*(-BETA - SQRT(DELTA))/ALPHA
-                        COLLTIMES(2*I) =         0.5*(-BETA + SQRT(DELTA))/ALPHA
+                     IF (PIC_TYPE .NE. NONE) THEN
+                        ALPHA = 0.5*SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS* &
+                              (COEFA*E(1) + COEFB*E(2))
                      ELSE
-                        COLLTIMES(2*(I-1) + 1) = -1.d0
-                        COLLTIMES(2*I) = - 1.d0
-                     END IF
-                  END IF
-               END DO
-
-               ! Find which collision happens first.
-               DTCOLL = part_adv(IP)%DTRIM
-               BOUNDCOLL = -1
-               DO I = 1, 6
-                  IF (COLLTIMES(I) > 0 .AND. COLLTIMES(I) < DTCOLL) THEN
-
-
-                     X_TEMP = part_adv(IP)%X
-                     Y_TEMP = part_adv(IP)%Y
-                     Z_TEMP = part_adv(IP)%Z
-
-                     VX_TEMP = part_adv(IP)%VX
-                     VY_TEMP = part_adv(IP)%VY
-                     VZ_TEMP = part_adv(IP)%VZ
-
-                     CALL MOVE_PARTICLE_CN(IP, E, COLLTIMES(I))
-                     J = EDGEINDEX(I)
-
-
-                     ! ! A small check that we actually found an intersection.
-
-                     ! JJ = NEXTVERT(J)
-                     ! EDGE_X1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,J),1)
-                     ! EDGE_Y1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,J),2)
-                     ! EDGE_X2 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,JJ),1)
-                     ! EDGE_Y2 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,JJ),2)
-
-                     ! COEFA = (EDGE_Y2-EDGE_Y1)
-                     ! COEFB = (EDGE_X1-EDGE_X2)
-                     ! COEFC = (EDGE_X2 - EDGE_X1) * EDGE_Y1 - (EDGE_Y2 - EDGE_Y1) * EDGE_X1
-                     ! WRITE(*,*) (COEFA*part_adv(IP)%X + COEFB*part_adv(IP)%Y + COEFC)/(ABS(COEFA)+ABS(COEFB)+ABS(COEFC))
-                     ! ! End of the small check.
-                     
-                     IF ((part_adv(IP)%VX*U2D_GRID%EDGE_NORMAL(IC,J,1) + part_adv(IP)%VY*U2D_GRID%EDGE_NORMAL(IC,J,2)) > 0) THEN
-                        DTCOLL = COLLTIMES(I)
-                        BOUNDCOLL = J
+                        ALPHA = 0.d0
                      END IF
 
-                     part_adv(IP)%X = X_TEMP
-                     part_adv(IP)%Y = Y_TEMP
-                     part_adv(IP)%Z = Z_TEMP
+                     BETA = COEFA*part_adv(IP)%VX + COEFB*part_adv(IP)%VY
+                     GAMMA = COEFA*part_adv(IP)%X + COEFB*part_adv(IP)%Y + COEFC
 
-                     part_adv(IP)%VX = VX_TEMP
-                     part_adv(IP)%VY = VY_TEMP
-                     part_adv(IP)%VZ = VZ_TEMP
+                     COLLTIMES = -1.d0
+                     IF (ALPHA == 0.d0) THEN
+                        COLLTIMES(2*(I-1) + 1) = - GAMMA/BETA
+                     ELSE
+                        DELTA = BETA*BETA - 4.0*ALPHA*GAMMA
+                        IF (DELTA >= 0.d0) THEN
+                           COLLTIMES(2*(I-1) + 1) = 0.5*(-BETA - SQRT(DELTA))/ALPHA
+                           COLLTIMES(2*I) =         0.5*(-BETA + SQRT(DELTA))/ALPHA
+                        END IF
+                     END IF
+                  END DO
 
-                  END IF
-               END DO
+                  ! Find which collision happens first.
+                  DTCOLL = part_adv(IP)%DTRIM
+                  BOUNDCOLL = -1
+                  DO I = 1, 6
+                     IF (COLLTIMES(I) > 0 .AND. COLLTIMES(I) < DTCOLL) THEN
+
+
+                        X_TEMP = part_adv(IP)%X
+                        Y_TEMP = part_adv(IP)%Y
+                        Z_TEMP = part_adv(IP)%Z
+
+                        VX_TEMP = part_adv(IP)%VX
+                        VY_TEMP = part_adv(IP)%VY
+                        VZ_TEMP = part_adv(IP)%VZ
+
+                        CALL MOVE_PARTICLE_CN(IP, E, COLLTIMES(I))
+                        J = EDGEINDEX(I)
+
+
+                        ! ! A small check that we actually found an intersection.
+
+                        ! JJ = NEXTVERT(J)
+                        ! EDGE_X1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,J),1)
+                        ! EDGE_Y1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,J),2)
+                        ! EDGE_X2 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,JJ),1)
+                        ! EDGE_Y2 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,JJ),2)
+
+                        ! COEFA = (EDGE_Y2-EDGE_Y1)
+                        ! COEFB = (EDGE_X1-EDGE_X2)
+                        ! COEFC = (EDGE_X2 - EDGE_X1) * EDGE_Y1 - (EDGE_Y2 - EDGE_Y1) * EDGE_X1
+                        ! WRITE(*,*) (COEFA*part_adv(IP)%X + COEFB*part_adv(IP)%Y + COEFC)/(ABS(COEFA)+ABS(COEFB)+ABS(COEFC))
+                        ! ! End of the small check.
+                        
+                        IF ((part_adv(IP)%VX*U2D_GRID%EDGE_NORMAL(IC,J,1) + part_adv(IP)%VY*U2D_GRID%EDGE_NORMAL(IC,J,2)) > 0) THEN
+                           DTCOLL = COLLTIMES(I)
+                           BOUNDCOLL = J
+                        END IF
+
+                        part_adv(IP)%X = X_TEMP
+                        part_adv(IP)%Y = Y_TEMP
+                        part_adv(IP)%Z = Z_TEMP
+
+                        part_adv(IP)%VX = VX_TEMP
+                        part_adv(IP)%VY = VY_TEMP
+                        part_adv(IP)%VZ = VZ_TEMP
+
+                     END IF
+                  END DO
+               ELSE IF (DIMS == 3) THEN
+                  DO I = 1, 4
+
+                     IF (PIC_TYPE .NE. NONE) THEN
+                        ALPHA = 0.5*SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS* &
+                              (U3D_GRID%CELL_FACES_COEFFS(IC,I,1)*E(1) &
+                             + U3D_GRID%CELL_FACES_COEFFS(IC,I,2)*E(2) &
+                             + U3D_GRID%CELL_FACES_COEFFS(IC,I,3)*E(3))
+                     ELSE
+                        ALPHA = 0.d0
+                     END IF
+
+                     BETA = U3D_GRID%CELL_FACES_COEFFS(IC,I,1)*part_adv(IP)%VX &
+                          + U3D_GRID%CELL_FACES_COEFFS(IC,I,2)*part_adv(IP)%VY &
+                          + U3D_GRID%CELL_FACES_COEFFS(IC,I,3)*part_adv(IP)%VZ
+
+                     GAMMA = U3D_GRID%CELL_FACES_COEFFS(IC,I,1)*part_adv(IP)%X &
+                           + U3D_GRID%CELL_FACES_COEFFS(IC,I,2)*part_adv(IP)%Y &
+                           + U3D_GRID%CELL_FACES_COEFFS(IC,I,3)*part_adv(IP)%Z &
+                           + U3D_GRID%CELL_FACES_COEFFS(IC,I,4)
+
+                     COLLTIMES = -1.d0
+                     IF (ALPHA == 0.d0) THEN
+                        COLLTIMES(2*(I-1) + 1) = - GAMMA/BETA
+                     ELSE
+                        DELTA = BETA*BETA - 4.0*ALPHA*GAMMA
+                        IF (DELTA >= 0.d0) THEN
+                           COLLTIMES(2*(I-1) + 1) = 0.5*(-BETA - SQRT(DELTA))/ALPHA
+                           COLLTIMES(2*I) =         0.5*(-BETA + SQRT(DELTA))/ALPHA
+                        END IF
+                     END IF
+                  END DO
+
+                  ! Find which collision happens first.
+                  DTCOLL = part_adv(IP)%DTRIM
+                  BOUNDCOLL = -1
+                  DO I = 1, 8
+                     IF (COLLTIMES(I) > 0 .AND. COLLTIMES(I) < DTCOLL) THEN
+
+
+                        X_TEMP = part_adv(IP)%X
+                        Y_TEMP = part_adv(IP)%Y
+                        Z_TEMP = part_adv(IP)%Z
+
+                        VX_TEMP = part_adv(IP)%VX
+                        VY_TEMP = part_adv(IP)%VY
+                        VZ_TEMP = part_adv(IP)%VZ
+
+                        CALL MOVE_PARTICLE_CN(IP, E, COLLTIMES(I))
+                        J = EDGEINDEX(I)
+                        
+                        IF ((part_adv(IP)%VX*U3D_GRID%FACE_NORMAL(IC,J,1) &
+                           + part_adv(IP)%VY*U3D_GRID%FACE_NORMAL(IC,J,2) &
+                           + part_adv(IP)%VZ*U3D_GRID%FACE_NORMAL(IC,J,3)) > 0) THEN
+                           DTCOLL = COLLTIMES(I)
+                           BOUNDCOLL = J
+                        END IF
+
+                        part_adv(IP)%X = X_TEMP
+                        part_adv(IP)%Y = Y_TEMP
+                        part_adv(IP)%Z = Z_TEMP
+
+                        part_adv(IP)%VX = VX_TEMP
+                        part_adv(IP)%VY = VY_TEMP
+                        part_adv(IP)%VZ = VZ_TEMP
+
+                     END IF
+                  END DO
+               END IF
 
                ! Do the advection
                IF (BOUNDCOLL .NE. -1) THEN
@@ -734,44 +835,65 @@ MODULE fully_implicit
                      + SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS*DTCOLL
                   END IF
 
+                  IF (DIMS == 2) THEN
+                     NEIGHBOR = U2D_GRID%CELL_NEIGHBORS(IC, BOUNDCOLL)
+                     FACE_PG = U2D_GRID%CELL_EDGES_PG(IC, BOUNDCOLL)
+                     FACE_NORMAL = U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,:)
+                     FACE_TANG1 = [-FACE_NORMAL(2), FACE_NORMAL(1), 0.d0]
+                     FACE_TANG2 = [0.d0, 0.d0, 1.d0]
+                  ELSE IF (DIMS == 3) THEN
+                     NEIGHBOR = U3D_GRID%CELL_NEIGHBORS(IC, BOUNDCOLL)
+                     FACE_PG = U3D_GRID%CELL_FACES_PG(IC, BOUNDCOLL)
+                     FACE_NORMAL = U3D_GRID%FACE_NORMAL(IC,BOUNDCOLL,:)
+                     FACE_TANG1 = U3D_GRID%FACE_TANG1(IC,BOUNDCOLL,:)
+                     FACE_TANG2 = U3D_GRID%FACE_TANG2(IC,BOUNDCOLL,:)
+                  END IF
+
                   ! Move to new cell
-                  IF (U2D_GRID%CELL_NEIGHBORS(IC, BOUNDCOLL) == -1) THEN
+                  IF (NEIGHBOR == -1) THEN
                      ! The particle is at the boundary of the domain
-                     EDGE_PG = U2D_GRID%CELL_EDGES_PG(IC, BOUNDCOLL)
-                     IF (EDGE_PG .NE. -1) THEN
+                     IF (FACE_PG .NE. -1) THEN
                         ! Apply particle boundary condition
-                        IF (GRID_BC(EDGE_PG)%PARTICLE_BC == SPECULAR) THEN
-                           IF (GRID_BC(EDGE_PG)%REACT) THEN
+                        IF (GRID_BC(FACE_PG)%PARTICLE_BC == SPECULAR) THEN
+                           IF (GRID_BC(FACE_PG)%REACT) THEN
                               CALL WALL_REACT(IP, REMOVE_PART(IP))
                            END IF
                            
-                           VDOTN = part_adv(IP)%VX*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,1) &
-                                 + part_adv(IP)%VY*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,2)
-                           part_adv(IP)%VX = part_adv(IP)%VX - 2.*VDOTN*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,1)
-                           part_adv(IP)%VY = part_adv(IP)%VY - 2.*VDOTN*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,2)
-                        ELSE IF (GRID_BC(EDGE_PG)%PARTICLE_BC == DIFFUSE) THEN
-                           IF (GRID_BC(EDGE_PG)%REACT) THEN
+                           VDOTN = particles(IP)%VX*FACE_NORMAL(1) &
+                                 + particles(IP)%VY*FACE_NORMAL(2) &
+                                 + particles(IP)%VZ*FACE_NORMAL(3)
+                           particles(IP)%VX = particles(IP)%VX - 2.*VDOTN*FACE_NORMAL(1)
+                           particles(IP)%VY = particles(IP)%VY - 2.*VDOTN*FACE_NORMAL(2)
+                           particles(IP)%VZ = particles(IP)%VZ - 2.*VDOTN*FACE_NORMAL(3)
+                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == DIFFUSE) THEN
+                           IF (GRID_BC(FACE_PG)%REACT) THEN
                               CALL WALL_REACT(IP, REMOVE_PART(IP))
                            END IF
 
-                           S_ID = part_adv(IP)%S_ID
-                           WALL_TEMP = GRID_BC(EDGE_PG)%WALL_TEMP
+                           S_ID = particles(IP)%S_ID
+                           WALL_TEMP = GRID_BC(FACE_PG)%WALL_TEMP
                            CALL MAXWELL(0.d0, 0.d0, 0.d0, &
                            WALL_TEMP, WALL_TEMP, WALL_TEMP, &
-                           VDUMMY, V_PARA, VZ, SPECIES(S_ID)%MOLECULAR_MASS)
+                           VDUMMY, V_TANG1, V_TANG2, SPECIES(S_ID)%MOLECULAR_MASS)
 
                            CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, WALL_TEMP, EROT)
                            CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, WALL_TEMP, EVIB)
                                           
                            V_PERP = FLX(0.d0, WALL_TEMP, SPECIES(S_ID)%MOLECULAR_MASS)
 
-                           part_adv(IP)%VX = - V_PERP*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,1) &
-                                            - V_PARA*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,2)
-                           part_adv(IP)%VY = - V_PERP*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,2) &
-                                            + V_PARA*U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,1)
-                           part_adv(IP)%VZ = VZ
-                           part_adv(IP)%EROT = EROT
-                           part_adv(IP)%EVIB = EVIB
+
+                           particles(IP)%VX = - V_PERP*FACE_NORMAL(1) &
+                                              - V_TANG1*FACE_TANG1(1) &
+                                              - V_TANG2*FACE_TANG2(1)
+                           particles(IP)%VY = - V_PERP*FACE_NORMAL(2) &
+                                              - V_TANG1*FACE_TANG1(2) &
+                                              - V_TANG2*FACE_TANG2(2)
+                           particles(IP)%VZ = - V_PERP*FACE_NORMAL(3) &
+                                              - V_TANG1*FACE_TANG1(3) &
+                                              - V_TANG2*FACE_TANG2(3)
+                           
+                           particles(IP)%EROT = EROT
+                           particles(IP)%EVIB = EVIB
                         ELSE
                            REMOVE_PART(IP) = .TRUE.
                            part_adv(IP)%DTRIM = 0.d0
@@ -782,8 +904,8 @@ MODULE fully_implicit
                      END IF
                   ELSE
                      ! The particle is crossing to another cell
-                     part_adv(IP)%IC = U2D_GRID%CELL_NEIGHBORS(IC, BOUNDCOLL)
-                     IC = part_adv(IP)%IC
+                     part_adv(IP)%IC = NEIGHBOR
+                     IC = NEIGHBOR
                      !WRITE(*,*) 'moved particle to cell: ', IC
                   END IF
                ELSE
@@ -881,74 +1003,109 @@ MODULE fully_implicit
          CALL MatAssemblyEnd(dxde,MAT_FINAL_ASSEMBLY,ierr)
 
          !CALL PetscViewerDrawOpen(PETSC_COMM_WORLD,PETSC_NULL_CHARACTER, &
-         !                         PETSC_NULL_CHARACTER,0,0,700,700,viewer,ierr)
+         !                         PETSC_NULL_CHARACTER,0,0,684,684,viewer,ierr)
          !CALL MatView(dxde,viewer,ierr)
-         !CALL PetscSleep(30.d0,ierr)
+         !CALL PetscSleep(5.d0,ierr)
+
+         CALL PetscViewerASCIIOpen(PETSC_COMM_WORLD,'mat.output',viewer,ierr)
+         CALL MatView(dxde,viewer,ierr)
+         CALL PetscSleep(5.d0,ierr)
+         CALL PetscViewerDestroy(viewer,ierr)
    
          CALL MatGetOwnershipRange(dxde,first_row,last_row,ierr)
-         DO I = first_row, last_row-1
-            CALL MatGetRow(dxde,I,ncols,cols,vals,ierr)
-            !WRITE(*,*) 'Row ', I, ' ncols ', ncols, ' cols ', cols, ' vals ', vals, ' ierr ', ierr
-            ! MatGetRow(Mat A,PetscInt row, PetscInt *ncols,const PetscInt (*cols)[],const PetscScalar (*vals)[]);
-            AREA = CELL_AREAS(I+1)
-            V1I = U2D_GRID%CELL_NODES(I+1,1)
-            V2I = U2D_GRID%CELL_NODES(I+1,2)
-            V3I = U2D_GRID%CELL_NODES(I+1,3)
-            X1 = U2D_GRID%NODE_COORDS(V1I, 1)
-            X2 = U2D_GRID%NODE_COORDS(V2I, 1)
-            X3 = U2D_GRID%NODE_COORDS(V3I, 1)
-            Y1 = U2D_GRID%NODE_COORDS(V1I, 2)
-            Y2 = U2D_GRID%NODE_COORDS(V2I, 2)
-            Y3 = U2D_GRID%NODE_COORDS(V3I, 2)
-            DPSI1DX =  0.5*(Y2-Y3)/AREA
-            DPSI2DX = -0.5*(Y1-Y3)/AREA
-            DPSI3DX = -0.5*(Y2-Y1)/AREA
-            DPSI1DY = -0.5*(X2-X3)/AREA
-            DPSI2DY =  0.5*(X1-X3)/AREA
-            DPSI3DY =  0.5*(X2-X1)/AREA
 
-            DO JJ = 1, ncols
-               J = cols(JJ)
-               AREA = CELL_AREAS(J+1)
-               V1J = U2D_GRID%CELL_NODES(J+1,1)
-               V2J = U2D_GRID%CELL_NODES(J+1,2)
-               V3J = U2D_GRID%CELL_NODES(J+1,3)            
-               X1 = U2D_GRID%NODE_COORDS(V1J, 1)
-               X2 = U2D_GRID%NODE_COORDS(V2J, 1)
-               X3 = U2D_GRID%NODE_COORDS(V3J, 1)
-               Y1 = U2D_GRID%NODE_COORDS(V1J, 2)
-               Y2 = U2D_GRID%NODE_COORDS(V2J, 2)
-               Y3 = U2D_GRID%NODE_COORDS(V3J, 2)
-               DPSJ1DX =  0.5*(Y2-Y3)/AREA
-               DPSJ2DX = -0.5*(Y1-Y3)/AREA
-               DPSJ3DX = -0.5*(Y2-Y1)/AREA
-               DPSJ1DY = -0.5*(X2-X3)/AREA
-               DPSJ2DY =  0.5*(X1-X3)/AREA
-               DPSJ3DY =  0.5*(X2-X1)/AREA
+         IF (DIMS == 2) THEN
+            DO I = first_row, last_row-1
+               CALL MatGetRow(dxde,I,ncols,cols,vals,ierr)
+               !WRITE(*,*) 'Row ', I, ' ncols ', ncols, ' cols ', cols, ' vals ', vals, ' ierr ', ierr
+               ! MatGetRow(Mat A,PetscInt row, PetscInt *ncols,const PetscInt (*cols)[],const PetscScalar (*vals)[]);
+               AREA = CELL_AREAS(I+1)
+               V1I = U2D_GRID%CELL_NODES(I+1,1)
+               V2I = U2D_GRID%CELL_NODES(I+1,2)
+               V3I = U2D_GRID%CELL_NODES(I+1,3)
+               X1 = U2D_GRID%NODE_COORDS(V1I, 1)
+               X2 = U2D_GRID%NODE_COORDS(V2I, 1)
+               X3 = U2D_GRID%NODE_COORDS(V3I, 1)
+               Y1 = U2D_GRID%NODE_COORDS(V1I, 2)
+               Y2 = U2D_GRID%NODE_COORDS(V2I, 2)
+               Y3 = U2D_GRID%NODE_COORDS(V3I, 2)
+               DPSI1DX =  0.5*(Y2-Y3)/AREA
+               DPSI2DX = -0.5*(Y1-Y3)/AREA
+               DPSI3DX = -0.5*(Y2-Y1)/AREA
+               DPSI1DY = -0.5*(X2-X3)/AREA
+               DPSI2DY =  0.5*(X1-X3)/AREA
+               DPSI3DY =  0.5*(X2-X1)/AREA
 
-               VAL = - vals(JJ)/EPS0/(ZMAX-ZMIN)*FNUM
+               DO JJ = 1, ncols
+                  J = cols(JJ)
+                  AREA = CELL_AREAS(J+1)
+                  V1J = U2D_GRID%CELL_NODES(J+1,1)
+                  V2J = U2D_GRID%CELL_NODES(J+1,2)
+                  V3J = U2D_GRID%CELL_NODES(J+1,3)            
+                  X1 = U2D_GRID%NODE_COORDS(V1J, 1)
+                  X2 = U2D_GRID%NODE_COORDS(V2J, 1)
+                  X3 = U2D_GRID%NODE_COORDS(V3J, 1)
+                  Y1 = U2D_GRID%NODE_COORDS(V1J, 2)
+                  Y2 = U2D_GRID%NODE_COORDS(V2J, 2)
+                  Y3 = U2D_GRID%NODE_COORDS(V3J, 2)
+                  DPSJ1DX =  0.5*(Y2-Y3)/AREA
+                  DPSJ2DX = -0.5*(Y1-Y3)/AREA
+                  DPSJ3DX = -0.5*(Y2-Y1)/AREA
+                  DPSJ1DY = -0.5*(X2-X3)/AREA
+                  DPSJ2DY =  0.5*(X1-X3)/AREA
+                  DPSJ3DY =  0.5*(X2-X1)/AREA
 
-               IF (.NOT. IS_DIRICHLET(V1I-1)) THEN
-                  CALL MatSetValues(jac,1,V1I-1,1,V1J-1,VAL*(DPSI1DX*DPSJ1DX+DPSI1DY*DPSJ1DY),ADD_VALUES,ierr)
-                  CALL MatSetValues(jac,1,V1I-1,1,V2J-1,VAL*(DPSI1DX*DPSJ2DX+DPSI1DY*DPSJ2DY),ADD_VALUES,ierr)
-                  CALL MatSetValues(jac,1,V1I-1,1,V3J-1,VAL*(DPSI1DX*DPSJ3DX+DPSI1DY*DPSJ3DY),ADD_VALUES,ierr)
-               END IF
-               IF (.NOT. IS_DIRICHLET(V2I-1)) THEN
-                  CALL MatSetValues(jac,1,V2I-1,1,V1J-1,VAL*(DPSI2DX*DPSJ1DX+DPSI2DY*DPSJ1DY),ADD_VALUES,ierr)
-                  CALL MatSetValues(jac,1,V2I-1,1,V2J-1,VAL*(DPSI2DX*DPSJ2DX+DPSI2DY*DPSJ2DY),ADD_VALUES,ierr)
-                  CALL MatSetValues(jac,1,V2I-1,1,V3J-1,VAL*(DPSI2DX*DPSJ3DX+DPSI2DY*DPSJ3DY),ADD_VALUES,ierr)
-               END IF
-               IF (.NOT. IS_DIRICHLET(V3I-1)) THEN
-                  CALL MatSetValues(jac,1,V3I-1,1,V1J-1,VAL*(DPSI3DX*DPSJ1DX+DPSI3DY*DPSJ1DY),ADD_VALUES,ierr)
-                  CALL MatSetValues(jac,1,V3I-1,1,V2J-1,VAL*(DPSI3DX*DPSJ2DX+DPSI3DY*DPSJ2DY),ADD_VALUES,ierr)
-                  CALL MatSetValues(jac,1,V3I-1,1,V3J-1,VAL*(DPSI3DX*DPSJ3DX+DPSI3DY*DPSJ3DY),ADD_VALUES,ierr)
-               END IF
+                  VAL = - vals(JJ)/EPS0/(ZMAX-ZMIN)*FNUM
+
+                  IF (.NOT. IS_DIRICHLET(V1I-1)) THEN
+                     CALL MatSetValues(jac,1,V1I-1,1,V1J-1,VAL*(DPSI1DX*DPSJ1DX+DPSI1DY*DPSJ1DY),ADD_VALUES,ierr)
+                     CALL MatSetValues(jac,1,V1I-1,1,V2J-1,VAL*(DPSI1DX*DPSJ2DX+DPSI1DY*DPSJ2DY),ADD_VALUES,ierr)
+                     CALL MatSetValues(jac,1,V1I-1,1,V3J-1,VAL*(DPSI1DX*DPSJ3DX+DPSI1DY*DPSJ3DY),ADD_VALUES,ierr)
+                  END IF
+                  IF (.NOT. IS_DIRICHLET(V2I-1)) THEN
+                     CALL MatSetValues(jac,1,V2I-1,1,V1J-1,VAL*(DPSI2DX*DPSJ1DX+DPSI2DY*DPSJ1DY),ADD_VALUES,ierr)
+                     CALL MatSetValues(jac,1,V2I-1,1,V2J-1,VAL*(DPSI2DX*DPSJ2DX+DPSI2DY*DPSJ2DY),ADD_VALUES,ierr)
+                     CALL MatSetValues(jac,1,V2I-1,1,V3J-1,VAL*(DPSI2DX*DPSJ3DX+DPSI2DY*DPSJ3DY),ADD_VALUES,ierr)
+                  END IF
+                  IF (.NOT. IS_DIRICHLET(V3I-1)) THEN
+                     CALL MatSetValues(jac,1,V3I-1,1,V1J-1,VAL*(DPSI3DX*DPSJ1DX+DPSI3DY*DPSJ1DY),ADD_VALUES,ierr)
+                     CALL MatSetValues(jac,1,V3I-1,1,V2J-1,VAL*(DPSI3DX*DPSJ2DX+DPSI3DY*DPSJ2DY),ADD_VALUES,ierr)
+                     CALL MatSetValues(jac,1,V3I-1,1,V3J-1,VAL*(DPSI3DX*DPSJ3DX+DPSI3DY*DPSJ3DY),ADD_VALUES,ierr)
+                  END IF
+
+               END DO
+
+               CALL MatRestoreRow(dxde,I,ncols,cols,vals,ierr)
 
             END DO
+         ELSE IF (DIMS == 3) THEN
+            DO I = first_row, last_row-1
+               CALL MatGetRow(dxde,I,ncols,cols,vals,ierr)
+   
+               DO JJ = 1, ncols
+                  J = cols(JJ)
 
-            CALL MatRestoreRow(dxde,I,ncols,cols,vals,ierr)
-
-         END DO
+                  VAL = - vals(JJ)/EPS0*FNUM
+                  DO NI = 1, 4
+                     VNI = U3D_GRID%CELL_NODES(I+1,NI)
+                     IF (.NOT. IS_DIRICHLET(VNI - 1)) THEN
+                        DO NJ = 1, 4
+                           VNJ = U3D_GRID%CELL_NODES(J+1,NJ)
+                           CALL MatSetValues(jac,1,VNI-1,1,VNJ-1,VAL* &
+                            (U3D_GRID%BASIS_COEFFS(I+1,NI,1)*U3D_GRID%BASIS_COEFFS(J+1,NJ,1) &
+                           + U3D_GRID%BASIS_COEFFS(I+1,NI,2)*U3D_GRID%BASIS_COEFFS(J+1,NJ,2) &
+                           + U3D_GRID%BASIS_COEFFS(I+1,NI,3)*U3D_GRID%BASIS_COEFFS(J+1,NJ,3)),ADD_VALUES,ierr)
+                        END DO
+                     END IF
+                  END DO
+   
+               END DO
+   
+               CALL MatRestoreRow(dxde,I,ncols,cols,vals,ierr)
+   
+            END DO
+   
+         END IF
 
          ! CALL MatAssemblyBegin(jac,MAT_FINAL_ASSEMBLY,ierr)
          ! CALL MatAssemblyEnd(jac,MAT_FINAL_ASSEMBLY,ierr)
@@ -1173,53 +1330,66 @@ MODULE fully_implicit
       IMPLICIT NONE
 
       REAL(KIND=8) :: HX, HY
-      INTEGER :: I, J
-      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, AREA
+      INTEGER :: I, J, P, VP, ID
+      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, AREA, VOL
       INTEGER :: V1, V2, V3, SIZE
       INTEGER :: ICENTER, INORTH, ISOUTH, IEAST, IWEST
 
       HX = (XMAX-XMIN)/DBLE(NX)
       HY = (YMAX-YMIN)/DBLE(NY)
 
+      SIZE = NNODES
 
-      IF (GRID_TYPE == UNSTRUCTURED) THEN
-         SIZE = U2D_GRID%NUM_NODES
-      ELSE
-         SIZE = NPX*NPY
-      END IF
       ! Reshape the linear array into a 2D array
       IF (GRID_TYPE == UNSTRUCTURED) THEN
 
          ! Compute the electric field at grid points
-         DO I = 1, U2D_GRID%NUM_CELLS
-            AREA = CELL_AREAS(I)
-            V1 = U2D_GRID%CELL_NODES(I,1)
-            V2 = U2D_GRID%CELL_NODES(I,2)
-            V3 = U2D_GRID%CELL_NODES(I,3)            
-            X1 = U2D_GRID%NODE_COORDS(V1, 1)
-            X2 = U2D_GRID%NODE_COORDS(V2, 1)
-            X3 = U2D_GRID%NODE_COORDS(V3, 1)
-            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
+         IF (DIMS == 2) THEN
+            DO I = 1, NCELLS
+               AREA = CELL_AREAS(I)
+               V1 = U2D_GRID%CELL_NODES(I,1)
+               V2 = U2D_GRID%CELL_NODES(I,2)
+               V3 = U2D_GRID%CELL_NODES(I,3)            
+               X1 = U2D_GRID%NODE_COORDS(V1, 1)
+               X2 = U2D_GRID%NODE_COORDS(V2, 1)
+               X3 = U2D_GRID%NODE_COORDS(V3, 1)
+               Y1 = U2D_GRID%NODE_COORDS(V1, 2)
+               Y2 = U2D_GRID%NODE_COORDS(V2, 2)
+               Y3 = U2D_GRID%NODE_COORDS(V3, 2)
 
-            E_FIELD(I,1,1) = -0.5/AREA*(  PHI_FIELD(V1)*(Y2-Y3) &
-                                        - PHI_FIELD(V2)*(Y1-Y3) &
-                                        - PHI_FIELD(V3)*(Y2-Y1))
-            E_FIELD(I,1,2) = -0.5/AREA*(- PHI_FIELD(V1)*(X2-X3) &
-                                        + PHI_FIELD(V2)*(X1-X3) &
-                                        + PHI_FIELD(V3)*(X2-X1))
-            E_FIELD(I,1,3) = 0.d0
+               E_FIELD(I,1,1) = -0.5/AREA*(  PHI_FIELD(V1)*(Y2-Y3) &
+                                          - PHI_FIELD(V2)*(Y1-Y3) &
+                                          - PHI_FIELD(V3)*(Y2-Y1))
+               E_FIELD(I,1,2) = -0.5/AREA*(- PHI_FIELD(V1)*(X2-X3) &
+                                          + PHI_FIELD(V2)*(X1-X3) &
+                                          + PHI_FIELD(V3)*(X2-X1))
+               E_FIELD(I,1,3) = 0.d0
 
-            EBAR_FIELD(I,1,1) = -0.5/AREA*(  PHIBAR_FIELD(V1)*(Y2-Y3) &
-                                           - PHIBAR_FIELD(V2)*(Y1-Y3) &
-                                           - PHIBAR_FIELD(V3)*(Y2-Y1))
-            EBAR_FIELD(I,1,2) = -0.5/AREA*(- PHIBAR_FIELD(V1)*(X2-X3) &
-                                           + PHIBAR_FIELD(V2)*(X1-X3) &
-                                           + PHIBAR_FIELD(V3)*(X2-X1))
-            EBAR_FIELD(I,1,3) = 0.d0
+               EBAR_FIELD(I,1,1) = -0.5/AREA*(  PHIBAR_FIELD(V1)*(Y2-Y3) &
+                                             - PHIBAR_FIELD(V2)*(Y1-Y3) &
+                                             - PHIBAR_FIELD(V3)*(Y2-Y1))
+               EBAR_FIELD(I,1,2) = -0.5/AREA*(- PHIBAR_FIELD(V1)*(X2-X3) &
+                                             + PHIBAR_FIELD(V2)*(X1-X3) &
+                                             + PHIBAR_FIELD(V3)*(X2-X1))
+               EBAR_FIELD(I,1,3) = 0.d0
 
-         END DO
+            END DO
+
+         ELSE IF (DIMS == 3) THEN
+
+            E_FIELD = 0.d0
+            EBAR_FIELD = 0.d0
+            DO I = 1, NCELLS
+               DO ID = 1, 3
+                  DO P = 1, 4
+                     VP = U3D_GRID%CELL_NODES(I,P)
+                     E_FIELD(I,1,ID) =    E_FIELD(I,1,ID)    - PHI_FIELD(VP)   *U3D_GRID%BASIS_COEFFS(I,P,ID)
+                     EBAR_FIELD(I,1,ID) = EBAR_FIELD(I,1,ID) - PHIBAR_FIELD(VP)*U3D_GRID%BASIS_COEFFS(I,P,ID)
+                  END DO
+               END DO
+            END DO
+
+         END IF
 
       ELSE
          ! Compute the electric field at grid points
@@ -1376,7 +1546,8 @@ MODULE fully_implicit
       INTEGER, DIMENSION(4) :: INDICES, INDI, INDJ
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, XP, YP
       INTEGER :: V1, V2, V3, SIZE
-      REAL(KIND=8) :: PSI1, PSI2, PSI3
+      REAL(KIND=8) :: PSI1, PSI2, PSI3, PSIP
+      INTEGER :: P, VP
 
       K = QE/(EPS0*EPS_SCALING**2) ! [V m] Elementary charge / Dielectric constant of vacuum
 
@@ -1388,26 +1559,39 @@ MODULE fully_implicit
 
          IF (GRID_TYPE == UNSTRUCTURED) THEN 
             IC = particles(JP)%IC
-            AREA = CELL_AREAS(IC)
-            V1 = U2D_GRID%CELL_NODES(IC,1)
-            V2 = U2D_GRID%CELL_NODES(IC,2)
-            V3 = U2D_GRID%CELL_NODES(IC,3)            
-            X1 = U2D_GRID%NODE_COORDS(V1, 1)
-            X2 = U2D_GRID%NODE_COORDS(V2, 1)
-            X3 = U2D_GRID%NODE_COORDS(V3, 1)
-            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
-            XP = particles(JP)%X
-            YP = particles(JP)%Y
-            PSI1 = 0.5*( (Y2-Y3)*(XP-X3) - (X2-X3)*(YP-Y3))/AREA/(ZMAX-ZMIN)
-            PSI2 = 0.5*(-(Y1-Y3)*(XP-X3) + (X1-X3)*(YP-Y3))/AREA/(ZMAX-ZMIN)
-            PSI3 = 0.5*(-(Y2-Y1)*(XP-X1) + (X2-X1)*(YP-Y1))/AREA/(ZMAX-ZMIN)
-            
-            RHO_Q = K*CHARGE*FNUM
-            RHS(V1-1) = RHS(V1-1) + RHO_Q*PSI1
-            RHS(V2-1) = RHS(V2-1) + RHO_Q*PSI2
-            RHS(V3-1) = RHS(V3-1) + RHO_Q*PSI3
+
+            IF (DIMS == 2) THEN
+               AREA = CELL_AREAS(IC)
+               V1 = U2D_GRID%CELL_NODES(IC,1)
+               V2 = U2D_GRID%CELL_NODES(IC,2)
+               V3 = U2D_GRID%CELL_NODES(IC,3)            
+               X1 = U2D_GRID%NODE_COORDS(V1, 1)
+               X2 = U2D_GRID%NODE_COORDS(V2, 1)
+               X3 = U2D_GRID%NODE_COORDS(V3, 1)
+               Y1 = U2D_GRID%NODE_COORDS(V1, 2)
+               Y2 = U2D_GRID%NODE_COORDS(V2, 2)
+               Y3 = U2D_GRID%NODE_COORDS(V3, 2)
+               XP = particles(JP)%X
+               YP = particles(JP)%Y
+               PSI1 = 0.5*( (Y2-Y3)*(XP-X3) - (X2-X3)*(YP-Y3))/AREA/(ZMAX-ZMIN)
+               PSI2 = 0.5*(-(Y1-Y3)*(XP-X3) + (X1-X3)*(YP-Y3))/AREA/(ZMAX-ZMIN)
+               PSI3 = 0.5*(-(Y2-Y1)*(XP-X1) + (X2-X1)*(YP-Y1))/AREA/(ZMAX-ZMIN)
+               
+               RHO_Q = K*CHARGE*FNUM
+               RHS(V1-1) = RHS(V1-1) + RHO_Q*PSI1
+               RHS(V2-1) = RHS(V2-1) + RHO_Q*PSI2
+               RHS(V3-1) = RHS(V3-1) + RHO_Q*PSI3
+            ELSE IF (DIMS == 3) THEN
+               RHO_Q = K*CHARGE*FNUM
+               DO P = 1, 4
+                  VP = U3D_GRID%CELL_NODES(IC,P) - 1
+                  PSIP = U3D_GRID%BASIS_COEFFS(IC,P,1)*particles(JP)%X &
+                       + U3D_GRID%BASIS_COEFFS(IC,P,2)*particles(JP)%Y &
+                       + U3D_GRID%BASIS_COEFFS(IC,P,3)*particles(JP)%Z &
+                       + U3D_GRID%BASIS_COEFFS(IC,P,4)
+                  RHS(VP) = RHS(VP) + RHO_Q*PSIP
+               END DO
+            END IF
 
          ELSE
 
@@ -1438,11 +1622,7 @@ MODULE fully_implicit
       END DO
 
 
-      IF (GRID_TYPE == UNSTRUCTURED) THEN
-         SIZE = U2D_GRID%NUM_NODES
-      ELSE
-         SIZE = NPX*NPY
-      END IF
+      SIZE = NNODES
 
       IF (PROC_ID .EQ. 0) THEN
          CALL MPI_REDUCE(MPI_IN_PLACE, RHS, SIZE, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
@@ -1470,7 +1650,7 @@ MODULE fully_implicit
       CALL VecAssemblyEnd(bvec,ierr)
 
 
-      DO I = 0, U2D_GRID%NUM_NODES-1
+      DO I = 0, NNODES-1
          IF (IS_DIRICHLET(I)) THEN
             RHS(I) = DIRICHLET(I)
          ELSE IF (IS_NEUMANN(I)) THEN
@@ -1493,8 +1673,8 @@ MODULE fully_implicit
       REAL(KIND=8), DIMENSION(4) :: WEIGHTS
       INTEGER, DIMENSION(4) :: INDICES, INDI, INDJ
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, XP, YP
-      INTEGER :: V1, V2, V3, SIZE
-      REAL(KIND=8) :: PSI1, PSI2, PSI3
+      INTEGER :: V1, V2, V3, SIZE, P, VP
+      REAL(KIND=8) :: PSI1, PSI2, PSI3, PSIP
 
       K = QE/(EPS0*EPS_SCALING**2) ! [V m] Elementary charge / Dielectric constant of vacuum
 
@@ -1506,26 +1686,38 @@ MODULE fully_implicit
 
          IF (GRID_TYPE == UNSTRUCTURED) THEN 
             IC = part_adv(JP)%IC
-            AREA = CELL_AREAS(IC)
-            V1 = U2D_GRID%CELL_NODES(IC,1)
-            V2 = U2D_GRID%CELL_NODES(IC,2)
-            V3 = U2D_GRID%CELL_NODES(IC,3)            
-            X1 = U2D_GRID%NODE_COORDS(V1, 1)
-            X2 = U2D_GRID%NODE_COORDS(V2, 1)
-            X3 = U2D_GRID%NODE_COORDS(V3, 1)
-            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
-            XP = part_adv(JP)%X
-            YP = part_adv(JP)%Y
-            PSI1 = 0.5*( (Y2-Y3)*(XP-X3) - (X2-X3)*(YP-Y3))/AREA/(ZMAX-ZMIN)
-            PSI2 = 0.5*(-(Y1-Y3)*(XP-X3) + (X1-X3)*(YP-Y3))/AREA/(ZMAX-ZMIN)
-            PSI3 = 0.5*(-(Y2-Y1)*(XP-X1) + (X2-X1)*(YP-Y1))/AREA/(ZMAX-ZMIN)
-            
-            RHO_Q = K*CHARGE*FNUM
-            RHS(V1-1) = RHS(V1-1) + RHO_Q*PSI1
-            RHS(V2-1) = RHS(V2-1) + RHO_Q*PSI2
-            RHS(V3-1) = RHS(V3-1) + RHO_Q*PSI3
+            IF (DIMS == 2) THEN
+               AREA = CELL_AREAS(IC)
+               V1 = U2D_GRID%CELL_NODES(IC,1)
+               V2 = U2D_GRID%CELL_NODES(IC,2)
+               V3 = U2D_GRID%CELL_NODES(IC,3)            
+               X1 = U2D_GRID%NODE_COORDS(V1, 1)
+               X2 = U2D_GRID%NODE_COORDS(V2, 1)
+               X3 = U2D_GRID%NODE_COORDS(V3, 1)
+               Y1 = U2D_GRID%NODE_COORDS(V1, 2)
+               Y2 = U2D_GRID%NODE_COORDS(V2, 2)
+               Y3 = U2D_GRID%NODE_COORDS(V3, 2)
+               XP = part_adv(JP)%X
+               YP = part_adv(JP)%Y
+               PSI1 = 0.5*( (Y2-Y3)*(XP-X3) - (X2-X3)*(YP-Y3))/AREA/(ZMAX-ZMIN)
+               PSI2 = 0.5*(-(Y1-Y3)*(XP-X3) + (X1-X3)*(YP-Y3))/AREA/(ZMAX-ZMIN)
+               PSI3 = 0.5*(-(Y2-Y1)*(XP-X1) + (X2-X1)*(YP-Y1))/AREA/(ZMAX-ZMIN)
+               
+               RHO_Q = K*CHARGE*FNUM
+               RHS(V1-1) = RHS(V1-1) + RHO_Q*PSI1
+               RHS(V2-1) = RHS(V2-1) + RHO_Q*PSI2
+               RHS(V3-1) = RHS(V3-1) + RHO_Q*PSI3
+            ELSE IF (DIMS == 3) THEN
+               RHO_Q = K*CHARGE*FNUM
+               DO P = 1, 4
+                  VP = U3D_GRID%CELL_NODES(IC,P) - 1
+                  PSIP = U3D_GRID%BASIS_COEFFS(IC,P,1)*part_adv(JP)%X &
+                       + U3D_GRID%BASIS_COEFFS(IC,P,2)*part_adv(JP)%Y &
+                       + U3D_GRID%BASIS_COEFFS(IC,P,3)*part_adv(JP)%Z &
+                       + U3D_GRID%BASIS_COEFFS(IC,P,4)
+                  RHS(VP) = RHS(VP) + RHO_Q*PSIP
+               END DO
+            END IF
 
          ELSE
 
@@ -1556,11 +1748,7 @@ MODULE fully_implicit
       END DO
 
 
-      IF (GRID_TYPE == UNSTRUCTURED) THEN
-         SIZE = U2D_GRID%NUM_NODES
-      ELSE
-         SIZE = NPX*NPY
-      END IF
+      SIZE = NNODES
 
       IF (PROC_ID .EQ. 0) THEN
          CALL MPI_REDUCE(MPI_IN_PLACE, RHS, SIZE, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
@@ -1588,7 +1776,7 @@ MODULE fully_implicit
       CALL VecAssemblyEnd(bvec,ierr)
 
 
-      DO I = 0, U2D_GRID%NUM_NODES-1
+      DO I = 0, NNODES-1
          IF (IS_DIRICHLET(I)) THEN
             RHS(I) = DIRICHLET(I)
          ELSE IF (IS_NEUMANN(I)) THEN

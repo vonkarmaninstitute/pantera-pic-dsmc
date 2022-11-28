@@ -15,13 +15,13 @@
 
 ! ========= Computational domain and grid ===========
 Dimensions:
-    3
+    2
 Axisymmetric:
     .FALSE.
 Number_of_cells:
-    1    1    1
+    256    256    1
 Domain_limits:
-    -1.0    1.0    -1.0    1.0    -0.5    0.5
+    -1.0e-4    1.0e-4    -1.0e-4    1.0e-4    -1.0e-4    1.0e-4
 Domain_periodicity:
     .FALSE.   .FALSE.   .FALSE.
 Domain_specular:
@@ -32,9 +32,9 @@ Boundary_temperature:
     300.0
     
 PIC_type:
-    none
-Mesh_file_SU2:
-    '3dtest.su2'
+    explicit
+!Mesh_file_SU2:
+!    'implicittest.su2'
 Bool_dump_moments:
     .FALSE.
 Bool_dump_fluxes:
@@ -49,33 +49,33 @@ Fluxes_dump_output:
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0e4
+    1.0e9
 Timestep:
-    1.0e-5
+    1.0e-9
 Number_of_timesteps:
-    100
+    1000
 Stats_every:
     1
 
 RNG_seed:
     65645
 Dump_part_every:
-    100
+    1000000
 
 Binary_output:
     .TRUE.
 Dump_grid_start:
     0
 Dump_grid_avgevery:
-    10
+    1
 Dump_grid_numavgs:
     1
 Dump_part_start:
-    10000
+    10000000
 
 
 Perform_checks:
-    .FALSE.
+    .TRUE.
 
 ! ========= Multispecies ==============================
 
@@ -83,7 +83,10 @@ Species_file:
     ar.species
 
 Def_mixture:
-    Argon Ar 1.0
+    Ions Ar+ 1.0
+
+Def_mixture:
+    Electrons e 1.0
 
 ! ========= Collisions ==============================
 
@@ -124,8 +127,12 @@ Thermal_bath_Ttr:
 ! ========= Initial particle seed ===================
 
 
-!Initial_particles:
-!    Plasma   1.0e12    0.0    0.    0.    11600.0    11600.0    11600.0    0.    0.
+Initial_particles:
+    Ions   1.0e11    0.0    0.0    0.0    300.0    300.0    300.0    0.    0.
+
+Initial_particles:
+    Electrons   1.0e11    0.0    0.0    0.0    11600.0    11600.0    11600.0    0.    0.
+
 
     
 !Boundary_condition:
@@ -143,14 +150,24 @@ Thermal_bath_Ttr:
 !Boundary_condition:
 !    Grid    vacuum
 
-Boundary_condition:
-    OuterWall    vacuum
+!Boundary_condition:
+!    OuterWall    vacuum
 
-Boundary_condition:
-    PFGWall    diffuse    50.0
+!Boundary_condition:
+!    PFGWall    vacuum
 
-Boundary_emit:
-    Emitter    Argon    1.0e15    0.0    0.0    0.0    300.0    300.0    300.0
+
+!Boundary_condition:
+!    OuterWall    dirichlet    0.0
+
+!Boundary_condition:
+!    PFGWall    dirichlet    0.0
+
+!Boundary_condition:
+!    Wall    dirichlet   0.0
+
+!Boundary_emit:
+!    Emitter    Argon    1.0e15    0.0    0.0    0.0    300.0    300.0    300.0
 
     
 !Solenoid_field:
@@ -167,7 +184,7 @@ Boundary_emit:
 ! We expect the number of processes to be N_BLOCKS_X*N_BLOCKS_Y
 
 Partition_style:
-    0
+    1
 
 Partition_num_blocks:
-    3  3
+    1  96

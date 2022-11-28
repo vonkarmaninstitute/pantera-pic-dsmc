@@ -252,12 +252,6 @@ CONTAINS
 
    SUBROUTINE DUMP_PARTICLES_FILE(TIMESTEP)
 
-      ! This subroutine dumps particles at the screen. DUMPS MAY OVERWRITE, SINCE STDOUT IS BUFFERED!!!!
-      ! Doesn't matter if I loop on processes!!!!
-      ! 
-      ! OLD OLD OL A loop is performed on the processes, making sure that
-      ! OLD OLD OL processes don't do it simultaneously, messing up the dump.
-
       USE global
       USE mpi_common
 
@@ -280,7 +274,7 @@ CONTAINS
          CLOSE(10)
       ELSE
          OPEN(10, FILE=filename )
-         !WRITE(10,*) '% X | Y | Z | VX | VY | VZ | EROT | EVIB | S_ID | IC'
+         !WRITE(10,*) '% X | Y | Z | VX | VY | VZ | EROT | EVIB | S_ID | IC | DTRIM'
          DO IP = 1, NP_PROC
             WRITE(10,*) particles(IP)%X, particles(IP)%Y, particles(IP)%Z, &
             particles(IP)%VX, particles(IP)%VY, particles(IP)%VZ, particles(IP)%EROT, particles(IP)%EVIB, &
@@ -292,6 +286,48 @@ CONTAINS
 
 
    END SUBROUTINE DUMP_PARTICLES_FILE
+
+
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE DUMP_PARTICLES_FILE -> dumps particle properties to file !!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+   SUBROUTINE DUMP_BOUNDARY_PARTICLES_FILE(TIMESTEP)
+
+      USE global
+      USE mpi_common
+
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN) :: TIMESTEP
+      CHARACTER(LEN=512)  :: filename
+      INTEGER :: IP
+
+
+      ! Dump particles that hit a boundary to file
+      WRITE(filename, "(A,A,I0.5,A6,I0.8)") TRIM(ADJUSTL(PARTDUMP_SAVE_PATH)), "bound_proc_", PROC_ID ! Compose filename
+
+      ! Open file for writing
+      IF (BOOL_BINARY_OUTPUT) THEN
+         OPEN(12, FILE=filename, ACCESS='SEQUENTIAL', FORM='UNFORMATTED', STATUS='NEW', CONVERT='BIG_ENDIAN', RECL=84)
+         DO IP = 1, NP_DUMP_PROC
+            WRITE(12) TIMESTEP, part_dump(IP)%X, part_dump(IP)%Y, part_dump(IP)%Z, &
+            part_dump(IP)%VX, part_dump(IP)%VY, part_dump(IP)%VZ, part_dump(IP)%EROT, part_dump(IP)%EVIB, &
+            part_dump(IP)%S_ID, part_dump(IP)%IC, part_dump(IP)%DTRIM
+         END DO
+         CLOSE(12)
+      ELSE
+         OPEN(12, FILE=filename )
+         !WRITE(10,*) '% X | Y | Z | VX | VY | VZ | EROT | EVIB | S_ID | IPG | DTRIM'
+         DO IP = 1, NP_DUMP_PROC
+            WRITE(12,*) TIMESTEP, part_dump(IP)%X, part_dump(IP)%Y, part_dump(IP)%Z, &
+            part_dump(IP)%VX, part_dump(IP)%VY, part_dump(IP)%VZ, part_dump(IP)%EROT, part_dump(IP)%EVIB, &
+            part_dump(IP)%S_ID, part_dump(IP)%IC, part_dump(IP)%DTRIM
+         END DO
+         CLOSE(12)
+      END IF
+
+   END SUBROUTINE DUMP_BOUNDARY_PARTICLES_FILE
 
 
    SUBROUTINE READ_PARTICLES_FILE(TIMESTEP)

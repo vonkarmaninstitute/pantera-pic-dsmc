@@ -775,7 +775,7 @@ MODULE timecycle
       REAL(KIND=8) :: XCOLL, YCOLL, COLLDIST, EDGE_X1, EDGE_Y1
       INTEGER, DIMENSION(:), ALLOCATABLE :: LOCAL_BOUNDARY_COLL_COUNT, LOCAL_WALL_COLL_COUNT
       REAL(KIND=8) :: WEIGHT_RATIO
-      TYPE(PARTICLE_DATA_STRUCTURE) :: NEWparticle
+      TYPE(PARTICLE_DATA_STRUCTURE) :: NEWparticle, particleNOW
 
       E = [0.d0, 0.d0, 0.d0]
       B = [0.d0, 0.d0, 0.d0]
@@ -1017,6 +1017,13 @@ MODULE timecycle
 
                   ! Move to new cell
                   IF (NEIGHBOR == -1) THEN
+
+                     IF (GRID_BC(FACE_PG)%DUMP_FLUXES) THEN
+                        particleNOW = particles(IP)
+                        particleNOW%IC = FACE_PG
+                        CALL ADD_PARTICLE_ARRAY(particleNOW, NP_DUMP_PROC, part_dump)
+                     END IF
+
                      IF (FACE_PG .NE. -1) THEN
                         ! Apply particle boundary condition
                         IF (GRID_BC(FACE_PG)%PARTICLE_BC == SPECULAR) THEN
@@ -1030,6 +1037,13 @@ MODULE timecycle
                            particles(IP)%VX = particles(IP)%VX - 2.*VDOTN*FACE_NORMAL(1)
                            particles(IP)%VY = particles(IP)%VY - 2.*VDOTN*FACE_NORMAL(2)
                            particles(IP)%VZ = particles(IP)%VZ - 2.*VDOTN*FACE_NORMAL(3)
+
+                           IF (GRID_BC(FACE_PG)%DUMP_FLUXES) THEN
+                              particleNOW = particles(IP)
+                              particleNOW%IC = -FACE_PG
+                              CALL ADD_PARTICLE_ARRAY(particleNOW, NP_DUMP_PROC, part_dump)
+                           END IF
+
                         ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == DIFFUSE) THEN
                            IF (GRID_BC(FACE_PG)%REACT) THEN
                               CALL WALL_REACT(IP, REMOVE_PART(IP))
@@ -1059,6 +1073,13 @@ MODULE timecycle
                            
                            particles(IP)%EROT = EROT
                            particles(IP)%EVIB = EVIB
+
+                           IF (GRID_BC(FACE_PG)%DUMP_FLUXES) THEN
+                              particleNOW = particles(IP)
+                              particleNOW%IC = -FACE_PG
+                              CALL ADD_PARTICLE_ARRAY(particleNOW, NP_DUMP_PROC, part_dump)
+                           END IF
+
                         ELSE
                            REMOVE_PART(IP) = .TRUE.
                            particles(IP)%DTRIM = 0.d0
@@ -1551,6 +1572,14 @@ MODULE timecycle
       MPI_COMM_WORLD, ierr)
 
       DEALLOCATE(LOCAL_WALL_COLL_COUNT)
+
+
+      IF ((tID .GE. DUMP_BOUND_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
+         IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_EVERY) .EQ. 0) CALL DUMP_BOUNDARY_PARTICLES_FILE(tID)
+      END IF
+      DEALLOCATE(part_dump)
+      NP_DUMP_PROC = 0
+
 
    END SUBROUTINE ADVECT
 

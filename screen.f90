@@ -38,7 +38,11 @@ MODULE screen
          WRITE(*,*)  ' PArticle Numerical Tool for non-Equilibrium         \          /             '
          WRITE(*,*)  '                            Reacting Aerodynamics     (__.,-_.,/              '
          WRITE(*,*)
-         WRITE(*,*)
+         WRITE(*,*)  '      ____     ____   ______           ____    _____    __  ___   ______      '
+         WRITE(*,*)  '     / __ \   /  _/  / ____/          / __ \  / ___/   /  |/  /  / ____/      '
+         WRITE(*,*)  '    / /_/ /   / /   / /      ______  / / / /  \__ \   / /|_/ /  / /           '
+         WRITE(*,*)  '   / ____/  _/ /   / /___   /_____/ / /_/ /  ___/ /  / /  / /  / /___         '
+         WRITE(*,*)  '  /_/      /___/   \____/          /_____/  /____/  /_/  /_/   \____/         '
          WRITE(*,*)
          WRITE(*,*)
       END IF

@@ -17,77 +17,7 @@ MODULE fields
    IMPLICIT NONE
 
    CONTAINS
-   
 
-
-   SUBROUTINE PETSC_INITIAL_TEST
-
-      IMPLICIT NONE
-!
-!  This example demonstrates basic use of the PETSc Fortran interface
-!  to vectors.
-!
-      PetscInt  n
-      PetscErrorCode ierr
-      PetscBool  flg
-      PetscScalar      one,two,three,dot
-      PetscReal        norm,rdot
-      Vec              x,y,w
-      PetscOptions     options
-
-      n     = 20
-      one   = 1.0
-      two   = 2.0
-      three = 3.0
-
-      call PetscInitialize(PETSC_NULL_CHARACTER,ierr)
-      if (ierr .ne. 0) then
-        print*,'Unable to initialize PETSc'
-        stop
-      endif
-      call PetscOptionsCreate(options,ierr)
-      call PetscOptionsGetInt(options,PETSC_NULL_CHARACTER,                  &
-    &                        '-n',n,flg,ierr)
-      call PetscOptionsDestroy(options,ierr)
-
-! Create a vector, then duplicate it
-      call VecCreate(PETSC_COMM_WORLD,x,ierr)
-      call VecSetSizes(x,PETSC_DECIDE,n,ierr)
-      call VecSetFromOptions(x,ierr)
-      call VecDuplicate(x,y,ierr)
-      call VecDuplicate(x,w,ierr)
-
-      call VecSet(x,one,ierr)
-      call VecSet(y,two,ierr)
-
-      call VecDot(x,y,dot,ierr)
-      rdot = PetscRealPart(dot)
-      write(6,100) rdot
- 100  format('Result of inner product ',f10.4)
-
-      call VecScale(x,two,ierr)
-      call VecNorm(x,NORM_2,norm,ierr)
-      write(6,110) norm
- 110  format('Result of scaling ',f10.4)
-
-      call VecCopy(x,w,ierr)
-      call VecNorm(w,NORM_2,norm,ierr)
-      write(6,120) norm
- 120  format('Result of copy ',f10.4)
-
-      call VecAXPY(y,three,x,ierr)
-      call VecNorm(y,NORM_2,norm,ierr)
-      write(6,130) norm
- 130  format('Result of axpy ',f10.4)
-
-      call VecDestroy(x,ierr)
-      call VecDestroy(y,ierr)
-      call VecDestroy(w,ierr)
-      call PetscFinalize(ierr)
-
-
-
-   END SUBROUTINE PETSC_INITIAL_TEST
 
 
    SUBROUTINE PETSC_INIT
@@ -113,16 +43,15 @@ MODULE fields
       INTEGER :: SIZE
       REAL(KIND=8) :: HX, HY
       REAL(KIND=8) :: AX, AY, BX, BY, CX, CY, H1X, H2X, H1Y, H2Y, R
-      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA, EDGELENGTH
-      INTEGER :: V1, V2, V3
+      REAL(KIND=8) :: X1, X2, X3, X4, Y1, Y2, Y3, Y4, Z1, Z2, Z3, Z4
+      REAL(KIND=8) :: K11, K22, K33, K12, K23, K13, AREA, EDGELENGTH, FACEAREA
+      INTEGER :: V1, V2, V3, V4
+      INTEGER :: P, Q, VP, VQ
+      REAL(KIND=8) :: KIJ, VOLUME
       INTEGER :: EDGE_PG
       LOGICAL, DIMENSION(:), ALLOCATABLE :: IS_UNUSED
 
-      IF (GRID_TYPE == UNSTRUCTURED) THEN
-         SIZE = U2D_GRID%NUM_NODES
-      ELSE
-         SIZE = NPX*NPY
-      END IF
+      SIZE = NNODES
 
       IF (.NOT. ALLOCATED(RHS)) ALLOCATE(RHS(0:SIZE-1))
       RHS = 0.d0
@@ -160,135 +89,286 @@ MODULE fields
 
       ! At this point, populate the matrix
       IF (GRID_TYPE == UNSTRUCTURED) THEN
-         ALLOCATE(IS_UNUSED(0:SIZE-1))
-         IS_UNUSED = .TRUE.
 
-         DO I = 1, U2D_GRID%NUM_CELLS
-            V1 = U2D_GRID%CELL_NODES(I,1)
-            V2 = U2D_GRID%CELL_NODES(I,2)
-            V3 = U2D_GRID%CELL_NODES(I,3)
-            IS_UNUSED(V1-1) = .FALSE.; IS_UNUSED(V2-1) = .FALSE.; IS_UNUSED(V3-1) = .FALSE.
-            DO J = 1, 3
-               EDGE_PG = U2D_GRID%CELL_EDGES_PG(I, J)
-               IF (EDGE_PG .NE. -1) THEN
-                  IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC) THEN
-                     IF (J==1) THEN
-                        DIRICHLET(V1-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
-                        DIRICHLET(V2-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
-                        IS_DIRICHLET(V1-1) = .TRUE.; IS_DIRICHLET(V2-1) = .TRUE.
-                     ELSE IF (J==2) THEN
-                        DIRICHLET(V2-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
-                        DIRICHLET(V3-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
-                        IS_DIRICHLET(V2-1) = .TRUE.; IS_DIRICHLET(V3-1) = .TRUE.
-                     ELSE
-                        DIRICHLET(V3-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
-                        DIRICHLET(V1-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
-                        IS_DIRICHLET(V3-1) = .TRUE.; IS_DIRICHLET(V1-1) = .TRUE.
+         IF (DIMS == 2) THEN
+
+            ALLOCATE(IS_UNUSED(0:SIZE-1))
+            IS_UNUSED = .TRUE.
+
+            DO I = 1, NCELLS
+               V1 = U2D_GRID%CELL_NODES(I,1)
+               V2 = U2D_GRID%CELL_NODES(I,2)
+               V3 = U2D_GRID%CELL_NODES(I,3)
+               IS_UNUSED(V1-1) = .FALSE.; IS_UNUSED(V2-1) = .FALSE.; IS_UNUSED(V3-1) = .FALSE.
+               DO J = 1, 3
+                  EDGE_PG = U2D_GRID%CELL_EDGES_PG(I, J)
+                  IF (EDGE_PG .NE. -1) THEN
+                     IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC) THEN
+                        IF (J==1) THEN
+                           DIRICHLET(V1-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           DIRICHLET(V2-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           IS_DIRICHLET(V1-1) = .TRUE.; IS_DIRICHLET(V2-1) = .TRUE.
+                        ELSE IF (J==2) THEN
+                           DIRICHLET(V2-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           DIRICHLET(V3-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           IS_DIRICHLET(V2-1) = .TRUE.; IS_DIRICHLET(V3-1) = .TRUE.
+                        ELSE
+                           DIRICHLET(V3-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           DIRICHLET(V1-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           IS_DIRICHLET(V3-1) = .TRUE.; IS_DIRICHLET(V1-1) = .TRUE.
+                        END IF
+                     END IF
+
+                     IF (GRID_BC(EDGE_PG)%FIELD_BC == NEUMANN_BC) THEN
+                        IF (J==1) THEN
+                           IS_NEUMANN(V1-1) = .TRUE.; IS_NEUMANN(V2-1) = .TRUE.
+                        ELSE IF (J==2) THEN
+                           IS_NEUMANN(V2-1) = .TRUE.; IS_NEUMANN(V3-1) = .TRUE.
+                        ELSE
+                           IS_NEUMANN(V3-1) = .TRUE.; IS_NEUMANN(V1-1) = .TRUE.
+                        END IF
                      END IF
                   END IF
+               END DO
+            END DO
 
+            !IS_DIRICHLET(0) = .TRUE.    ! DBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDDBDBDBDBDBDBDB
+            !DIRICHLET(0) = 0.d0
+
+            DO I = 1, NCELLS
+               AREA = CELL_AREAS(I)
+               V1 = U2D_GRID%CELL_NODES(I,1)
+               V2 = U2D_GRID%CELL_NODES(I,2)
+               V3 = U2D_GRID%CELL_NODES(I,3)            
+               X1 = U2D_GRID%NODE_COORDS(V1, 1)
+               X2 = U2D_GRID%NODE_COORDS(V2, 1)
+               X3 = U2D_GRID%NODE_COORDS(V3, 1)
+               Y1 = U2D_GRID%NODE_COORDS(V1, 2)
+               Y2 = U2D_GRID%NODE_COORDS(V2, 2)
+               Y3 = U2D_GRID%NODE_COORDS(V3, 2)
+               K11 = 0.25*((Y2-Y3)**2 + (X2-X3)**2)/AREA
+               K22 = 0.25*((Y1-Y3)**2 + (X1-X3)**2)/AREA
+               K33 = 0.25*((Y2-Y1)**2 + (X2-X1)**2)/AREA
+               K12 =-0.25*((Y2-Y3)*(Y1-Y3) + (X2-X3)*(X1-X3))/AREA
+               K23 = 0.25*((Y1-Y3)*(Y2-Y1) + (X1-X3)*(X2-X1))/AREA
+               K13 =-0.25*((Y2-Y3)*(Y2-Y1) + (X2-X3)*(X2-X1))/AREA
+               IF (AXI) THEN
+                  K11 = K11*(Y1+Y2+Y3)/3.
+                  K22 = K22*(Y1+Y2+Y3)/3.
+                  K33 = K33*(Y1+Y2+Y3)/3.
+                  K12 = K12*(Y1+Y2+Y3)/3.
+                  K23 = K23*(Y1+Y2+Y3)/3.
+                  K13 = K13*(Y1+Y2+Y3)/3.
+               END IF
+
+               ! We need to ADD to a sparse matrix entry.
+               IF (V1-1 >= Istart .AND. V1-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(V1-1)) THEN
+                     CALL MatSetValues(Amat,one,V1-1,one,V1-1,K11,ADD_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,V1-1,one,V2-1,K12,ADD_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,V1-1,one,V3-1,K13,ADD_VALUES,ierr)
+                  END IF
+               END IF
+               IF (V2-1 >= Istart .AND. V2-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(V2-1)) THEN
+                     CALL MatSetValues(Amat,one,V2-1,one,V1-1,K12,ADD_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,V2-1,one,V3-1,K23,ADD_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,V2-1,one,V2-1,K22,ADD_VALUES,ierr)
+                  END IF
+               END IF
+               IF (V3-1 >= Istart .AND. V3-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(V3-1)) THEN
+                     CALL MatSetValues(Amat,one,V3-1,one,V1-1,K13,ADD_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,V3-1,one,V2-1,K23,ADD_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,V3-1,one,V3-1,K33,ADD_VALUES,ierr)
+                  END IF
+               END IF
+
+               DO J = 1, 3
+                  EDGE_PG = U2D_GRID%CELL_EDGES_PG(I, J)
+                  IF (EDGE_PG == -1) CYCLE
                   IF (GRID_BC(EDGE_PG)%FIELD_BC == NEUMANN_BC) THEN
+
                      IF (J==1) THEN
-                        IS_NEUMANN(V1-1) = .TRUE.; IS_NEUMANN(V2-1) = .TRUE.
+                        EDGELENGTH = SQRT((X2-X1)**2 + (Y2-Y1)**2)
+                        IF (.NOT. IS_DIRICHLET(V1-1)) THEN
+                           NEUMANN(V1-1) = NEUMANN(V1-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
+                        END IF
+                        IF (.NOT. IS_DIRICHLET(V2-1)) THEN
+                           NEUMANN(V2-1) = NEUMANN(V2-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
+                        END IF
                      ELSE IF (J==2) THEN
-                        IS_NEUMANN(V2-1) = .TRUE.; IS_NEUMANN(V3-1) = .TRUE.
+                        EDGELENGTH = SQRT((X3-X2)**2 + (Y3-Y2)**2)
+                        IF (.NOT. IS_DIRICHLET(V2-1)) THEN
+                           NEUMANN(V2-1) = NEUMANN(V2-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
+                        END IF
+                        IF (.NOT. IS_DIRICHLET(V3-1)) THEN
+                           NEUMANN(V3-1) = NEUMANN(V3-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
+                        END IF
                      ELSE
-                        IS_NEUMANN(V3-1) = .TRUE.; IS_NEUMANN(V1-1) = .TRUE.
+                        EDGELENGTH = SQRT((X1-X3)**2 + (Y1-Y3)**2)
+                        IF (.NOT. IS_DIRICHLET(V1-1)) THEN
+                           NEUMANN(V1-1) = NEUMANN(V1-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
+                        END IF
+                        IF (.NOT. IS_DIRICHLET(V3-1)) THEN
+                           NEUMANN(V3-1) = NEUMANN(V3-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
+                        END IF
                      END IF
+
                   END IF
-               END IF
-            END DO
-         END DO
+               END DO
 
-         !IS_DIRICHLET(0) = .TRUE.    ! DBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDDBDBDBDBDBDBDB
-         !DIRICHLET(0) = 0.d0
-
-         DO I = 1, U2D_GRID%NUM_CELLS
-            AREA = CELL_AREAS(I)
-            V1 = U2D_GRID%CELL_NODES(I,1)
-            V2 = U2D_GRID%CELL_NODES(I,2)
-            V3 = U2D_GRID%CELL_NODES(I,3)            
-            X1 = U2D_GRID%NODE_COORDS(V1, 1)
-            X2 = U2D_GRID%NODE_COORDS(V2, 1)
-            X3 = U2D_GRID%NODE_COORDS(V3, 1)
-            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
-            K11 = 0.25*((Y2-Y3)**2 + (X2-X3)**2)/AREA
-            K22 = 0.25*((Y1-Y3)**2 + (X1-X3)**2)/AREA
-            K33 = 0.25*((Y2-Y1)**2 + (X2-X1)**2)/AREA
-            K12 =-0.25*((Y2-Y3)*(Y1-Y3) + (X2-X3)*(X1-X3))/AREA
-            K23 = 0.25*((Y1-Y3)*(Y2-Y1) + (X1-X3)*(X2-X1))/AREA
-            K13 =-0.25*((Y2-Y3)*(Y2-Y1) + (X2-X3)*(X2-X1))/AREA
-            IF (AXI) THEN
-               K11 = K11*(Y1+Y2+Y3)/3.
-               K22 = K22*(Y1+Y2+Y3)/3.
-               K33 = K33*(Y1+Y2+Y3)/3.
-               K12 = K12*(Y1+Y2+Y3)/3.
-               K23 = K23*(Y1+Y2+Y3)/3.
-               K13 = K13*(Y1+Y2+Y3)/3.
-            END IF
-
-            ! We need to ADD to a sparse matrix entry.
-            IF (V1-1 >= Istart .AND. V1-1 < Iend) THEN
-               IF (.NOT. IS_DIRICHLET(V1-1)) THEN
-                  CALL MatSetValues(Amat,one,V1-1,one,V1-1,K11,ADD_VALUES,ierr)
-                  CALL MatSetValues(Amat,one,V1-1,one,V2-1,K12,ADD_VALUES,ierr)
-                  CALL MatSetValues(Amat,one,V1-1,one,V3-1,K13,ADD_VALUES,ierr)
-               END IF
-            END IF
-            IF (V2-1 >= Istart .AND. V2-1 < Iend) THEN
-               IF (.NOT. IS_DIRICHLET(V2-1)) THEN
-                  CALL MatSetValues(Amat,one,V2-1,one,V1-1,K12,ADD_VALUES,ierr)
-                  CALL MatSetValues(Amat,one,V2-1,one,V3-1,K23,ADD_VALUES,ierr)
-                  CALL MatSetValues(Amat,one,V2-1,one,V2-1,K22,ADD_VALUES,ierr)
-               END IF
-            END IF
-            IF (V3-1 >= Istart .AND. V3-1 < Iend) THEN
-               IF (.NOT. IS_DIRICHLET(V3-1)) THEN
-                  CALL MatSetValues(Amat,one,V3-1,one,V1-1,K13,ADD_VALUES,ierr)
-                  CALL MatSetValues(Amat,one,V3-1,one,V2-1,K23,ADD_VALUES,ierr)
-                  CALL MatSetValues(Amat,one,V3-1,one,V3-1,K33,ADD_VALUES,ierr)
-               END IF
-            END IF
-
-            DO J = 1, 3
-               EDGE_PG = U2D_GRID%CELL_EDGES_PG(I, J)
-               IF (EDGE_PG == -1) CYCLE
-               IF (GRID_BC(EDGE_PG)%FIELD_BC == NEUMANN_BC) THEN
-
-                  IF (J==1) THEN
-                     EDGELENGTH = SQRT((X2-X1)**2 + (Y2-Y1)**2)
-                     IF (.NOT. IS_DIRICHLET(V1-1)) THEN
-                        NEUMANN(V1-1) = NEUMANN(V1-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
-                     END IF
-                     IF (.NOT. IS_DIRICHLET(V2-1)) THEN
-                        NEUMANN(V2-1) = NEUMANN(V2-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
-                     END IF
-                  ELSE IF (J==2) THEN
-                     EDGELENGTH = SQRT((X3-X2)**2 + (Y3-Y2)**2)
-                     IF (.NOT. IS_DIRICHLET(V2-1)) THEN
-                        NEUMANN(V2-1) = NEUMANN(V2-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
-                     END IF
-                     IF (.NOT. IS_DIRICHLET(V3-1)) THEN
-                        NEUMANN(V3-1) = NEUMANN(V3-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
-                     END IF
-                  ELSE
-                     EDGELENGTH = SQRT((X1-X3)**2 + (Y1-Y3)**2)
-                     IF (.NOT. IS_DIRICHLET(V1-1)) THEN
-                        NEUMANN(V1-1) = NEUMANN(V1-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
-                     END IF
-                     IF (.NOT. IS_DIRICHLET(V3-1)) THEN
-                        NEUMANN(V3-1) = NEUMANN(V3-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
-                     END IF
-                  END IF
-
-               END IF
             END DO
 
-         END DO
+         ELSE IF (DIMS == 3) THEN
 
-         DO I = 1, U2D_GRID%NUM_NODES
+            ALLOCATE(IS_UNUSED(0:SIZE-1))
+            IS_UNUSED = .TRUE.
+
+            DO I = 1, NCELLS
+               V1 = U3D_GRID%CELL_NODES(I,1)
+               V2 = U3D_GRID%CELL_NODES(I,2)
+               V3 = U3D_GRID%CELL_NODES(I,3)
+               V4 = U3D_GRID%CELL_NODES(I,4)
+               IS_UNUSED(V1-1) = .FALSE.; IS_UNUSED(V2-1) = .FALSE.
+               IS_UNUSED(V3-1) = .FALSE.; IS_UNUSED(V4-1) = .FALSE.
+
+               DO J = 1, 4
+                  EDGE_PG = U3D_GRID%CELL_FACES_PG(I, J)
+                  IF (EDGE_PG .NE. -1) THEN
+                     IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC) THEN
+                        IF (J==1) THEN
+                           DIRICHLET(V1-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           DIRICHLET(V3-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           DIRICHLET(V2-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           IS_DIRICHLET(V1-1) = .TRUE.
+                           IS_DIRICHLET(V3-1) = .TRUE.
+                           IS_DIRICHLET(V2-1) = .TRUE.
+                        ELSE IF (J==2) THEN
+                           DIRICHLET(V1-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           DIRICHLET(V2-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           DIRICHLET(V4-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           IS_DIRICHLET(V1-1) = .TRUE.
+                           IS_DIRICHLET(V2-1) = .TRUE.
+                           IS_DIRICHLET(V4-1) = .TRUE.
+                        ELSE IF (J == 3) THEN
+                           DIRICHLET(V2-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           DIRICHLET(V3-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           DIRICHLET(V4-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           IS_DIRICHLET(V2-1) = .TRUE.
+                           IS_DIRICHLET(V3-1) = .TRUE.
+                           IS_DIRICHLET(V4-1) = .TRUE.
+                        ELSE
+                           DIRICHLET(V1-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           DIRICHLET(V4-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           DIRICHLET(V3-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           IS_DIRICHLET(V1-1) = .TRUE.
+                           IS_DIRICHLET(V4-1) = .TRUE.
+                           IS_DIRICHLET(V3-1) = .TRUE.
+                        END IF
+                     END IF
+
+                     IF (GRID_BC(EDGE_PG)%FIELD_BC == NEUMANN_BC) THEN
+                        IF (J==1) THEN
+                           IS_NEUMANN(V1-1) = .TRUE.
+                           IS_NEUMANN(V3-1) = .TRUE.
+                           IS_NEUMANN(V2-1) = .TRUE.
+                        ELSE IF (J==2) THEN
+                           IS_NEUMANN(V1-1) = .TRUE.
+                           IS_NEUMANN(V2-1) = .TRUE.
+                           IS_NEUMANN(V4-1) = .TRUE.
+                        ELSE IF (J==3) THEN
+                           IS_NEUMANN(V2-1) = .TRUE.
+                           IS_NEUMANN(V3-1) = .TRUE.
+                           IS_NEUMANN(V4-1) = .TRUE.
+                        ELSE
+                           IS_NEUMANN(V1-1) = .TRUE.
+                           IS_NEUMANN(V4-1) = .TRUE.
+                           IS_NEUMANN(V3-1) = .TRUE.
+                        END IF
+                     END IF
+                  END IF
+               END DO
+            END DO
+
+            !IS_DIRICHLET(0) = .TRUE.    ! DBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDDBDBDBDBDBDBDB
+            !DIRICHLET(0) = 0.d0
+
+            DO I = 1, NCELLS
+
+               VOLUME = CELL_VOLUMES(I)
+
+               DO P = 1, 4
+                  VP = U3D_GRID%CELL_NODES(I,P) - 1
+                  IF (VP >= Istart .AND. VP < Iend) THEN
+                     IF (.NOT. IS_DIRICHLET(VP)) THEN
+                        DO Q = 1, 4
+                           VQ = U3D_GRID%CELL_NODES(I,Q) - 1
+                           KIJ = VOLUME*(U3D_GRID%BASIS_COEFFS(I,P,1)*U3D_GRID%BASIS_COEFFS(I,Q,1) &
+                                       + U3D_GRID%BASIS_COEFFS(I,P,2)*U3D_GRID%BASIS_COEFFS(I,Q,2) &
+                                       + U3D_GRID%BASIS_COEFFS(I,P,3)*U3D_GRID%BASIS_COEFFS(I,Q,3))
+                           CALL MatSetValues(Amat,one,VP,one,VQ,KIJ,ADD_VALUES,ierr)
+                        END DO
+                     END IF
+                  END IF
+               END DO
+
+               DO J = 1, 4
+                  EDGE_PG = U3D_GRID%CELL_FACES_PG(I, J)
+                  IF (EDGE_PG == -1) CYCLE
+                  IF (GRID_BC(EDGE_PG)%FIELD_BC == NEUMANN_BC) THEN
+
+                     FACEAREA = U3D_GRID%FACE_AREA(I, J)
+                     IF (J==1) THEN
+                        IF (.NOT. IS_DIRICHLET(V1-1)) THEN
+                           NEUMANN(V1-1) = NEUMANN(V1-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * FACEAREA/3.
+                        END IF
+                        IF (.NOT. IS_DIRICHLET(V3-1)) THEN
+                           NEUMANN(V3-1) = NEUMANN(V3-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * FACEAREA/3.
+                        END IF
+                        IF (.NOT. IS_DIRICHLET(V2-1)) THEN
+                           NEUMANN(V2-1) = NEUMANN(V2-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * FACEAREA/3.
+                        END IF
+                     ELSE IF (J==2) THEN
+                        IF (.NOT. IS_DIRICHLET(V1-1)) THEN
+                           NEUMANN(V1-1) = NEUMANN(V1-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * FACEAREA/3.
+                        END IF
+                        IF (.NOT. IS_DIRICHLET(V2-1)) THEN
+                           NEUMANN(V2-1) = NEUMANN(V2-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * FACEAREA/3.
+                        END IF
+                        IF (.NOT. IS_DIRICHLET(V4-1)) THEN
+                           NEUMANN(V4-1) = NEUMANN(V4-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * FACEAREA/3.
+                        END IF
+                     ELSE IF (J==3) THEN
+                        IF (.NOT. IS_DIRICHLET(V2-1)) THEN
+                           NEUMANN(V2-1) = NEUMANN(V2-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * FACEAREA/3.
+                        END IF
+                        IF (.NOT. IS_DIRICHLET(V3-1)) THEN
+                           NEUMANN(V3-1) = NEUMANN(V3-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * FACEAREA/3.
+                        END IF
+                        IF (.NOT. IS_DIRICHLET(V4-1)) THEN
+                           NEUMANN(V4-1) = NEUMANN(V4-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * FACEAREA/3.
+                        END IF
+                     ELSE
+                        IF (.NOT. IS_DIRICHLET(V1-1)) THEN
+                           NEUMANN(V1-1) = NEUMANN(V1-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * FACEAREA/3.
+                        END IF
+                        IF (.NOT. IS_DIRICHLET(V4-1)) THEN
+                           NEUMANN(V4-1) = NEUMANN(V4-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * FACEAREA/3.
+                        END IF
+                        IF (.NOT. IS_DIRICHLET(V3-1)) THEN
+                           NEUMANN(V3-1) = NEUMANN(V3-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * FACEAREA/3.
+                        END IF
+                     END IF
+
+                  END IF
+               END DO
+
+            END DO
+
+         END IF
+
+         DO I = 1, NNODES
             IF (IS_UNUSED(I-1)) THEN
                !CALL MatSetValues(Amat,one,I-1,one,I-1,1.d0,ADD_VALUES,ierr)
                IS_DIRICHLET(I-1) = .TRUE.
@@ -399,17 +479,13 @@ MODULE fields
 
       INTEGER :: I, J
       INTEGER :: MAXNNZ, SIZE
-      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA
-      REAL(KIND=8) :: K11TILDE, K22TILDE, K33TILDE, K12TILDE, K23TILDE, K13TILDE
-      INTEGER :: V1, V2, V3
+      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA, VOLUME
+      REAL(KIND=8) :: K11TILDE, K22TILDE, K33TILDE, K12TILDE, K23TILDE, K13TILDE, KIJ
+      INTEGER :: V1, V2, V3, V4, P, Q, VP, VQ
       INTEGER :: EDGE_PG
       LOGICAL, DIMENSION(:), ALLOCATABLE :: IS_UNUSED
 
-      IF (GRID_TYPE == UNSTRUCTURED) THEN
-         SIZE = U2D_GRID%NUM_NODES
-      ELSE
-         SIZE = NPX*NPY
-      END IF
+      SIZE = NNODES
 
       IF (.NOT. ALLOCATED(RHS)) ALLOCATE(RHS(0:SIZE-1))
       RHS = 0.d0
@@ -446,169 +522,264 @@ MODULE fields
          ALLOCATE(IS_UNUSED(0:SIZE-1))
          IS_UNUSED = .TRUE.
 
-         DO I = 1, U2D_GRID%NUM_CELLS
-            V1 = U2D_GRID%CELL_NODES(I,1)
-            V2 = U2D_GRID%CELL_NODES(I,2)
-            V3 = U2D_GRID%CELL_NODES(I,3)
+         IF (DIMS == 2) THEN
+            DO I = 1, NCELLS
+               V1 = U2D_GRID%CELL_NODES(I,1)
+               V2 = U2D_GRID%CELL_NODES(I,2)
+               V3 = U2D_GRID%CELL_NODES(I,3)
 
-            !IF ((V1-1 < Istart .OR. V1-1 >= Iend) .AND. &
-            !    (V2-1 < Istart .OR. V2-1 >= Iend) .AND. &
-            !    (V3-1 < Istart .OR. V3-1 >= Iend)) CYCLE
+               !IF ((V1-1 < Istart .OR. V1-1 >= Iend) .AND. &
+               !    (V2-1 < Istart .OR. V2-1 >= Iend) .AND. &
+               !    (V3-1 < Istart .OR. V3-1 >= Iend)) CYCLE
 
-            IS_UNUSED(V1-1) = .FALSE.; IS_UNUSED(V2-1) = .FALSE.; IS_UNUSED(V3-1) = .FALSE.
-            DO J = 1, 3
-               EDGE_PG = U2D_GRID%CELL_EDGES_PG(I, J)
-               IF (EDGE_PG .NE. -1) THEN
-                  IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC) THEN
-                     IF (J==1) THEN
-                        DIRICHLET(V1-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
-                        DIRICHLET(V2-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
-                        IS_DIRICHLET(V1-1) = .TRUE.; IS_DIRICHLET(V2-1) = .TRUE.
-                     ELSE IF (J==2) THEN
-                        DIRICHLET(V2-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
-                        DIRICHLET(V3-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
-                        IS_DIRICHLET(V2-1) = .TRUE.; IS_DIRICHLET(V3-1) = .TRUE.
-                     ELSE
-                        DIRICHLET(V3-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
-                        DIRICHLET(V1-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
-                        IS_DIRICHLET(V3-1) = .TRUE.; IS_DIRICHLET(V1-1) = .TRUE.
+               IS_UNUSED(V1-1) = .FALSE.; IS_UNUSED(V2-1) = .FALSE.; IS_UNUSED(V3-1) = .FALSE.
+               DO J = 1, 3
+                  EDGE_PG = U2D_GRID%CELL_EDGES_PG(I, J)
+                  IF (EDGE_PG .NE. -1) THEN
+                     IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC) THEN
+                        IF (J==1) THEN
+                           DIRICHLET(V1-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           DIRICHLET(V2-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           IS_DIRICHLET(V1-1) = .TRUE.; IS_DIRICHLET(V2-1) = .TRUE.
+                        ELSE IF (J==2) THEN
+                           DIRICHLET(V2-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           DIRICHLET(V3-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           IS_DIRICHLET(V2-1) = .TRUE.; IS_DIRICHLET(V3-1) = .TRUE.
+                        ELSE
+                           DIRICHLET(V3-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           DIRICHLET(V1-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           IS_DIRICHLET(V3-1) = .TRUE.; IS_DIRICHLET(V1-1) = .TRUE.
+                        END IF
+                     END IF
+
+                     IF (GRID_BC(EDGE_PG)%FIELD_BC == NEUMANN_BC) THEN
+                        IF (J==1) THEN
+                           IS_NEUMANN(V1-1) = .TRUE.; IS_NEUMANN(V2-1) = .TRUE.
+                        ELSE IF (J==2) THEN
+                           IS_NEUMANN(V2-1) = .TRUE.; IS_NEUMANN(V3-1) = .TRUE.
+                        ELSE
+                           IS_NEUMANN(V3-1) = .TRUE.; IS_NEUMANN(V1-1) = .TRUE.
+                        END IF
                      END IF
                   END IF
-
-                  IF (GRID_BC(EDGE_PG)%FIELD_BC == NEUMANN_BC) THEN
-                     IF (J==1) THEN
-                        IS_NEUMANN(V1-1) = .TRUE.; IS_NEUMANN(V2-1) = .TRUE.
-                     ELSE IF (J==2) THEN
-                        IS_NEUMANN(V2-1) = .TRUE.; IS_NEUMANN(V3-1) = .TRUE.
-                     ELSE
-                        IS_NEUMANN(V3-1) = .TRUE.; IS_NEUMANN(V1-1) = .TRUE.
-                     END IF
-                  END IF
-               END IF
+               END DO
             END DO
-         END DO
 
-         !IS_DIRICHLET(0) = .TRUE. ! DBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDDBDBDBDBDBDBDB
-         !DIRICHLET(0) = 0.d0
+            !IS_DIRICHLET(0) = .TRUE. ! DBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDDBDBDBDBDBDBDB
+            !DIRICHLET(0) = 0.d0
 
-         DO I = 1, U2D_GRID%NUM_CELLS
-            V1 = U2D_GRID%CELL_NODES(I,1)
-            V2 = U2D_GRID%CELL_NODES(I,2)
-            V3 = U2D_GRID%CELL_NODES(I,3)
+            DO I = 1, NCELLS
+               V1 = U2D_GRID%CELL_NODES(I,1)
+               V2 = U2D_GRID%CELL_NODES(I,2)
+               V3 = U2D_GRID%CELL_NODES(I,3)
+               
+               !IF ((V1-1 < Istart .OR. V1-1 >= Iend) .AND. &
+               !    (V2-1 < Istart .OR. V2-1 >= Iend) .AND. &
+               !    (V3-1 < Istart .OR. V3-1 >= Iend)) CYCLE
+
+               AREA = CELL_AREAS(I)
+               X1 = U2D_GRID%NODE_COORDS(V1, 1)
+               X2 = U2D_GRID%NODE_COORDS(V2, 1)
+               X3 = U2D_GRID%NODE_COORDS(V3, 1)
+               Y1 = U2D_GRID%NODE_COORDS(V1, 2)
+               Y2 = U2D_GRID%NODE_COORDS(V2, 2)
+               Y3 = U2D_GRID%NODE_COORDS(V3, 2)
+               K11 = 0.25*((Y2-Y3)**2 + (X2-X3)**2)/AREA
+               K22 = 0.25*((Y1-Y3)**2 + (X1-X3)**2)/AREA
+               K33 = 0.25*((Y2-Y1)**2 + (X2-X1)**2)/AREA
+               K12 =-0.25*((Y2-Y3)*(Y1-Y3) + (X2-X3)*(X1-X3))/AREA
+               K23 = 0.25*((Y1-Y3)*(Y2-Y1) + (X1-X3)*(X2-X1))/AREA
+               K13 =-0.25*((Y2-Y3)*(Y2-Y1) + (X2-X3)*(X2-X1))/AREA
+               K11TILDE = K11*(Y1+Y2+Y3)/3.
+               K22TILDE = K22*(Y1+Y2+Y3)/3.
+               K33TILDE = K33*(Y1+Y2+Y3)/3.
+               K12TILDE = K12*(Y1+Y2+Y3)/3.
+               K23TILDE = K23*(Y1+Y2+Y3)/3.
+               K13TILDE = K13*(Y1+Y2+Y3)/3.
+
+               ! We need to ADD to a sparse matrix entry.
+               IF (V1-1 >= Istart .AND. V1-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(V1-1)) THEN
+                     IF (AXI) THEN
+                        CALL MatSetValues(Amat,one,V1-1,one,V1-1,K11TILDE + MASS_MATRIX(I)*K11,ADD_VALUES,ierr)
+                        CALL MatSetValues(Amat,one,V1-1,one,V2-1,K12TILDE + MASS_MATRIX(I)*K12,ADD_VALUES,ierr)
+                        CALL MatSetValues(Amat,one,V1-1,one,V3-1,K13TILDE + MASS_MATRIX(I)*K13,ADD_VALUES,ierr)
+                        val = PHI_FIELD(V1-1)*K11TILDE+PHI_FIELD(V2-1)*K12TILDE+PHI_FIELD(V3-1)*K13TILDE
+                        CALL VecSetValues(bvec,one,V1-1,val,ADD_VALUES,ierr)
+                     ELSE
+                        CALL MatSetValues(Amat,one,V1-1,one,V1-1,(MASS_MATRIX(I)+1.)*K11,ADD_VALUES,ierr)
+                        CALL MatSetValues(Amat,one,V1-1,one,V2-1,(MASS_MATRIX(I)+1.)*K12,ADD_VALUES,ierr)
+                        CALL MatSetValues(Amat,one,V1-1,one,V3-1,(MASS_MATRIX(I)+1.)*K13,ADD_VALUES,ierr)
+                        val = PHI_FIELD(V1)*K11+PHI_FIELD(V2)*K12+PHI_FIELD(V3)*K13
+                        CALL VecSetValues(bvec,one,V1-1,val,ADD_VALUES,ierr)
+                     END IF
+                  END IF
+               END IF
+               IF (V2-1 >= Istart .AND. V2-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(V2-1)) THEN
+                     IF (AXI) THEN
+                        CALL MatSetValues(Amat,one,V2-1,one,V1-1,K12TILDE + MASS_MATRIX(I)*K12,ADD_VALUES,ierr)
+                        CALL MatSetValues(Amat,one,V2-1,one,V3-1,K23TILDE + MASS_MATRIX(I)*K23,ADD_VALUES,ierr)
+                        CALL MatSetValues(Amat,one,V2-1,one,V2-1,K22TILDE + MASS_MATRIX(I)*K22,ADD_VALUES,ierr)
+                        val = PHI_FIELD(V1)*K12TILDE+PHI_FIELD(V2)*K22TILDE+PHI_FIELD(V3)*K23TILDE
+                        CALL VecSetValues(bvec,one,V2-1,val,ADD_VALUES,ierr)
+                     ELSE
+                        CALL MatSetValues(Amat,one,V2-1,one,V1-1,(MASS_MATRIX(I)+1.)*K12,ADD_VALUES,ierr)
+                        CALL MatSetValues(Amat,one,V2-1,one,V3-1,(MASS_MATRIX(I)+1.)*K23,ADD_VALUES,ierr)
+                        CALL MatSetValues(Amat,one,V2-1,one,V2-1,(MASS_MATRIX(I)+1.)*K22,ADD_VALUES,ierr)
+                        val = PHI_FIELD(V1)*K12+PHI_FIELD(V2)*K22+PHI_FIELD(V3)*K23
+                        CALL VecSetValues(bvec,one,V2-1,val,ADD_VALUES,ierr)
+                     END IF
+                  END IF
+               END IF
+               IF (V3-1 >= Istart .AND. V3-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(V3-1)) THEN
+                     IF (AXI) THEN
+                        CALL MatSetValues(Amat,one,V3-1,one,V1-1,K13TILDE + MASS_MATRIX(I)*K13,ADD_VALUES,ierr)
+                        CALL MatSetValues(Amat,one,V3-1,one,V2-1,K23TILDE + MASS_MATRIX(I)*K23,ADD_VALUES,ierr)
+                        CALL MatSetValues(Amat,one,V3-1,one,V3-1,K33TILDE + MASS_MATRIX(I)*K33,ADD_VALUES,ierr)
+                        val = PHI_FIELD(V1)*K13TILDE+PHI_FIELD(V2)*K23TILDE+PHI_FIELD(V3)*K33TILDE
+                        CALL VecSetValues(bvec,one,V3-1,val,ADD_VALUES,ierr)
+                     ELSE
+
+                        CALL MatSetValues(Amat,one,V3-1,one,V1-1,(MASS_MATRIX(I)+1.)*K13,ADD_VALUES,ierr)
+                        CALL MatSetValues(Amat,one,V3-1,one,V2-1,(MASS_MATRIX(I)+1.)*K23,ADD_VALUES,ierr)
+                        CALL MatSetValues(Amat,one,V3-1,one,V3-1,(MASS_MATRIX(I)+1.)*K33,ADD_VALUES,ierr)
+                        val = PHI_FIELD(V1)*K13+PHI_FIELD(V2)*K23+PHI_FIELD(V3)*K33
+                        CALL VecSetValues(bvec,one,V3-1,val,ADD_VALUES,ierr)
+                     END IF
+                  END IF
+               END IF
+            ! Neumann part has to be included only if the derivative changes in time.
+            !    DO J = 1, 3
+            !       EDGE_PG = U2D_GRID%CELL_EDGES_PG(I, J)
+            !       IF (EDGE_PG == -1) CYCLE
+            !       IF (GRID_BC(EDGE_PG)%FIELD_BC == NEUMANN_BC) THEN
+
+            !          IF (J==1) THEN
+            !             EDGELENGTH = SQRT((X2-X1)**2 + (Y2-Y1)**2)
+            !             IF (.NOT. IS_DIRICHLET(V1-1)) THEN
+            !                NEUMANN(V1-1) = NEUMANN(V1-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
+            !             END IF
+            !             IF (.NOT. IS_DIRICHLET(V2-1)) THEN
+            !                NEUMANN(V2-1) = NEUMANN(V2-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
+            !             END IF
+            !          ELSE IF (J==2) THEN
+            !             EDGELENGTH = SQRT((X3-X2)**2 + (Y3-Y2)**2)
+            !             IF (.NOT. IS_DIRICHLET(V2-1)) THEN
+            !                NEUMANN(V2-1) = NEUMANN(V2-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
+            !             END IF
+            !             IF (.NOT. IS_DIRICHLET(V3-1)) THEN
+            !                NEUMANN(V3-1) = NEUMANN(V3-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
+            !             END IF
+            !          ELSE
+            !             EDGELENGTH = SQRT((X1-X3)**2 + (Y1-Y3)**2)
+            !             IF (.NOT. IS_DIRICHLET(V1-1)) THEN
+            !                NEUMANN(V1-1) = NEUMANN(V1-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
+            !             END IF
+            !             IF (.NOT. IS_DIRICHLET(V3-1)) THEN
+            !                NEUMANN(V3-1) = NEUMANN(V3-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
+            !             END IF
+            !          END IF
+
+            !       END IF
+            !    END DO
+
+            END DO
+         ELSE IF (DIMS == 3) THEN
+
+            DO I = 1, NCELLS
+               V1 = U3D_GRID%CELL_NODES(I,1)
+               V2 = U3D_GRID%CELL_NODES(I,2)
+               V3 = U3D_GRID%CELL_NODES(I,3)
+               V4 = U3D_GRID%CELL_NODES(I,4)
+               IS_UNUSED(V1-1) = .FALSE.; IS_UNUSED(V2-1) = .FALSE.
+               IS_UNUSED(V3-1) = .FALSE.; IS_UNUSED(V4-1) = .FALSE.
+
+               DO J = 1, 4
+                  EDGE_PG = U3D_GRID%CELL_FACES_PG(I, J)
+                  IF (EDGE_PG .NE. -1) THEN
+                     IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC) THEN
+                        IF (J==1) THEN
+                           DIRICHLET(V1-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           DIRICHLET(V3-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           DIRICHLET(V2-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           IS_DIRICHLET(V1-1) = .TRUE.
+                           IS_DIRICHLET(V3-1) = .TRUE.
+                           IS_DIRICHLET(V2-1) = .TRUE.
+                        ELSE IF (J==2) THEN
+                           DIRICHLET(V1-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           DIRICHLET(V2-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           DIRICHLET(V4-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           IS_DIRICHLET(V1-1) = .TRUE.
+                           IS_DIRICHLET(V2-1) = .TRUE.
+                           IS_DIRICHLET(V4-1) = .TRUE.
+                        ELSE IF (J == 3) THEN
+                           DIRICHLET(V2-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           DIRICHLET(V3-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           DIRICHLET(V4-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           IS_DIRICHLET(V2-1) = .TRUE.
+                           IS_DIRICHLET(V3-1) = .TRUE.
+                           IS_DIRICHLET(V4-1) = .TRUE.
+                        ELSE
+                           DIRICHLET(V1-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           DIRICHLET(V4-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           DIRICHLET(V3-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           IS_DIRICHLET(V1-1) = .TRUE.
+                           IS_DIRICHLET(V4-1) = .TRUE.
+                           IS_DIRICHLET(V3-1) = .TRUE.
+                        END IF
+                     END IF
+
+                     IF (GRID_BC(EDGE_PG)%FIELD_BC == NEUMANN_BC) THEN
+                        IF (J==1) THEN
+                           IS_NEUMANN(V1-1) = .TRUE.
+                           IS_NEUMANN(V3-1) = .TRUE.
+                           IS_NEUMANN(V2-1) = .TRUE.
+                        ELSE IF (J==2) THEN
+                           IS_NEUMANN(V1-1) = .TRUE.
+                           IS_NEUMANN(V2-1) = .TRUE.
+                           IS_NEUMANN(V4-1) = .TRUE.
+                        ELSE IF (J==3) THEN
+                           IS_NEUMANN(V2-1) = .TRUE.
+                           IS_NEUMANN(V3-1) = .TRUE.
+                           IS_NEUMANN(V4-1) = .TRUE.
+                        ELSE
+                           IS_NEUMANN(V1-1) = .TRUE.
+                           IS_NEUMANN(V4-1) = .TRUE.
+                           IS_NEUMANN(V3-1) = .TRUE.
+                        END IF
+                     END IF
+                  END IF
+               END DO
+            END DO
+
+            !IS_DIRICHLET(0) = .TRUE.    ! DBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDDBDBDBDBDBDBDB
+            !DIRICHLET(0) = 0.d0
+            DO I = 1, NCELLS
+
+               VOLUME = CELL_VOLUMES(I)
+
+               DO P = 1, 4
+                  VP = U3D_GRID%CELL_NODES(I,P) - 1
+                  IF (VP >= Istart .AND. VP < Iend) THEN
+                     IF (.NOT. IS_DIRICHLET(VP)) THEN
+                        DO Q = 1, 4
+                           VQ = U3D_GRID%CELL_NODES(I,Q) - 1
+                           KIJ = VOLUME*(U3D_GRID%BASIS_COEFFS(I,P,1)*U3D_GRID%BASIS_COEFFS(I,Q,1) &
+                                       + U3D_GRID%BASIS_COEFFS(I,P,2)*U3D_GRID%BASIS_COEFFS(I,Q,2) &
+                                       + U3D_GRID%BASIS_COEFFS(I,P,3)*U3D_GRID%BASIS_COEFFS(I,Q,3))
+                           CALL MatSetValues(Amat,one,VP,one,VQ,(MASS_MATRIX(I)+1.)*KIJ,ADD_VALUES,ierr)
+                           val = PHI_FIELD(VQ+1)*KIJ
+                           CALL VecSetValues(bvec,one,VP,val,ADD_VALUES,ierr)
+                        END DO
+                     END IF
+                  END IF
+               END DO
             
-            !IF ((V1-1 < Istart .OR. V1-1 >= Iend) .AND. &
-            !    (V2-1 < Istart .OR. V2-1 >= Iend) .AND. &
-            !    (V3-1 < Istart .OR. V3-1 >= Iend)) CYCLE
+            END DO
 
-            AREA = CELL_AREAS(I)
-            X1 = U2D_GRID%NODE_COORDS(V1, 1)
-            X2 = U2D_GRID%NODE_COORDS(V2, 1)
-            X3 = U2D_GRID%NODE_COORDS(V3, 1)
-            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
-            K11 = 0.25*((Y2-Y3)**2 + (X2-X3)**2)/AREA
-            K22 = 0.25*((Y1-Y3)**2 + (X1-X3)**2)/AREA
-            K33 = 0.25*((Y2-Y1)**2 + (X2-X1)**2)/AREA
-            K12 =-0.25*((Y2-Y3)*(Y1-Y3) + (X2-X3)*(X1-X3))/AREA
-            K23 = 0.25*((Y1-Y3)*(Y2-Y1) + (X1-X3)*(X2-X1))/AREA
-            K13 =-0.25*((Y2-Y3)*(Y2-Y1) + (X2-X3)*(X2-X1))/AREA
-            K11TILDE = K11*(Y1+Y2+Y3)/3.
-            K22TILDE = K22*(Y1+Y2+Y3)/3.
-            K33TILDE = K33*(Y1+Y2+Y3)/3.
-            K12TILDE = K12*(Y1+Y2+Y3)/3.
-            K23TILDE = K23*(Y1+Y2+Y3)/3.
-            K13TILDE = K13*(Y1+Y2+Y3)/3.
-
-            ! We need to ADD to a sparse matrix entry.
-            IF (V1-1 >= Istart .AND. V1-1 < Iend) THEN
-               IF (.NOT. IS_DIRICHLET(V1-1)) THEN
-                  IF (AXI) THEN
-                     CALL MatSetValues(Amat,one,V1-1,one,V1-1,K11TILDE + MASS_MATRIX(I)*K11,ADD_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,V1-1,one,V2-1,K12TILDE + MASS_MATRIX(I)*K12,ADD_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,V1-1,one,V3-1,K13TILDE + MASS_MATRIX(I)*K13,ADD_VALUES,ierr)
-                     val = PHI_FIELD(V1-1)*K11TILDE+PHI_FIELD(V2-1)*K12TILDE+PHI_FIELD(V3-1)*K13TILDE
-                     CALL VecSetValues(bvec,one,V1-1,val,ADD_VALUES,ierr)
-                  ELSE
-                     CALL MatSetValues(Amat,one,V1-1,one,V1-1,(MASS_MATRIX(I)+1.)*K11,ADD_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,V1-1,one,V2-1,(MASS_MATRIX(I)+1.)*K12,ADD_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,V1-1,one,V3-1,(MASS_MATRIX(I)+1.)*K13,ADD_VALUES,ierr)
-                     val = PHI_FIELD(V1)*K11+PHI_FIELD(V2)*K12+PHI_FIELD(V3)*K13
-                     CALL VecSetValues(bvec,one,V1-1,val,ADD_VALUES,ierr)
-                  END IF
-               END IF
-            END IF
-            IF (V2-1 >= Istart .AND. V2-1 < Iend) THEN
-               IF (.NOT. IS_DIRICHLET(V2-1)) THEN
-                  IF (AXI) THEN
-                     CALL MatSetValues(Amat,one,V2-1,one,V1-1,K12TILDE + MASS_MATRIX(I)*K12,ADD_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,V2-1,one,V3-1,K23TILDE + MASS_MATRIX(I)*K23,ADD_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,V2-1,one,V2-1,K22TILDE + MASS_MATRIX(I)*K22,ADD_VALUES,ierr)
-                     val = PHI_FIELD(V1)*K12TILDE+PHI_FIELD(V2)*K22TILDE+PHI_FIELD(V3)*K23TILDE
-                     CALL VecSetValues(bvec,one,V2-1,val,ADD_VALUES,ierr)
-                  ELSE
-                     CALL MatSetValues(Amat,one,V2-1,one,V1-1,(MASS_MATRIX(I)+1.)*K12,ADD_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,V2-1,one,V3-1,(MASS_MATRIX(I)+1.)*K23,ADD_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,V2-1,one,V2-1,(MASS_MATRIX(I)+1.)*K22,ADD_VALUES,ierr)
-                     val = PHI_FIELD(V1)*K12+PHI_FIELD(V2)*K22+PHI_FIELD(V3)*K23
-                     CALL VecSetValues(bvec,one,V2-1,val,ADD_VALUES,ierr)
-                  END IF
-               END IF
-            END IF
-            IF (V3-1 >= Istart .AND. V3-1 < Iend) THEN
-               IF (.NOT. IS_DIRICHLET(V3-1)) THEN
-                  IF (AXI) THEN
-                     CALL MatSetValues(Amat,one,V3-1,one,V1-1,K13TILDE + MASS_MATRIX(I)*K13,ADD_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,V3-1,one,V2-1,K23TILDE + MASS_MATRIX(I)*K23,ADD_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,V3-1,one,V3-1,K33TILDE + MASS_MATRIX(I)*K33,ADD_VALUES,ierr)
-                     val = PHI_FIELD(V1)*K13TILDE+PHI_FIELD(V2)*K23TILDE+PHI_FIELD(V3)*K33TILDE
-                     CALL VecSetValues(bvec,one,V3-1,val,ADD_VALUES,ierr)
-                  ELSE
-
-                     CALL MatSetValues(Amat,one,V3-1,one,V1-1,(MASS_MATRIX(I)+1.)*K13,ADD_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,V3-1,one,V2-1,(MASS_MATRIX(I)+1.)*K23,ADD_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,V3-1,one,V3-1,(MASS_MATRIX(I)+1.)*K33,ADD_VALUES,ierr)
-                     val = PHI_FIELD(V1)*K13+PHI_FIELD(V2)*K23+PHI_FIELD(V3)*K33
-                     CALL VecSetValues(bvec,one,V3-1,val,ADD_VALUES,ierr)
-                  END IF
-               END IF
-            END IF
-         ! Neumann part has to be included only if the derivative changes in time.
-         !    DO J = 1, 3
-         !       EDGE_PG = U2D_GRID%CELL_EDGES_PG(I, J)
-         !       IF (EDGE_PG == -1) CYCLE
-         !       IF (GRID_BC(EDGE_PG)%FIELD_BC == NEUMANN_BC) THEN
-
-         !          IF (J==1) THEN
-         !             EDGELENGTH = SQRT((X2-X1)**2 + (Y2-Y1)**2)
-         !             IF (.NOT. IS_DIRICHLET(V1-1)) THEN
-         !                NEUMANN(V1-1) = NEUMANN(V1-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
-         !             END IF
-         !             IF (.NOT. IS_DIRICHLET(V2-1)) THEN
-         !                NEUMANN(V2-1) = NEUMANN(V2-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
-         !             END IF
-         !          ELSE IF (J==2) THEN
-         !             EDGELENGTH = SQRT((X3-X2)**2 + (Y3-Y2)**2)
-         !             IF (.NOT. IS_DIRICHLET(V2-1)) THEN
-         !                NEUMANN(V2-1) = NEUMANN(V2-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
-         !             END IF
-         !             IF (.NOT. IS_DIRICHLET(V3-1)) THEN
-         !                NEUMANN(V3-1) = NEUMANN(V3-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
-         !             END IF
-         !          ELSE
-         !             EDGELENGTH = SQRT((X1-X3)**2 + (Y1-Y3)**2)
-         !             IF (.NOT. IS_DIRICHLET(V1-1)) THEN
-         !                NEUMANN(V1-1) = NEUMANN(V1-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
-         !             END IF
-         !             IF (.NOT. IS_DIRICHLET(V3-1)) THEN
-         !                NEUMANN(V3-1) = NEUMANN(V3-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * 0.5*EDGELENGTH
-         !             END IF
-         !          END IF
-
-         !       END IF
-         !    END DO
-
-         END DO
+         END IF
 
          DO I = Istart, Iend-1
             IF (IS_UNUSED(I)) THEN
@@ -659,13 +830,13 @@ MODULE fields
       REAL(KIND=8) :: CHARGE
       REAL(KIND=8) :: AREA
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3
-      INTEGER :: V1, V2, V3, SIZE, SIZEC
+      INTEGER :: V1, V2, V3, V4, SIZE, SIZEC, P, VP
       REAL(KIND=8) :: DPSI1DX, DPSI2DX, DPSI3DX, DPSI1DY, DPSI2DY, DPSI3DY
 
 
       IF (GRID_TYPE == UNSTRUCTURED) THEN
-         SIZE = U2D_GRID%NUM_NODES
-         SIZEC = U2D_GRID%NUM_CELLS
+         SIZE = NNODES
+         SIZEC = NCELLS
       ELSE
          CALL ERROR_ABORT('Not implemented.')
       END IF
@@ -679,39 +850,55 @@ MODULE fields
          CHARGE = SPECIES(particles(JP)%S_ID)%CHARGE
          IF (ABS(CHARGE) .LT. 1.d-6) CYCLE
 
-         IF (GRID_TYPE == UNSTRUCTURED) THEN 
+         IF (GRID_TYPE == UNSTRUCTURED) THEN
             IC = particles(JP)%IC
-            AREA = CELL_AREAS(IC)
-            V1 = U2D_GRID%CELL_NODES(IC,1)
-            V2 = U2D_GRID%CELL_NODES(IC,2)
-            V3 = U2D_GRID%CELL_NODES(IC,3)            
-            X1 = U2D_GRID%NODE_COORDS(V1, 1)
-            X2 = U2D_GRID%NODE_COORDS(V2, 1)
-            X3 = U2D_GRID%NODE_COORDS(V3, 1)
-            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
-            DPSI1DX =  0.5*(Y2-Y3)/AREA
-            DPSI2DX = -0.5*(Y1-Y3)/AREA
-            DPSI3DX = -0.5*(Y2-Y1)/AREA
-            DPSI1DY = -0.5*(X2-X3)/AREA
-            DPSI2DY =  0.5*(X1-X3)/AREA
-            DPSI3DY =  0.5*(X2-X1)/AREA
-            
-            IF (AXI) THEN
-               J_FIELD(V1-1) = J_FIELD(V1-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI1DX + particles(JP)%VY*DPSI1DY)/(ZMAX-ZMIN)
-               J_FIELD(V2-1) = J_FIELD(V2-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI2DX + particles(JP)%VY*DPSI2DY)/(ZMAX-ZMIN)
-               J_FIELD(V3-1) = J_FIELD(V3-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI3DX + particles(JP)%VY*DPSI3DY)/(ZMAX-ZMIN)
 
-               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/AREA/(ZMAX-ZMIN)*FNUM &
-                                 * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
-            ELSE
-               J_FIELD(V1-1) = J_FIELD(V1-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI1DX + particles(JP)%VY*DPSI1DY)/(ZMAX-ZMIN)
-               J_FIELD(V2-1) = J_FIELD(V2-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI2DX + particles(JP)%VY*DPSI2DY)/(ZMAX-ZMIN)
-               J_FIELD(V3-1) = J_FIELD(V3-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI3DX + particles(JP)%VY*DPSI3DY)/(ZMAX-ZMIN)
+            IF (DIMS == 2) THEN
+               
+               AREA = CELL_AREAS(IC)
+               V1 = U2D_GRID%CELL_NODES(IC,1)
+               V2 = U2D_GRID%CELL_NODES(IC,2)
+               V3 = U2D_GRID%CELL_NODES(IC,3)            
+               X1 = U2D_GRID%NODE_COORDS(V1, 1)
+               X2 = U2D_GRID%NODE_COORDS(V2, 1)
+               X3 = U2D_GRID%NODE_COORDS(V3, 1)
+               Y1 = U2D_GRID%NODE_COORDS(V1, 2)
+               Y2 = U2D_GRID%NODE_COORDS(V2, 2)
+               Y3 = U2D_GRID%NODE_COORDS(V3, 2)
+               DPSI1DX =  0.5*(Y2-Y3)/AREA
+               DPSI2DX = -0.5*(Y1-Y3)/AREA
+               DPSI3DX = -0.5*(Y2-Y1)/AREA
+               DPSI1DY = -0.5*(X2-X3)/AREA
+               DPSI2DY =  0.5*(X1-X3)/AREA
+               DPSI3DY =  0.5*(X2-X1)/AREA
+               
+               IF (AXI) THEN
+                  J_FIELD(V1-1) = J_FIELD(V1-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI1DX + particles(JP)%VY*DPSI1DY)/(ZMAX-ZMIN)
+                  J_FIELD(V2-1) = J_FIELD(V2-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI2DX + particles(JP)%VY*DPSI2DY)/(ZMAX-ZMIN)
+                  J_FIELD(V3-1) = J_FIELD(V3-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI3DX + particles(JP)%VY*DPSI3DY)/(ZMAX-ZMIN)
 
-               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/AREA/(ZMAX-ZMIN)*FNUM &
-                                 * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
+                  MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/AREA/(ZMAX-ZMIN)*FNUM &
+                                    * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
+               ELSE
+                  J_FIELD(V1-1) = J_FIELD(V1-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI1DX + particles(JP)%VY*DPSI1DY)/(ZMAX-ZMIN)
+                  J_FIELD(V2-1) = J_FIELD(V2-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI2DX + particles(JP)%VY*DPSI2DY)/(ZMAX-ZMIN)
+                  J_FIELD(V3-1) = J_FIELD(V3-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI3DX + particles(JP)%VY*DPSI3DY)/(ZMAX-ZMIN)
+
+                  MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/AREA/(ZMAX-ZMIN)*FNUM &
+                                    * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
+               END IF
+
+            ELSE IF (DIMS == 3) THEN
+               
+               DO P = 1, 4
+                  VP = U3D_GRID%CELL_NODES(IC,P) - 1
+                  J_FIELD(VP) = J_FIELD(VP) + FNUM*QE*CHARGE*(particles(JP)%VX*U3D_GRID%BASIS_COEFFS(IC,P,1) &
+                                                            + particles(JP)%VY*U3D_GRID%BASIS_COEFFS(IC,P,2) &
+                                                            + particles(JP)%VZ*U3D_GRID%BASIS_COEFFS(IC,P,3))
+               END DO
+               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/CELL_VOLUMES(IC)*FNUM &
+                                    * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
+
             END IF
          ELSE
 
@@ -746,6 +933,8 @@ MODULE fields
 
       CALL KSPCreate(PETSC_COMM_WORLD,ksp,ierr)
       CALL KSPSetOperators(ksp,Amat,Amat,ierr)
+
+      !CALL KSPSetTolerances(ksp,1.d-11,1.d-11,PETSC_DEFAULT_REAL,PETSC_DEFAULT_INTEGER,ierr)
 
       CALL KSPSolve(ksp,bvec,xvec,ierr)
       

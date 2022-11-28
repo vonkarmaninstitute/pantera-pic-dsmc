@@ -30,7 +30,7 @@ MODULE collisions
       
       INTEGER, DIMENSION(NX*NY)          :: NPC, IOF
       INTEGER, DIMENSION(:), ALLOCATABLE :: IND
-      INTEGER                            :: JP, JC, NCELLS, IDX
+      INTEGER                            :: JP, JC, IDX
       INTEGER                            :: NCOLLREAL
 
       ! Count the number of particles in each cell, to allocate arrays later
@@ -39,8 +39,6 @@ MODULE collisions
          JC = particles(JP)%IC
          NPC(JC) = NPC(JC) + 1
       END DO
-
-      NCELLS = NX*NY
 
       ! Fill the array of offsets (IOF). IOF(IC) is the the index of the first
       ! particle in cell IP
@@ -101,7 +99,7 @@ MODULE collisions
       
       INTEGER, DIMENSION(:), ALLOCATABLE :: NPC, IOF
       INTEGER, DIMENSION(:), ALLOCATABLE :: IND
-      INTEGER                            :: JP, JC, NCELLS, IDX
+      INTEGER                            :: JP, JC, IDX
       INTEGER                            :: NCOLLREAL
 
       ALLOCATE(NPC(U2D_GRID%NUM_CELLS))
@@ -113,8 +111,6 @@ MODULE collisions
          JC = particles(JP)%IC
          NPC(JC) = NPC(JC) + 1
       END DO
-
-      NCELLS = U2D_GRID%NUM_CELLS
 
       ! Fill the array of offsets (IOF). IOF(IC) is the the index of the first
       ! particle in cell IP
@@ -707,7 +703,7 @@ MODULE collisions
 
       INTEGER, ALLOCATABLE, DIMENSION(:) :: NPC, IOF
       INTEGER, DIMENSION(:), ALLOCATABLE :: IND
-      INTEGER                            :: JP, JC, NCELLS, IDX
+      INTEGER                            :: JP, JC, IDX
    
       ! For actual collisions
       INTEGER :: IDp, N_DOF_TOT, JP_START, JP_END

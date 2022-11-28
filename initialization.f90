@@ -103,6 +103,11 @@ MODULE initialization
             CALL DEF_SOLENOID(SOLENOID_DEFINITION)
          END IF
 
+         IF (line=='Boundary_dump_fluxes:') THEN
+            READ(in1,'(A)') BC_DEFINITION
+            CALL DEF_BOUNDARY_DUMP_FLUXES(BC_DEFINITION)
+         END IF
+
          ! ~~~~~~~~~~~~~  Numerical settings  ~~~~~~~~~~~~~~~~~
          IF (line=='Fnum:')                    READ(in1,*) FNUM
          IF (line=='Bool_radial_weighting:')   READ(in1,*) BOOL_RADIAL_WEIGHTING
@@ -142,6 +147,8 @@ MODULE initialization
          IF (line=='Binary_output:')           READ(in1,*) BOOL_BINARY_OUTPUT
          IF (line=='Dump_part_every:')         READ(in1,*) DUMP_EVERY
          IF (line=='Dump_part_start:')         READ(in1,*) DUMP_START
+         IF (line=='Dump_bound_every:')         READ(in1,*) DUMP_BOUND_EVERY
+         IF (line=='Dump_bound_start:')         READ(in1,*) DUMP_BOUND_START
          IF (line=='Dump_grid_avgevery:')      READ(in1,*) DUMP_GRID_AVG_EVERY
          IF (line=='Dump_grid_start:')         READ(in1,*) DUMP_GRID_START
          IF (line=='Dump_grid_numavgs:')       READ(in1,*) DUMP_GRID_N_AVG
@@ -963,6 +970,34 @@ MODULE initialization
 
 
 
+   SUBROUTINE DEF_BOUNDARY_DUMP_FLUXES(DEFINITION)
+
+      IMPLICIT NONE
+
+      CHARACTER(LEN=*), INTENT(IN) :: DEFINITION
+
+      INTEGER :: N_STR, I, IPG
+      CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
+
+
+      CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
+
+      IF (N_STR .NE. 1) CALL ERROR_ABORT('Error in dump fluxes definition.')
+
+      ! phys_group type parameters
+      IPG = -1
+      DO I = 1, N_GRID_BC
+         IF (GRID_BC(I)%PHYSICAL_GROUP_NAME == STRARRAY(1)) IPG = I
+      END DO
+      IF (IPG == -1) CALL ERROR_ABORT('Error in boundary condition definition. Group name not found.')
+
+      GRID_BC(IPG)%DUMP_FLUXES = .TRUE.
+
+
+   END SUBROUTINE DEF_BOUNDARY_DUMP_FLUXES
+
+
+
 
    SUBROUTINE DEF_BOUNDARY_EMIT(DEFINITION)
 
@@ -1560,32 +1595,25 @@ MODULE initialization
                      S = rf()
                      T = rf()
                      U = rf()
-                     IF (DIMS == 2) THEN
-                        IF (S > 1-T) THEN
-                           Q = 1-T
-                           P = 1-S
-                        ELSE
-                           Q = S
-                        END IF
+                     
+                     IF (S+T > 1) THEN
+                        S = 1-S; T = 1-T
+                     END IF
 
-                        XP = V1(1) + (V2(1)-V1(1))*P + (V3(1)-V1(1))*Q
-                        YP = V1(2) + (V2(2)-V1(2))*P + (V3(2)-V1(2))*Q
+                     IF (DIMS == 2) THEN
+                        XP = V1(1) + (V2(1)-V1(1))*S + (V3(1)-V1(1))*T
+                        YP = V1(2) + (V2(2)-V1(2))*S + (V3(2)-V1(2))*T
                         ZP = ZMIN + (ZMAX-ZMIN)*U
                      ELSE IF (DIMS == 3) THEN
                         ! http://vcg.isti.cnr.it/publications/papers/rndtetra_a.pdf
-                        IF (S+T+U .LE. 1) THEN
-                           P = S
-                           Q = T
-                           R = U
+
+                        IF (S+T+U <= 1) THEN
+                           P = S; Q = T; R = U
                         ELSE
-                           IF (T+U .GT. 1) THEN
-                              P = S
-                              Q = 1-U
-                              R = 1-S-T
+                           IF (T+U > 1) THEN
+                              P = S; Q = 1-U; R = 1-S-T
                            ELSE
-                              P = 1-T-U
-                              Q = T
-                              R = S+T+U-1
+                              P = 1-T-U; Q = T; R = S+T+U-1
                            END IF
                         END IF
 
@@ -1593,7 +1621,7 @@ MODULE initialization
                         YP = V1(2) + (V2(2)-V1(2))*P + (V3(2)-V1(2))*Q + (V4(2)-V1(2))*R
                         ZP = V1(3) + (V2(3)-V1(3))*P + (V3(3)-V1(3))*Q + (V4(3)-V1(3))*R
                      END IF
-                     !IF (XP > 0.25 .OR. XP < -0.25 .OR. YP > 0.25 .OR. YP < -0.25) CYCLE
+                     IF (XP > 0.25 .OR. XP < -0.25 .OR. YP > 0.25 .OR. YP < -0.25 .OR. ZP > 0.25 .OR. ZP < -0.25) CYCLE
 
                      ! Assign velocity and energy following a Boltzmann distribution
                      M = SPECIES(S_ID)%MOLECULAR_MASS
@@ -1758,12 +1786,7 @@ MODULE initialization
 
       CALL init_genrand64(RNG_SEED_LOCAL) ! Seed Mersenne Twister PRNG with local quantity
 
-      ! ~~~~~~~~ Additional variables for MPI domain decomposition ~~~~~~
-      IF (DOMPART_TYPE == 1) THEN ! "blocks" domain partition
-         ! Compute DX_BLOCKS, DY_BLOCKS
-         DX_BLOCKS = (XMAX - XMIN)/N_BLOCKS_X
-         DY_BLOCKS = (YMAX - YMIN)/N_BLOCKS_Y
-      END IF
+
 
       CELL_VOL = (XMAX-XMIN)*(YMAX-YMIN)*(ZMAX-ZMIN)/(NX*NY)
 

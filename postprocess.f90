@@ -1099,7 +1099,7 @@ MODULE postprocess
          IF (GRID_TYPE == UNSTRUCTURED) THEN
             TOT_EE = 0.d0
             DO JC = 1, NCELLS
-               TOT_EE = TOT_EE + (E_FIELD(JC, 1, 1)**2 + E_FIELD(JC, 1, 2)**2)*CELL_VOLUMES(JC)
+               TOT_EE = TOT_EE + (E_FIELD(JC, 1, 1)**2 + E_FIELD(JC, 1, 2)**2 + E_FIELD(JC, 1, 3)**2)*CELL_VOLUMES(JC)
             END DO
             TOT_EE = TOT_EE *0.5*EPS0
          ELSE

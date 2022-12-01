@@ -1188,7 +1188,7 @@ MODULE postprocess
 
          WRITE(20,'(A)') 'DATASET UNSTRUCTURED_GRID'
          
-         WRITE(20,'(A,I10,A7)') 'POINTS', NP_PROC, 'double'
+         WRITE(20,'(A,I10,A7)') 'POINTS', NP_PROC, ' double'
          DO IP = 1, NP_PROC
             WRITE(20,*) particles(IP)%X, particles(IP)%Y, particles(IP)%Z
          END DO
@@ -1199,14 +1199,14 @@ MODULE postprocess
          END DO
 
          WRITE(20,'(A,I10)') 'POINT_DATA', NP_PROC
-         WRITE(20,'(A,I10)') 'VECTORS Velocity float'
+         WRITE(20,'(A)') 'VECTORS Velocity float'
          DO IP = 1, NP_PROC
             WRITE(20,*) particles(IP)%VX, particles(IP)%VY, particles(IP)%VZ
          END DO
 
          WRITE(20,'(A,I10)') 'FIELD FieldData', 1
 
-         WRITE(20,'(A,I10,I10,A7)') 'IC', 1, NP_PROC, 'integer'
+         WRITE(20,'(A,I10,I10,A8)') 'IC', 1, NP_PROC,  ' integer'
          DO IP = 1, NP_PROC
             WRITE(20,*) particles(IP)%IC
          END DO

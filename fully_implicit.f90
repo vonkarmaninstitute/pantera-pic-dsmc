@@ -290,7 +290,7 @@ MODULE fully_implicit
 
 
       f30 = 30
-      CALL MatMPIAIJSetPreallocation(jac,f30,PETSC_NULL_INTEGER,f30,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
+      CALL MatMPIAIJSetPreallocation(jac,100,PETSC_NULL_INTEGER,100,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
       CALL MatSetFromOptions(jac,ierr)
       CALL MatSetUp(jac,ierr)
 
@@ -542,7 +542,7 @@ MODULE fully_implicit
          CALL MatSetSizes(dxde,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
          CALL MatSetType(dxde, MATMPIAIJ, ierr)
          !CALL MatSetOption(dxde,MAT_SPD,PETSC_TRUE,ierr)
-         CALL MatMPIAIJSetPreallocation(dxde,30,PETSC_NULL_INTEGER,30,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
+         CALL MatMPIAIJSetPreallocation(dxde,100,PETSC_NULL_INTEGER,100,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
          CALL MatSetFromOptions(dxde, ierr)
          CALL MatSetUp(dxde,ierr)
       END IF
@@ -661,6 +661,7 @@ MODULE fully_implicit
 
                ! The new C-N procedure with uniform E field.
                IF (DIMS == 2) THEN
+                  COLLTIMES = -1.d0
                   DO I = 1, 3
                      J = NEXTVERT(I)
                      EDGE_X1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),1)
@@ -695,7 +696,6 @@ MODULE fully_implicit
                      BETA = COEFA*part_adv(IP)%VX + COEFB*part_adv(IP)%VY
                      GAMMA = COEFA*part_adv(IP)%X + COEFB*part_adv(IP)%Y + COEFC
 
-                     COLLTIMES = -1.d0
                      IF (ALPHA == 0.d0) THEN
                         COLLTIMES(2*(I-1) + 1) = - GAMMA/BETA
                      ELSE
@@ -756,8 +756,8 @@ MODULE fully_implicit
                      END IF
                   END DO
                ELSE IF (DIMS == 3) THEN
+                  COLLTIMES = -1.d0
                   DO I = 1, 4
-
                      IF (PIC_TYPE .NE. NONE) THEN
                         ALPHA = 0.5*SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS* &
                               (U3D_GRID%CELL_FACES_COEFFS(IC,I,1)*E(1) &
@@ -776,7 +776,6 @@ MODULE fully_implicit
                            + U3D_GRID%CELL_FACES_COEFFS(IC,I,3)*part_adv(IP)%Z &
                            + U3D_GRID%CELL_FACES_COEFFS(IC,I,4)
 
-                     COLLTIMES = -1.d0
                      IF (ALPHA == 0.d0) THEN
                         COLLTIMES(2*(I-1) + 1) = - GAMMA/BETA
                      ELSE

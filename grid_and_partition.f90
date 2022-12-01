@@ -804,9 +804,6 @@ MODULE grid_and_partition
             U2D_GRID%EDGE_NORMAL(I,J,1) = (Y2-Y1)/LEN
             U2D_GRID%EDGE_NORMAL(I,J,2) = (X1-X2)/LEN
             U2D_GRID%EDGE_NORMAL(I,J,3) = 0.d0
-            IF (U2D_GRID%EDGE_NORMAL(I,J,2) == 0.d0) THEN
-               WRITE(*,*) 'Cell ', I, ' has a vertical edge.'
-            END IF
          END DO
       END DO
 

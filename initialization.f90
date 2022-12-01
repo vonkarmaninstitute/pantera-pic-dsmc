@@ -1621,7 +1621,6 @@ MODULE initialization
                         YP = V1(2) + (V2(2)-V1(2))*P + (V3(2)-V1(2))*Q + (V4(2)-V1(2))*R
                         ZP = V1(3) + (V2(3)-V1(3))*P + (V3(3)-V1(3))*Q + (V4(3)-V1(3))*R
                      END IF
-                     IF (XP > 0.25 .OR. XP < -0.25 .OR. YP > 0.25 .OR. YP < -0.25 .OR. ZP > 0.25 .OR. ZP < -0.25) CYCLE
 
                      ! Assign velocity and energy following a Boltzmann distribution
                      M = SPECIES(S_ID)%MOLECULAR_MASS

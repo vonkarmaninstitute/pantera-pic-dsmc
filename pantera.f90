@@ -13,6 +13,15 @@ PROGRAM PANTERA
 
    IMPLICIT NONE
    
+   TYPE(PARTICLE_DATA_STRUCTURE), ALLOCATABLE, DIMENSION(:) :: aaa, bbb
+   ALLOCATE(aaa(5))
+   aaa(1)%IC = 100
+   WRITE(*,*) aaa(1)%IC
+   ALLOCATE(bbb, SOURCE=aaa)
+   bbb(1)%IC = 666
+   WRITE(*,*) aaa(1)%IC
+   WRITE(*,*) bbb(1)%IC
+
    ! ========= Init MPI environment ========================
    CALL ONLYMASTERPRINT1(PROC_ID, '> INITIALIZING MPI...')
    CALL MPI_INIT(ierr)
@@ -59,6 +68,8 @@ PROGRAM PANTERA
 
    ! ========== Close MPI environment ======================
    CALL MPI_BARRIER(MPI_COMM_WORLD, ierr)
+
+   CALL TIMER_SUMMARY
 
    CALL ONLYMASTERPRINT1(PROC_ID, '> R O A R !')
    CALL MPI_FINALIZE(ierr)

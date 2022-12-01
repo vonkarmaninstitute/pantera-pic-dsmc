@@ -52,9 +52,10 @@ MODULE fully_implicit
       CALL MatSetSizes(Jmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
       CALL MatSetType(Jmat, MATMPIAIJ, ierr)
       !CALL MatSetOption(Jmat,MAT_SPD,PETSC_TRUE,ierr)
-      CALL MatMPIAIJSetPreallocation(Jmat,f30,PETSC_NULL_INTEGER,f30,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
-      CALL MatSetFromOptions(Jmat,ierr)
-      CALL MatSetUp(Jmat,ierr)
+      !f30 = 30
+      !CALL MatMPIAIJSetPreallocation(Jmat,f30,PETSC_NULL_INTEGER,f30,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
+      !CALL MatSetFromOptions(Jmat,ierr)
+      !CALL MatSetUp(Jmat,ierr)
       
       
       !CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobianDUMMY,0,ierr)
@@ -151,8 +152,13 @@ MODULE fully_implicit
       INTEGER :: P, Q, VP, VQ
       REAL(KIND=8) :: KPQ, VOLUME
 
+      TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: part_adv
+
       !CALL VecView(x,PETSC_VIEWER_STDOUT_WORLD,ierr)
 
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) 'FormFunction Called'
+      END IF
 
       CALL VecScatterCreateToAll(x,ctx,x_seq,ierr)
       CALL VecScatterBegin(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
@@ -232,8 +238,8 @@ MODULE fully_implicit
 
       !  Advect the particles using the guessed new potential
       ALLOCATE(part_adv, SOURCE = particles)
-      CALL ADVECT_CN(.FALSE., .FALSE., Jmat)
-      CALL DEPOSIT_CHARGE_CN
+      CALL ADVECT_CN(part_adv, .FALSE., .FALSE., Jmat)
+      CALL DEPOSIT_CHARGE(part_adv)
       DEALLOCATE(part_adv)
 
       ! Compute the new potential from the charge distribution
@@ -251,7 +257,7 @@ MODULE fully_implicit
       CALL VecNorm(f,NORM_2,norm,ierr)
       IF (PROC_ID == 0) THEN
          !WRITE(*,*) ' PHI_FIELD = ', PHI_FIELD
-         WRITE(*,*) 'FormFunction Called, ||RESIDUAL|| = ', norm !, ' with potential ', PHIBAR_FIELD
+         WRITE(*,*) '||RESIDUAL|| = ', norm !, ' with potential ', PHIBAR_FIELD
       END IF
 
       DEALLOCATE(RHS_NEW)
@@ -276,6 +282,18 @@ MODULE fully_implicit
       INTEGER :: V1, V2, V3
       INTEGER :: P, Q, VP, VQ
       REAL(KIND=8) :: KPQ, VOLUME
+      TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: part_adv
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) 'FormJacobian Called'
+      END IF
+
+
+      f30 = 30
+      CALL MatMPIAIJSetPreallocation(jac,f30,PETSC_NULL_INTEGER,f30,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
+      CALL MatSetFromOptions(jac,ierr)
+      CALL MatSetUp(jac,ierr)
+
 
       !CALL MatConvert(Amat,MATSAME,MAT_INITIAL_MATRIX,jac,ierr)
       mult = -2.d0
@@ -306,7 +324,7 @@ MODULE fully_implicit
       !CALL MatView(jac,PETSC_VIEWER_STDOUT_WORLD,ierr)
       !  Advect the particles using the guessed new potential
       ALLOCATE(part_adv, SOURCE = particles)
-      CALL ADVECT_CN(.FALSE., .TRUE., jac)
+      CALL ADVECT_CN(part_adv, .FALSE., .TRUE., jac)
       DEALLOCATE(part_adv)
 
 
@@ -436,10 +454,6 @@ MODULE fully_implicit
 
       B = jac
 
-      IF (PROC_ID == 0) THEN
-         WRITE(*,*) 'FormJacobian Called'
-      END IF
-
    END SUBROUTINE FormJacobian
 
 
@@ -448,7 +462,7 @@ MODULE fully_implicit
    ! SUBROUTINE ADVECT_CN -> Advects particles in the domain using a Crank-Nicholson scheme for fully implicit !!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-   SUBROUTINE ADVECT_CN(FINAL, COMPUTE_JACOBIAN, jac)
+   SUBROUTINE ADVECT_CN(part_adv, FINAL, COMPUTE_JACOBIAN, jac)
 
       ! This subroutine advects the particles belonging to the processor.
       ! Particles are advected for a timestep DT. A temporary variable DTRIM is
@@ -476,6 +490,7 @@ MODULE fully_implicit
       PetscViewer  viewer
 
       LOGICAL, INTENT(IN) :: FINAL, COMPUTE_JACOBIAN
+      TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE, INTENT(INOUT) :: part_adv
 
       INTEGER      :: IP, IC, I, J, SOL, OLD_IC, II, JJ, SIZE
       INTEGER      :: BOUNDCOLL, WALLCOLL, GOODSOL, FACE_PG, NEIGHBOR
@@ -527,7 +542,7 @@ MODULE fully_implicit
          CALL MatSetSizes(dxde,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
          CALL MatSetType(dxde, MATMPIAIJ, ierr)
          !CALL MatSetOption(dxde,MAT_SPD,PETSC_TRUE,ierr)
-         CALL MatMPIAIJSetPreallocation(dxde,f500,PETSC_NULL_INTEGER,5000,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
+         CALL MatMPIAIJSetPreallocation(dxde,30,PETSC_NULL_INTEGER,30,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
          CALL MatSetFromOptions(dxde, ierr)
          CALL MatSetUp(dxde,ierr)
       END IF
@@ -707,7 +722,7 @@ MODULE fully_implicit
                         VY_TEMP = part_adv(IP)%VY
                         VZ_TEMP = part_adv(IP)%VZ
 
-                        CALL MOVE_PARTICLE_CN(IP, E, COLLTIMES(I))
+                        CALL MOVE_PARTICLE_CN(part_adv, IP, E, COLLTIMES(I))
                         J = EDGEINDEX(I)
 
 
@@ -788,7 +803,7 @@ MODULE fully_implicit
                         VY_TEMP = part_adv(IP)%VY
                         VZ_TEMP = part_adv(IP)%VZ
 
-                        CALL MOVE_PARTICLE_CN(IP, E, COLLTIMES(I))
+                        CALL MOVE_PARTICLE_CN(part_adv, IP, E, COLLTIMES(I))
                         J = EDGEINDEX(I)
                         
                         IF ((part_adv(IP)%VX*U3D_GRID%FACE_NORMAL(IC,J,1) &
@@ -812,7 +827,7 @@ MODULE fully_implicit
 
                ! Do the advection
                IF (BOUNDCOLL .NE. -1) THEN
-                  CALL MOVE_PARTICLE_CN(IP, E, DTCOLL)
+                  CALL MOVE_PARTICLE_CN(part_adv, IP, E, DTCOLL)
                   part_adv(IP)%DTRIM = part_adv(IP)%DTRIM - DTCOLL
 
                   IF (COMPUTE_JACOBIAN) THEN
@@ -859,18 +874,18 @@ MODULE fully_implicit
                               CALL WALL_REACT(IP, REMOVE_PART(IP))
                            END IF
                            
-                           VDOTN = particles(IP)%VX*FACE_NORMAL(1) &
-                                 + particles(IP)%VY*FACE_NORMAL(2) &
-                                 + particles(IP)%VZ*FACE_NORMAL(3)
-                           particles(IP)%VX = particles(IP)%VX - 2.*VDOTN*FACE_NORMAL(1)
-                           particles(IP)%VY = particles(IP)%VY - 2.*VDOTN*FACE_NORMAL(2)
-                           particles(IP)%VZ = particles(IP)%VZ - 2.*VDOTN*FACE_NORMAL(3)
+                           VDOTN = part_adv(IP)%VX*FACE_NORMAL(1) &
+                                 + part_adv(IP)%VY*FACE_NORMAL(2) &
+                                 + part_adv(IP)%VZ*FACE_NORMAL(3)
+                           part_adv(IP)%VX = part_adv(IP)%VX - 2.*VDOTN*FACE_NORMAL(1)
+                           part_adv(IP)%VY = part_adv(IP)%VY - 2.*VDOTN*FACE_NORMAL(2)
+                           part_adv(IP)%VZ = part_adv(IP)%VZ - 2.*VDOTN*FACE_NORMAL(3)
                         ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == DIFFUSE) THEN
                            IF (GRID_BC(FACE_PG)%REACT) THEN
                               CALL WALL_REACT(IP, REMOVE_PART(IP))
                            END IF
 
-                           S_ID = particles(IP)%S_ID
+                           S_ID = part_adv(IP)%S_ID
                            WALL_TEMP = GRID_BC(FACE_PG)%WALL_TEMP
                            CALL MAXWELL(0.d0, 0.d0, 0.d0, &
                            WALL_TEMP, WALL_TEMP, WALL_TEMP, &
@@ -882,18 +897,18 @@ MODULE fully_implicit
                            V_PERP = FLX(0.d0, WALL_TEMP, SPECIES(S_ID)%MOLECULAR_MASS)
 
 
-                           particles(IP)%VX = - V_PERP*FACE_NORMAL(1) &
-                                              - V_TANG1*FACE_TANG1(1) &
-                                              - V_TANG2*FACE_TANG2(1)
-                           particles(IP)%VY = - V_PERP*FACE_NORMAL(2) &
-                                              - V_TANG1*FACE_TANG1(2) &
-                                              - V_TANG2*FACE_TANG2(2)
-                           particles(IP)%VZ = - V_PERP*FACE_NORMAL(3) &
-                                              - V_TANG1*FACE_TANG1(3) &
-                                              - V_TANG2*FACE_TANG2(3)
+                           part_adv(IP)%VX = - V_PERP*FACE_NORMAL(1) &
+                                             - V_TANG1*FACE_TANG1(1) &
+                                             - V_TANG2*FACE_TANG2(1)
+                           part_adv(IP)%VY = - V_PERP*FACE_NORMAL(2) &
+                                             - V_TANG1*FACE_TANG1(2) &
+                                             - V_TANG2*FACE_TANG2(2)
+                           part_adv(IP)%VZ = - V_PERP*FACE_NORMAL(3) &
+                                             - V_TANG1*FACE_TANG1(3) &
+                                             - V_TANG2*FACE_TANG2(3)
                            
-                           particles(IP)%EROT = EROT
-                           particles(IP)%EVIB = EVIB
+                           part_adv(IP)%EROT = EROT
+                           part_adv(IP)%EVIB = EVIB
                         ELSE
                            REMOVE_PART(IP) = .TRUE.
                            part_adv(IP)%DTRIM = 0.d0
@@ -931,7 +946,7 @@ MODULE fully_implicit
                      + SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS*part_adv(IP)%DTRIM
                   END IF
 
-                  CALL MOVE_PARTICLE_CN(IP, E, part_adv(IP)%DTRIM)
+                  CALL MOVE_PARTICLE_CN(part_adv, IP, E, part_adv(IP)%DTRIM)
                   part_adv(IP)%DTRIM = 0.d0
                END IF
             
@@ -1007,10 +1022,10 @@ MODULE fully_implicit
          !CALL MatView(dxde,viewer,ierr)
          !CALL PetscSleep(5.d0,ierr)
 
-         CALL PetscViewerASCIIOpen(PETSC_COMM_WORLD,'mat.output',viewer,ierr)
-         CALL MatView(dxde,viewer,ierr)
-         CALL PetscSleep(5.d0,ierr)
-         CALL PetscViewerDestroy(viewer,ierr)
+         !CALL PetscViewerASCIIOpen(PETSC_COMM_WORLD,'mat.output',viewer,ierr)
+         !CALL MatView(dxde,viewer,ierr)
+         !CALL PetscSleep(5.d0,ierr)
+         !CALL PetscViewerDestroy(viewer,ierr)
    
          CALL MatGetOwnershipRange(dxde,first_row,last_row,ierr)
 
@@ -1180,7 +1195,7 @@ MODULE fully_implicit
    ! SUBROUTINE MOVE_PARTICLE_CN -> Move the particles !!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-   SUBROUTINE MOVE_PARTICLE_CN(IP, E, TIME)
+   SUBROUTINE MOVE_PARTICLE_CN(part_adv, IP, E, TIME)
 
       ! Moves particle with index IP for time TIME.
       ! For now simply rectilinear movement, will have to include Lorentz's force
@@ -1191,6 +1206,7 @@ MODULE fully_implicit
       REAL(KIND=8), DIMENSION(3), INTENT(IN) :: E
       REAL(KIND=8), INTENT(IN) :: TIME
       REAL(KIND=8), DIMENSION(3) :: ACC
+      TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE, INTENT(INOUT) :: part_adv
 
       ACC = E*SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS
 
@@ -1534,138 +1550,10 @@ MODULE fully_implicit
    ! SUBROUTINE DEPOSIT_CHARGE -> Deposits the charge of particles on grid points !
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-   SUBROUTINE DEPOSIT_CHARGE
+   SUBROUTINE DEPOSIT_CHARGE(part_adv)
       
       IMPLICIT NONE
-
-      INTEGER :: JP, I, IC
-
-      REAL(KIND=8) :: K, RHO_Q, CHARGE
-      REAL(KIND=8) :: VOL, CFNUM, AREA
-      REAL(KIND=8), DIMENSION(4) :: WEIGHTS
-      INTEGER, DIMENSION(4) :: INDICES, INDI, INDJ
-      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, XP, YP
-      INTEGER :: V1, V2, V3, SIZE
-      REAL(KIND=8) :: PSI1, PSI2, PSI3, PSIP
-      INTEGER :: P, VP
-
-      K = QE/(EPS0*EPS_SCALING**2) ! [V m] Elementary charge / Dielectric constant of vacuum
-
-      RHS = 0.d0
-
-      DO JP = 1, NP_PROC
-         CHARGE = SPECIES(particles(JP)%S_ID)%CHARGE
-         IF (ABS(CHARGE) .LT. 1.d-6) CYCLE
-
-         IF (GRID_TYPE == UNSTRUCTURED) THEN 
-            IC = particles(JP)%IC
-
-            IF (DIMS == 2) THEN
-               AREA = CELL_AREAS(IC)
-               V1 = U2D_GRID%CELL_NODES(IC,1)
-               V2 = U2D_GRID%CELL_NODES(IC,2)
-               V3 = U2D_GRID%CELL_NODES(IC,3)            
-               X1 = U2D_GRID%NODE_COORDS(V1, 1)
-               X2 = U2D_GRID%NODE_COORDS(V2, 1)
-               X3 = U2D_GRID%NODE_COORDS(V3, 1)
-               Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-               Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-               Y3 = U2D_GRID%NODE_COORDS(V3, 2)
-               XP = particles(JP)%X
-               YP = particles(JP)%Y
-               PSI1 = 0.5*( (Y2-Y3)*(XP-X3) - (X2-X3)*(YP-Y3))/AREA/(ZMAX-ZMIN)
-               PSI2 = 0.5*(-(Y1-Y3)*(XP-X3) + (X1-X3)*(YP-Y3))/AREA/(ZMAX-ZMIN)
-               PSI3 = 0.5*(-(Y2-Y1)*(XP-X1) + (X2-X1)*(YP-Y1))/AREA/(ZMAX-ZMIN)
-               
-               RHO_Q = K*CHARGE*FNUM
-               RHS(V1-1) = RHS(V1-1) + RHO_Q*PSI1
-               RHS(V2-1) = RHS(V2-1) + RHO_Q*PSI2
-               RHS(V3-1) = RHS(V3-1) + RHO_Q*PSI3
-            ELSE IF (DIMS == 3) THEN
-               RHO_Q = K*CHARGE*FNUM
-               DO P = 1, 4
-                  VP = U3D_GRID%CELL_NODES(IC,P) - 1
-                  PSIP = U3D_GRID%BASIS_COEFFS(IC,P,1)*particles(JP)%X &
-                       + U3D_GRID%BASIS_COEFFS(IC,P,2)*particles(JP)%Y &
-                       + U3D_GRID%BASIS_COEFFS(IC,P,3)*particles(JP)%Z &
-                       + U3D_GRID%BASIS_COEFFS(IC,P,4)
-                  RHS(VP) = RHS(VP) + RHO_Q*PSIP
-               END DO
-            END IF
-
-         ELSE
-
-            CALL COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)
-
-            IF (GRID_TYPE == RECTILINEAR_UNIFORM .AND. .NOT. AXI) THEN
-               VOL = CELL_VOL
-            ELSE
-               VOL = CELL_VOLUMES(particles(JP)%IC)
-            END IF
-
-            CFNUM = FNUM
-            IF (BOOL_RADIAL_WEIGHTING) CFNUM = CELL_FNUM(particles(JP)%IC)         
-
-            RHO_Q = -K*CHARGE*CFNUM/VOL
-
-            IF (DIMS == 2) THEN
-               RHS(INDICES(1)) = RHS(INDICES(1)) + RHO_Q * WEIGHTS(1)
-               RHS(INDICES(2)) = RHS(INDICES(2)) + RHO_Q * WEIGHTS(2)
-               RHS(INDICES(3)) = RHS(INDICES(3)) + RHO_Q * WEIGHTS(3)
-               RHS(INDICES(4)) = RHS(INDICES(4)) + RHO_Q * WEIGHTS(4)            
-            ELSE
-               RHS(INDICES(1)) = RHS(INDICES(1)) + RHO_Q * WEIGHTS(1)
-               RHS(INDICES(2)) = RHS(INDICES(2)) + RHO_Q * WEIGHTS(2)
-            END IF
-
-         END IF
-      END DO
-
-
-      SIZE = NNODES
-
-      IF (PROC_ID .EQ. 0) THEN
-         CALL MPI_REDUCE(MPI_IN_PLACE, RHS, SIZE, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-      ELSE
-         CALL MPI_REDUCE(RHS,          RHS, SIZE, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-      END IF
-
-      CALL MPI_BCAST(RHS, SIZE, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-
-
-      DO I = Istart, Iend-1
-         IF (IS_DIRICHLET(I)) THEN
-            val = DIRICHLET(I)
-         ELSE IF (IS_NEUMANN(I)) THEN
-            val = RHS(I) + NEUMANN(I)
-         ELSE
-            val = RHS(I)
-         END IF
-
-         CALL VecSetValues(bvec,one,I,val,INSERT_VALUES,ierr)
-      END DO
-
-
-      CALL VecAssemblyBegin(bvec,ierr)
-      CALL VecAssemblyEnd(bvec,ierr)
-
-
-      DO I = 0, NNODES-1
-         IF (IS_DIRICHLET(I)) THEN
-            RHS(I) = DIRICHLET(I)
-         ELSE IF (IS_NEUMANN(I)) THEN
-            RHS(I) = RHS(I) + NEUMANN(I)
-         END IF
-      END DO
-
-   END SUBROUTINE DEPOSIT_CHARGE
-
-
-   ! Same as DEPOSIT_CHARGE but uses part_adv
-   SUBROUTINE DEPOSIT_CHARGE_CN()
-      
-      IMPLICIT NONE
-
+      TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), INTENT(IN) :: part_adv
       INTEGER :: JP, I, IC
 
       REAL(KIND=8) :: K, RHO_Q, CHARGE
@@ -1784,7 +1672,7 @@ MODULE fully_implicit
          END IF
       END DO
 
-   END SUBROUTINE DEPOSIT_CHARGE_CN
+   END SUBROUTINE DEPOSIT_CHARGE
 
 
 END MODULE fully_implicit

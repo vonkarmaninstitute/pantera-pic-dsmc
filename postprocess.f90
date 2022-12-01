@@ -1139,4 +1139,83 @@ MODULE postprocess
 
    END SUBROUTINE CHECKS
 
+
+   SUBROUTINE DUMP_PARTICLES_VTK(TIMESTEP)
+
+      USE global
+      USE mpi_common
+
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN) :: TIMESTEP
+      CHARACTER(LEN=512)  :: filename
+      INTEGER :: IP
+
+      WRITE(filename, "(A,A,I0.5,A6,I0.8,A4)") TRIM(ADJUSTL(PARTDUMP_SAVE_PATH)), "proc_", PROC_ID, "_time_", TIMESTEP, ".vtk" ! Compose filename
+
+      IF (BOOL_BINARY_OUTPUT) THEN
+         OPEN(20, FILE=filename, ACCESS='STREAM', FORM='UNFORMATTED', STATUS='NEW', CONVERT='BIG_ENDIAN')
+
+         WRITE(20) '# vtk DataFile Version 2.0'//ACHAR(10)
+         WRITE(20) 'vtk output'//ACHAR(10)
+         WRITE(20) 'BINARY'//ACHAR(10)
+
+         WRITE(20) 'DATASET UNSTRUCTURED_GRID'//ACHAR(10)
+
+         WRITE(20) 'POINTS '//ITOA(NP_PROC)//' double'//ACHAR(10)
+         DO IP = 1, NP_PROC
+            WRITE(20) particles(IP)%X, particles(IP)%Y, particles(IP)%Z
+         END DO
+
+         WRITE(20) 'CELL_TYPES '//ITOA(NP_PROC)//ACHAR(10)
+         DO IP = 1, NP_PROC
+            WRITE(20) 1
+         END DO
+
+         WRITE(20) 'POINT_DATA '//ITOA(NP_PROC)//ACHAR(10)
+         WRITE(20) 'VECTORS Velocity float'//ACHAR(10)
+
+         DO IP = 1, NP_PROC
+            WRITE(20) particles(IP)%VX, particles(IP)%VY, particles(IP)%VZ
+         END DO
+
+      ELSE  ! Write ASCII output.
+         OPEN(20, FILE=filename, ACCESS='SEQUENTIAL', FORM='FORMATTED', STATUS='NEW')
+
+         WRITE(20,'(A)') '# vtk DataFile Version 2.0'
+         WRITE(20,'(A)') 'vtk output'
+         WRITE(20,'(A)') 'ASCII'
+
+         WRITE(20,'(A)') 'DATASET UNSTRUCTURED_GRID'
+         
+         WRITE(20,'(A,I10,A7)') 'POINTS', NP_PROC, 'double'
+         DO IP = 1, NP_PROC
+            WRITE(20,*) particles(IP)%X, particles(IP)%Y, particles(IP)%Z
+         END DO
+
+         WRITE(20,'(A,I10)') 'CELL_TYPES', NP_PROC
+         DO IP = 1, NP_PROC
+            WRITE(20,*) 1
+         END DO
+
+         WRITE(20,'(A,I10)') 'POINT_DATA', NP_PROC
+         WRITE(20,'(A,I10)') 'VECTORS Velocity float'
+         DO IP = 1, NP_PROC
+            WRITE(20,*) particles(IP)%VX, particles(IP)%VY, particles(IP)%VZ
+         END DO
+
+         WRITE(20,'(A,I10)') 'FIELD FieldData', 1
+
+         WRITE(20,'(A,I10,I10,A7)') 'IC', 1, NP_PROC, 'integer'
+         DO IP = 1, NP_PROC
+            WRITE(20,*) particles(IP)%IC
+         END DO
+
+      END IF
+
+   END SUBROUTINE DUMP_PARTICLES_VTK
+
+
+
+
 END MODULE postprocess

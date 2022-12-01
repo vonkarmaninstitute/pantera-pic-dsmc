@@ -32,7 +32,7 @@ MODULE timecycle
 
       IF (PIC_TYPE .NE. NONE) THEN
 
-         CALL DEPOSIT_CHARGE
+         CALL DEPOSIT_CHARGE(particles)
          CALL SOLVE_POISSON
          PHIBAR_FIELD = PHI_FIELD
          CALL COMPUTE_E_FIELD
@@ -49,7 +49,7 @@ MODULE timecycle
       
       ! ########### Dump particles and flowfield after the initial seeding ##########################################
       IF ((tID .GE. DUMP_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
-         IF (MOD(tID-DUMP_START, DUMP_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
+         IF (MOD(tID-DUMP_START, DUMP_EVERY) .EQ. 0) CALL DUMP_PARTICLES_VTK(tID)
       END IF
 
       IF ((tID .GT. DUMP_GRID_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
@@ -91,6 +91,11 @@ MODULE timecycle
             CALL ONLYMASTERPRINT1(PROC_ID, TRIM(stringTMP))
 
          END IF
+
+
+         IF (tID .GT. 0 .AND. MOD(tID, TIMING_STATS_EVERY) .EQ. 0) THEN
+            CALL TIMER_SUMMARY
+         END IF
          
          ! ########### Inject particles from boundaries/injection sources ##########
 
@@ -105,47 +110,60 @@ MODULE timecycle
 
          ! ########### Exchange particles among processes ##########################
 
+         CALL TIMER_START(5)
          CALL EXCHANGE
-
+         CALL TIMER_STOP(5)
 
          IF (PIC_TYPE == EXPLICIT) THEN
-
+            CALL TIMER_START(3)
             CALL ADVECT
+            CALL TIMER_STOP(3)
 
-            CALL DEPOSIT_CHARGE
+            CALL DEPOSIT_CHARGE(particles)
+
+            CALL TIMER_START(2)
             CALL SOLVE_POISSON
             CALL COMPUTE_E_FIELD
+            CALL TIMER_STOP(2)
          
          ELSE IF (PIC_TYPE == SEMIIMPLICIT) THEN
          
             CALL DEPOSIT_CURRENT
+
+            CALL TIMER_START(2)
             CALL ASSEMBLE_AMPERE
             CALL SOLVE_AMPERE
             CALL COMPUTE_E_FIELD
+            CALL TIMER_STOP(2)
 
+            CALL TIMER_START(3)
             CALL ADVECT
+            CALL TIMER_STOP(3)
 
          ELSE IF (PIC_TYPE == FULLYIMPLICIT) THEN
 
+            CALL TIMER_START(2)
             CALL SOLVE_POISSON_FULLY_IMPLICIT
             CALL COMPUTE_E_FIELD
+            CALL TIMER_STOP(2)
             
-            !DBDBDBDBDBDBDBDBDDBDBDBDBDB I have to do this stupid copy of particle array!
-            ALLOCATE(part_adv, SOURCE = particles)
-            CALL ADVECT_CN(.TRUE., .FALSE., Jmat)
-            DEALLOCATE(particles)
-            ALLOCATE(particles, SOURCE = part_adv)
-            DEALLOCATE(part_adv)
+            CALL TIMER_START(3)
+            CALL ADVECT_CN(particles, .TRUE., .FALSE., Jmat)
+            CALL TIMER_STOP(3)
 
          ELSE
 
+            CALL TIMER_START(3)
             CALL ADVECT
+            CALL TIMER_STOP(3)
             
          END IF
 
          ! ########### Exchange particles among processes ##########################
 
+         CALL TIMER_START(5)
          CALL EXCHANGE
+         CALL TIMER_STOP(5)
          
 
          ! ########### Perform collisions ##########################################
@@ -162,9 +180,10 @@ MODULE timecycle
 
 
 
+         CALL TIMER_START(4)
          ! ########### Dump particles ##############################################
          IF (tID .GE. DUMP_START) THEN
-            IF (MOD(tID-DUMP_START, DUMP_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
+            IF (MOD(tID-DUMP_START, DUMP_EVERY) .EQ. 0) CALL DUMP_PARTICLES_VTK(tID)
          END IF
 
          ! ########### Dump flowfield ##############################################
@@ -185,6 +204,8 @@ MODULE timecycle
 
          ! ########### Dump individual particle ###################################
          CALL DUMP_TRAJECTORY_FILE(tID)
+         CALL TIMER_STOP(4)
+
 
          ! ########### Perform the conservation checks ###################################
          IF (PERFORM_CHECKS .AND. MOD(tID, CHECKS_EVERY) .EQ. 0) CALL CHECKS
@@ -1577,7 +1598,7 @@ MODULE timecycle
       IF ((tID .GE. DUMP_BOUND_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
          IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_EVERY) .EQ. 0) CALL DUMP_BOUNDARY_PARTICLES_FILE(tID)
       END IF
-      DEALLOCATE(part_dump)
+      IF (ALLOCATED(part_dump)) DEALLOCATE(part_dump)
       NP_DUMP_PROC = 0
 
 

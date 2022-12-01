@@ -677,4 +677,53 @@ CONTAINS
    END SUBROUTINE QUICKSORT
 
 
+
+   SUBROUTINE TIMER_START(SECTION_ID)
+      
+      INTEGER, INTENT(IN) :: SECTION_ID
+
+      CALL CPU_TIME(TIMERS_START_TIME(SECTION_ID))
+
+   END SUBROUTINE
+
+
+   SUBROUTINE TIMER_STOP(SECTION_ID)
+
+      INTEGER, INTENT(IN) :: SECTION_ID
+      REAL(KIND=8) :: TIMENOW
+      
+      CALL CPU_TIME(TIMENOW)
+      TIMERS_ELAPSED(SECTION_ID) = TIMERS_ELAPSED(SECTION_ID) + (TIMENOW - TIMERS_START_TIME(SECTION_ID))
+
+   END SUBROUTINE
+
+
+   SUBROUTINE TIMER_SUMMARY
+
+      REAL(KIND=8) :: TOTAL_ELAPSED
+
+      
+      IF (PROC_ID == 0) THEN
+         TOTAL_ELAPSED = SUM(TIMERS_ELAPSED)
+
+         WRITE(*,*) '=========================================='
+         WRITE(*,*) '==========     TIMING INFO     ==========='
+         WRITE(*,*) '=========================================='
+
+         WRITE(*,'(A20,F6.1,A6,F4.1,A2)') 'Initialization:     ',  TIMERS_ELAPSED(1),   ' s  = ', &
+                                          100*TIMERS_ELAPSED(1)/TOTAL_ELAPSED, '%.'
+         WRITE(*,'(A20,F6.1,A6,F4.1,A2)') 'Field solution:     ',  TIMERS_ELAPSED(2),   ' s  = ', &
+                                          100*TIMERS_ELAPSED(2)/TOTAL_ELAPSED, '%.'
+         WRITE(*,'(A20,F6.1,A6,F4.1,A2)') 'Particle movement:  ',  TIMERS_ELAPSED(3), ' s  = ', &
+                                          100*TIMERS_ELAPSED(3)/TOTAL_ELAPSED, '%.'
+         WRITE(*,'(A20,F6.1,A6,F4.1,A2)') 'File output:        ',  TIMERS_ELAPSED(4),   ' s  = ', &
+                                          100*TIMERS_ELAPSED(4)/TOTAL_ELAPSED, '%.'
+         WRITE(*,'(A20,F6.1,A6,F4.1,A2)') 'MPI particle comm.: ',  TIMERS_ELAPSED(5),   ' s  = ', &
+                                          100*TIMERS_ELAPSED(5)/TOTAL_ELAPSED, '%.'
+
+         WRITE(*,*) '=========================================='
+      END IF
+
+   END SUBROUTINE TIMER_SUMMARY
+
 END MODULE tools

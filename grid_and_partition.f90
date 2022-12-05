@@ -876,11 +876,11 @@ MODULE grid_and_partition
                         TEMP_CELL_NEIGHBORS(JC1, 3) = JC2
                      END IF
 
-                     IF (ANY(WHICH1 == 1) .AND. ANY(WHICH1 == 2)) THEN
+                     IF (ANY(WHICH2 == 1) .AND. ANY(WHICH2 == 2)) THEN
                         TEMP_CELL_NEIGHBORS(JC2, 1) = JC1
-                     ELSE IF (ANY(WHICH1 == 2) .AND. ANY(WHICH1 == 3)) THEN
+                     ELSE IF (ANY(WHICH2 == 2) .AND. ANY(WHICH2 == 3)) THEN
                         TEMP_CELL_NEIGHBORS(JC2, 2) = JC1
-                     ELSE IF (ANY(WHICH1 == 3) .AND. ANY(WHICH1 == 1)) THEN
+                     ELSE IF (ANY(WHICH2 == 3) .AND. ANY(WHICH2 == 1)) THEN
                         TEMP_CELL_NEIGHBORS(JC2, 3) = JC1
                      END IF
       

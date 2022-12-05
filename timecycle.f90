@@ -1039,13 +1039,14 @@ MODULE timecycle
                   ! Move to new cell
                   IF (NEIGHBOR == -1) THEN
 
-                     IF (GRID_BC(FACE_PG)%DUMP_FLUXES) THEN
-                        particleNOW = particles(IP)
-                        particleNOW%IC = FACE_PG
-                        CALL ADD_PARTICLE_ARRAY(particleNOW, NP_DUMP_PROC, part_dump)
-                     END IF
-
                      IF (FACE_PG .NE. -1) THEN
+
+                        IF (GRID_BC(FACE_PG)%DUMP_FLUXES) THEN
+                           particleNOW = particles(IP)
+                           particleNOW%IC = FACE_PG
+                           CALL ADD_PARTICLE_ARRAY(particleNOW, NP_DUMP_PROC, part_dump)
+                        END IF
+                        
                         ! Apply particle boundary condition
                         IF (GRID_BC(FACE_PG)%PARTICLE_BC == SPECULAR) THEN
                            IF (GRID_BC(FACE_PG)%REACT) THEN

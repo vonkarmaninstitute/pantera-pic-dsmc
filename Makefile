@@ -3,8 +3,8 @@
 ############################################################
 
 # GNU Compiler
-CMPF  = mpifort -c -cpp -I/home/pietro/petsc/petsc--openmpi/include -pg -g
-LNK   = mpifort -cpp -pg -g
+CMPF  = mpifort -c -cpp -I/home/pietro/petsc/petsc--openmpi/include -g
+LNK   = mpifort -cpp -g
 
 #OPTF = -O0 -Wall -Wextra -Warray-temporaries -ggdb3 -pedantic -fimplicit-none -fcheck=all -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow -mcmodel=medium # Debug options
 OPTF = -O3 -Wall -Wextra -fimplicit-none -fbacktrace -fcheck=all -ffpe-trap=invalid,zero,overflow -mcmodel=medium # Standard optimization options 

@@ -604,28 +604,28 @@ MODULE grid_and_partition
 
       CHARACTER*256, INTENT(IN) :: FILENAME
 
-      CHARACTER*256 :: LINE, GROUPNAME
+      CHARACTER*256 :: LINE, GROUPNAME, DUMMYLINE
 
       INTEGER, PARAMETER :: in5 = 2385
       INTEGER            :: ios
       INTEGER            :: ReasonEOF
 
-      INTEGER            :: NUM, I, J, FOUND, V1, V2, ELEM_TYPE, NUMELEMS, IC
+      INTEGER            :: NUM, I, J, FOUND, V1, V2, ELEM_TYPE, NUMELEMS
       INTEGER, DIMENSION(3,2) :: IND
-      REAL(KIND=8)       :: X1, X2, Y1, Y2, LEN, RAD
+      REAL(KIND=8)       :: X1, X2, Y1, Y2, LEN, RAD, COORDMIN, COORDMAX
       REAL(KIND=8), DIMENSION(3) :: XYZ, A, B, C
 
       INTEGER, DIMENSION(:,:), ALLOCATABLE      :: TEMP_CELL_NEIGHBORS
 
-      INTEGER, DIMENSION(2) :: WHICH1, WHICH2
-
-      INTEGER :: NCELLSPP
+      INTEGER, DIMENSION(2) :: VLIST, WHICH1, WHICH2
 
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CENTROID
-      INTEGER, DIMENSION(:), ALLOCATABLE      :: ORDER
-      INTEGER :: IMIN, TEMP1
-      REAL(KIND=8) :: TEMP2
+      !INTEGER, DIMENSION(:), ALLOCATABLE      :: ORDER
+      !INTEGER :: IMIN, TEMP1
+      !REAL(KIND=8) :: TEMP2
 
+      INTEGER, DIMENSION(:), ALLOCATABLE :: N_CELLS_WITH_NODE, CELL_WITH_NODE, IOF
+      INTEGER :: IDX, JN, JC1, JC2
 
       ! Open input file for reading
       OPEN(UNIT=in5,FILE=FILENAME, STATUS='old',IOSTAT=ios)
@@ -635,9 +635,11 @@ MODULE grid_and_partition
       ENDIF
 
       ! Read the mesh file. SU2 file format (*.su2)
-      WRITE(*,*) '==========================================='
-      WRITE(*,*) 'Reading grid file in SU2 format.'
-      WRITE(*,*) '==========================================='
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Reading grid file in SU2 format.'
+         WRITE(*,*) '==========================================='
+      END IF
       
       DO
          READ(in5,*, IOSTAT=ReasonEOF) LINE, NUM
@@ -670,10 +672,6 @@ MODULE grid_and_partition
          ELSE IF (LINE == 'NMARK=') THEN
 
             ! Assign physical groups to cell edges.
-
-            ALLOCATE(GRID_BC(NUM)) ! Append the physical group to the list
-            N_GRID_BC = NUM
-
             DO I = 1, NUM
                
                READ(in5,*, IOSTAT=ReasonEOF) LINE, GROUPNAME
@@ -682,8 +680,6 @@ MODULE grid_and_partition
                ELSE
                   WRITE(*,*) 'Found marker tag, with groupname: ', GROUPNAME
                END IF
-      
-               GRID_BC(I)%PHYSICAL_GROUP_NAME = GROUPNAME
          
                
                READ(in5,*, IOSTAT=ReasonEOF) LINE, NUMELEMS
@@ -694,23 +690,103 @@ MODULE grid_and_partition
                END IF
 
                DO J = 1, NUMELEMS
-                  READ(in5,*, IOSTAT=ReasonEOF) ELEM_TYPE, V1, V2
-                  IF (ELEM_TYPE .NE. 3) WRITE(*,*) 'Error! element type was not line.'
+                  READ(in5,*, IOSTAT=ReasonEOF) DUMMYLINE
+               END DO
+            END DO
 
-                  V1 = V1 + 1
-                  V2 = V2 + 1
-                  DO IC = 1, U2D_GRID%NUM_CELLS
-                     IF ((U2D_GRID%CELL_NODES(IC, 1) == V1 .AND. U2D_GRID%CELL_NODES(IC, 2) == V2) .OR. &
-                         (U2D_GRID%CELL_NODES(IC, 1) == V2 .AND. U2D_GRID%CELL_NODES(IC, 2) == V1)) THEN
-                        U2D_GRID%CELL_EDGES_PG(IC, 1) = I
-                     ELSE IF ((U2D_GRID%CELL_NODES(IC, 2) == V1 .AND. U2D_GRID%CELL_NODES(IC, 3) == V2) .OR. &
-                              (U2D_GRID%CELL_NODES(IC, 2) == V2 .AND. U2D_GRID%CELL_NODES(IC, 3) == V1)) THEN
-                        U2D_GRID%CELL_EDGES_PG(IC, 2) = I
-                     ELSE IF ((U2D_GRID%CELL_NODES(IC, 3) == V1 .AND. U2D_GRID%CELL_NODES(IC, 1) == V2) .OR. &
-                              (U2D_GRID%CELL_NODES(IC, 3) == V2 .AND. U2D_GRID%CELL_NODES(IC, 1) == V1)) THEN
-                        U2D_GRID%CELL_EDGES_PG(IC, 3) = I
-                     END IF
-                  END DO
+         END IF
+      END DO
+
+      REWIND(in5)
+
+      ALLOCATE(N_CELLS_WITH_NODE(U2D_GRID%NUM_NODES))
+      ALLOCATE(IOF(U2D_GRID%NUM_NODES))
+
+      N_CELLS_WITH_NODE = 0
+      DO I = 1, U2D_GRID%NUM_CELLS
+         DO V1 = 1, 3
+            JN = U2D_GRID%CELL_NODES(I,V1)
+            N_CELLS_WITH_NODE(JN) = N_CELLS_WITH_NODE(JN) + 1
+         END DO
+      END DO
+   
+      IOF = -1
+      IDX = 1
+      DO JN = 1, U2D_GRID%NUM_NODES
+         IF (N_CELLS_WITH_NODE(JN) .NE. 0) THEN
+            IOF(JN) = IDX
+            IDX = IDX + N_CELLS_WITH_NODE(JN)
+         END IF
+      END DO
+   
+      ALLOCATE(CELL_WITH_NODE(IDX))
+      
+      N_CELLS_WITH_NODE = 0
+      DO I = 1, U2D_GRID%NUM_CELLS
+         DO V1 = 1, 3
+            JN = U2D_GRID%CELL_NODES(I,V1)
+            CELL_WITH_NODE(IOF(JN) + N_CELLS_WITH_NODE(JN)) = I
+            N_CELLS_WITH_NODE(JN) = N_CELLS_WITH_NODE(JN) + 1
+         END DO
+      END DO
+
+
+      DO
+         READ(in5,*, IOSTAT=ReasonEOF) LINE, NUM
+         IF (ReasonEOF < 0) EXIT 
+         !WRITE(*,*) 'Read line:', LINE, ' number ', NUM
+         
+         IF (LINE == 'NPOIN=') THEN
+            DO I = 1, NUM
+               READ(in5,*, IOSTAT=ReasonEOF) DUMMYLINE
+            END DO
+         ELSE IF (LINE == 'NELEM=') THEN
+            DO I = 1, NUM
+               READ(in5,*, IOSTAT=ReasonEOF) DUMMYLINE
+            END DO
+         ELSE IF (LINE == 'NMARK=') THEN
+
+            ! Assign physical groups to cell edges.
+
+            ALLOCATE(GRID_BC(NUM)) ! Append the physical group to the list
+            N_GRID_BC = NUM
+
+            DO I = 1, NUM
+               
+               READ(in5,*, IOSTAT=ReasonEOF) LINE, GROUPNAME
+      
+               GRID_BC(I)%PHYSICAL_GROUP_NAME = GROUPNAME
+         
+               READ(in5,*, IOSTAT=ReasonEOF) LINE, NUMELEMS
+
+               DO J = 1, NUMELEMS
+                  READ(in5,*, IOSTAT=ReasonEOF) ELEM_TYPE, VLIST
+                  IF (ELEM_TYPE .NE. 3) WRITE(*,*) 'Error! element type was not line.'
+                  VLIST = VLIST + 1
+
+                  JN = VLIST(1)
+                  IF (N_CELLS_WITH_NODE(JN) > 0) THEN
+                     DO IDX = 0, N_CELLS_WITH_NODE(JN) - 1
+                        JC1 = CELL_WITH_NODE(IOF(JN) + IDX)
+                        FOUND = 0
+                        DO V1 = 1, 3
+                           IF (ANY(VLIST == U2D_GRID%CELL_NODES(JC1,V1))) THEN
+                              FOUND = FOUND + 1
+                              WHICH1(FOUND) = V1
+                           END IF
+                        END DO
+         
+                        IF (FOUND == 2) THEN
+                           IF (ANY(WHICH1 == 1) .AND. ANY(WHICH1 == 2)) THEN
+                              U2D_GRID%CELL_EDGES_PG(JC1, 1) = I
+                           ELSE IF (ANY(WHICH1 == 2) .AND. ANY(WHICH1 == 3)) THEN
+                              U2D_GRID%CELL_EDGES_PG(JC1, 2) = I
+                           ELSE IF (ANY(WHICH1 == 3) .AND. ANY(WHICH1 == 1)) THEN
+                              U2D_GRID%CELL_EDGES_PG(JC1, 3) = I
+                           END IF
+                        END IF
+                     END DO
+                  END IF
 
                END DO
             END DO
@@ -721,8 +797,8 @@ MODULE grid_and_partition
       ! Done reading
       CLOSE(in5)
 
-      WRITE(*,*) 'Read grid file. It contains ', U2D_GRID%NUM_NODES, &
-                 'points, and ', U2D_GRID%NUM_CELLS, 'cells.'
+      !WRITE(*,*) 'Read grid file. It contains ', U2D_GRID%NUM_NODES, &
+      !           'points, and ', U2D_GRID%NUM_CELLS, 'cells.'
 
       ! Process the mesh: generate connectivity, normals and such...
       !XMIN, XMAX,...
@@ -730,6 +806,12 @@ MODULE grid_and_partition
       !DO I = 1, U2D_GRID%NUM_CELLS
       !   WRITE(*,*) U2D_GRID%CELL_NODES(I,:)
       !END DO
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Computing cell volumes.'
+         WRITE(*,*) '==========================================='
+      END IF
 
       ! Compute cell volumes
       ALLOCATE(CELL_AREAS(U2D_GRID%NUM_CELLS))
@@ -750,35 +832,68 @@ MODULE grid_and_partition
          END IF
       END DO
 
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Computing grid connectivity.'
+         WRITE(*,*) '==========================================='
+      END IF
+
       ! Find cell connectivity
       ALLOCATE(TEMP_CELL_NEIGHBORS(U2D_GRID%NUM_CELLS, 3))
       TEMP_CELL_NEIGHBORS = -1
-      DO I = 1, U2D_GRID%NUM_CELLS
-         DO J = I, U2D_GRID%NUM_CELLS
-            IF (I == J) CYCLE
-            FOUND = 0
-            DO V1 = 1, 3
-               DO V2 = 1, 3
-                  IF (U2D_GRID%CELL_NODES(I,V1) == U2D_GRID%CELL_NODES(J,V2)) THEN
-                     FOUND = FOUND + 1
-                     IF (FOUND .GT. 2) CALL ERROR_ABORT('Error! Found duplicate cells in the mesh!')
-                     WHICH1(FOUND) = V1
-                     WHICH2(FOUND) = V2
+
+
+
+      DO JN = 1, U2D_GRID%NUM_NODES
+         !IF (PROC_ID == 0) WRITE(*,*) 'Checking node ', JN, ' of ',  U2D_GRID%NUM_NODES
+         IF (N_CELLS_WITH_NODE(JN) > 1) THEN
+            DO I = 0, N_CELLS_WITH_NODE(JN) - 1
+               DO J = I, N_CELLS_WITH_NODE(JN) - 1
+                  IF (I == J) CYCLE
+                  JC1 = CELL_WITH_NODE(IOF(JN) + I)
+                  JC2 = CELL_WITH_NODE(IOF(JN) + J)
+
+
+                  FOUND = 0
+                  DO V1 = 1, 3
+                     DO V2 = 1, 3
+                        IF (U2D_GRID%CELL_NODES(JC1,V1) == U2D_GRID%CELL_NODES(JC2,V2)) THEN
+                           FOUND = FOUND + 1
+                           IF (FOUND .GT. 2) CALL ERROR_ABORT('Error! Found duplicate cells in the mesh!')
+                           WHICH1(FOUND) = V1
+                           WHICH2(FOUND) = V2
+                        END IF
+                     END DO
+                  END DO
+
+                  IF (FOUND == 2) THEN
+      
+                     IF (ANY(WHICH1 == 1) .AND. ANY(WHICH1 == 2)) THEN
+                        TEMP_CELL_NEIGHBORS(JC1, 1) = JC2
+                     ELSE IF (ANY(WHICH1 == 2) .AND. ANY(WHICH1 == 3)) THEN
+                        TEMP_CELL_NEIGHBORS(JC1, 2) = JC2
+                     ELSE IF (ANY(WHICH1 == 3) .AND. ANY(WHICH1 == 1)) THEN
+                        TEMP_CELL_NEIGHBORS(JC1, 3) = JC2
+                     END IF
+
+                     IF (ANY(WHICH1 == 1) .AND. ANY(WHICH1 == 2)) THEN
+                        TEMP_CELL_NEIGHBORS(JC2, 1) = JC1
+                     ELSE IF (ANY(WHICH1 == 2) .AND. ANY(WHICH1 == 3)) THEN
+                        TEMP_CELL_NEIGHBORS(JC2, 2) = JC1
+                     ELSE IF (ANY(WHICH1 == 3) .AND. ANY(WHICH1 == 1)) THEN
+                        TEMP_CELL_NEIGHBORS(JC2, 3) = JC1
+                     END IF
+      
                   END IF
+
+
                END DO
             END DO
-            IF (FOUND == 2) THEN
-               IF (ANY(WHICH1 == 1) .AND. ANY(WHICH1 == 2)) TEMP_CELL_NEIGHBORS(I, 1) = J
-               IF (ANY(WHICH1 == 2) .AND. ANY(WHICH1 == 3)) TEMP_CELL_NEIGHBORS(I, 2) = J
-               IF (ANY(WHICH1 == 3) .AND. ANY(WHICH1 == 1)) TEMP_CELL_NEIGHBORS(I, 3) = J
-               IF (ANY(WHICH2 == 1) .AND. ANY(WHICH2 == 2)) TEMP_CELL_NEIGHBORS(J, 1) = I
-               IF (ANY(WHICH2 == 2) .AND. ANY(WHICH2 == 3)) TEMP_CELL_NEIGHBORS(J, 2) = I
-               IF (ANY(WHICH2 == 3) .AND. ANY(WHICH2 == 1)) TEMP_CELL_NEIGHBORS(J, 3) = I
-            END IF
-         END DO
+         END IF
       END DO
 
       U2D_GRID%CELL_NEIGHBORS = TEMP_CELL_NEIGHBORS
+
 
 
       !WRITE(*,*) 'Generated grid connectivity. '
@@ -786,6 +901,11 @@ MODULE grid_and_partition
       !   WRITE(*,*) 'Cell ', I, ' neighbors cells ', TEMP_CELL_NEIGHBORS(I, :)
       !END DO
 
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Computing face normals.'
+         WRITE(*,*) '==========================================='
+      END IF
 
       ! Compute cell edge normals
       IND(1,:) = [1,2]
@@ -807,14 +927,11 @@ MODULE grid_and_partition
          END DO
       END DO
 
-
-      WRITE(*,*) '==========================================='
-      WRITE(*,*) 'Done reading grid file.'
-      WRITE(*,*) '==========================================='
-
-      WRITE(*,*) '==========================================='
-      WRITE(*,*) 'Checking ordering.'
-      WRITE(*,*) '==========================================='
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Checking ordering.'
+         WRITE(*,*) '==========================================='
+      END IF
 
       DO I = 1, U2D_GRID%NUM_CELLS
          X1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,2), 1) &
@@ -830,9 +947,11 @@ MODULE grid_and_partition
 
       END DO
 
-      WRITE(*,*) '==========================================='
-      WRITE(*,*) 'Partitioning domain.'
-      WRITE(*,*) '==========================================='
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Partitioning domain.'
+         WRITE(*,*) '==========================================='
+      END IF
 
       ALLOCATE(CENTROID(U2D_GRID%NUM_CELLS))
       DO I = 1, U2D_GRID%NUM_CELLS
@@ -841,34 +960,52 @@ MODULE grid_and_partition
                      +  U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,3), 2)) / 3.
       END DO
 
-      ALLOCATE(ORDER(U2D_GRID%NUM_CELLS))
+      ! Old ordering with sort
+      ! ALLOCATE(ORDER(U2D_GRID%NUM_CELLS))
 
+      ! DO I = 1, U2D_GRID%NUM_CELLS
+      !    ORDER(I) = I
+      ! END DO
+      ! DO I = 1, U2D_GRID%NUM_CELLS-1
+      !    ! find ith smallest in 'a'
+      !    IMIN = MINLOC(CENTROID(I:), 1) + I - 1
+      !    ! swap to position i in 'a' and 'b', if not already there
+      !    IF (IMIN .NE. I) THEN
+      !       TEMP2 = CENTROID(I); CENTROID(I) = CENTROID(IMIN); CENTROID(IMIN) = TEMP2
+      !       TEMP1 = ORDER(I); ORDER(I) = ORDER(IMIN); ORDER(IMIN) = TEMP1
+      !    END IF
+      ! END DO
+
+      
+
+      ! ! Distributing cells over MPI processes
+      ! NCELLSPP = CEILING(REAL(U2D_GRID%NUM_CELLS)/REAL(N_MPI_THREADS))
+      ! ALLOCATE(U2D_GRID%CELL_PROC(U2D_GRID%NUM_CELLS))
+      ! DO I = 1, U2D_GRID%NUM_CELLS
+      !    U2D_GRID%CELL_PROC(ORDER(I)) = INT((I-1)/NCELLSPP)
+      ! END DO
+
+      ! DEALLOCATE(ORDER)
+
+      COORDMAX = MAXVAL(U2D_GRID%NODE_COORDS(:,2))
+      COORDMIN = MINVAL(U2D_GRID%NODE_COORDS(:,2))
+
+      ALLOCATE(U2D_GRID%CELL_PROC(U2D_GRID%NUM_CELLS))
       DO I = 1, U2D_GRID%NUM_CELLS
-         ORDER(I) = I
-      END DO
-      DO I = 1, U2D_GRID%NUM_CELLS-1
-         ! find ith smallest in 'a'
-         IMIN = MINLOC(CENTROID(I:), 1) + I - 1
-         ! swap to position i in 'a' and 'b', if not already there
-         IF (IMIN .NE. I) THEN
-            TEMP2 = CENTROID(I); CENTROID(I) = CENTROID(IMIN); CENTROID(IMIN) = TEMP2
-            TEMP1 = ORDER(I); ORDER(I) = ORDER(IMIN); ORDER(IMIN) = TEMP1
-         END IF
+         U2D_GRID%CELL_PROC(I) = INT((CENTROID(I)-COORDMIN)/(COORDMAX-COORDMIN)*REAL(N_MPI_THREADS))
       END DO
 
       DEALLOCATE(CENTROID)
 
-      ! Distributing cells over MPI processes
-      NCELLSPP = CEILING(REAL(U2D_GRID%NUM_CELLS)/REAL(N_MPI_THREADS))
-      ALLOCATE(U2D_GRID%CELL_PROC(U2D_GRID%NUM_CELLS))
-      DO I = 1, U2D_GRID%NUM_CELLS
-         U2D_GRID%CELL_PROC(ORDER(I)) = INT((I-1)/NCELLSPP)
-      END DO
-
-      DEALLOCATE(ORDER)
-
       NCELLS = U2D_GRID%NUM_CELLS
       NNODES = U2D_GRID%NUM_NODES
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Done reading grid file.'
+         WRITE(*,*) 'It contains ', NNODES, ' nodes and ', NCELLS, ' cells.'
+         WRITE(*,*) '==========================================='
+      END IF
 
    END SUBROUTINE READ_2D_UNSTRUCTURED_GRID_SU2
 

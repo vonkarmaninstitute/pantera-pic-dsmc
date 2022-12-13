@@ -1123,8 +1123,8 @@ MODULE timecycle
 
             ELSE ! Grid type is rectilinear
                BOUNDCOLL = -1
-               DO i = 1, 4 ! Check collisions with boundaries (xmin, xmax, ymin, ymax)
-                  IF (AXI) THEN
+               DO I = 1, 2*DIMS ! Check collisions with boundaries (xmin, xmax, ymin, ymax)
+                  IF (DIMS == 2 .AND. AXI) THEN
                      ! We are axisymmetric. Check is more complicated.
                      CANDIDATE_DTCOLL = DTCOLL
                      
@@ -1196,7 +1196,7 @@ MODULE timecycle
                      
 
                   ELSE
-                     ! We are not axisymmetric
+                     ! We are not 2d axisymmetric
                      ! Compute the velocity normal to the boundary
                      VN = -(particles(IP)%VX * NORMX(i) + particles(IP)%VY * NORMY(i))
                      ! Compute the distance from the boundary
@@ -1517,6 +1517,17 @@ MODULE timecycle
             END DO
             DO WHILE (particles(IP)%Z .LT. ZMIN) 
                particles(IP)%Z = ZMAX + (particles(IP)%Z - ZMIN)
+            END DO
+      
+         END IF
+
+         IF (DIMS == 1 .AND. BOOL_Y_PERIODIC) THEN
+         
+            DO WHILE (particles(IP)%Y .GT. YMAX)
+               particles(IP)%Y = YMIN + (particles(IP)%Y - YMAX)
+            END DO
+            DO WHILE (particles(IP)%Y .LT. YMIN) 
+               particles(IP)%Y = YMAX + (particles(IP)%Y - YMIN)
             END DO
       
          END IF 

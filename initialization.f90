@@ -1510,16 +1510,23 @@ MODULE initialization
       IF (ReasonEOF < 0) CALL ERROR_ABORT('Attention, format error in grid definition file! ABORTING.')
    
       ALLOCATE(CELL_VOLUMES(NX*NY))
-      DO I = 1, NX
-         DO J = 1, NY
-            IF (DIMS == 2 .AND. .NOT. AXI) THEN
-               CELL_VOLUMES(I + NX*(J-1)) = XSIZE(I)*YSIZE(J)*(ZMAX-ZMIN)
-            ELSE IF (DIMS == 2 .AND. AXI) THEN
-               ! 2D Axisymmetric geometry: volume is a cylindrical annulus. Coordinate Z is in radians.
-               CELL_VOLUMES(I + NX*(J-1)) = 0.5*XSIZE(I)*(YCOORD(J+1)**2 - YCOORD(J)**2)*(ZMAX-ZMIN)
-            END IF
+
+      IF (DIMS == 1) THEN
+         DO I = 1, NX
+            CELL_VOLUMES(I) = XSIZE(I)*(YMAX-YMIN)*(ZMAX-ZMIN)
          END DO
-      END DO
+      ELSE IF (DIMS == 2) THEN
+         DO I = 1, NX
+            DO J = 1, NY
+               IF (.NOT. AXI) THEN
+                  CELL_VOLUMES(I + NX*(J-1)) = XSIZE(I)*YSIZE(J)*(ZMAX-ZMIN)
+               ELSE
+                  ! 2D Axisymmetric geometry: volume is a cylindrical annulus. Coordinate Z is in radians.
+                  CELL_VOLUMES(I + NX*(J-1)) = 0.5*XSIZE(I)*(YCOORD(J+1)**2 - YCOORD(J)**2)*(ZMAX-ZMIN)
+               END IF
+            END DO
+         END DO
+      END IF
       ! Perform all the checks on these arrays!
       CLOSE(in5)
 
@@ -1815,7 +1822,11 @@ MODULE initialization
 
       IF (.NOT. GRID_TYPE == UNSTRUCTURED) THEN
          NCELLS = NX*NY
-         NNODES = (NX+1)*(NY+1)
+         IF (DIMS == 1) THEN
+            NNODES = NX+1
+         ELSE IF (DIMS == 2) THEN
+            NNODES = (NX+1)*(NY+1)
+         END IF
       END IF
 
    END SUBROUTINE INITVARIOUS

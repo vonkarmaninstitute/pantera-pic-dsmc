@@ -1079,6 +1079,9 @@ MODULE fully_implicit
 
                   IF (COMPUTE_JACOBIAN) THEN
                      ! Accumulate approximate Jacobian of the motion
+                     ! The particle hit the boundary of a cell.
+                     ! It may cross to the neighboring cell, or if this is a domain boundary be reflected or absorbed.
+                     ! The total time of the motion is less than dt (or the particle's initial dtrim) and depends on the path taken.
                      LOC = NUMSTEPS + 1
                      DO I = 1, NUMSTEPS
                         IF (EBARIDX(I) == IC-1) THEN
@@ -1159,10 +1162,12 @@ MODULE fully_implicit
                         ELSE
                            REMOVE_PART(IP) = .TRUE.
                            part_adv(IP)%DTRIM = 0.d0
+                           NUMSTEPS = 0 ! The particle gets to the boundary anyways.
                         END IF
                      ELSE
                         REMOVE_PART(IP) = .TRUE.
                         part_adv(IP)%DTRIM = 0.d0
+                        NUMSTEPS = 0 ! The particle gets to the boundary anyways.
                      END IF
                   ELSE
                      ! The particle is crossing to another cell
@@ -1175,6 +1180,8 @@ MODULE fully_implicit
                   ! The particle stays within the current cell. End of the motion.
                   IF (COMPUTE_JACOBIAN) THEN
                      ! Accumulate approximate Jacobian of the motion
+                     ! The particle ends its trajectory inside a cell.
+                     ! The total time of the motion is dt (or the particle's initial dtrim) independently of the path taken.
                      LOC = NUMSTEPS + 1
                      DO I = 1, NUMSTEPS
                         IF (EBARIDX(I) == IC-1) THEN
@@ -1787,8 +1794,8 @@ MODULE fully_implicit
          INDJ(4) = -1
       
          ! Left, right
-         INDICES(1) = IC
-         INDICES(2) = IC + 1
+         INDICES(1) = IC-1
+         INDICES(2) = IC
          INDICES(4) = -1
          INDICES(3) = -1
 

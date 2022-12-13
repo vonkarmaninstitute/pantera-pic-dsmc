@@ -35,42 +35,42 @@ MODULE grid_and_partition
          XCELL = INT((XP-XMIN)/DX)
          YCELL = INT((YP-YMIN)/DY)
 
-         IF (XCELL .GT. (NX-1)) THEN 
-            XCELL = NX-1
-            WRITE(*,*) 'Particle out of bound xhi!'
-         ELSE IF (XCELL .LT. 0) THEN
-            XCELL = 0
-            WRITE(*,*) 'Particle out of bound xlo!'
-         END IF
+         ! IF (XCELL .GT. (NX-1)) THEN 
+         !    XCELL = NX-1
+         !    WRITE(*,*) 'Particle out of bound xhi!'
+         ! ELSE IF (XCELL .LT. 0) THEN
+         !    XCELL = 0
+         !    WRITE(*,*) 'Particle out of bound xlo!'
+         ! END IF
 
-         IF (YCELL .GT. (NY-1)) THEN 
-            YCELL = NY-1
-            WRITE(*,*) 'Particle out of bound yhi!'
-         ELSE IF (YCELL .LT. 0) THEN
-            YCELL = 0
-            WRITE(*,*) 'Particle out of bound ylo!'
-         END IF
+         ! IF (YCELL .GT. (NY-1)) THEN 
+         !    YCELL = NY-1
+         !    WRITE(*,*) 'Particle out of bound yhi!'
+         ! ELSE IF (YCELL .LT. 0) THEN
+         !    YCELL = 0
+         !    WRITE(*,*) 'Particle out of bound ylo!'
+         ! END IF
 
          IDCELL = XCELL + NX*YCELL + 1
       ELSE IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) THEN
          XCELL = BINARY_SEARCH(XP, XCOORD)
          YCELL = BINARY_SEARCH(YP, YCOORD)
 
-         IF (XCELL .GT. (NX)) THEN 
-            XCELL = NX
-            WRITE(*,*) 'Particle out of bound xhi!', XCELL, NX
-         ELSE IF (XCELL .LT. 1) THEN
-            XCELL = 1
-            WRITE(*,*) 'Particle out of bound xlo!'
-         END IF
+         ! IF (XCELL .GT. (NX)) THEN 
+         !    XCELL = NX
+         !    WRITE(*,*) 'Particle out of bound xhi!', XCELL, NX
+         ! ELSE IF (XCELL .LT. 1) THEN
+         !    XCELL = 1
+         !    WRITE(*,*) 'Particle out of bound xlo!'
+         ! END IF
 
-         IF (YCELL .GT. (NY)) THEN 
-            YCELL = NY
-            WRITE(*,*) 'Particle out of bound yhi!'
-         ELSE IF (YCELL .LT. 1) THEN
-            YCELL = 1
-            WRITE(*,*) 'Particle out of bound ylo!'
-         END IF
+         ! IF (YCELL .GT. (NY)) THEN 
+         !    YCELL = NY
+         !    WRITE(*,*) 'Particle out of bound yhi!'
+         ! ELSE IF (YCELL .LT. 1) THEN
+         !    YCELL = 1
+         !    WRITE(*,*) 'Particle out of bound ylo!'
+         ! END IF
 
          IDCELL = XCELL + NX*(YCELL-1)
       END IF
@@ -120,10 +120,6 @@ MODULE grid_and_partition
 
    END FUNCTION BINARY_SEARCH
 
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   ! SUBROUTINE PROC_FROM_CELL -> Establishes to which processor IDPROC the cell     !
-   ! IDCELL belongs to. IDCELL starts from 1, IDPROC starts from 0                   !
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    SUBROUTINE PROC_FROM_CELL(IDCELL, IDPROC)
 
@@ -135,72 +131,60 @@ MODULE grid_and_partition
 
       INTEGER, INTENT(IN)     :: IDCELL
       INTEGER, INTENT(OUT)     :: IDPROC
-
-      INTEGER :: NCELLSPP
-      INTEGER :: I, J
-      REAL(KIND=8) :: CX, CY, ANGULAR, RADIAL
       
       IF (N_MPI_THREADS == 1) THEN ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ Serial operation
 
-         IDPROC = 0      
+         IDPROC = 0
+   
+      ELSE
 
-      ELSE IF (DOMPART_TYPE == 0) THEN ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ S T R I P S
-      !
-      ! Domain partition type: strips
-      !
-      ! This domain partition assigns the same number of grid cells to every process.
-      ! The domain partition is thus in strips along the "x" axis, as the cells are assumed 
-      ! to be numbered along x.
-         IF (GRID_TYPE == UNSTRUCTURED) THEN
-            IF (DIMS == 2) THEN
-               IDPROC = U2D_GRID%CELL_PROC(IDCELL)
-            ELSE
-               IDPROC = U3D_GRID%CELL_PROC(IDCELL)
-            END IF
-         ELSE            
-            NCELLSPP = CEILING(REAL(NCELLS)/REAL(N_MPI_THREADS))
-
-            ! 3) Here is the process ID 
-            IDPROC   = INT((IDCELL-1)/NCELLSPP) ! Before was giving wrong result for peculiar combinations of NCELLS and NCELLSPP
-            IF (IDPROC .GT. N_MPI_THREADS-1 .OR. IDPROC .LT. 0) THEN
-               WRITE(*,*) 'Error! PROC_FROM_CELL returned proc:', IDPROC
-            END IF
-         END IF
-
-      ELSE IF (DOMPART_TYPE == 1) THEN ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ B L O C K S
-      !
-      ! Domain partition type: blocks
-      !
-      ! This domain partition style divides the domain into blocks
-      ! Note that blocks in this definition are independent from cells! IT IS POSSIBLE TO
-      ! GENERALIZE IT.
-
-         I = MOD(IDCELL - 1, NX)
-         J = (IDCELL - 1)/NX
-         !IDPROC = I*N_BLOCKS_X/NX + N_BLOCKS_X*(J*N_BLOCKS_Y/NY)
-
-
-         CX = 2.0*(DBLE(I)+0.5)/DBLE(NX) - 1.0
-         CY = 2.0*(DBLE(J)+0.5)/DBLE(NY) - 1.0
-         ANGULAR = 0.5*ATAN2(CY, CX)/PI + 0.5
-         RADIAL  = SQRT(CX*CX + CY*CY - CX*CX*CY*CY)
-         IDPROC = INT(ANGULAR*N_BLOCKS_X) + N_BLOCKS_X*INT(RADIAL*N_BLOCKS_Y)
-
-
-
-         IF (IDPROC .GT. N_MPI_THREADS-1 .OR. IDPROC .LT. 0) THEN
-            WRITE(*,*) 'Error! PROC_FROM_CELL returned proc:', IDPROC
-         END IF
-
-      ELSE ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ E R R O R
-
-         WRITE(*,*) 'ATTENTION! Value for variable DOMPART_TYPE = ', DOMPART_TYPE
-         WRITE(*,*) ' not recognized! Check input file!! In: PROC_FROM_POSITION() ABORTING!'
-         STOP
+         IDPROC = CELL_PROCS(IDCELL)
 
       END IF
 
    END SUBROUTINE PROC_FROM_CELL
+
+
+
+
+   SUBROUTINE ASSIGN_CELLS_TO_PROCS
+
+      INTEGER, DIMENSION(:), ALLOCATABLE :: NPC, NPCMOD, NPP
+      INTEGER :: JP, IC, NPPDESIRED, IPROC
+      
+      ALLOCATE(NPC(NCELLS))
+      DO JP = 1, NP_PROC
+         IC = particles(JP)%IC
+         NPC(IC) = NPC(IC) + 1
+      END DO
+
+      IF (PROC_ID .EQ. 0) THEN
+         CALL MPI_REDUCE(MPI_IN_PLACE, NPC, NCELLS, MPI_INTEGER,  MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      ELSE
+         CALL MPI_REDUCE(NPC,          NPC, NCELLS, MPI_INTEGER,  MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      END IF
+
+
+      NPCMOD = NPC + SUM(NPC)/NCELLS/10 + 1
+
+      NPPDESIRED = SUM(NPCMOD) / N_MPI_THREADS
+
+      ALLOCATE(NPP(N_MPI_THREADS))
+      IPROC = 0
+      DO IC = 1, NCELLS
+         IF (NPP(IPROC) < NPPDESIRED .OR. IPROC == N_MPI_THREADS - 1) THEN
+            NPP(IPROC) = NPP(IPROC) + NPCMOD(IC)
+            CELL_PROCS(IC) = IPROC
+         ELSE
+            IPROC = IPROC + 1
+            NPP(IPROC) = NPP(IPROC) + NPCMOD(IC)
+            CELL_PROCS(IC) = IPROC
+         END IF
+      END DO
+
+
+   END SUBROUTINE ASSIGN_CELLS_TO_PROCS
+
 
 
    ! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -583,9 +567,9 @@ MODULE grid_and_partition
 
       ! Distributing cells over MPI processes
       NCELLSPP = CEILING(REAL(NUM_CELLS)/REAL(N_MPI_THREADS))
-      ALLOCATE(U2D_GRID%CELL_PROC(NUM_CELLS))
+      ALLOCATE(CELL_PROCS(NUM_CELLS))
       DO I = 1, NUM_CELLS
-         U2D_GRID%CELL_PROC(I) = INT((I-1)/NCELLSPP)
+         CELL_PROCS(I) = INT((I-1)/NCELLSPP)
       END DO
 
       WRITE(*,*) '==========================================='
@@ -990,9 +974,9 @@ MODULE grid_and_partition
       COORDMAX = MAXVAL(U2D_GRID%NODE_COORDS(:,2))
       COORDMIN = MINVAL(U2D_GRID%NODE_COORDS(:,2))
 
-      ALLOCATE(U2D_GRID%CELL_PROC(U2D_GRID%NUM_CELLS))
+      ALLOCATE(CELL_PROCS(U2D_GRID%NUM_CELLS))
       DO I = 1, U2D_GRID%NUM_CELLS
-         U2D_GRID%CELL_PROC(I) = INT((CENTROID(I)-COORDMIN)/(COORDMAX-COORDMIN)*REAL(N_MPI_THREADS))
+         CELL_PROCS(I) = INT((CENTROID(I)-COORDMIN)/(COORDMAX-COORDMIN)*REAL(N_MPI_THREADS))
       END DO
 
       DEALLOCATE(CENTROID)
@@ -1392,9 +1376,9 @@ MODULE grid_and_partition
       COORDMAX = MAXVAL(U3D_GRID%NODE_COORDS(:,2))
       COORDMIN = MINVAL(U3D_GRID%NODE_COORDS(:,2))
 
-      ALLOCATE(U3D_GRID%CELL_PROC(U3D_GRID%NUM_CELLS))
+      ALLOCATE(CELL_PROCS(U3D_GRID%NUM_CELLS))
       DO I = 1, U3D_GRID%NUM_CELLS
-         U3D_GRID%CELL_PROC(I) = INT((CENTROID(I)-COORDMIN)/(COORDMAX-COORDMIN)*REAL(N_MPI_THREADS))
+         CELL_PROCS(I) = INT((CENTROID(I)-COORDMIN)/(COORDMAX-COORDMIN)*REAL(N_MPI_THREADS))
       END DO
 
       NCELLS = U3D_GRID%NUM_CELLS

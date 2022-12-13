@@ -518,7 +518,20 @@ MODULE postprocess
                DO I = 1, U3D_GRID%NUM_CELLS
                   WRITE(54321) 10
                END DO
-            ELSE
+            ELSE IF (DIMS == 1) THEN
+               WRITE(54321) 'DATASET RECTILINEAR_GRID'//ACHAR(10)
+               
+               WRITE(54321) 'DIMENSIONS '//ITOA(NX+1)//' '//ITOA(1)//' '//ITOA(1)//ACHAR(10)
+
+               WRITE(54321) 'X_COORDINATES '//ITOA(NX+1)//' double'//ACHAR(10)
+               WRITE(54321) XNODES, ACHAR(10)
+
+               WRITE(54321) 'Y_COORDINATES '//ITOA(1)//' double'//ACHAR(10)
+               WRITE(54321) 0.d0, ACHAR(10)
+
+               WRITE(54321) 'Z_COORDINATES '//ITOA(1)//' double'//ACHAR(10)
+               WRITE(54321) 0.d0, ACHAR(10)
+            ELSE IF (DIMS == 2) THEN
                WRITE(54321) 'DATASET RECTILINEAR_GRID'//ACHAR(10)
                
                WRITE(54321) 'DIMENSIONS '//ITOA(NX+1)//' '//ITOA(NY+1)//' '//ITOA(1)//ACHAR(10)
@@ -664,43 +677,23 @@ MODULE postprocess
                      WRITE(54321) BOLTZ_NRHOE, ACHAR(10)
                   END IF
                ELSE
-                  IF (DIMS == 2) THEN
-                     WRITE(54321) 'POINT_DATA '//ITOA( NNODES )//ACHAR(10)
-                     WRITE(54321) 'FIELD FieldData '//ITOA(5)//ACHAR(10)
-                  
-                     WRITE(54321) 'QRHO '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
-                     WRITE(54321) RHS, ACHAR(10)
+                  WRITE(54321) 'POINT_DATA '//ITOA( NNODES )//ACHAR(10)
+                  WRITE(54321) 'FIELD FieldData '//ITOA(5)//ACHAR(10)
+               
+                  WRITE(54321) 'QRHO '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
+                  WRITE(54321) RHS, ACHAR(10)
 
-                     WRITE(54321) 'PHI '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
-                     WRITE(54321) AVG_PHI, ACHAR(10)
+                  WRITE(54321) 'PHI '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
+                  WRITE(54321) AVG_PHI, ACHAR(10)
 
-                     WRITE(54321) 'E_X '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
-                     WRITE(54321) E_FIELD(:,:,1), ACHAR(10)
+                  WRITE(54321) 'E_X '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
+                  WRITE(54321) E_FIELD(:,:,1), ACHAR(10)
 
-                     WRITE(54321) 'E_Y '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
-                     WRITE(54321) E_FIELD(:,:,2), ACHAR(10)
+                  WRITE(54321) 'E_Y '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
+                  WRITE(54321) E_FIELD(:,:,2), ACHAR(10)
 
-                     WRITE(54321) 'E_Z '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
-                     WRITE(54321) E_FIELD(:,:,3), ACHAR(10)
-                  ELSE
-                     WRITE(54321) 'POINT_DATA '//ITOA( NNODES )//ACHAR(10)
-                     WRITE(54321) 'FIELD FieldData '//ITOA(5)//ACHAR(10)
-
-                     WRITE(54321) 'QRHO '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
-                     WRITE(54321) RHS, RHS, ACHAR(10)
-
-                     WRITE(54321) 'PHI '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
-                     WRITE(54321) PHI_FIELD, PHI_FIELD, ACHAR(10)
-
-                     WRITE(54321) 'E_X '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
-                     WRITE(54321) E_FIELD(:,:,1), E_FIELD(:,:,1), ACHAR(10)
-
-                     WRITE(54321) 'E_Y '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
-                     WRITE(54321) E_FIELD(:,:,2), E_FIELD(:,:,2), ACHAR(10)
-
-                     WRITE(54321) 'E_Z '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
-                     WRITE(54321) E_FIELD(:,:,3), E_FIELD(:,:,3), ACHAR(10)
-                  END IF
+                  WRITE(54321) 'E_Z '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
+                  WRITE(54321) E_FIELD(:,:,3), ACHAR(10)
                END IF
             END IF
 
@@ -747,7 +740,20 @@ MODULE postprocess
                DO I = 1, U3D_GRID%NUM_CELLS
                   WRITE(54321,*) 10
                END DO
-            ELSE
+            ELSE IF (DIMS == 1) THEN
+               WRITE(54321,'(A)') 'DATASET RECTILINEAR_GRID'
+               
+               WRITE(54321,'(A,I10,I10,I10)') 'DIMENSIONS', NX+1, NY+1, 1 
+
+               WRITE(54321,'(A,I10,A7)') 'X_COORDINATES', NX+1, 'double'
+               WRITE(54321,*) XNODES
+
+               WRITE(54321,'(A,I10,A7)') 'Y_COORDINATES', 1, 'double'
+               WRITE(54321,*) 0.
+
+               WRITE(54321,'(A,I10,A7)') 'Z_COORDINATES', 1, 'double'
+               WRITE(54321,*) 0.
+            ELSE IF (DIMS == 2) THEN
                WRITE(54321,'(A)') 'DATASET RECTILINEAR_GRID'
                
                WRITE(54321,'(A,I10,I10,I10)') 'DIMENSIONS', NX+1, NY+1, 1 
@@ -887,43 +893,23 @@ MODULE postprocess
 
 
                ELSE
-                  IF (DIMS == 2) THEN
-                     WRITE(54321,'(A,I10)') 'POINT_DATA', NNODES
-                     WRITE(54321,'(A,I10)') 'FIELD FieldData', 5
-                  
-                     WRITE(54321,'(A,I10,I10,A7)') 'QRHO', 1, NNODES, 'double'
-                     WRITE(54321,*) RHS
+                  WRITE(54321,'(A,I10)') 'POINT_DATA', NNODES
+                  WRITE(54321,'(A,I10)') 'FIELD FieldData', 5
+               
+                  WRITE(54321,'(A,I10,I10,A7)') 'QRHO', 1, NNODES, 'double'
+                  WRITE(54321,*) RHS
 
-                     WRITE(54321,'(A,I10,I10,A7)') 'PHI', 1, NNODES, 'double'
-                     WRITE(54321,*) AVG_PHI
+                  WRITE(54321,'(A,I10,I10,A7)') 'PHI', 1, NNODES, 'double'
+                  WRITE(54321,*) AVG_PHI
 
-                     WRITE(54321,'(A,I10,I10,A7)') 'E_X', 1, NNODES, 'double'
-                     WRITE(54321,*) E_FIELD(:,:,1)
+                  WRITE(54321,'(A,I10,I10,A7)') 'E_X', 1, NNODES, 'double'
+                  WRITE(54321,*) E_FIELD(:,:,1)
 
-                     WRITE(54321,'(A,I10,I10,A7)') 'E_Y', 1, NNODES, 'double'
-                     WRITE(54321,*) E_FIELD(:,:,2)
+                  WRITE(54321,'(A,I10,I10,A7)') 'E_Y', 1, NNODES, 'double'
+                  WRITE(54321,*) E_FIELD(:,:,2)
 
-                     WRITE(54321,'(A,I10,I10,A7)') 'E_Z', 1, NNODES, 'double'
-                     WRITE(54321,*) E_FIELD(:,:,3)
-                  ELSE
-                     WRITE(54321,'(A,I10)') 'POINT_DATA', NNODES
-                     WRITE(54321,'(A,I10)') 'FIELD FieldData', 5
-
-                     WRITE(54321,'(A,I10,I10,A7)') 'QRHO', 1, NNODES, 'double'
-                     WRITE(54321,*) RHS, RHS
-
-                     WRITE(54321,'(A,I10,I10,A7)') 'PHI', 1, NNODES, 'double'
-                     WRITE(54321,*) PHI_FIELD, PHI_FIELD
-
-                     WRITE(54321,'(A,I10,I10,A7)') 'E_X', 1, NNODES, 'double'
-                     WRITE(54321,*) E_FIELD(:,:,1), E_FIELD(:,:,1)
-
-                     WRITE(54321,'(A,I10,I10,A7)') 'E_Y', 1, NNODES, 'double'
-                     WRITE(54321,*) E_FIELD(:,:,2), E_FIELD(:,:,2)
-
-                     WRITE(54321,'(A,I10,I10,A7)') 'E_Z', 1, NNODES, 'double'
-                     WRITE(54321,*) E_FIELD(:,:,3), E_FIELD(:,:,3)
-                  END IF
+                  WRITE(54321,'(A,I10,I10,A7)') 'E_Z', 1, NNODES, 'double'
+                  WRITE(54321,*) E_FIELD(:,:,3)
                END IF
             END IF
 

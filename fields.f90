@@ -378,84 +378,118 @@ MODULE fields
          DEALLOCATE(IS_UNUSED)
 
       ELSE
-         DO I = 0, NPX-1
-            DO J = 0, NPY-1
+         IF (DIMS == 1) THEN
+            DO I = 0, NPX-1
 
+               IF (I < Istart .OR. I >= Iend) CYCLE ! Each proc populates part of the matrix.
+               ICENTER = I
+               IEAST = I+1
+               IWEST = I-1
 
-               ICENTER = I+(NPX)*J
-               IF (ICENTER < Istart .OR. ICENTER >= Iend) CYCLE ! Each proc populates part of the matrix.
-               IEAST = I+(NPX)*J+1
-               IWEST = I+(NPX)*J-1
-               INORTH = I+(NPX)*(J+1)
-               ISOUTH = I+(NPX)*(J-1)
-
-
-               ! Various configurations go here.
-               
-               !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-               ! Plume 2d cartesian, full domain !
-               !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-               IF ((I == 0) .OR. (I == NPX-1) .OR. (J == 0) .OR. (J == NPY-1)) THEN
+               IF ((I == 0) .OR. (I == NPX-1)) THEN
                   ! Boundary point
-                  ! CALL MatSetValues(Amat,one,ICENTER,one,ICENTER,1.d0,INSERT_VALUES,ierr)
-                  ! On the boundary or on the rest of the PFG.
                   DIRICHLET(ICENTER) = 0.d0
                   IS_DIRICHLET(ICENTER) = .TRUE.
-
 
                ELSE
                   ! Interior point.
 
                   IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
                      HX = (XMAX-XMIN)/DBLE(NX)
-                     HY = (YMAX-YMIN)/DBLE(NY)
                      AX = 1./(HX*HX)
                      CX = AX
                      BX = -AX-CX
-                     AY = 1./(HY*HY)
-                     CY = AY
-                     BY = -AY-CY
                   ELSE
                      H1X = XSIZE(I)
                      H2X = XSIZE(I+1)
-                     H1Y = YSIZE(J)
-                     H2Y = YSIZE(J+1)
 
                      AX = 2./(H1X*(H1X+H2X))
                      CX = 2./(H2X*(H1X+H2X))
                      BX = -AX-CX
+                  END IF
+                        
+                  CALL MatSetValues(Amat,one,ICENTER,one,ICENTER,BX,INSERT_VALUES,ierr)
+                  CALL MatSetValues(Amat,one,ICENTER,one,IEAST,CX,INSERT_VALUES,ierr)
+                  CALL MatSetValues(Amat,one,ICENTER,one,IWEST,AX,INSERT_VALUES,ierr)
 
-                     AY = 2./(H1Y*(H1Y+H2Y))
-                     CY = 2./(H2Y*(H1Y+H2Y))
-                     BY = -AY-CY
-                  END IF
-      
-                  IF (AXI) THEN
-                     IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
-                        R = YMIN + J*(YMAX-YMIN)/DBLE(NY)
-                     ELSE
-                        R = YCOORD(J+1)
-                     END IF
-                     AY = AY - 1./(R*(H1Y+H2Y))
-                     CY = CY + 1./(R*(H1Y+H2Y))
-                  END IF
+               END IF
+
+            END DO
+         ELSE IF (DIMS == 2) THEN
+            DO I = 0, NPX-1
+               DO J = 0, NPY-1
+
+
+                  ICENTER = I+(NPX)*J
+                  IF (ICENTER < Istart .OR. ICENTER >= Iend) CYCLE ! Each proc populates part of the matrix.
+                  IEAST = I+(NPX)*J+1
+                  IWEST = I+(NPX)*J-1
+                  INORTH = I+(NPX)*(J+1)
+                  ISOUTH = I+(NPX)*(J-1)
+
+
+                  ! Various configurations go here.
                   
-                  IF (DIMS == 2) THEN
+                  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                  ! Plume 2d cartesian, full domain !
+                  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                  IF ((I == 0) .OR. (I == NPX-1) .OR. (J == 0) .OR. (J == NPY-1)) THEN
+                     ! Boundary point
+                     ! CALL MatSetValues(Amat,one,ICENTER,one,ICENTER,1.d0,INSERT_VALUES,ierr)
+                     ! On the boundary or on the rest of the PFG.
+                     DIRICHLET(ICENTER) = 0.d0
+                     IS_DIRICHLET(ICENTER) = .TRUE.
+
+
+                  ELSE
+                     ! Interior point.
+
+                     IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
+                        HX = (XMAX-XMIN)/DBLE(NX)
+                        HY = (YMAX-YMIN)/DBLE(NY)
+                        AX = 1./(HX*HX)
+                        CX = AX
+                        BX = -AX-CX
+                        AY = 1./(HY*HY)
+                        CY = AY
+                        BY = -AY-CY
+                     ELSE
+                        H1X = XSIZE(I)
+                        H2X = XSIZE(I+1)
+                        H1Y = YSIZE(J)
+                        H2Y = YSIZE(J+1)
+
+                        AX = 2./(H1X*(H1X+H2X))
+                        CX = 2./(H2X*(H1X+H2X))
+                        BX = -AX-CX
+
+                        AY = 2./(H1Y*(H1Y+H2Y))
+                        CY = 2./(H2Y*(H1Y+H2Y))
+                        BY = -AY-CY
+                     END IF
+         
+                     IF (AXI) THEN
+                        IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
+                           R = YMIN + J*(YMAX-YMIN)/DBLE(NY)
+                        ELSE
+                           R = YCOORD(J+1)
+                        END IF
+                        AY = AY - 1./(R*(H1Y+H2Y))
+                        CY = CY + 1./(R*(H1Y+H2Y))
+                     END IF
+                     
                      CALL MatSetValues(Amat,one,ICENTER,one,ICENTER,BX+BY,INSERT_VALUES,ierr)
                      CALL MatSetValues(Amat,one,ICENTER,one,INORTH,CY,INSERT_VALUES,ierr)
                      CALL MatSetValues(Amat,one,ICENTER,one,ISOUTH,AY,INSERT_VALUES,ierr)
                      CALL MatSetValues(Amat,one,ICENTER,one,IEAST,CX,INSERT_VALUES,ierr)
                      CALL MatSetValues(Amat,one,ICENTER,one,IWEST,AX,INSERT_VALUES,ierr)
-                  ELSE
-                     CALL MatSetValues(Amat,one,ICENTER,one,ICENTER,BX,INSERT_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,ICENTER,one,IEAST,CX,INSERT_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,ICENTER,one,IWEST,AX,INSERT_VALUES,ierr)
+
                   END IF
-               END IF
 
 
+               END DO
             END DO
-         END DO
+         END IF
       END IF
 
 
@@ -468,6 +502,9 @@ MODULE fields
 
       CALL MatAssemblyBegin(Amat,MAT_FINAL_ASSEMBLY,ierr)
       CALL MatAssemblyEnd(Amat,MAT_FINAL_ASSEMBLY,ierr)
+
+      CALL MPI_BARRIER(MPI_COMM_WORLD, ierr)
+      CALL MatView(Amat,PETSC_VIEWER_STDOUT_WORLD,ierr)
 
 
    END SUBROUTINE ASSEMBLE_POISSON

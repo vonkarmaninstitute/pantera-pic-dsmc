@@ -1578,6 +1578,7 @@ MODULE initialization
          DO i = 1, MIXTURES(INITIAL_PARTICLES_TASKS(ITASK)%MIX_ID)%N_COMPONENTS
             
             S_ID = MIXTURES(INITIAL_PARTICLES_TASKS(ITASK)%MIX_ID)%COMPONENTS(i)%ID
+            IF (S_ID == 2) CYCLE ! DBDBDBDBDBDBDBDBDBBDBDBDBDBDBDBDBDBDBDBDBDBDDBDBBDDBBDBDBDBDBDBDBDBDBDBDBDBDBDBDBD
             IF (GRID_TYPE == UNSTRUCTURED) THEN
                DO IC = 1, NCELLS
                   ! Compute number of particles of this species per process to be created in this cell.
@@ -1629,6 +1630,8 @@ MODULE initialization
                         ZP = V1(3) + (V2(3)-V1(3))*P + (V3(3)-V1(3))*Q + (V4(3)-V1(3))*R
                      END IF
 
+                     !IF (XP > 0.6 .OR. XP  < 0.4 .OR. YP > 0.6 .OR. YP < 0.4) CYCLE
+
                      ! Assign velocity and energy following a Boltzmann distribution
                      M = SPECIES(S_ID)%MOLECULAR_MASS
                      CALL MAXWELL(INITIAL_PARTICLES_TASKS(ITASK)%UX, &
@@ -1644,6 +1647,25 @@ MODULE initialization
 
                      CALL INIT_PARTICLE(XP,YP,ZP,VXP,VYP,VZP,EROT,EVIB,S_ID,IC,DT, particleNOW) ! Save in particle
                      CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
+
+
+
+                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                     M = SPECIES(2)%MOLECULAR_MASS
+                     CALL MAXWELL(INITIAL_PARTICLES_TASKS(ITASK)%UX, &
+                                 INITIAL_PARTICLES_TASKS(ITASK)%UY, &
+                                 INITIAL_PARTICLES_TASKS(ITASK)%UZ, &
+                                 11600.d0, &
+                                 11600.d0, &
+                                 11600.d0, &
+                                 VXP, VYP, VZP, M)
+
+                     CALL INTERNAL_ENERGY(SPECIES(2)%ROTDOF, INITIAL_PARTICLES_TASKS(ITASK)%TROT, EROT)
+                     CALL INTERNAL_ENERGY(SPECIES(2)%VIBDOF, INITIAL_PARTICLES_TASKS(ITASK)%TVIB, EVIB)
+
+                     CALL INIT_PARTICLE(XP,YP,ZP,VXP,VYP,VZP,EROT,EVIB,2,IC,DT, particleNOW) ! Save in particle
+                     CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
+                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                   END DO
                END DO
             ELSE ! Structured grid

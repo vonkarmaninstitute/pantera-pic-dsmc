@@ -121,6 +121,7 @@ MODULE grid_and_partition
    END FUNCTION BINARY_SEARCH
 
 
+
    SUBROUTINE PROC_FROM_CELL(IDCELL, IDPROC)
 
       ! Note: processes go from 0 (usually termed the Master) to MPI_N_THREADS - 1
@@ -145,45 +146,142 @@ MODULE grid_and_partition
    END SUBROUTINE PROC_FROM_CELL
 
 
-
-
    SUBROUTINE ASSIGN_CELLS_TO_PROCS
 
-      INTEGER, DIMENSION(:), ALLOCATABLE :: NPC, NPCMOD, NPP
-      INTEGER :: JP, IC, NPPDESIRED, IPROC
-      
-      ALLOCATE(NPC(NCELLS))
-      DO JP = 1, NP_PROC
-         IC = particles(JP)%IC
-         NPC(IC) = NPC(IC) + 1
-      END DO
+      INTEGER :: IDCELL
+      INTEGER :: NCELLSPP
+      INTEGER :: I, J
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CENTROID
+      REAL(KIND=8) :: COORDMAX, COORDMIN
 
-      IF (PROC_ID .EQ. 0) THEN
-         CALL MPI_REDUCE(MPI_IN_PLACE, NPC, NCELLS, MPI_INTEGER,  MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-      ELSE
-         CALL MPI_REDUCE(NPC,          NPC, NCELLS, MPI_INTEGER,  MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+
+      IF (.NOT. ALLOCATED(CELL_PROCS)) ALLOCATE(CELL_PROCS(NCELLS))
+
+      IF (N_MPI_THREADS == 1) THEN ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ Serial operation
+
+         CELL_PROCS = 0
+      
+      ELSE IF (GRID_TYPE == UNSTRUCTURED) THEN
+
+         ALLOCATE(CENTROID(NCELLS))
+
+         IF (DIMS == 3) THEN
+
+            DO I = 1, NCELLS
+               CENTROID(I) = (U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,1), 2) &
+                           +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,2), 2) &
+                           +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,3), 2) &
+                           +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,4), 2)) / 4.
+            END DO
+      
+            COORDMAX = MAXVAL(U3D_GRID%NODE_COORDS(:,2))
+            COORDMIN = MINVAL(U3D_GRID%NODE_COORDS(:,2))
+            
+         ELSE IF (DIMS == 2) THEN
+
+            DO I = 1, NCELLS
+               CENTROID(I) = (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,1), 2) &
+                           +  U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,2), 2) &
+                           +  U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,3), 2)) / 3.
+            END DO
+      
+            COORDMAX = MAXVAL(U2D_GRID%NODE_COORDS(:,2))
+            COORDMIN = MINVAL(U2D_GRID%NODE_COORDS(:,2))
+      
+         END IF   
+
+         DO I = 1, NCELLS
+            CELL_PROCS(I) = INT((CENTROID(I)-COORDMIN)/(COORDMAX-COORDMIN)*REAL(N_MPI_THREADS))
+         END DO
+
+         DEALLOCATE(CENTROID)
+
+      ELSE IF (DOMPART_TYPE == 0) THEN ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ S T R I P S
+      !
+      ! Domain partition type: strips
+      !
+      ! This domain partition assigns the same number of grid cells to every process.
+      ! The domain partition is thus in strips along the "x" axis, as the cells are assumed 
+      ! to be numbered along x.
+
+         NCELLSPP = CEILING(REAL(NCELLS)/REAL(N_MPI_THREADS))
+
+         DO IDCELL = 1, NCELLS
+            ! 3) Here is the process ID 
+            CELL_PROCS(IDCELL) = INT((IDCELL-1)/NCELLSPP) ! Before was giving wrong result for peculiar combinations of NCELLS and NCELLSPP
+         END DO
+
+      ELSE IF (DOMPART_TYPE == 1) THEN ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ B L O C K S
+      !
+      ! Domain partition type: blocks
+      !
+      ! This domain partition style divides the domain into blocks
+      ! Note that blocks in this definition are independent from cells! IT IS POSSIBLE TO
+      ! GENERALIZE IT.
+
+         DO IDCELL = 1, NCELLS
+            I = MOD(IDCELL - 1, NX)
+            J = (IDCELL - 1)/NX
+            CELL_PROCS(IDCELL) = I*N_BLOCKS_X/NX + N_BLOCKS_X*(J*N_BLOCKS_Y/NY)
+         END DO
+
+      ELSE ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ E R R O R
+
+         WRITE(*,*) 'ATTENTION! Value for variable DOMPART_TYPE = ', DOMPART_TYPE
+         WRITE(*,*) ' not recognized! Check input file!! In: PROC_FROM_POSITION() ABORTING!'
+         STOP
       END IF
 
-
-      NPCMOD = NPC + SUM(NPC)/NCELLS/10 + 1
-
-      NPPDESIRED = SUM(NPCMOD) / N_MPI_THREADS
-
-      ALLOCATE(NPP(N_MPI_THREADS))
-      IPROC = 0
-      DO IC = 1, NCELLS
-         IF (NPP(IPROC) < NPPDESIRED .OR. IPROC == N_MPI_THREADS - 1) THEN
-            NPP(IPROC) = NPP(IPROC) + NPCMOD(IC)
-            CELL_PROCS(IC) = IPROC
-         ELSE
-            IPROC = IPROC + 1
-            NPP(IPROC) = NPP(IPROC) + NPCMOD(IC)
-            CELL_PROCS(IC) = IPROC
-         END IF
-      END DO
-
-
    END SUBROUTINE ASSIGN_CELLS_TO_PROCS
+
+   ! SUBROUTINE ASSIGN_CELLS_TO_PROCS
+
+   !    INTEGER, DIMENSION(:), ALLOCATABLE :: NPC, NPCMOD, NPP
+   !    INTEGER :: JP, IC, NPPDESIRED, IPROC
+      
+   !    ALLOCATE(NPC(NCELLS))
+   !    NPC = 0
+
+   !    DO JP = 1, NP_PROC
+   !       IC = particles(JP)%IC
+   !       NPC(IC) = NPC(IC) + 1
+   !    END DO
+
+   !    IF (PROC_ID .EQ. 0) THEN
+   !       CALL MPI_REDUCE(MPI_IN_PLACE, NPC, NCELLS, MPI_INTEGER,  MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+   !    ELSE
+   !       CALL MPI_REDUCE(NPC,          NPC, NCELLS, MPI_INTEGER,  MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+   !    END IF
+
+   !    CALL MPI_BCAST(NPC, NCELLS, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+
+   !    NPCMOD = NPC + SUM(NPC)/NCELLS/10 + 1
+
+   !    NPPDESIRED = SUM(NPCMOD) / N_MPI_THREADS
+
+   !    ALLOCATE(NPP(N_MPI_THREADS))
+   !    NPP = 0
+
+   !    IF (.NOT. ALLOCATED(CELL_PROCS)) ALLOCATE(CELL_PROCS(NCELLS))
+   !    CELL_PROCS = 0
+   !    IPROC = 0
+   !    DO IC = 1, NCELLS
+   !       IF (NPP(IPROC) < NPPDESIRED .OR. IPROC == N_MPI_THREADS - 1) THEN
+   !          NPP(IPROC) = NPP(IPROC) + NPCMOD(IC)
+   !          CELL_PROCS(IC) = IPROC
+   !       ELSE
+   !          IPROC = IPROC + 1
+   !          NPP(IPROC) = NPP(IPROC) + NPCMOD(IC)
+   !          CELL_PROCS(IC) = IPROC
+   !       END IF
+   !    END DO
+
+   !    DEALLOCATE(NPC)
+   !    DEALLOCATE(NPP)
+
+
+   ! END SUBROUTINE ASSIGN_CELLS_TO_PROCS
 
 
 
@@ -594,19 +692,14 @@ MODULE grid_and_partition
       INTEGER            :: ios
       INTEGER            :: ReasonEOF
 
-      INTEGER            :: NUM, I, J, FOUND, V1, V2, ELEM_TYPE, NUMELEMS
+      INTEGER            :: NUM, I, J, FOUND, V1, V2, V3, ELEM_TYPE, NUMELEMS
       INTEGER, DIMENSION(3,2) :: IND
-      REAL(KIND=8)       :: X1, X2, Y1, Y2, LEN, RAD, COORDMIN, COORDMAX
+      REAL(KIND=8)       :: X1, X2, X3, Y1, Y2, Y3, LEN, RAD
       REAL(KIND=8), DIMENSION(3) :: XYZ, A, B, C
 
       INTEGER, DIMENSION(:,:), ALLOCATABLE      :: TEMP_CELL_NEIGHBORS
 
       INTEGER, DIMENSION(2) :: VLIST, WHICH1, WHICH2
-
-      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CENTROID
-      !INTEGER, DIMENSION(:), ALLOCATABLE      :: ORDER
-      !INTEGER :: IMIN, TEMP1
-      !REAL(KIND=8) :: TEMP2
 
       INTEGER, DIMENSION(:), ALLOCATABLE :: N_CELLS_WITH_NODE, CELL_WITH_NODE, IOF
       INTEGER :: IDX, JN, JC1, JC2
@@ -931,58 +1024,44 @@ MODULE grid_and_partition
 
       END DO
 
-      IF (PROC_ID == 0) THEN
-         WRITE(*,*) '==========================================='
-         WRITE(*,*) 'Partitioning domain.'
-         WRITE(*,*) '==========================================='
-      END IF
-
-      ALLOCATE(CENTROID(U2D_GRID%NUM_CELLS))
-      DO I = 1, U2D_GRID%NUM_CELLS
-         CENTROID(I) = (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,1), 2) &
-                     +  U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,2), 2) &
-                     +  U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,3), 2)) / 3.
-      END DO
-
-      ! Old ordering with sort
-      ! ALLOCATE(ORDER(U2D_GRID%NUM_CELLS))
-
-      ! DO I = 1, U2D_GRID%NUM_CELLS
-      !    ORDER(I) = I
-      ! END DO
-      ! DO I = 1, U2D_GRID%NUM_CELLS-1
-      !    ! find ith smallest in 'a'
-      !    IMIN = MINLOC(CENTROID(I:), 1) + I - 1
-      !    ! swap to position i in 'a' and 'b', if not already there
-      !    IF (IMIN .NE. I) THEN
-      !       TEMP2 = CENTROID(I); CENTROID(I) = CENTROID(IMIN); CENTROID(IMIN) = TEMP2
-      !       TEMP1 = ORDER(I); ORDER(I) = ORDER(IMIN); ORDER(IMIN) = TEMP1
-      !    END IF
-      ! END DO
-
-      
-
-      ! ! Distributing cells over MPI processes
-      ! NCELLSPP = CEILING(REAL(U2D_GRID%NUM_CELLS)/REAL(N_MPI_THREADS))
-      ! ALLOCATE(U2D_GRID%CELL_PROC(U2D_GRID%NUM_CELLS))
-      ! DO I = 1, U2D_GRID%NUM_CELLS
-      !    U2D_GRID%CELL_PROC(ORDER(I)) = INT((I-1)/NCELLSPP)
-      ! END DO
-
-      ! DEALLOCATE(ORDER)
-
-      COORDMAX = MAXVAL(U2D_GRID%NODE_COORDS(:,2))
-      COORDMIN = MINVAL(U2D_GRID%NODE_COORDS(:,2))
-
-      ALLOCATE(CELL_PROCS(U2D_GRID%NUM_CELLS))
-      DO I = 1, U2D_GRID%NUM_CELLS
-         CELL_PROCS(I) = INT((CENTROID(I)-COORDMIN)/(COORDMAX-COORDMIN)*REAL(N_MPI_THREADS))
-      END DO
-
-      DEALLOCATE(CENTROID)
-
       NCELLS = U2D_GRID%NUM_CELLS
       NNODES = U2D_GRID%NUM_NODES
+
+
+
+      ALLOCATE(U2D_GRID%BASIS_COEFFS(NCELLS,3,3))
+
+      DO I = 1, NCELLS
+         AREA = CELL_AREAS(I)
+         V1 = U2D_GRID%CELL_NODES(I,1)
+         V2 = U2D_GRID%CELL_NODES(I,2)
+         V3 = U2D_GRID%CELL_NODES(I,3)
+
+         X1 = U2D_GRID%NODE_COORDS(V1, 1)
+         X2 = U2D_GRID%NODE_COORDS(V2, 1)
+         X3 = U2D_GRID%NODE_COORDS(V3, 1)
+         Y1 = U2D_GRID%NODE_COORDS(V1, 2)
+         Y2 = U2D_GRID%NODE_COORDS(V2, 2)
+         Y3 = U2D_GRID%NODE_COORDS(V3, 2)
+
+         ! These are such that PSI_i = SUM_j [ x_j * BASIS_COEFFS(IC,i,j) ] + BASIS_COEFFS(IC,i,4)
+
+         U2D_GRID%BASIS_COEFFS(I,1,1) =  Y2-Y3
+         U2D_GRID%BASIS_COEFFS(I,1,2) = -(X2-X3)
+         U2D_GRID%BASIS_COEFFS(I,1,3) =  X2*Y3 - X3*Y2
+
+         U2D_GRID%BASIS_COEFFS(I,2,1) = -(Y1-Y3)
+         U2D_GRID%BASIS_COEFFS(I,2,2) =  X1-X3
+         U2D_GRID%BASIS_COEFFS(I,2,3) =  X3*Y1 - X1*Y3
+
+         U2D_GRID%BASIS_COEFFS(I,3,1) = -(Y2-Y1)
+         U2D_GRID%BASIS_COEFFS(I,3,2) =  X2-X1
+         U2D_GRID%BASIS_COEFFS(I,3,3) =  X1*Y2 - X2*Y1
+
+         U2D_GRID%BASIS_COEFFS(I,:,:) = 0.5*U2D_GRID%BASIS_COEFFS(I,:,:)/AREA
+
+      END DO
+
 
       IF (PROC_ID == 0) THEN
          WRITE(*,*) '==========================================='
@@ -1019,9 +1098,6 @@ MODULE grid_and_partition
       INTEGER, DIMENSION(:,:), ALLOCATABLE      :: TEMP_CELL_NEIGHBORS
 
       INTEGER, DIMENSION(3) :: VLIST, WHICH1, WHICH2
-
-      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CENTROID
-      REAL(KIND=8) :: COORDMAX, COORDMIN
 
       INTEGER, DIMENSION(:), ALLOCATABLE :: N_CELLS_WITH_NODE, CELL_WITH_NODE, IOF
       INTEGER :: IDX, JN, JC1, JC2
@@ -1359,27 +1435,7 @@ MODULE grid_and_partition
          END DO
       END DO
 
-      IF (PROC_ID == 0) THEN
-         WRITE(*,*) '==========================================='
-         WRITE(*,*) 'Partitioning domain.'
-         WRITE(*,*) '==========================================='
-      END IF
 
-      ALLOCATE(CENTROID(U3D_GRID%NUM_CELLS))
-      DO I = 1, U3D_GRID%NUM_CELLS
-         CENTROID(I) = (U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,1), 2) &
-                     +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,2), 2) &
-                     +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,3), 2) &
-                     +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,4), 2)) / 4.
-      END DO
-
-      COORDMAX = MAXVAL(U3D_GRID%NODE_COORDS(:,2))
-      COORDMIN = MINVAL(U3D_GRID%NODE_COORDS(:,2))
-
-      ALLOCATE(CELL_PROCS(U3D_GRID%NUM_CELLS))
-      DO I = 1, U3D_GRID%NUM_CELLS
-         CELL_PROCS(I) = INT((CENTROID(I)-COORDMIN)/(COORDMAX-COORDMIN)*REAL(N_MPI_THREADS))
-      END DO
 
       NCELLS = U3D_GRID%NUM_CELLS
       NNODES = U3D_GRID%NUM_NODES

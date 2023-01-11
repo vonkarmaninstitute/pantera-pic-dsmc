@@ -12,15 +12,6 @@ PROGRAM PANTERA
    USE fully_implicit
 
    IMPLICIT NONE
-   
-   TYPE(PARTICLE_DATA_STRUCTURE), ALLOCATABLE, DIMENSION(:) :: aaa, bbb
-   ALLOCATE(aaa(5))
-   aaa(1)%IC = 100
-   WRITE(*,*) aaa(1)%IC
-   ALLOCATE(bbb, SOURCE=aaa)
-   bbb(1)%IC = 666
-   WRITE(*,*) aaa(1)%IC
-   WRITE(*,*) bbb(1)%IC
 
    ! ========= Init MPI environment ========================
    CALL ONLYMASTERPRINT1(PROC_ID, '> INITIALIZING MPI...')
@@ -39,6 +30,7 @@ PROGRAM PANTERA
    ! ========= Read input file and init variables ==========
    CALL ONLYMASTERPRINT1(PROC_ID, '> READING INPUT DATA...')
    CALL READINPUT          ! Read input file
+   CALL ASSIGN_CELLS_TO_PROCS
    CALL INITVARIOUS        ! Initialize some additional variables
    CALL INITINJECTION      ! Initialize variables for injection
    CALL INITCOLLISIONS     ! Initialize variables for collisions
@@ -51,13 +43,14 @@ PROGRAM PANTERA
    IF (RESTART_TIMESTEP > 0) THEN
       CALL READ_PARTICLES_FILE(RESTART_TIMESTEP)
       tID = RESTART_TIMESTEP
-      CALL EXCHANGE
    ELSE
       tID = 0
       RESTART_TIMESTEP = 0
       CALL INITIAL_SEED
    END IF
    ! CALL DUMP_PARTICLES_SCREEN
+   
+   CALL EXCHANGE
 
    ! ========= Time loop ===================================
    CALL MPI_BARRIER(MPI_COMM_WORLD, ierr)

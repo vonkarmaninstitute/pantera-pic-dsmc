@@ -503,8 +503,8 @@ MODULE fields
       CALL MatAssemblyBegin(Amat,MAT_FINAL_ASSEMBLY,ierr)
       CALL MatAssemblyEnd(Amat,MAT_FINAL_ASSEMBLY,ierr)
 
-      CALL MPI_BARRIER(MPI_COMM_WORLD, ierr)
-      CALL MatView(Amat,PETSC_VIEWER_STDOUT_WORLD,ierr)
+      !CALL MPI_BARRIER(MPI_COMM_WORLD, ierr)
+      !CALL MatView(Amat,PETSC_VIEWER_STDOUT_WORLD,ierr)
 
 
    END SUBROUTINE ASSEMBLE_POISSON

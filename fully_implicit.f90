@@ -29,6 +29,7 @@ MODULE fully_implicit
    SNESConvergedReason snesreason
    PC pc, pcnk
    SNES snes
+   SNESLineSearch linesearch
 
 
    CONTAINS
@@ -40,6 +41,12 @@ MODULE fully_implicit
       PetscScalar, POINTER :: solvec_l(:)
 
       CALL SNESCreate(PETSC_COMM_WORLD,snes,ierr)
+      CALL SNESSetType(snes, SNESNEWTONLS ,ierr)
+      
+      CALL SNESGetLineSearch(snes,linesearch,ierr)
+      !CALL SNESLineSearchSetType(linesearch,SNESLINESEARCHBT,ierr)
+      !CALL SNESLineSearchSetOrder(linesearch,SNES_LINESEARCH_ORDER_QUADRATIC,ierr)
+
       CALL VecCreate(PETSC_COMM_WORLD,rvec,ierr)
       CALL VecSetSizes(rvec,PETSC_DECIDE,NNODES,ierr)
       CALL VecSetFromOptions(rvec, ierr)
@@ -70,9 +77,11 @@ MODULE fully_implicit
       !CALL SNESSetTolerances(snes, abstol, rtol, stol, maxit, maxf, ierr)
       CALL SNESSetTolerances(snes, PETSC_DEFAULT_REAL, PETSC_DEFAULT_REAL, PETSC_DEFAULT_REAL, maxit, maxf, ierr)
 
-      !CALL SNESGetKSP(snes,kspnk,ierr)
-      !CALL KSPGetPC(kspnk,pcnk,ierr)
-      !CALL PCSetType(pcnk,PCNONE,ierr)
+      CALL SNESGetKSP(snes,kspnk,ierr)
+      CALL KSPGetPC(kspnk,pcnk,ierr)
+      CALL PCSetType(pcnk,PCLU,ierr)
+
+      CALL SNESSetFromOptions(snes,ierr)
 
       !CALL KSPSetTolerances(kspnk,rtol,abstol,PETSC_DEFAULT_REAL,maxit,ierr)
       ! tol = 1.e-4
@@ -481,7 +490,7 @@ MODULE fully_implicit
       !CALL VecView(x,PETSC_VIEWER_STDOUT_WORLD,ierr)
 
       IF (PROC_ID == 0) THEN
-         WRITE(*,*) 'FormFunction Called'
+         WRITE(*,*) 'FormFunctionAndJacobian Called'
       END IF
 
 
@@ -720,11 +729,11 @@ MODULE fully_implicit
       IMPLICIT NONE
 
       Mat jac
-      Mat dxde
+      Mat dxde, dxdexmat, dxdeymat, dydexmat, dydeymat
       PetscInt row
       PetscInt ncols
       PetscInt cols(2000)
-      PetscScalar vals(2000)
+      PetscScalar dxdexvals(2000), dxdeyvals(2000), dydexvals(2000), dydeyvals(2000)
       PetscInt first_row, last_row
       PetscInt f500
 
@@ -735,8 +744,8 @@ MODULE fully_implicit
 
       INTEGER      :: IP, IC, I, J, SOL, OLD_IC, II, JJ, SIZE
       INTEGER      :: BOUNDCOLL, WALLCOLL, GOODSOL, FACE_PG, NEIGHBOR
-      REAL(KIND=8) :: DTCOLL, TOTDTCOLL, CANDIDATE_DTCOLL, rfp
-      REAL(KIND=8) :: COEFA, COEFB, COEFC, DELTA, SOL1, SOL2, ALPHA, BETA, GAMMA
+      REAL(KIND=8) :: DTCOLL, TOTDTCOLL, CANDIDATE_DTCOLL, rfp, QOM
+      REAL(KIND=8) :: COEFA, COEFB, COEFC, DELTA, SOL1, SOL2, ALPHA, BETA, GAMMA, DTADV
       REAL(KIND=8), DIMENSION(2) :: TEST
       REAL(KIND=8), DIMENSION(4) :: NORMX, NORMY, XW, YW, ZW, BOUNDPOS
       ! REAL(KIND=8) :: XCOLL, YCOLL, ZCOLL
@@ -755,9 +764,11 @@ MODULE fully_implicit
       INTEGER, DIMENSION(8) :: EDGEINDEX
       REAL(KIND=8), DIMENSION(8) :: COLLTIMES
       INTEGER, DIMENSION(200) :: EBARIDX
-      REAL(KIND=8), DIMENSION(200) :: DVDEBAR, DXDEBAR
+      REAL(KIND=8), DIMENSION(200) :: DVXDEX, DVYDEX, DVXDEY, DVYDEY, DXDEX, DYDEX, DXDEY, DYDEY, DTDEX, DTDEY, &
+      DTDEXPREC, DTDEYPREC, DALPHADEX, DALPHADEY, DBETADEX, DBETADEY, DGAMMADEX, DGAMMADEY
+      REAL(KIND=8) :: NEWVX, NEWVY
       INTEGER :: LOC, NUMSTEPS
-      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, AREA, VAL
+      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, AREA, VALXX, VALXY, VALYX, VALYY
       REAL(KIND=8) :: DPSI1DX, DPSI1DY, DPSI2DX, DPSI2DY, DPSI3DX, DPSI3DY, DPSJ1DX, DPSJ1DY, DPSJ2DX, DPSJ2DY, DPSJ3DX, DPSJ3DY
       INTEGER :: V1I, V2I, V3I, V1J, V2J, V3J, COUNTER
       REAL(KIND=8) :: X_TEMP, Y_TEMP, Z_TEMP, VX_TEMP, VY_TEMP, VZ_TEMP
@@ -767,6 +778,10 @@ MODULE fully_implicit
 
       INTEGER :: NCROSSINGS
       REAL(KIND=8) :: TOL
+
+      INTEGER :: NCOLSXX, NCOLSXY, NCOLSYX, NCOLSYY
+      INTEGER, DIMENSION(:), ALLOCATABLE :: COLSXX, COLSXY, COLSYX, COLSYY
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: DXDEXV, DXDEYV, DYDEXV, DYDEYV
 
       ! IF (tID == 4 .AND. FINAL) THEN
       !    OPEN(66332, FILE='crossings', POSITION='append', STATUS='unknown', ACTION='write')
@@ -792,6 +807,38 @@ MODULE fully_implicit
          CALL MatMPIAIJSetPreallocation(dxde,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
          CALL MatSetFromOptions(dxde, ierr)
          CALL MatSetUp(dxde,ierr)
+
+         CALL MatCreate(PETSC_COMM_WORLD,dxdexmat,ierr)
+         CALL MatSetSizes(dxdexmat,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
+         CALL MatSetType(dxdexmat, MATMPIAIJ, ierr)
+         !CALL MatSetOption(dxdexmat,MAT_SPD,PETSC_TRUE,ierr)
+         CALL MatMPIAIJSetPreallocation(dxdexmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
+         CALL MatSetFromOptions(dxdexmat, ierr)
+         CALL MatSetUp(dxdexmat,ierr)
+
+         CALL MatCreate(PETSC_COMM_WORLD,dxdeymat,ierr)
+         CALL MatSetSizes(dxdeymat,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
+         CALL MatSetType(dxdeymat, MATMPIAIJ, ierr)
+         !CALL MatSetOption(dxdeymat,MAT_SPD,PETSC_TRUE,ierr)
+         CALL MatMPIAIJSetPreallocation(dxdeymat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
+         CALL MatSetFromOptions(dxdeymat, ierr)
+         CALL MatSetUp(dxdeymat,ierr)
+
+         CALL MatCreate(PETSC_COMM_WORLD,dydexmat,ierr)
+         CALL MatSetSizes(dydexmat,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
+         CALL MatSetType(dydexmat, MATMPIAIJ, ierr)
+         !CALL MatSetOption(dydexmat,MAT_SPD,PETSC_TRUE,ierr)
+         CALL MatMPIAIJSetPreallocation(dydexmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
+         CALL MatSetFromOptions(dydexmat, ierr)
+         CALL MatSetUp(dydexmat,ierr)
+
+         CALL MatCreate(PETSC_COMM_WORLD,dydeymat,ierr)
+         CALL MatSetSizes(dydeymat,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
+         CALL MatSetType(dydeymat, MATMPIAIJ, ierr)
+         !CALL MatSetOption(dydeymat,MAT_SPD,PETSC_TRUE,ierr)
+         CALL MatMPIAIJSetPreallocation(dydeymat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
+         CALL MatSetFromOptions(dydeymat, ierr)
+         CALL MatSetUp(dydeymat,ierr)
       END IF
 
 
@@ -824,8 +871,22 @@ MODULE fully_implicit
          IC = part_adv(IP)%IC
 
          IF (COMPUTE_JACOBIAN) THEN
-            DVDEBAR = 0.d0
-            DXDEBAR = 0.d0
+            DVXDEX = 0.d0
+            DVYDEX = 0.d0
+            DVXDEY = 0.d0
+            DVYDEY = 0.d0
+
+            DXDEX = 0.d0
+            DYDEX = 0.d0
+            DXDEY = 0.d0
+            DYDEY = 0.d0
+
+            DTDEX = 0.d0
+            DTDEY = 0.d0
+
+            DTDEXPREC = 0.d0
+            DTDEYPREC = 0.d0
+
             EBARIDX = -1
             NUMSTEPS = 0
          END IF
@@ -1072,33 +1133,98 @@ MODULE fully_implicit
                   END DO
                END IF
 
+
+               IF (COMPUTE_JACOBIAN) THEN
+                  ! Accumulate approximate Jacobian of the motion
+                  ! The particle hit the boundary of a cell.
+                  ! It may cross to the neighboring cell, or if this is a domain boundary be reflected or absorbed.
+                  ! The total time of the motion is less than dt (or the particle's initial dtrim) and depends on the path taken.
+
+                  LOC = NUMSTEPS + 1
+                  DO I = 1, NUMSTEPS
+                     IF (EBARIDX(I) == IC-1) THEN
+                        LOC = I
+                        EXIT
+                     END IF
+                  END DO
+                  IF (LOC == NUMSTEPS + 1) THEN
+                     NUMSTEPS = LOC
+                     EBARIDX(LOC) = IC-1
+                  END IF
+
+                  QOM = SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS
+
+                  IF (BOUNDCOLL .NE. -1) THEN
+                     DTADV = DTCOLL
+
+                     I = BOUNDCOLL
+                     J = NEXTVERT(I)
+                     EDGE_X1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),1)
+                     EDGE_Y1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),2)
+                     EDGE_X2 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,J),1)
+                     EDGE_Y2 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,J),2)
+
+                     COEFA = (EDGE_Y2-EDGE_Y1)
+                     COEFB = (EDGE_X1-EDGE_X2)
+                     COEFC = EDGE_Y1*EDGE_X2 - EDGE_X1*EDGE_Y2
+
+                     ALPHA = 0.5*QOM*(COEFA*E(1) + COEFB*E(2))
+                     BETA = COEFA*part_adv(IP)%VX + COEFB*part_adv(IP)%VY
+                     GAMMA = COEFA*part_adv(IP)%X + COEFB*part_adv(IP)%Y + COEFC
+                     DALPHADEX = 0.d0
+                     DALPHADEY = 0.d0
+                     DALPHADEX(LOC) = 0.5*QOM*COEFA
+                     DALPHADEY(LOC) = 0.5*QOM*COEFB
+                     DBETADEX = COEFA*DVXDEX+COEFB*DVYDEX
+                     DBETADEY = COEFA*DVXDEY+COEFB*DVYDEY
+                     DGAMMADEX = COEFA*DXDEX+COEFB*DYDEX
+                     DGAMMADEY = COEFA*DXDEY+COEFB*DYDEY
+                     DTDEX = -(DALPHADEX*DTADV*DTADV + DBETADEX*DTADV + DGAMMADEX)/(2.*ALPHA*DTADV + BETA)
+                     DTDEY = -(DALPHADEY*DTADV*DTADV + DBETADEY*DTADV + DGAMMADEY)/(2.*ALPHA*DTADV + BETA)
+                  ELSE
+                     DTADV = part_adv(IP)%DTRIM
+                  END IF
+
+                  DXDEX = DXDEX + DVXDEX*DTADV
+                  DXDEY = DXDEY + DVXDEY*DTADV
+                  DYDEX = DYDEX + DVYDEX*DTADV
+                  DYDEY = DYDEY + DVYDEY*DTADV
+
+                  DXDEX(LOC) = DXDEX(LOC) + 0.5*QOM*DTADV*DTADV
+                  DYDEY(LOC) = DYDEY(LOC) + 0.5*QOM*DTADV*DTADV
+
+                  NEWVX = part_adv(IP)%VX + QOM*E(1)*DTADV
+                  NEWVY = part_adv(IP)%VY + QOM*E(2)*DTADV
+                  IF (BOUNDCOLL .NE. -1) THEN
+                     DXDEX = DXDEX + NEWVX*DTDEX
+                     DXDEY = DXDEY + NEWVX*DTDEY
+                     DYDEX = DYDEX + NEWVY*DTDEX
+                     DYDEY = DYDEY + NEWVY*DTDEY
+                  ELSE
+                     DXDEX = DXDEX - NEWVX*DTDEXPREC
+                     DXDEY = DXDEY - NEWVX*DTDEYPREC
+                     DYDEX = DYDEX - NEWVY*DTDEXPREC
+                     DYDEY = DYDEY - NEWVY*DTDEYPREC
+                  END IF
+
+                  DTDEXPREC = DTDEXPREC + DTDEX
+                  DTDEYPREC = DTDEYPREC + DTDEY
+
+                  DVXDEX = DVXDEX + QOM*E(1)*DTDEX
+                  DVYDEX = DVYDEX + QOM*E(2)*DTDEX
+                  DVXDEY = DVXDEY + QOM*E(1)*DTDEY
+                  DVYDEY = DVYDEY + QOM*E(2)*DTDEY
+
+                  DVXDEX(LOC) = DVXDEX(LOC) + QOM*DTADV
+                  DVYDEY(LOC) = DVYDEY(LOC) + QOM*DTADV
+
+               END IF
+
+
                ! Do the advection
                IF (BOUNDCOLL .NE. -1) THEN
                   CALL MOVE_PARTICLE_CN(part_adv, IP, E, DTCOLL)
                   part_adv(IP)%DTRIM = part_adv(IP)%DTRIM - DTCOLL
-
-                  IF (COMPUTE_JACOBIAN) THEN
-                     ! Accumulate approximate Jacobian of the motion
-                     ! The particle hit the boundary of a cell.
-                     ! It may cross to the neighboring cell, or if this is a domain boundary be reflected or absorbed.
-                     ! The total time of the motion is less than dt (or the particle's initial dtrim) and depends on the path taken.
-                     LOC = NUMSTEPS + 1
-                     DO I = 1, NUMSTEPS
-                        IF (EBARIDX(I) == IC-1) THEN
-                           LOC = I
-                           EXIT
-                        END IF
-                     END DO
-                     IF (LOC == NUMSTEPS + 1) THEN
-                        NUMSTEPS = LOC
-                        EBARIDX(LOC) = IC-1
-                     END IF
-                     DXDEBAR = DXDEBAR + DVDEBAR*DTCOLL
-                     DXDEBAR(LOC) = DXDEBAR(LOC) &
-                     + 0.5*SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS*DTCOLL*DTCOLL
-                     DVDEBAR(LOC) = DVDEBAR(LOC) &
-                     + SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS*DTCOLL
-                  END IF
 
                   IF (DIMS == 2) THEN
                      NEIGHBOR = U2D_GRID%CELL_NEIGHBORS(IC, BOUNDCOLL)
@@ -1162,12 +1288,10 @@ MODULE fully_implicit
                         ELSE
                            REMOVE_PART(IP) = .TRUE.
                            part_adv(IP)%DTRIM = 0.d0
-                           NUMSTEPS = 0 ! The particle gets to the boundary anyways.
                         END IF
                      ELSE
                         REMOVE_PART(IP) = .TRUE.
                         part_adv(IP)%DTRIM = 0.d0
-                        NUMSTEPS = 0 ! The particle gets to the boundary anyways.
                      END IF
                   ELSE
                      ! The particle is crossing to another cell
@@ -1178,29 +1302,6 @@ MODULE fully_implicit
                   END IF
                ELSE
                   ! The particle stays within the current cell. End of the motion.
-                  IF (COMPUTE_JACOBIAN) THEN
-                     ! Accumulate approximate Jacobian of the motion
-                     ! The particle ends its trajectory inside a cell.
-                     ! The total time of the motion is dt (or the particle's initial dtrim) independently of the path taken.
-                     LOC = NUMSTEPS + 1
-                     DO I = 1, NUMSTEPS
-                        IF (EBARIDX(I) == IC-1) THEN
-                           LOC = I
-                           EXIT
-                        END IF
-                     END DO
-                     IF (LOC == NUMSTEPS + 1) THEN
-                        NUMSTEPS = LOC
-                        EBARIDX(LOC) = IC-1
-                     END IF
-                     DXDEBAR = DXDEBAR + DVDEBAR*part_adv(IP)%DTRIM
-                     DXDEBAR(LOC) = DXDEBAR(LOC) &
-                     + 0.5*SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS &
-                     * part_adv(IP)%DTRIM*part_adv(IP)%DTRIM
-                     DVDEBAR(LOC) = DVDEBAR(LOC) &
-                     + SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS*part_adv(IP)%DTRIM
-                  END IF
-
                   CALL MOVE_PARTICLE_CN(part_adv, IP, E, part_adv(IP)%DTRIM)
                   part_adv(IP)%DTRIM = 0.d0
                END IF
@@ -1260,10 +1361,16 @@ MODULE fully_implicit
 
          IF (COMPUTE_JACOBIAN) THEN
 
-            DXDEBAR = DXDEBAR * SPECIES(part_adv(IP)%S_ID)%CHARGE*QE
+            DXDEX = DXDEX * SPECIES(part_adv(IP)%S_ID)%CHARGE*QE
+            DXDEY = DXDEY * SPECIES(part_adv(IP)%S_ID)%CHARGE*QE
+            DYDEX = DYDEX * SPECIES(part_adv(IP)%S_ID)%CHARGE*QE
+            DYDEY = DYDEY * SPECIES(part_adv(IP)%S_ID)%CHARGE*QE
             !CALL MatSetValues(jac,1,IC-1,NUMSTEPS,EBARIDX,DXDEBAR,ADD_VALUES,ierr)
             DO I = 1, NUMSTEPS
-               CALL MatSetValue(dxde,IC-1,EBARIDX(I),DXDEBAR(I),ADD_VALUES,ierr)
+               CALL MatSetValue(dxdexmat,IC-1,EBARIDX(I),DXDEX(I),ADD_VALUES,ierr)
+               CALL MatSetValue(dxdeymat,IC-1,EBARIDX(I),DXDEY(I),ADD_VALUES,ierr)
+               CALL MatSetValue(dydexmat,IC-1,EBARIDX(I),DYDEX(I),ADD_VALUES,ierr)
+               CALL MatSetValue(dydeymat,IC-1,EBARIDX(I),DYDEY(I),ADD_VALUES,ierr)
             END DO
             ! Tutto qui. Il resto fuori dal loop particelle.
          END IF
@@ -1273,8 +1380,15 @@ MODULE fully_implicit
 
       IF (COMPUTE_JACOBIAN) THEN
 
-         CALL MatAssemblyBegin(dxde,MAT_FINAL_ASSEMBLY,ierr)
-         CALL MatAssemblyEnd(dxde,MAT_FINAL_ASSEMBLY,ierr)
+         CALL MatAssemblyBegin(dxdexmat,MAT_FINAL_ASSEMBLY,ierr)
+         CALL MatAssemblyBegin(dxdeymat,MAT_FINAL_ASSEMBLY,ierr)
+         CALL MatAssemblyBegin(dydexmat,MAT_FINAL_ASSEMBLY,ierr)
+         CALL MatAssemblyBegin(dydeymat,MAT_FINAL_ASSEMBLY,ierr)
+
+         CALL MatAssemblyEnd(dxdexmat,MAT_FINAL_ASSEMBLY,ierr)
+         CALL MatAssemblyEnd(dxdeymat,MAT_FINAL_ASSEMBLY,ierr)
+         CALL MatAssemblyEnd(dydexmat,MAT_FINAL_ASSEMBLY,ierr)
+         CALL MatAssemblyEnd(dydeymat,MAT_FINAL_ASSEMBLY,ierr)
 
          !CALL PetscViewerDrawOpen(PETSC_COMM_WORLD,PETSC_NULL_CHARACTER, &
          !                         PETSC_NULL_CHARACTER,0,0,684,684,viewer,ierr)
@@ -1286,11 +1400,35 @@ MODULE fully_implicit
          !CALL PetscSleep(5.d0,ierr)
          !CALL PetscViewerDestroy(viewer,ierr)
    
-         CALL MatGetOwnershipRange(dxde,first_row,last_row,ierr)
+         CALL MatGetOwnershipRange(dxdexmat,first_row,last_row,ierr)
 
          IF (DIMS == 2) THEN
             DO I = first_row, last_row-1
-               CALL MatGetRow(dxde,I,ncols,cols,vals,ierr)
+               CALL MatGetRow(dxdexmat,I,ncols,cols,dxdexvals,ierr)
+               NCOLSXX = ncols
+               ALLOCATE(COLSXX, SOURCE=cols)
+               ALLOCATE(DXDEXV, SOURCE=dxdexvals)
+               CALL MatRestoreRow(dxdexmat,I,ncols,cols,dxdexvals,ierr)
+               
+               CALL MatGetRow(dxdeymat,I,ncols,cols,dxdeyvals,ierr)
+               NCOLSXY = ncols
+               ALLOCATE(COLSXY, SOURCE=cols)
+               ALLOCATE(DXDEYV, SOURCE=dxdeyvals)
+               CALL MatRestoreRow(dxdeymat,I,ncols,cols,dxdeyvals,ierr)
+
+               CALL MatGetRow(dydexmat,I,ncols,cols,dydexvals,ierr)
+               NCOLSYX = ncols
+               ALLOCATE(COLSYX, SOURCE=cols)
+               ALLOCATE(DYDEXV, SOURCE=dydexvals)
+               CALL MatRestoreRow(dydexmat,I,ncols,cols,dydexvals,ierr)
+
+               CALL MatGetRow(dydeymat,I,ncols,cols,dydeyvals,ierr)
+               NCOLSYY = ncols
+               ALLOCATE(COLSYY, SOURCE=cols)
+               ALLOCATE(DYDEYV, SOURCE=dydeyvals)
+               CALL MatRestoreRow(dydeymat,I,ncols,cols,dydeyvals,ierr)
+
+               
                !WRITE(*,*) 'Row ', I, ' ncols ', ncols, ' cols ', cols, ' vals ', vals, ' ierr ', ierr
                ! MatGetRow(Mat A,PetscInt row, PetscInt *ncols,const PetscInt (*cols)[],const PetscScalar (*vals)[]);
                AREA = CELL_AREAS(I+1)
@@ -1303,6 +1441,13 @@ MODULE fully_implicit
                Y1 = U2D_GRID%NODE_COORDS(V1I, 2)
                Y2 = U2D_GRID%NODE_COORDS(V2I, 2)
                Y3 = U2D_GRID%NODE_COORDS(V3I, 2)
+               DPSI1DX = U2D_GRID%BASIS_COEFFS(I+1,1,1)
+               DPSI2DX = U2D_GRID%BASIS_COEFFS(I+1,2,1)
+               DPSI3DX = U2D_GRID%BASIS_COEFFS(I+1,3,1)
+               DPSI1DY = U2D_GRID%BASIS_COEFFS(I+1,1,2)
+               DPSI2DY = U2D_GRID%BASIS_COEFFS(I+1,2,2)
+               DPSI3DY = U2D_GRID%BASIS_COEFFS(I+1,3,2)
+
                DPSI1DX =  0.5*(Y2-Y3)/AREA
                DPSI2DX = -0.5*(Y1-Y3)/AREA
                DPSI3DX = -0.5*(Y2-Y1)/AREA
@@ -1310,8 +1455,8 @@ MODULE fully_implicit
                DPSI2DY =  0.5*(X1-X3)/AREA
                DPSI3DY =  0.5*(X2-X1)/AREA
 
-               DO JJ = 1, ncols
-                  J = cols(JJ)
+               DO JJ = 1, NCOLSXX
+                  J = COLSXX(JJ)
                   AREA = CELL_AREAS(J+1)
                   V1J = U2D_GRID%CELL_NODES(J+1,1)
                   V2J = U2D_GRID%CELL_NODES(J+1,2)
@@ -1329,65 +1474,56 @@ MODULE fully_implicit
                   DPSJ2DY =  0.5*(X1-X3)/AREA
                   DPSJ3DY =  0.5*(X2-X1)/AREA
 
-                  VAL = - vals(JJ)/EPS0/(ZMAX-ZMIN)*FNUM
+                  VALXX = - DXDEXV(JJ)/EPS0/(ZMAX-ZMIN)*FNUM
+                  VALXY = - DXDEYV(JJ)/EPS0/(ZMAX-ZMIN)*FNUM
+                  VALYX = - DYDEXV(JJ)/EPS0/(ZMAX-ZMIN)*FNUM
+                  VALYY = - DYDEYV(JJ)/EPS0/(ZMAX-ZMIN)*FNUM
 
                   IF (.NOT. IS_DIRICHLET(V1I-1)) THEN
-                     CALL MatSetValues(jac,1,V1I-1,1,V1J-1,VAL*(DPSI1DX*DPSJ1DX+DPSI1DY*DPSJ1DY),ADD_VALUES,ierr)
-                     CALL MatSetValues(jac,1,V1I-1,1,V2J-1,VAL*(DPSI1DX*DPSJ2DX+DPSI1DY*DPSJ2DY),ADD_VALUES,ierr)
-                     CALL MatSetValues(jac,1,V1I-1,1,V3J-1,VAL*(DPSI1DX*DPSJ3DX+DPSI1DY*DPSJ3DY),ADD_VALUES,ierr)
+                     CALL MatSetValues(jac,1,V1I-1,1,V1J-1,VALXX*DPSI1DX*DPSJ1DX + VALXY*DPSI1DX*DPSJ1DY + &
+                                                           VALYX*DPSI1DY*DPSJ1DX + VALYY*DPSI1DY*DPSJ1DY,ADD_VALUES,ierr)
+                     CALL MatSetValues(jac,1,V1I-1,1,V2J-1,VALXX*DPSI1DX*DPSJ2DX + VALXY*DPSI1DX*DPSJ2DY + &
+                                                           VALYX*DPSI1DY*DPSJ2DX + VALYY*DPSI1DY*DPSJ2DY,ADD_VALUES,ierr)
+                     CALL MatSetValues(jac,1,V1I-1,1,V3J-1,VALXX*DPSI1DX*DPSJ3DX + VALXY*DPSI1DX*DPSJ3DY + &
+                                                           VALYX*DPSI1DY*DPSJ3DX + VALYY*DPSI1DY*DPSJ3DY,ADD_VALUES,ierr)
                   END IF
                   IF (.NOT. IS_DIRICHLET(V2I-1)) THEN
-                     CALL MatSetValues(jac,1,V2I-1,1,V1J-1,VAL*(DPSI2DX*DPSJ1DX+DPSI2DY*DPSJ1DY),ADD_VALUES,ierr)
-                     CALL MatSetValues(jac,1,V2I-1,1,V2J-1,VAL*(DPSI2DX*DPSJ2DX+DPSI2DY*DPSJ2DY),ADD_VALUES,ierr)
-                     CALL MatSetValues(jac,1,V2I-1,1,V3J-1,VAL*(DPSI2DX*DPSJ3DX+DPSI2DY*DPSJ3DY),ADD_VALUES,ierr)
+                     CALL MatSetValues(jac,1,V2I-1,1,V1J-1,VALXX*DPSI2DX*DPSJ1DX + VALXY*DPSI2DX*DPSJ1DY + &
+                                                           VALYX*DPSI2DY*DPSJ1DX + VALYY*DPSI2DY*DPSJ1DY,ADD_VALUES,ierr)
+                     CALL MatSetValues(jac,1,V2I-1,1,V2J-1,VALXX*DPSI2DX*DPSJ2DX + VALXY*DPSI2DX*DPSJ2DY + &
+                                                           VALYX*DPSI2DY*DPSJ2DX + VALYY*DPSI2DY*DPSJ2DY,ADD_VALUES,ierr)
+                     CALL MatSetValues(jac,1,V2I-1,1,V3J-1,VALXX*DPSI2DX*DPSJ3DX + VALXY*DPSI2DX*DPSJ3DY + &
+                                                           VALYX*DPSI2DY*DPSJ3DX + VALYY*DPSI2DY*DPSJ3DY,ADD_VALUES,ierr)
                   END IF
                   IF (.NOT. IS_DIRICHLET(V3I-1)) THEN
-                     CALL MatSetValues(jac,1,V3I-1,1,V1J-1,VAL*(DPSI3DX*DPSJ1DX+DPSI3DY*DPSJ1DY),ADD_VALUES,ierr)
-                     CALL MatSetValues(jac,1,V3I-1,1,V2J-1,VAL*(DPSI3DX*DPSJ2DX+DPSI3DY*DPSJ2DY),ADD_VALUES,ierr)
-                     CALL MatSetValues(jac,1,V3I-1,1,V3J-1,VAL*(DPSI3DX*DPSJ3DX+DPSI3DY*DPSJ3DY),ADD_VALUES,ierr)
+                     CALL MatSetValues(jac,1,V3I-1,1,V1J-1,VALXX*DPSI3DX*DPSJ1DX + VALXY*DPSI3DX*DPSJ1DY + &
+                                                           VALYX*DPSI3DY*DPSJ1DX + VALYY*DPSI3DY*DPSJ1DY,ADD_VALUES,ierr)
+                     CALL MatSetValues(jac,1,V3I-1,1,V2J-1,VALXX*DPSI3DX*DPSJ2DX + VALXY*DPSI3DX*DPSJ2DY + &
+                                                           VALYX*DPSI3DY*DPSJ2DX + VALYY*DPSI3DY*DPSJ2DY,ADD_VALUES,ierr)
+                     CALL MatSetValues(jac,1,V3I-1,1,V3J-1,VALXX*DPSI3DX*DPSJ3DX + VALXY*DPSI3DX*DPSJ3DY + &
+                                                           VALYX*DPSI3DY*DPSJ3DX + VALYY*DPSI3DY*DPSJ3DY,ADD_VALUES,ierr)
                   END IF
 
                END DO
 
-               CALL MatRestoreRow(dxde,I,ncols,cols,vals,ierr)
+               DEALLOCATE(COLSXX)
+               DEALLOCATE(COLSXY)
+               DEALLOCATE(COLSYX)
+               DEALLOCATE(COLSYY)
+               DEALLOCATE(DXDEXV)
+               DEALLOCATE(DXDEYV)
+               DEALLOCATE(DYDEXV)
+               DEALLOCATE(DYDEYV)
 
             END DO
          ELSE IF (DIMS == 3) THEN
-            DO I = first_row, last_row-1
-               CALL MatGetRow(dxde,I,ncols,cols,vals,ierr)
-   
-               DO JJ = 1, ncols
-                  J = cols(JJ)
-
-                  VAL = - vals(JJ)/EPS0*FNUM
-                  DO NI = 1, 4
-                     VNI = U3D_GRID%CELL_NODES(I+1,NI)
-                     IF (.NOT. IS_DIRICHLET(VNI - 1)) THEN
-                        DO NJ = 1, 4
-                           VNJ = U3D_GRID%CELL_NODES(J+1,NJ)
-                           CALL MatSetValues(jac,1,VNI-1,1,VNJ-1,VAL* &
-                            (U3D_GRID%BASIS_COEFFS(I+1,NI,1)*U3D_GRID%BASIS_COEFFS(J+1,NJ,1) &
-                           + U3D_GRID%BASIS_COEFFS(I+1,NI,2)*U3D_GRID%BASIS_COEFFS(J+1,NJ,2) &
-                           + U3D_GRID%BASIS_COEFFS(I+1,NI,3)*U3D_GRID%BASIS_COEFFS(J+1,NJ,3)),ADD_VALUES,ierr)
-                        END DO
-                     END IF
-                  END DO
-   
-               END DO
-   
-               CALL MatRestoreRow(dxde,I,ncols,cols,vals,ierr)
-   
-            END DO
-   
+            CALL ERROR_ABORT('Not supported!')   
          END IF
 
-         ! CALL MatAssemblyBegin(jac,MAT_FINAL_ASSEMBLY,ierr)
-         ! CALL MatAssemblyEnd(jac,MAT_FINAL_ASSEMBLY,ierr)
-
-         !CALL MatMatMult(drhodxx,dxde,MAT_INITIAL_MATRIX,PETSC_DEFAULT,drhodex,ierr)
-         !CALL MatMatMult(drhodex,dexdphi,MAT_INITIAL_MATRIX,PETSC_DEFAULT,drhodphi,ierr)
-
-         CALL MatDestroy(dxde,ierr)
+         CALL MatDestroy(dxdexmat,ierr)
+         CALL MatDestroy(dxdeymat,ierr)
+         CALL MatDestroy(dydexmat,ierr)
+         CALL MatDestroy(dydeymat,ierr)
 
       END IF
 

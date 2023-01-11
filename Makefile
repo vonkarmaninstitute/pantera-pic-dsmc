@@ -3,7 +3,7 @@
 ############################################################
 
 # GNU Compiler
-CMPF  = mpifort -c -cpp -I/home/pietro/petsc/petsc--openmpi/include -g
+CMPF  = mpifort -c -cpp -I$(PETSC_DIR)/include -g
 LNK   = mpifort -cpp -g
 
 #OPTF = -O0 -Wall -Wextra -Warray-temporaries -ggdb3 -pedantic -fimplicit-none -fcheck=all -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow -mcmodel=medium # Debug options
@@ -46,7 +46,7 @@ CUDA_INCLUDE := $(shell pkg-config --variable=cudainclude $(PACKAGES))
 # Executable generation by the linker
 pantera.exe: pantera.o $(OBJS) 
 	$(LNK) $(OPTF) pantera.o $(OBJS) \
-	            -o pantera.exe -L/usr/lib $(LDFLAGS) $(LDLIBS) -I/home/pietro/petsc/petsc--openmpi/include
+	            -o pantera.exe -L/usr/lib $(LDFLAGS) $(LDLIBS) -I$(PETSC_DIR)/include
 
 # Objects generation
 pantera.o: pantera.f90  $(OBJS) 

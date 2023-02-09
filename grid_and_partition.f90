@@ -1032,7 +1032,6 @@ MODULE grid_and_partition
       ALLOCATE(U2D_GRID%BASIS_COEFFS(NCELLS,3,3))
 
       DO I = 1, NCELLS
-         AREA = CELL_AREAS(I)
          V1 = U2D_GRID%CELL_NODES(I,1)
          V2 = U2D_GRID%CELL_NODES(I,2)
          V3 = U2D_GRID%CELL_NODES(I,3)
@@ -1058,7 +1057,7 @@ MODULE grid_and_partition
          U2D_GRID%BASIS_COEFFS(I,3,2) =  X2-X1
          U2D_GRID%BASIS_COEFFS(I,3,3) =  X1*Y2 - X2*Y1
 
-         U2D_GRID%BASIS_COEFFS(I,:,:) = 0.5*U2D_GRID%BASIS_COEFFS(I,:,:)/AREA
+         U2D_GRID%BASIS_COEFFS(I,:,:) = 0.5*U2D_GRID%BASIS_COEFFS(I,:,:)/CELL_AREAS(I)
 
       END DO
 

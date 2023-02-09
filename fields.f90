@@ -824,7 +824,7 @@ MODULE fields
                IS_DIRICHLET(I) = .TRUE.
                DIRICHLET(I) = 0.d0
             ELSE IF (.NOT. IS_DIRICHLET(I) ) THEN
-               val = 0.5*DT/EPS0*J_FIELD(I)
+               val = 0.5/EPS0*J_FIELD(I)
                CALL VecSetValues(bvec,one,I,val,ADD_VALUES,ierr)
             END IF
          END DO
@@ -893,33 +893,35 @@ MODULE fields
             IF (DIMS == 2) THEN
                
                AREA = CELL_AREAS(IC)
+
                V1 = U2D_GRID%CELL_NODES(IC,1)
                V2 = U2D_GRID%CELL_NODES(IC,2)
                V3 = U2D_GRID%CELL_NODES(IC,3)            
-               X1 = U2D_GRID%NODE_COORDS(V1, 1)
-               X2 = U2D_GRID%NODE_COORDS(V2, 1)
-               X3 = U2D_GRID%NODE_COORDS(V3, 1)
-               Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-               Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-               Y3 = U2D_GRID%NODE_COORDS(V3, 2)
-               DPSI1DX =  0.5*(Y2-Y3)/AREA
-               DPSI2DX = -0.5*(Y1-Y3)/AREA
-               DPSI3DX = -0.5*(Y2-Y1)/AREA
-               DPSI1DY = -0.5*(X2-X3)/AREA
-               DPSI2DY =  0.5*(X1-X3)/AREA
-               DPSI3DY =  0.5*(X2-X1)/AREA
+
+               DPSI1DX = U2D_GRID%BASIS_COEFFS(IC,1,1)
+               DPSI2DX = U2D_GRID%BASIS_COEFFS(IC,2,1)
+               DPSI3DX = U2D_GRID%BASIS_COEFFS(IC,3,1)
+               DPSI1DY = U2D_GRID%BASIS_COEFFS(IC,1,2)
+               DPSI2DY = U2D_GRID%BASIS_COEFFS(IC,2,2)
+               DPSI3DY = U2D_GRID%BASIS_COEFFS(IC,3,2)
                
                IF (AXI) THEN
-                  J_FIELD(V1-1) = J_FIELD(V1-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI1DX + particles(JP)%VY*DPSI1DY)/(ZMAX-ZMIN)
-                  J_FIELD(V2-1) = J_FIELD(V2-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI2DX + particles(JP)%VY*DPSI2DY)/(ZMAX-ZMIN)
-                  J_FIELD(V3-1) = J_FIELD(V3-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI3DX + particles(JP)%VY*DPSI3DY)/(ZMAX-ZMIN)
+                  J_FIELD(V1-1) = J_FIELD(V1-1) &
+                  + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI1DX + particles(JP)%VY*DPSI1DY)/(ZMAX-ZMIN)*particles(JP)%DTRIM
+                  J_FIELD(V2-1) = J_FIELD(V2-1) &
+                  + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI2DX + particles(JP)%VY*DPSI2DY)/(ZMAX-ZMIN)*particles(JP)%DTRIM
+                  J_FIELD(V3-1) = J_FIELD(V3-1) &
+                  + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI3DX + particles(JP)%VY*DPSI3DY)/(ZMAX-ZMIN)*particles(JP)%DTRIM
 
                   MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/AREA/(ZMAX-ZMIN)*FNUM &
                                     * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
                ELSE
-                  J_FIELD(V1-1) = J_FIELD(V1-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI1DX + particles(JP)%VY*DPSI1DY)/(ZMAX-ZMIN)
-                  J_FIELD(V2-1) = J_FIELD(V2-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI2DX + particles(JP)%VY*DPSI2DY)/(ZMAX-ZMIN)
-                  J_FIELD(V3-1) = J_FIELD(V3-1) + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI3DX + particles(JP)%VY*DPSI3DY)/(ZMAX-ZMIN)
+                  J_FIELD(V1-1) = J_FIELD(V1-1) &
+                  + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI1DX + particles(JP)%VY*DPSI1DY)/(ZMAX-ZMIN)*particles(JP)%DTRIM
+                  J_FIELD(V2-1) = J_FIELD(V2-1) &
+                  + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI2DX + particles(JP)%VY*DPSI2DY)/(ZMAX-ZMIN)*particles(JP)%DTRIM
+                  J_FIELD(V3-1) = J_FIELD(V3-1) &
+                  + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI3DX + particles(JP)%VY*DPSI3DY)/(ZMAX-ZMIN)*particles(JP)%DTRIM
 
                   MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/AREA/(ZMAX-ZMIN)*FNUM &
                                     * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
@@ -931,7 +933,7 @@ MODULE fields
                   VP = U3D_GRID%CELL_NODES(IC,P) - 1
                   J_FIELD(VP) = J_FIELD(VP) + FNUM*QE*CHARGE*(particles(JP)%VX*U3D_GRID%BASIS_COEFFS(IC,P,1) &
                                                             + particles(JP)%VY*U3D_GRID%BASIS_COEFFS(IC,P,2) &
-                                                            + particles(JP)%VZ*U3D_GRID%BASIS_COEFFS(IC,P,3))
+                                                            + particles(JP)%VZ*U3D_GRID%BASIS_COEFFS(IC,P,3))*particles(JP)%DTRIM
                END DO
                MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/CELL_VOLUMES(IC)*FNUM &
                                     * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS

@@ -15,7 +15,7 @@ MODULE fully_implicit
 
    IMPLICIT NONE
 
-   Mat Amat, Jmat
+   Mat Amat, Jmat, Jmfmat
    Vec bvec, xvec, x_seq, solvec_seq, xvec_seq, rvec, solvec
    VecScatter ctx
    KSP ksp, kspnk
@@ -38,12 +38,13 @@ MODULE fully_implicit
 
    SUBROUTINE SOLVE_POISSON_FULLY_IMPLICIT
 
+      LOGICAL :: SET_SOLVEC_TO_ZERO = .FALSE.
+
       PetscScalar, POINTER :: solvec_l(:)
 
       CALL SNESCreate(PETSC_COMM_WORLD,snes,ierr)
-      CALL SNESSetType(snes, SNESNEWTONLS ,ierr)
-      
-      CALL SNESGetLineSearch(snes,linesearch,ierr)
+      !CALL SNESSetType(snes, SNESNEWTONLS ,ierr) ! defalut
+      !CALL SNESGetLineSearch(snes,linesearch,ierr)
       !CALL SNESLineSearchSetType(linesearch,SNESLINESEARCHBT,ierr)
       !CALL SNESLineSearchSetOrder(linesearch,SNES_LINESEARCH_ORDER_QUADRATIC,ierr)
 
@@ -52,22 +53,29 @@ MODULE fully_implicit
       CALL VecSetFromOptions(rvec, ierr)
       CALL VecDuplicate(rvec, solvec, ierr)
 
-      CALL SNESSetFunction(snes,rvec,FormFunctionAndJacobian,0,ierr)
+      CALL SNESSetFunction(snes,rvec,FormFunctionAndJacobian,0,ierr) ! Function and Jacobian computed together
+      !CALL SNESSetFunction(snes,rvec,FormFunction,0,ierr) ! Function and Jacobian computed separately
 
 
       CALL MatCreate(PETSC_COMM_WORLD,Jmat,ierr)
       CALL MatSetSizes(Jmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
       CALL MatSetType(Jmat, MATMPIAIJ, ierr)
       !CALL MatSetOption(Jmat,MAT_SPD,PETSC_TRUE,ierr)
-      !f30 = 30
-      !CALL MatMPIAIJSetPreallocation(Jmat,f30,PETSC_NULL_INTEGER,f30,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
+      !CALL MatMPIAIJSetPreallocation(Jmat,30,PETSC_NULL_INTEGER,30,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
       !CALL MatSetFromOptions(Jmat,ierr)
       !CALL MatSetUp(Jmat,ierr)
-      
-      
-      !CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobianDUMMY,0,ierr)
-      CALL SNESSetJacobian(snes,Jmat,Jmat,PETSC_NULL_FUNCTION,0,ierr)
-      !CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobian,0,ierr) ! The expensive but safe one.
+
+      !CALL MatCreate(PETSC_COMM_WORLD,Jmfmat,ierr);
+      !CALL MatSetSizes(Jmfmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
+      !CALL MatSetType(Jmfmat,MATSHELL,ierr)
+      !CALL MatSetUp(Jmfmat,ierr)
+
+
+
+      CALL SNESSetJacobian(snes,Jmat,Jmat,PETSC_NULL_FUNCTION,0,ierr)   ! Use this for the compined computation of residual and Jacobian.
+      !CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobian,0,ierr) ! The expensive but safe one. Jacobian computed independently.
+      !CALL SNESSetJacobian(snes,Jmfmat,Jmat,FormJacobian,0,ierr) ! This should work as matrix-free (JFNK). Jacobian computed independently.
+
 
       !abstol = 1.d-5
       !rtol = 1.d-5
@@ -77,34 +85,32 @@ MODULE fully_implicit
       !CALL SNESSetTolerances(snes, abstol, rtol, stol, maxit, maxf, ierr)
       CALL SNESSetTolerances(snes, PETSC_DEFAULT_REAL, PETSC_DEFAULT_REAL, PETSC_DEFAULT_REAL, maxit, maxf, ierr)
 
+      
+      ! These three lines to use the direct solver.
       CALL SNESGetKSP(snes,kspnk,ierr)
       CALL KSPGetPC(kspnk,pcnk,ierr)
       CALL PCSetType(pcnk,PCLU,ierr)
 
+      !CALL KSPSetTolerances(kspnk,rtol,abstol,PETSC_DEFAULT_REAL,maxit,ierr)
+      !CALL KSPSetTolerances(ksp,1.e-4,PETSC_DEFAULT_REAL,PETSC_DEFAULT_REAL,20,ierr)
+
       CALL SNESSetFromOptions(snes,ierr)
 
-      !CALL KSPSetTolerances(kspnk,rtol,abstol,PETSC_DEFAULT_REAL,maxit,ierr)
-      ! tol = 1.e-4
-      ! CALL KSPSetTolerances(ksp,tol,PETSC_DEFAULT_REAL,PETSC_DEFAULT_REAL,i20,ierr)
-      !CALL KSPMonitorCancel(kspnk,ierr)
-      !CALL SNESSetFromOptions(snes,ierr)
 
       !  Note: The user should initialize the vector, x, with the initial guess
       !  for the nonlinear solver prior to calling SNESSolve().  In particular,
       !  to employ an initial guess of zero, the user should explicitly set
       !  this vector to zero by calling VecSet().
-      !CALL DEPOSIT_CHARGE
-      !CALL SOLVE_POISSON
 
-      CALL VecGetOwnershipRange(solvec,Istart,Iend,ierr)
-      CALL VecGetArrayF90(solvec,solvec_l,ierr)
-      !WRITE(*,*) 'ON PROC ', PROC_ID, ' Istart ', Istart, ' Iend= ', Iend
-      solvec_l = PHI_FIELD(Istart+1:Iend)
-      CALL VecRestoreArrayF90(solvec,solvec_l,ierr)
-
-      !f0 = 0.d0
-      !CALL VecSet(solvec,0.d0,ierr)
-
+      IF (SET_SOLVEC_TO_ZERO) THEN
+         CALL VecSet(solvec,0.d0,ierr)
+      ELSE
+         CALL VecGetOwnershipRange(solvec,Istart,Iend,ierr)
+         CALL VecGetArrayF90(solvec,solvec_l,ierr)
+         solvec_l = PHI_FIELD(Istart+1:Iend)
+         CALL VecRestoreArrayF90(solvec,solvec_l,ierr)
+      END IF
+      
       ! Test the jacobian
       !CALL MatCreate(PETSC_COMM_WORLD,testJ,ierr)
       !CALL MatSetSizes(testJ,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
@@ -113,9 +119,7 @@ MODULE fully_implicit
       !CALL SNESComputeJacobianDefault(snes,solvec,testJ,testJ,ierr)
       !CALL MatView(testJ,PETSC_VIEWER_STDOUT_WORLD,ierr)
 
-
-
-
+      IF (JACOBIAN_TYPE == 3) CALL COMPUTE_MASS_MATRICES
 
       CALL SNESSolve(snes,PETSC_NULL_VEC,solvec,ierr)
       CALL SNESGetConvergedReason(snes,snesreason,ierr)
@@ -134,12 +138,12 @@ MODULE fully_implicit
 
       PHI_FIELD = 2.*PHIBAR_FIELD - PHI_FIELD
 
+
+      ! Cleanup.
       CALL VecDestroy(solvec, ierr)
       CALL VecDestroy(rvec, ierr)
       CALL SNESDestroy(snes, ierr)
-
-      !WRITE(*,*) 'We get here on PROC ', PROC_ID
-
+      CALL MatDestroy(Jmat,ierr)
 
    END SUBROUTINE SOLVE_POISSON_FULLY_IMPLICIT
 
@@ -370,52 +374,33 @@ MODULE fully_implicit
       IF (DIMS == 2) THEN
          DO I = 1, NCELLS
             AREA = CELL_AREAS(I)
-            V1 = U2D_GRID%CELL_NODES(I,1)
-            V2 = U2D_GRID%CELL_NODES(I,2)
-            V3 = U2D_GRID%CELL_NODES(I,3)            
-            X1 = U2D_GRID%NODE_COORDS(V1, 1)
-            X2 = U2D_GRID%NODE_COORDS(V2, 1)
-            X3 = U2D_GRID%NODE_COORDS(V3, 1)
-            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
-            K11 = 0.25*((Y2-Y3)**2 + (X2-X3)**2)/AREA
-            K22 = 0.25*((Y1-Y3)**2 + (X1-X3)**2)/AREA
-            K33 = 0.25*((Y2-Y1)**2 + (X2-X1)**2)/AREA
-            K12 =-0.25*((Y2-Y3)*(Y1-Y3) + (X2-X3)*(X1-X3))/AREA
-            K23 = 0.25*((Y1-Y3)*(Y2-Y1) + (X1-X3)*(X2-X1))/AREA
-            K13 =-0.25*((Y2-Y3)*(Y2-Y1) + (X2-X3)*(X2-X1))/AREA
-            IF (AXI) THEN
-               K11 = K11*(Y1+Y2+Y3)/3.
-               K22 = K22*(Y1+Y2+Y3)/3.
-               K33 = K33*(Y1+Y2+Y3)/3.
-               K12 = K12*(Y1+Y2+Y3)/3.
-               K23 = K23*(Y1+Y2+Y3)/3.
-               K13 = K13*(Y1+Y2+Y3)/3.
-            END IF
-
+            
             ! We need to ADD to a sparse matrix entry.
-            IF (V1-1 >= Istart .AND. V1-1 < Iend) THEN
-               IF (.NOT. IS_DIRICHLET(V1-1)) THEN
-                  CALL MatSetValues(jac,one,V1-1,one,V1-1,-2.*K11,ADD_VALUES,ierr)
-                  CALL MatSetValues(jac,one,V1-1,one,V2-1,-2.*K12,ADD_VALUES,ierr)
-                  CALL MatSetValues(jac,one,V1-1,one,V3-1,-2.*K13,ADD_VALUES,ierr)
+            DO P = 1, 3
+               VP = U2D_GRID%CELL_NODES(I,P)
+               IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(VP-1)) THEN
+                     DO Q = 1, 3
+                        VQ = U2D_GRID%CELL_NODES(I,Q)
+                        KPQ = AREA*(U2D_GRID%BASIS_COEFFS(I,P,1)*U2D_GRID%BASIS_COEFFS(I,Q,1) &
+                                  + U2D_GRID%BASIS_COEFFS(I,P,2)*U2D_GRID%BASIS_COEFFS(I,Q,2))
+                        
+                        IF (AXI) THEN
+                           KPQ = KPQ*(U2D_GRID%NODE_COORDS(V1, 2) &
+                                    + U2D_GRID%NODE_COORDS(V2, 2) &
+                                    + U2D_GRID%NODE_COORDS(V3, 2))/3.
+                        END IF
+
+                        IF (JACOBIAN_TYPE == 3) THEN
+                           KPQ = KPQ * (MASS_MATRIX(I)+1)
+                        END IF
+
+                        CALL MatSetValues(Jmat,one,VP-1,one,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
+                     END DO
+                  END IF
                END IF
-            END IF
-            IF (V2-1 >= Istart .AND. V2-1 < Iend) THEN
-               IF (.NOT. IS_DIRICHLET(V2-1)) THEN
-                  CALL MatSetValues(jac,one,V2-1,one,V1-1,-2.*K12,ADD_VALUES,ierr)
-                  CALL MatSetValues(jac,one,V2-1,one,V3-1,-2.*K23,ADD_VALUES,ierr)
-                  CALL MatSetValues(jac,one,V2-1,one,V2-1,-2.*K22,ADD_VALUES,ierr)
-               END IF
-            END IF
-            IF (V3-1 >= Istart .AND. V3-1 < Iend) THEN
-               IF (.NOT. IS_DIRICHLET(V3-1)) THEN
-                  CALL MatSetValues(jac,one,V3-1,one,V1-1,-2.*K13,ADD_VALUES,ierr)
-                  CALL MatSetValues(jac,one,V3-1,one,V2-1,-2.*K23,ADD_VALUES,ierr)
-                  CALL MatSetValues(jac,one,V3-1,one,V3-1,-2.*K33,ADD_VALUES,ierr)
-               END IF
-            END IF
+            END DO
+
          END DO
       ELSE IF (DIMS == 3) THEN
          DO I = 1, NCELLS
@@ -431,6 +416,11 @@ MODULE fully_implicit
                         KPQ = VOLUME*(U3D_GRID%BASIS_COEFFS(I,P,1)*U3D_GRID%BASIS_COEFFS(I,Q,1) &
                                     + U3D_GRID%BASIS_COEFFS(I,P,2)*U3D_GRID%BASIS_COEFFS(I,Q,2) &
                                     + U3D_GRID%BASIS_COEFFS(I,P,3)*U3D_GRID%BASIS_COEFFS(I,Q,3))
+
+                        IF (JACOBIAN_TYPE == 3) THEN
+                           KPQ = KPQ * (MASS_MATRIX(I)+1)
+                        END IF
+
                         CALL MatSetValues(jac,one,VP-1,one,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
                      END DO
                   END IF
@@ -459,8 +449,8 @@ MODULE fully_implicit
       CALL MatAssemblyBegin(jac,MAT_FINAL_ASSEMBLY,ierr)
       CALL MatAssemblyEnd(jac,MAT_FINAL_ASSEMBLY,ierr)
 
-
-
+      !CALL MatAssemblyBegin(B,MAT_FINAL_ASSEMBLY,ierr)
+      !CALL MatAssemblyEnd(B,MAT_FINAL_ASSEMBLY,ierr)
       B = jac
 
    END SUBROUTINE FormJacobian
@@ -469,6 +459,8 @@ MODULE fully_implicit
 
 
    SUBROUTINE FormFunctionAndJacobian(snes,x,f,dummy,ierr_l)
+
+      ! SNES variable x is the mid-step potential \phi^{n+1/2}.
 
       IMPLICIT NONE
 
@@ -625,52 +617,33 @@ MODULE fully_implicit
       IF (DIMS == 2) THEN
          DO I = 1, NCELLS
             AREA = CELL_AREAS(I)
-            V1 = U2D_GRID%CELL_NODES(I,1)
-            V2 = U2D_GRID%CELL_NODES(I,2)
-            V3 = U2D_GRID%CELL_NODES(I,3)            
-            X1 = U2D_GRID%NODE_COORDS(V1, 1)
-            X2 = U2D_GRID%NODE_COORDS(V2, 1)
-            X3 = U2D_GRID%NODE_COORDS(V3, 1)
-            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
-            K11 = 0.25*((Y2-Y3)**2 + (X2-X3)**2)/AREA
-            K22 = 0.25*((Y1-Y3)**2 + (X1-X3)**2)/AREA
-            K33 = 0.25*((Y2-Y1)**2 + (X2-X1)**2)/AREA
-            K12 =-0.25*((Y2-Y3)*(Y1-Y3) + (X2-X3)*(X1-X3))/AREA
-            K23 = 0.25*((Y1-Y3)*(Y2-Y1) + (X1-X3)*(X2-X1))/AREA
-            K13 =-0.25*((Y2-Y3)*(Y2-Y1) + (X2-X3)*(X2-X1))/AREA
-            IF (AXI) THEN
-               K11 = K11*(Y1+Y2+Y3)/3.
-               K22 = K22*(Y1+Y2+Y3)/3.
-               K33 = K33*(Y1+Y2+Y3)/3.
-               K12 = K12*(Y1+Y2+Y3)/3.
-               K23 = K23*(Y1+Y2+Y3)/3.
-               K13 = K13*(Y1+Y2+Y3)/3.
-            END IF
-
+            
             ! We need to ADD to a sparse matrix entry.
-            IF (V1-1 >= Istart .AND. V1-1 < Iend) THEN
-               IF (.NOT. IS_DIRICHLET(V1-1)) THEN
-                  CALL MatSetValues(Jmat,one,V1-1,one,V1-1,-2.*K11,ADD_VALUES,ierr)
-                  CALL MatSetValues(Jmat,one,V1-1,one,V2-1,-2.*K12,ADD_VALUES,ierr)
-                  CALL MatSetValues(Jmat,one,V1-1,one,V3-1,-2.*K13,ADD_VALUES,ierr)
+            DO P = 1, 3
+               VP = U2D_GRID%CELL_NODES(I,P)
+               IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(VP-1)) THEN
+                     DO Q = 1, 3
+                        VQ = U2D_GRID%CELL_NODES(I,Q)
+                        KPQ = AREA*(U2D_GRID%BASIS_COEFFS(I,P,1)*U2D_GRID%BASIS_COEFFS(I,Q,1) &
+                                  + U2D_GRID%BASIS_COEFFS(I,P,2)*U2D_GRID%BASIS_COEFFS(I,Q,2))
+                        
+                        IF (AXI) THEN
+                           KPQ = KPQ*(U2D_GRID%NODE_COORDS(V1, 2) &
+                                    + U2D_GRID%NODE_COORDS(V2, 2) &
+                                    + U2D_GRID%NODE_COORDS(V3, 2))/3.
+                        END IF
+
+                        IF (JACOBIAN_TYPE == 3) THEN
+                           KPQ = KPQ * (MASS_MATRIX(I)+1)
+                        END IF
+
+                        CALL MatSetValues(Jmat,one,VP-1,one,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
+                     END DO
+                  END IF
                END IF
-            END IF
-            IF (V2-1 >= Istart .AND. V2-1 < Iend) THEN
-               IF (.NOT. IS_DIRICHLET(V2-1)) THEN
-                  CALL MatSetValues(Jmat,one,V2-1,one,V1-1,-2.*K12,ADD_VALUES,ierr)
-                  CALL MatSetValues(Jmat,one,V2-1,one,V3-1,-2.*K23,ADD_VALUES,ierr)
-                  CALL MatSetValues(Jmat,one,V2-1,one,V2-1,-2.*K22,ADD_VALUES,ierr)
-               END IF
-            END IF
-            IF (V3-1 >= Istart .AND. V3-1 < Iend) THEN
-               IF (.NOT. IS_DIRICHLET(V3-1)) THEN
-                  CALL MatSetValues(Jmat,one,V3-1,one,V1-1,-2.*K13,ADD_VALUES,ierr)
-                  CALL MatSetValues(Jmat,one,V3-1,one,V2-1,-2.*K23,ADD_VALUES,ierr)
-                  CALL MatSetValues(Jmat,one,V3-1,one,V3-1,-2.*K33,ADD_VALUES,ierr)
-               END IF
-            END IF
+            END DO
+
          END DO
       ELSE IF (DIMS == 3) THEN
          DO I = 1, NCELLS
@@ -686,6 +659,11 @@ MODULE fully_implicit
                         KPQ = VOLUME*(U3D_GRID%BASIS_COEFFS(I,P,1)*U3D_GRID%BASIS_COEFFS(I,Q,1) &
                                     + U3D_GRID%BASIS_COEFFS(I,P,2)*U3D_GRID%BASIS_COEFFS(I,Q,2) &
                                     + U3D_GRID%BASIS_COEFFS(I,P,3)*U3D_GRID%BASIS_COEFFS(I,Q,3))
+                        
+                        IF (JACOBIAN_TYPE == 3) THEN
+                           KPQ = KPQ * (MASS_MATRIX(I)+1)
+                        END IF
+
                         CALL MatSetValues(Jmat,one,VP-1,one,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
                      END DO
                   END IF
@@ -706,6 +684,64 @@ MODULE fully_implicit
       CALL MatAssemblyEnd(Jmat,MAT_FINAL_ASSEMBLY,ierr)
 
    END SUBROUTINE FormFunctionAndJacobian
+
+
+
+
+   SUBROUTINE COMPUTE_MASS_MATRICES
+
+      IMPLICIT NONE
+
+      INTEGER :: JP, IC
+
+      REAL(KIND=8) :: CHARGE
+      INTEGER :: SIZEC
+
+
+
+      IF (GRID_TYPE == UNSTRUCTURED) THEN
+         SIZEC = NCELLS
+      ELSE
+         CALL ERROR_ABORT('Not implemented.')
+      END IF
+
+      IF (.NOT. ALLOCATED(MASS_MATRIX)) ALLOCATE(MASS_MATRIX(SIZEC))
+      MASS_MATRIX = 0.d0
+
+      DO JP = 1, NP_PROC
+         CHARGE = SPECIES(particles(JP)%S_ID)%CHARGE
+         IF (ABS(CHARGE) .LT. 1.d-6) CYCLE
+
+         IF (GRID_TYPE == UNSTRUCTURED) THEN
+            IC = particles(JP)%IC
+
+            IF (DIMS == 2) THEN
+               
+               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/CELL_AREAS(IC)/(ZMAX-ZMIN)*FNUM &
+                                 * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
+
+            ELSE IF (DIMS == 3) THEN
+
+               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/CELL_VOLUMES(IC)*FNUM &
+                                 * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
+
+            END IF
+         ELSE
+
+            CALL ERROR_ABORT('Not implemented.')
+
+         END IF
+      END DO
+
+      IF (PROC_ID .EQ. 0) THEN
+         CALL MPI_REDUCE(MPI_IN_PLACE, MASS_MATRIX, SIZEC, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      ELSE
+         CALL MPI_REDUCE(MASS_MATRIX,  MASS_MATRIX, SIZEC, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      END IF
+
+      CALL MPI_BCAST(MASS_MATRIX, SIZEC, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+
+   END SUBROUTINE COMPUTE_MASS_MATRICES
 
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -733,7 +769,7 @@ MODULE fully_implicit
       PetscInt row
       PetscInt ncols
       PetscInt cols(2000)
-      PetscScalar dxdexvals(2000), dxdeyvals(2000), dydexvals(2000), dydeyvals(2000)
+      PetscScalar dxdexvals(2000), dxdeyvals(2000), dydexvals(2000), dydeyvals(2000), vals(2000)
       PetscInt first_row, last_row
       PetscInt f500
 
@@ -783,22 +819,19 @@ MODULE fully_implicit
       INTEGER, DIMENSION(:), ALLOCATABLE :: COLSXX, COLSXY, COLSYX, COLSYY
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: DXDEXV, DXDEYV, DYDEXV, DYDEYV
 
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: DXDEBAR, DVDEBAR
+
       ! IF (tID == 4 .AND. FINAL) THEN
       !    OPEN(66332, FILE='crossings', POSITION='append', STATUS='unknown', ACTION='write')
       ! END IF
 
+      IF (JACOBIAN_TYPE .LT. 1 .OR. JACOBIAN_TYPE .GT. 3) CALL ERROR_ABORT('Jacobian type not supported.')
 
       TOL = 1e-15
 
       SIZE = NCELLS
 
-      !IF (ALLOCATED(DVDEBAR)) DEALLOCATE(DVDEBAR)
-      !ALLOCATE(DVDEBAR(SIZE))
-      
-      !IF (ALLOCATED(DXDEBAR)) DEALLOCATE(DXDEBAR)
-      !ALLOCATE(DXDEBAR(SIZE))
-
-      IF (COMPUTE_JACOBIAN) THEN
+      IF (COMPUTE_JACOBIAN .AND. JACOBIAN_TYPE == 1) THEN
          f500 = 500
          CALL MatCreate(PETSC_COMM_WORLD,dxde,ierr)
          CALL MatSetSizes(dxde,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
@@ -839,6 +872,23 @@ MODULE fully_implicit
          CALL MatMPIAIJSetPreallocation(dydeymat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
          CALL MatSetFromOptions(dydeymat, ierr)
          CALL MatSetUp(dydeymat,ierr)
+
+      ELSE IF (COMPUTE_JACOBIAN .AND. JACOBIAN_TYPE == 2) THEN
+         
+         CALL MatCreate(PETSC_COMM_WORLD,dxde,ierr)
+         CALL MatSetSizes(dxde,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
+         CALL MatSetType(dxde, MATMPIAIJ, ierr)
+         !CALL MatSetOption(dxde,MAT_SPD,PETSC_TRUE,ierr)
+         CALL MatMPIAIJSetPreallocation(dxde,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
+         CALL MatSetFromOptions(dxde, ierr)
+         CALL MatSetUp(dxde,ierr)
+
+         IF (ALLOCATED(DVDEBAR)) DEALLOCATE(DVDEBAR)
+         ALLOCATE(DVDEBAR(SIZE))
+         
+         IF (ALLOCATED(DXDEBAR)) DEALLOCATE(DXDEBAR)
+         ALLOCATE(DXDEBAR(SIZE))
+      
       END IF
 
 
@@ -870,7 +920,7 @@ MODULE fully_implicit
          REMOVE_PART(IP) = .FALSE.
          IC = part_adv(IP)%IC
 
-         IF (COMPUTE_JACOBIAN) THEN
+         IF (COMPUTE_JACOBIAN .AND. JACOBIAN_TYPE == 1) THEN
             DVXDEX = 0.d0
             DVYDEX = 0.d0
             DVXDEY = 0.d0
@@ -887,6 +937,11 @@ MODULE fully_implicit
             DTDEXPREC = 0.d0
             DTDEYPREC = 0.d0
 
+            EBARIDX = -1
+            NUMSTEPS = 0
+         ELSE IF (COMPUTE_JACOBIAN .AND. JACOBIAN_TYPE == 2) THEN
+            DXDEBAR = 0.d0
+            DVDEBAR = 0.d0
             EBARIDX = -1
             NUMSTEPS = 0
          END IF
@@ -1134,8 +1189,8 @@ MODULE fully_implicit
                END IF
 
 
-               IF (COMPUTE_JACOBIAN) THEN
-                  ! Accumulate approximate Jacobian of the motion
+               IF (COMPUTE_JACOBIAN .AND. JACOBIAN_TYPE == 1) THEN
+                  ! Accumulate exact Jacobian of the motion
                   ! The particle hit the boundary of a cell.
                   ! It may cross to the neighboring cell, or if this is a domain boundary be reflected or absorbed.
                   ! The total time of the motion is less than dt (or the particle's initial dtrim) and depends on the path taken.
@@ -1218,6 +1273,31 @@ MODULE fully_implicit
                   DVXDEX(LOC) = DVXDEX(LOC) + QOM*DTADV
                   DVYDEY(LOC) = DVYDEY(LOC) + QOM*DTADV
 
+               ELSE IF (COMPUTE_JACOBIAN .AND. JACOBIAN_TYPE == 2) THEN
+                  ! Accumulate approximate Jacobian of the motion
+                  LOC = NUMSTEPS + 1
+                  DO I = 1, NUMSTEPS
+                     IF (EBARIDX(I) == IC-1) THEN
+                        LOC = I
+                        EXIT
+                     END IF
+                  END DO
+                  IF (LOC == NUMSTEPS + 1) THEN
+                     NUMSTEPS = LOC
+                     EBARIDX(LOC) = IC-1
+                  END IF
+
+                  IF (BOUNDCOLL .NE. -1) THEN
+                     DTADV = DTCOLL
+                  ELSE
+                     DTADV = part_adv(IP)%DTRIM
+                  END IF
+
+                  DXDEBAR = DXDEBAR + DVDEBAR*DTCOLL
+                  DXDEBAR(LOC) = DXDEBAR(LOC) &
+                  + 0.5*SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS*DTADV*DTADV
+                  DVDEBAR(LOC) = DVDEBAR(LOC) &
+                  + SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS*DTADV
                END IF
 
 
@@ -1359,7 +1439,7 @@ MODULE fully_implicit
          ! END IF
 
 
-         IF (COMPUTE_JACOBIAN) THEN
+         IF (COMPUTE_JACOBIAN .AND. JACOBIAN_TYPE == 1) THEN
 
             DXDEX = DXDEX * SPECIES(part_adv(IP)%S_ID)%CHARGE*QE
             DXDEY = DXDEY * SPECIES(part_adv(IP)%S_ID)%CHARGE*QE
@@ -1373,12 +1453,19 @@ MODULE fully_implicit
                CALL MatSetValue(dydeymat,IC-1,EBARIDX(I),DYDEY(I),ADD_VALUES,ierr)
             END DO
             ! Tutto qui. Il resto fuori dal loop particelle.
+         ELSE IF (COMPUTE_JACOBIAN .AND. JACOBIAN_TYPE == 2) THEN
+            DXDEBAR = DXDEBAR * SPECIES(part_adv(IP)%S_ID)%CHARGE*QE
+            !CALL MatSetValues(jac,1,IC-1,NUMSTEPS,EBARIDX,DXDEBAR,ADD_VALUES,ierr)
+            DO I = 1, NUMSTEPS
+               CALL MatSetValue(dxde,IC-1,EBARIDX(I),DXDEBAR(I),ADD_VALUES,ierr)
+            END DO
+
          END IF
 
       END DO ! End loop: DO IP = 1,NP_PROC
 
 
-      IF (COMPUTE_JACOBIAN) THEN
+      IF (COMPUTE_JACOBIAN .AND. JACOBIAN_TYPE == 1) THEN
 
          CALL MatAssemblyBegin(dxdexmat,MAT_FINAL_ASSEMBLY,ierr)
          CALL MatAssemblyBegin(dxdeymat,MAT_FINAL_ASSEMBLY,ierr)
@@ -1431,16 +1518,11 @@ MODULE fully_implicit
                
                !WRITE(*,*) 'Row ', I, ' ncols ', ncols, ' cols ', cols, ' vals ', vals, ' ierr ', ierr
                ! MatGetRow(Mat A,PetscInt row, PetscInt *ncols,const PetscInt (*cols)[],const PetscScalar (*vals)[]);
-               AREA = CELL_AREAS(I+1)
+
                V1I = U2D_GRID%CELL_NODES(I+1,1)
                V2I = U2D_GRID%CELL_NODES(I+1,2)
                V3I = U2D_GRID%CELL_NODES(I+1,3)
-               X1 = U2D_GRID%NODE_COORDS(V1I, 1)
-               X2 = U2D_GRID%NODE_COORDS(V2I, 1)
-               X3 = U2D_GRID%NODE_COORDS(V3I, 1)
-               Y1 = U2D_GRID%NODE_COORDS(V1I, 2)
-               Y2 = U2D_GRID%NODE_COORDS(V2I, 2)
-               Y3 = U2D_GRID%NODE_COORDS(V3I, 2)
+
                DPSI1DX = U2D_GRID%BASIS_COEFFS(I+1,1,1)
                DPSI2DX = U2D_GRID%BASIS_COEFFS(I+1,2,1)
                DPSI3DX = U2D_GRID%BASIS_COEFFS(I+1,3,1)
@@ -1448,32 +1530,20 @@ MODULE fully_implicit
                DPSI2DY = U2D_GRID%BASIS_COEFFS(I+1,2,2)
                DPSI3DY = U2D_GRID%BASIS_COEFFS(I+1,3,2)
 
-               DPSI1DX =  0.5*(Y2-Y3)/AREA
-               DPSI2DX = -0.5*(Y1-Y3)/AREA
-               DPSI3DX = -0.5*(Y2-Y1)/AREA
-               DPSI1DY = -0.5*(X2-X3)/AREA
-               DPSI2DY =  0.5*(X1-X3)/AREA
-               DPSI3DY =  0.5*(X2-X1)/AREA
-
                DO JJ = 1, NCOLSXX
                   J = COLSXX(JJ)
-                  AREA = CELL_AREAS(J+1)
+
                   V1J = U2D_GRID%CELL_NODES(J+1,1)
                   V2J = U2D_GRID%CELL_NODES(J+1,2)
-                  V3J = U2D_GRID%CELL_NODES(J+1,3)            
-                  X1 = U2D_GRID%NODE_COORDS(V1J, 1)
-                  X2 = U2D_GRID%NODE_COORDS(V2J, 1)
-                  X3 = U2D_GRID%NODE_COORDS(V3J, 1)
-                  Y1 = U2D_GRID%NODE_COORDS(V1J, 2)
-                  Y2 = U2D_GRID%NODE_COORDS(V2J, 2)
-                  Y3 = U2D_GRID%NODE_COORDS(V3J, 2)
-                  DPSJ1DX =  0.5*(Y2-Y3)/AREA
-                  DPSJ2DX = -0.5*(Y1-Y3)/AREA
-                  DPSJ3DX = -0.5*(Y2-Y1)/AREA
-                  DPSJ1DY = -0.5*(X2-X3)/AREA
-                  DPSJ2DY =  0.5*(X1-X3)/AREA
-                  DPSJ3DY =  0.5*(X2-X1)/AREA
+                  V3J = U2D_GRID%CELL_NODES(J+1,3)
 
+                  DPSJ1DX = U2D_GRID%BASIS_COEFFS(J+1,1,1)
+                  DPSJ2DX = U2D_GRID%BASIS_COEFFS(J+1,2,1)
+                  DPSJ3DX = U2D_GRID%BASIS_COEFFS(J+1,3,1)
+                  DPSJ1DY = U2D_GRID%BASIS_COEFFS(J+1,1,2)
+                  DPSJ2DY = U2D_GRID%BASIS_COEFFS(J+1,2,2)
+                  DPSJ3DY = U2D_GRID%BASIS_COEFFS(J+1,3,2)
+   
                   VALXX = - DXDEXV(JJ)/EPS0/(ZMAX-ZMIN)*FNUM
                   VALXY = - DXDEYV(JJ)/EPS0/(ZMAX-ZMIN)*FNUM
                   VALYX = - DYDEXV(JJ)/EPS0/(ZMAX-ZMIN)*FNUM
@@ -1524,6 +1594,86 @@ MODULE fully_implicit
          CALL MatDestroy(dxdeymat,ierr)
          CALL MatDestroy(dydexmat,ierr)
          CALL MatDestroy(dydeymat,ierr)
+
+      ELSE IF (COMPUTE_JACOBIAN .AND. JACOBIAN_TYPE == 2) THEN
+
+
+         CALL MatAssemblyBegin(dxde,MAT_FINAL_ASSEMBLY,ierr)
+         CALL MatAssemblyEnd(dxde,MAT_FINAL_ASSEMBLY,ierr)
+
+         !CALL PetscViewerDrawOpen(PETSC_COMM_WORLD,PETSC_NULL_CHARACTER, &
+         !                         PETSC_NULL_CHARACTER,0,0,684,684,viewer,ierr)
+         !CALL MatView(dxde,viewer,ierr)
+         !CALL PetscSleep(5.d0,ierr)
+
+         !CALL PetscViewerASCIIOpen(PETSC_COMM_WORLD,'mat.output',viewer,ierr)
+         !CALL MatView(dxde,viewer,ierr)
+         !CALL PetscSleep(5.d0,ierr)
+         !CALL PetscViewerDestroy(viewer,ierr)
+   
+         CALL MatGetOwnershipRange(dxde,first_row,last_row,ierr)
+
+         IF (DIMS == 2) THEN
+            DO I = first_row, last_row-1
+               CALL MatGetRow(dxde,I,ncols,cols,vals,ierr)
+
+               DO JJ = 1, ncols
+                  J = cols(JJ)
+
+                  VAL = - vals(JJ)/EPS0/(ZMAX-ZMIN)*FNUM
+                  DO NI = 1, 3
+                     VNI = U2D_GRID%CELL_NODES(I+1,NI)
+                     IF (.NOT. IS_DIRICHLET(VNI - 1)) THEN
+                        DO NJ = 1, 3
+                           VNJ = U2D_GRID%CELL_NODES(J+1,NJ)
+                           CALL MatSetValues(jac,1,VNI-1,1,VNJ-1,VAL* &
+                            (U2D_GRID%BASIS_COEFFS(I+1,NI,1)*U2D_GRID%BASIS_COEFFS(J+1,NJ,1) &
+                           + U2D_GRID%BASIS_COEFFS(I+1,NI,2)*U2D_GRID%BASIS_COEFFS(J+1,NJ,2)),ADD_VALUES,ierr)
+                        END DO
+                     END IF
+                  END DO
+
+               END DO
+
+               CALL MatRestoreRow(dxde,I,ncols,cols,vals,ierr)
+
+            END DO
+         ELSE IF (DIMS == 3) THEN
+            DO I = first_row, last_row-1
+               CALL MatGetRow(dxde,I,ncols,cols,vals,ierr)
+   
+               DO JJ = 1, ncols
+                  J = cols(JJ)
+
+                  VAL = - vals(JJ)/EPS0*FNUM
+                  DO NI = 1, 4
+                     VNI = U3D_GRID%CELL_NODES(I+1,NI)
+                     IF (.NOT. IS_DIRICHLET(VNI - 1)) THEN
+                        DO NJ = 1, 4
+                           VNJ = U3D_GRID%CELL_NODES(J+1,NJ)
+                           CALL MatSetValues(jac,1,VNI-1,1,VNJ-1,VAL* &
+                            (U3D_GRID%BASIS_COEFFS(I+1,NI,1)*U3D_GRID%BASIS_COEFFS(J+1,NJ,1) &
+                           + U3D_GRID%BASIS_COEFFS(I+1,NI,2)*U3D_GRID%BASIS_COEFFS(J+1,NJ,2) &
+                           + U3D_GRID%BASIS_COEFFS(I+1,NI,3)*U3D_GRID%BASIS_COEFFS(J+1,NJ,3)),ADD_VALUES,ierr)
+                        END DO
+                     END IF
+                  END DO
+   
+               END DO
+   
+               CALL MatRestoreRow(dxde,I,ncols,cols,vals,ierr)
+   
+            END DO
+   
+         END IF
+
+         ! CALL MatAssemblyBegin(jac,MAT_FINAL_ASSEMBLY,ierr)
+         ! CALL MatAssemblyEnd(jac,MAT_FINAL_ASSEMBLY,ierr)
+
+         !CALL MatMatMult(drhodxx,dxde,MAT_INITIAL_MATRIX,PETSC_DEFAULT,drhodex,ierr)
+         !CALL MatMatMult(drhodex,dexdphi,MAT_INITIAL_MATRIX,PETSC_DEFAULT,drhodphi,ierr)
+
+         CALL MatDestroy(dxde,ierr)
 
       END IF
 
@@ -1761,34 +1911,17 @@ MODULE fully_implicit
 
          ! Compute the electric field at grid points
          IF (DIMS == 2) THEN
+
+            E_FIELD = 0.d0
+            EBAR_FIELD = 0.d0
             DO I = 1, NCELLS
-               AREA = CELL_AREAS(I)
-               V1 = U2D_GRID%CELL_NODES(I,1)
-               V2 = U2D_GRID%CELL_NODES(I,2)
-               V3 = U2D_GRID%CELL_NODES(I,3)            
-               X1 = U2D_GRID%NODE_COORDS(V1, 1)
-               X2 = U2D_GRID%NODE_COORDS(V2, 1)
-               X3 = U2D_GRID%NODE_COORDS(V3, 1)
-               Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-               Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-               Y3 = U2D_GRID%NODE_COORDS(V3, 2)
-
-               E_FIELD(I,1,1) = -0.5/AREA*(  PHI_FIELD(V1)*(Y2-Y3) &
-                                          - PHI_FIELD(V2)*(Y1-Y3) &
-                                          - PHI_FIELD(V3)*(Y2-Y1))
-               E_FIELD(I,1,2) = -0.5/AREA*(- PHI_FIELD(V1)*(X2-X3) &
-                                          + PHI_FIELD(V2)*(X1-X3) &
-                                          + PHI_FIELD(V3)*(X2-X1))
-               E_FIELD(I,1,3) = 0.d0
-
-               EBAR_FIELD(I,1,1) = -0.5/AREA*(  PHIBAR_FIELD(V1)*(Y2-Y3) &
-                                             - PHIBAR_FIELD(V2)*(Y1-Y3) &
-                                             - PHIBAR_FIELD(V3)*(Y2-Y1))
-               EBAR_FIELD(I,1,2) = -0.5/AREA*(- PHIBAR_FIELD(V1)*(X2-X3) &
-                                             + PHIBAR_FIELD(V2)*(X1-X3) &
-                                             + PHIBAR_FIELD(V3)*(X2-X1))
-               EBAR_FIELD(I,1,3) = 0.d0
-
+               DO ID = 1, 2
+                  DO P = 1, 3
+                     VP = U2D_GRID%CELL_NODES(I,P)
+                     E_FIELD(I,1,ID) =    E_FIELD(I,1,ID)    - PHI_FIELD(VP)   *U2D_GRID%BASIS_COEFFS(I,P,ID)
+                     EBAR_FIELD(I,1,ID) = EBAR_FIELD(I,1,ID) - PHIBAR_FIELD(VP)*U2D_GRID%BASIS_COEFFS(I,P,ID)
+                  END DO
+               END DO
             END DO
 
          ELSE IF (DIMS == 3) THEN
@@ -1975,26 +2108,14 @@ MODULE fully_implicit
          IF (GRID_TYPE == UNSTRUCTURED) THEN 
             IC = part_adv(JP)%IC
             IF (DIMS == 2) THEN
-               AREA = CELL_AREAS(IC)
-               V1 = U2D_GRID%CELL_NODES(IC,1)
-               V2 = U2D_GRID%CELL_NODES(IC,2)
-               V3 = U2D_GRID%CELL_NODES(IC,3)            
-               X1 = U2D_GRID%NODE_COORDS(V1, 1)
-               X2 = U2D_GRID%NODE_COORDS(V2, 1)
-               X3 = U2D_GRID%NODE_COORDS(V3, 1)
-               Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-               Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-               Y3 = U2D_GRID%NODE_COORDS(V3, 2)
-               XP = part_adv(JP)%X
-               YP = part_adv(JP)%Y
-               PSI1 = 0.5*( (Y2-Y3)*(XP-X3) - (X2-X3)*(YP-Y3))/AREA/(ZMAX-ZMIN)
-               PSI2 = 0.5*(-(Y1-Y3)*(XP-X3) + (X1-X3)*(YP-Y3))/AREA/(ZMAX-ZMIN)
-               PSI3 = 0.5*(-(Y2-Y1)*(XP-X1) + (X2-X1)*(YP-Y1))/AREA/(ZMAX-ZMIN)
-               
-               RHO_Q = K*CHARGE*FNUM
-               RHS(V1-1) = RHS(V1-1) + RHO_Q*PSI1
-               RHS(V2-1) = RHS(V2-1) + RHO_Q*PSI2
-               RHS(V3-1) = RHS(V3-1) + RHO_Q*PSI3
+               RHO_Q = K*CHARGE*FNUM/(ZMAX-ZMIN)
+               DO P = 1, 3
+                  VP = U2D_GRID%CELL_NODES(IC,P) - 1
+                  PSIP = U2D_GRID%BASIS_COEFFS(IC,P,1)*part_adv(JP)%X &
+                       + U2D_GRID%BASIS_COEFFS(IC,P,2)*part_adv(JP)%Y &
+                       + U2D_GRID%BASIS_COEFFS(IC,P,3)
+                  RHS(VP) = RHS(VP) + RHO_Q*PSIP
+               END DO
             ELSE IF (DIMS == 3) THEN
                RHO_Q = K*CHARGE*FNUM
                DO P = 1, 4

@@ -138,6 +138,9 @@ MODULE initialization
          IF (line=='Fluid_electrons_phi0:')    READ(in1,*) BOLTZ_PHI0
          IF (line=='Fluid_electrons_Te:')      READ(in1,*) BOLTZ_TE
 
+         IF (line=='Jacobian_type:')           READ(in1,*) JACOBIAN_TYPE
+         IF (line=='Colocated_electrons:')     READ(in1,*) COLOCATED_ELECTRONS
+         
          ! ~~~~~~~~~~~~~  File output ~~~~~~~~~~~~~~~
 
          IF (line=='Flowfield_output:')        READ(in1,*) FLOWFIELD_SAVE_PATH
@@ -1560,11 +1563,13 @@ MODULE initialization
 
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
       REAL(KIND=8)  :: M
-      INTEGER       :: S_ID, i, ITASK
+      INTEGER       :: S_ID, ELECTRON_S_ID, i, ITASK
 
       ! Print message 
       CALL ONLYMASTERPRINT1(PROC_ID, '> SEEDING INITIAL PARTICLES IN THE DOMAIN...')
      
+      ELECTRON_S_ID = SPECIES_NAME_TO_ID('e')
+
       ! Compute number of particles to be seeded
       !NP_INIT = NINT(NRHO_INIT/FNUM*(XMAX-XMIN)*(YMAX-YMIN)*(ZMAX-ZMIN))
 
@@ -1578,7 +1583,9 @@ MODULE initialization
          DO i = 1, MIXTURES(INITIAL_PARTICLES_TASKS(ITASK)%MIX_ID)%N_COMPONENTS
             
             S_ID = MIXTURES(INITIAL_PARTICLES_TASKS(ITASK)%MIX_ID)%COMPONENTS(i)%ID
-            IF (S_ID == 2) CYCLE ! DBDBDBDBDBDBDBDBDBBDBDBDBDBDBDBDBDBDBDBDBDBDDBDBBDDBBDBDBDBDBDBDBDBDBDBDBDBDBDBDBD
+
+            IF (COLOCATED_ELECTRONS .AND. S_ID == ELECTRON_S_ID) CYCLE
+
             IF (GRID_TYPE == UNSTRUCTURED) THEN
                DO IC = 1, NCELLS
                   ! Compute number of particles of this species per process to be created in this cell.
@@ -1630,7 +1637,7 @@ MODULE initialization
                         ZP = V1(3) + (V2(3)-V1(3))*P + (V3(3)-V1(3))*Q + (V4(3)-V1(3))*R
                      END IF
 
-                     !IF (XP > 0.6 .OR. XP  < 0.4 .OR. YP > 0.6 .OR. YP < 0.4) CYCLE
+                     IF (XP > 0.6 .OR. XP  < 0.4 .OR. YP > 0.6 .OR. YP < 0.4) CYCLE
 
                      ! Assign velocity and energy following a Boltzmann distribution
                      M = SPECIES(S_ID)%MOLECULAR_MASS
@@ -1651,20 +1658,20 @@ MODULE initialization
 
 
                      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                     M = SPECIES(2)%MOLECULAR_MASS
-                     CALL MAXWELL(INITIAL_PARTICLES_TASKS(ITASK)%UX, &
-                                 INITIAL_PARTICLES_TASKS(ITASK)%UY, &
-                                 INITIAL_PARTICLES_TASKS(ITASK)%UZ, &
-                                 11600.d0, &
-                                 11600.d0, &
-                                 11600.d0, &
-                                 VXP, VYP, VZP, M)
+                     ! Modification to inject electrons colocated with ions.
+                     IF (COLOCATED_ELECTRONS .AND. SPECIES(S_ID)%CHARGE == 1) THEN
+                        
+                        CALL MAXWELL(INITIAL_PARTICLES_TASKS(ITASK)%UX, &
+                                    INITIAL_PARTICLES_TASKS(ITASK)%UY, &
+                                    INITIAL_PARTICLES_TASKS(ITASK)%UZ, &
+                                    11600.d0, &
+                                    11600.d0, &
+                                    11600.d0, &
+                                    VXP, VYP, VZP, SPECIES(ELECTRON_S_ID)%MOLECULAR_MASS)
 
-                     CALL INTERNAL_ENERGY(SPECIES(2)%ROTDOF, INITIAL_PARTICLES_TASKS(ITASK)%TROT, EROT)
-                     CALL INTERNAL_ENERGY(SPECIES(2)%VIBDOF, INITIAL_PARTICLES_TASKS(ITASK)%TVIB, EVIB)
-
-                     CALL INIT_PARTICLE(XP,YP,ZP,VXP,VYP,VZP,EROT,EVIB,2,IC,DT, particleNOW) ! Save in particle
-                     CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
+                        CALL INIT_PARTICLE(XP,YP,ZP,VXP,VYP,VZP,0.d0,0.d0,ELECTRON_S_ID,IC,DT, particleNOW) ! Save in particle
+                        CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
+                     END IF
                      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                   END DO
                END DO
@@ -1911,7 +1918,7 @@ MODULE initialization
       REAL(KIND=8) :: PI2  
 
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: nfs_LINE
-      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TASK_NFS
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TASK_NFS, TASK_S_NORM
       !INTEGER, DIMENSION(:), ALLOCATABLE :: EMIT_COUNT
  
       REAL(KIND=8)  :: M, FRAC
@@ -2095,7 +2102,6 @@ MODULE initialization
          
          ALLOCATE(TASK_NFS(N_COMP))
 
-
          IF (DIMS == 2) THEN
 
             X1 = U2D_GRID%NODE_COORDS(EMIT_TASKS(ITASK)%IV1, 1)
@@ -2132,12 +2138,11 @@ MODULE initialization
             BETA = 1./SQRT(2.*KB/M*EMIT_TASKS(ITASK)%TTRA) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
 
             U_NORM = EMIT_TASKS(ITASK)%UX*NORMX + EMIT_TASKS(ITASK)%UY*NORMY + EMIT_TASKS(ITASK)%UZ*NORMZ ! Molecular speed ratio normal to boundary
+            EMIT_TASKS(ITASK)%U_NORM = U_NORM
             S_NORM = U_NORM*BETA
-            EMIT_TASKS(ITASK)%S_NORM = S_NORM
-            Snow   = S_NORM     ! temp variable
 
-            FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) &
-                           + SQRT(PI)*Snow*(1.+ERF1(Snow)))      ! Tot number flux emitted
+            FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-S_NORM**2) &
+                           + SQRT(PI)*S_NORM*(1.+ERF1(S_NORM)))      ! Tot number flux emitted
 
 
 
@@ -2151,7 +2156,7 @@ MODULE initialization
                                                    &particles will be emitted at boundary.')
             END IF
          END DO
-         WRITE(*,*) 'Task NFS', TASK_NFS
+         !WRITE(*,*) 'Task NFS', TASK_NFS
          CALL MOVE_ALLOC(TASK_NFS, EMIT_TASKS(ITASK)%NFS)
 
       END DO
@@ -2243,63 +2248,6 @@ MODULE initialization
    END SUBROUTINE INITREACTIONS
 
 
-   INTEGER FUNCTION SPECIES_NAME_TO_ID(NAME)
-
-      IMPLICIT NONE
-
-      CHARACTER(LEN=*), INTENT(IN)  :: NAME
-      INTEGER                       :: INDEX, MATCH
-      MATCH = -1
-      DO INDEX = 1, N_SPECIES
-         IF (SPECIES(INDEX)%NAME == NAME) MATCH = INDEX
-      END DO
-
-
-      SPECIES_NAME_TO_ID = MATCH
-
-   END FUNCTION SPECIES_NAME_TO_ID
-
-
-
-   INTEGER FUNCTION REACTION_SPECIES_NAME_TO_ID(NAME)
-
-      IMPLICIT NONE
-
-      CHARACTER(LEN=*), INTENT(IN)  :: NAME
-      INTEGER                       :: INDEX, MATCH
-      MATCH = -1
-      DO INDEX = 1, N_SPECIES
-         IF (SPECIES(INDEX)%NAME == NAME) MATCH = INDEX
-      END DO
-      IF (NAME == 'M') THEN
-         MATCH = 0
-      END IF
-
-
-      REACTION_SPECIES_NAME_TO_ID = MATCH
-
-   END FUNCTION REACTION_SPECIES_NAME_TO_ID
-
-
-
-   INTEGER FUNCTION MIXTURE_NAME_TO_ID(NAME)
-
-      IMPLICIT NONE
-
-      CHARACTER(LEN=*), INTENT(IN)  :: NAME
-      INTEGER                       :: INDEX, MATCH
-      MATCH = -1
-      DO INDEX = 1, N_MIXTURES
-         IF (MIXTURES(INDEX)%NAME == NAME) MATCH = INDEX
-      END DO
-
-      IF (MATCH .EQ. -1) THEN
-         WRITE(*,*) 'Error! Mixture name not found.'
-      END IF
-
-      MIXTURE_NAME_TO_ID = MATCH
-
-   END FUNCTION MIXTURE_NAME_TO_ID
 
 
 END MODULE initialization

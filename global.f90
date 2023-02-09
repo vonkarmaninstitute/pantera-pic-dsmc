@@ -151,7 +151,7 @@ TYPE(UNSTRUCTURED_3D_GRID_DATA_STRUCTURE) :: U3D_GRID
       REAL(KIND=8) :: NRHO
       REAL(KIND=8) :: UX, UY, UZ
       REAL(KIND=8) :: TTRA, TROT, TVIB
-      REAL(KIND=8) :: S_NORM
+      REAL(KIND=8) :: U_NORM
       INTEGER      :: MIX_ID
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: NFS
       INTEGER      :: IC
@@ -247,6 +247,9 @@ TYPE(UNSTRUCTURED_3D_GRID_DATA_STRUCTURE) :: U3D_GRID
    INTEGER      :: TIMING_STATS_EVERY = 100
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CELL_FNUM
    LOGICAL      :: BOOL_RADIAL_WEIGHTING = .FALSE.
+   INTEGER      :: JACOBIAN_TYPE = 1
+   LOGICAL      :: COLOCATED_ELECTRONS = .FALSE.
+
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Collisions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

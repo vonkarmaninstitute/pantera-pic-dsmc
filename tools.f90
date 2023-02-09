@@ -309,7 +309,7 @@ CONTAINS
 
       ! Open file for writing
       IF (BOOL_BINARY_OUTPUT) THEN
-         OPEN(12, FILE=filename, ACCESS='SEQUENTIAL', FORM='UNFORMATTED', STATUS='NEW', CONVERT='BIG_ENDIAN', RECL=84)
+         OPEN(12, FILE=filename, ACCESS='SEQUENTIAL', FORM='UNFORMATTED', STATUS='OLD', CONVERT='BIG_ENDIAN', RECL=84)
          DO IP = 1, NP_DUMP_PROC
             WRITE(12) TIMESTEP, part_dump(IP)%X, part_dump(IP)%Y, part_dump(IP)%Z, &
             part_dump(IP)%VX, part_dump(IP)%VY, part_dump(IP)%VZ, part_dump(IP)%EROT, part_dump(IP)%EVIB, &
@@ -725,5 +725,69 @@ CONTAINS
       END IF
 
    END SUBROUTINE TIMER_SUMMARY
+
+
+
+   INTEGER FUNCTION SPECIES_NAME_TO_ID(NAME)
+
+      IMPLICIT NONE
+
+      CHARACTER(LEN=*), INTENT(IN)  :: NAME
+      INTEGER                       :: INDEX, MATCH
+      MATCH = -1
+      DO INDEX = 1, N_SPECIES
+         IF (SPECIES(INDEX)%NAME == NAME) MATCH = INDEX
+      END DO
+
+
+      SPECIES_NAME_TO_ID = MATCH
+
+   END FUNCTION SPECIES_NAME_TO_ID
+
+
+
+   INTEGER FUNCTION REACTION_SPECIES_NAME_TO_ID(NAME)
+
+      IMPLICIT NONE
+
+      CHARACTER(LEN=*), INTENT(IN)  :: NAME
+      INTEGER                       :: INDEX, MATCH
+      MATCH = -1
+      DO INDEX = 1, N_SPECIES
+         IF (SPECIES(INDEX)%NAME == NAME) MATCH = INDEX
+      END DO
+      IF (NAME == 'M') THEN
+         MATCH = 0
+      END IF
+
+
+      REACTION_SPECIES_NAME_TO_ID = MATCH
+
+   END FUNCTION REACTION_SPECIES_NAME_TO_ID
+
+
+
+   INTEGER FUNCTION MIXTURE_NAME_TO_ID(NAME)
+
+      IMPLICIT NONE
+
+      CHARACTER(LEN=*), INTENT(IN)  :: NAME
+      INTEGER                       :: INDEX, MATCH
+      MATCH = -1
+      DO INDEX = 1, N_MIXTURES
+         IF (MIXTURES(INDEX)%NAME == NAME) MATCH = INDEX
+      END DO
+
+      IF (MATCH .EQ. -1) THEN
+         WRITE(*,*) 'Error! Mixture name not found.'
+      END IF
+
+      MIXTURE_NAME_TO_ID = MATCH
+
+   END FUNCTION MIXTURE_NAME_TO_ID
+
+
+
+
 
 END MODULE tools

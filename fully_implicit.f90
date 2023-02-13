@@ -102,6 +102,8 @@ MODULE fully_implicit
       !  to employ an initial guess of zero, the user should explicitly set
       !  this vector to zero by calling VecSet().
 
+      SET_SOLVEC_TO_ZERO = .TRUE.
+
       IF (SET_SOLVEC_TO_ZERO) THEN
          CALL VecSet(solvec,0.d0,ierr)
       ELSE

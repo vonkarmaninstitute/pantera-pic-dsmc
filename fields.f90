@@ -77,7 +77,7 @@ MODULE fields
       CALL MatSetSizes( Amat,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
       CALL MatSetType( Amat, MATMPIAIJ, ierr)
       !CALL MatSetOption(Amat,MAT_SPD,PETSC_TRUE,ierr)
-      CALL MatMPIAIJSetPreallocation(Amat,10,PETSC_NULL_INTEGER,10,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
+      CALL MatMPIAIJSetPreallocation(Amat,100,PETSC_NULL_INTEGER,100,PETSC_NULL_INTEGER, ierr)
       CALL MatSetFromOptions( Amat, ierr)
       CALL MatSetUp( Amat, ierr)
       CALL MatGetOwnershipRange( Amat, Istart, Iend, ierr)

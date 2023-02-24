@@ -397,7 +397,7 @@ MODULE fully_implicit
                            KPQ = KPQ * (MASS_MATRIX(I)+1)
                         END IF
 
-                        CALL MatSetValues(Jmat,one,VP-1,one,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
+                        CALL MatSetValues(jac,one,VP-1,one,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
                      END DO
                   END IF
                END IF
@@ -1738,6 +1738,13 @@ MODULE fully_implicit
       ! IF (tID == 4 .AND. FINAL) THEN
       !    CLOSE(66332)
       ! END IF
+      
+      !CALL VecDestroy(dxdexvals,ierr)
+      !CALL VecDestroy(dxdeyvals,ierr)
+      !CALL VecDestroy(dydexvals,ierr)
+      !CALL VecDestroy(dydeyvals,ierr)
+      !CALL VecDestroy(vals,ierr)
+      !CALL VecDestroy(cols,ierr)
 
 
    END SUBROUTINE ADVECT_CN

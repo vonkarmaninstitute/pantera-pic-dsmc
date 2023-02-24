@@ -831,9 +831,9 @@ MODULE collisions
 
          ! +++++++ Compute collision frequency according to the model ++++++++
          nu = 0
-         IF (BGK_MODEL_TYPE_INT == 0)  nu = n_CELL*BGK_SIGMA*V_TH ! [1/s]       ! Classical BGK
-         IF (BGK_MODEL_TYPE_INT == 1)  nu = BGK_BG_DENS*BGK_SIGMA*V_TH ! [1/s]  ! Collisions with background
-         IF (BGK_MODEL_TYPE_INT == 2)  nu = 1.0d5                               ! [1/s]  !!!!!!!!!!!! HARD-CODED !!!!!!!!!!!!!
+         IF (BGK_MODEL_TYPE_INT == 0)  nu = SQRT(2.d0)*n_CELL*BGK_SIGMA*V_TH    ! [1/s]  ! Classical BGK
+         IF (BGK_MODEL_TYPE_INT == 1)  nu = BGK_BG_DENS*BGK_SIGMA*V_TH          ! [1/s]  ! Collisions with background
+         IF (BGK_MODEL_TYPE_INT == 2)  nu = 1.0d5                               ! [1/s]  ! HARD-CODED
 
          ! ++++++++++ Test particles for collisions +++++++++++
          DO JP = JP_START, JP_END

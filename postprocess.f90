@@ -1159,7 +1159,7 @@ MODULE postprocess
          END DO
 
          WRITE(20) 'POINT_DATA '//ITOA(NP_PROC)//ACHAR(10)
-         WRITE(20) 'VECTORS Velocity float'//ACHAR(10)
+         WRITE(20) 'VECTORS Velocity double'//ACHAR(10)
 
          DO IP = 1, NP_PROC
             WRITE(20) particles(IP)%VX, particles(IP)%VY, particles(IP)%VZ
@@ -1185,7 +1185,7 @@ MODULE postprocess
          END DO
 
          WRITE(20,'(A,I10)') 'POINT_DATA', NP_PROC
-         WRITE(20,'(A)') 'VECTORS Velocity float'
+         WRITE(20,'(A)') 'VECTORS Velocity double'
          DO IP = 1, NP_PROC
             WRITE(20,*) particles(IP)%VX, particles(IP)%VY, particles(IP)%VZ
          END DO

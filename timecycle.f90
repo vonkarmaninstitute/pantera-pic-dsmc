@@ -49,7 +49,7 @@ MODULE timecycle
       
       ! ########### Dump particles and flowfield after the initial seeding ##########################################
       IF ((tID .GE. DUMP_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
-         IF (MOD(tID-DUMP_START, DUMP_EVERY) .EQ. 0) CALL DUMP_PARTICLES_VTK(tID)
+         IF (MOD(tID-DUMP_START, DUMP_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
       END IF
 
       IF ((tID .GT. DUMP_GRID_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
@@ -183,7 +183,7 @@ MODULE timecycle
          CALL TIMER_START(4)
          ! ########### Dump particles ##############################################
          IF (tID .GE. DUMP_START) THEN
-            IF (MOD(tID-DUMP_START, DUMP_EVERY) .EQ. 0) CALL DUMP_PARTICLES_VTK(tID)
+            IF (MOD(tID-DUMP_START, DUMP_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
          END IF
 
          ! ########### Dump flowfield ##############################################

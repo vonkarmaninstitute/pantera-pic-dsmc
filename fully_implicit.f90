@@ -30,6 +30,7 @@ MODULE fully_implicit
    PC pc, pcnk
    SNES snes
    SNESLineSearch linesearch
+   PetscViewer viewer
 
 
    CONTAINS
@@ -65,14 +66,15 @@ MODULE fully_implicit
       !CALL MatSetFromOptions(Jmat,ierr)
       !CALL MatSetUp(Jmat,ierr)
 
-      !CALL MatCreate(PETSC_COMM_WORLD,Jmfmat,ierr);
+      !CALL MatCreate(PETSC_COMM_WORLD,Jmfmat,ierr)
       !CALL MatSetSizes(Jmfmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
       !CALL MatSetType(Jmfmat,MATSHELL,ierr)
       !CALL MatSetUp(Jmfmat,ierr)
+      !CALL MatCreateSNESMF(snes,Jmfmat,ierr)
 
 
 
-      CALL SNESSetJacobian(snes,Jmat,Jmat,PETSC_NULL_FUNCTION,0,ierr)   ! Use this for the compined computation of residual and Jacobian.
+      CALL SNESSetJacobian(snes,Jmat,Jmat,PETSC_NULL_FUNCTION,0,ierr)   ! Use this for the combined computation of residual and Jacobian.
       !CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobian,0,ierr) ! The expensive but safe one. Jacobian computed independently.
       !CALL SNESSetJacobian(snes,Jmfmat,Jmat,FormJacobian,0,ierr) ! This should work as matrix-free (JFNK). Jacobian computed independently.
 
@@ -87,9 +89,9 @@ MODULE fully_implicit
 
       
       ! These three lines to use the direct solver.
-      CALL SNESGetKSP(snes,kspnk,ierr)
-      CALL KSPGetPC(kspnk,pcnk,ierr)
-      CALL PCSetType(pcnk,PCLU,ierr)
+      !CALL SNESGetKSP(snes,kspnk,ierr)
+      !CALL KSPGetPC(kspnk,pcnk,ierr)
+      !CALL PCSetType(pcnk,PCLU,ierr)
 
       !CALL KSPSetTolerances(kspnk,rtol,abstol,PETSC_DEFAULT_REAL,maxit,ierr)
       !CALL KSPSetTolerances(ksp,1.e-4,PETSC_DEFAULT_REAL,PETSC_DEFAULT_REAL,20,ierr)
@@ -102,7 +104,7 @@ MODULE fully_implicit
       !  to employ an initial guess of zero, the user should explicitly set
       !  this vector to zero by calling VecSet().
 
-      SET_SOLVEC_TO_ZERO = .TRUE.
+      SET_SOLVEC_TO_ZERO = .FALSE.
 
       IF (SET_SOLVEC_TO_ZERO) THEN
          CALL VecSet(solvec,0.d0,ierr)
@@ -121,7 +123,7 @@ MODULE fully_implicit
       !CALL SNESComputeJacobianDefault(snes,solvec,testJ,testJ,ierr)
       !CALL MatView(testJ,PETSC_VIEWER_STDOUT_WORLD,ierr)
 
-      IF (JACOBIAN_TYPE == 3) CALL COMPUTE_MASS_MATRICES
+      IF (JACOBIAN_TYPE == 3) CALL COMPUTE_MASS_MATRICES(particles)
 
       CALL SNESSolve(snes,PETSC_NULL_VEC,solvec,ierr)
       CALL SNESGetConvergedReason(snes,snesreason,ierr)
@@ -281,7 +283,7 @@ MODULE fully_implicit
 
 
 
-   SUBROUTINE FormJacobian(snes,x,jac,B,dummy,ierr_l)
+   SUBROUTINE FormJacobian(snes,x,B,jac,dummy,ierr_l)
 
       IMPLICIT NONE
 
@@ -340,6 +342,7 @@ MODULE fully_implicit
       !  Advect the particles using the guessed new potential
       ALLOCATE(part_adv, SOURCE = particles)
       CALL ADVECT_CN(part_adv, .FALSE., .TRUE., jac)
+      IF (JACOBIAN_TYPE == 4) CALL COMPUTE_MASS_MATRICES(part_adv)
       DEALLOCATE(part_adv)
 
 
@@ -393,7 +396,7 @@ MODULE fully_implicit
                                     + U2D_GRID%NODE_COORDS(V3, 2))/3.
                         END IF
 
-                        IF (JACOBIAN_TYPE == 3) THEN
+                        IF (JACOBIAN_TYPE == 3 .OR. JACOBIAN_TYPE == 4) THEN
                            KPQ = KPQ * (MASS_MATRIX(I)+1)
                         END IF
 
@@ -419,7 +422,7 @@ MODULE fully_implicit
                                     + U3D_GRID%BASIS_COEFFS(I,P,2)*U3D_GRID%BASIS_COEFFS(I,Q,2) &
                                     + U3D_GRID%BASIS_COEFFS(I,P,3)*U3D_GRID%BASIS_COEFFS(I,Q,3))
 
-                        IF (JACOBIAN_TYPE == 3) THEN
+                        IF (JACOBIAN_TYPE == 3 .OR. JACOBIAN_TYPE == 4) THEN
                            KPQ = KPQ * (MASS_MATRIX(I)+1)
                         END IF
 
@@ -451,9 +454,9 @@ MODULE fully_implicit
       CALL MatAssemblyBegin(jac,MAT_FINAL_ASSEMBLY,ierr)
       CALL MatAssemblyEnd(jac,MAT_FINAL_ASSEMBLY,ierr)
 
-      !CALL MatAssemblyBegin(B,MAT_FINAL_ASSEMBLY,ierr)
-      !CALL MatAssemblyEnd(B,MAT_FINAL_ASSEMBLY,ierr)
-      B = jac
+      CALL MatAssemblyBegin(B,MAT_FINAL_ASSEMBLY,ierr)
+      CALL MatAssemblyEnd(B,MAT_FINAL_ASSEMBLY,ierr)
+      !B = jac
 
    END SUBROUTINE FormJacobian
 
@@ -578,6 +581,7 @@ MODULE fully_implicit
       ALLOCATE(part_adv, SOURCE = particles)
       CALL ADVECT_CN(part_adv, .FALSE., .TRUE., Jmat)
       CALL DEPOSIT_CHARGE(part_adv)
+      IF (JACOBIAN_TYPE == 4) CALL COMPUTE_MASS_MATRICES(part_adv)
       DEALLOCATE(part_adv)
 
       ! Compute the new potential from the charge distribution
@@ -636,7 +640,7 @@ MODULE fully_implicit
                                     + U2D_GRID%NODE_COORDS(V3, 2))/3.
                         END IF
 
-                        IF (JACOBIAN_TYPE == 3) THEN
+                        IF (JACOBIAN_TYPE == 3 .OR. JACOBIAN_TYPE == 4) THEN
                            KPQ = KPQ * (MASS_MATRIX(I)+1)
                         END IF
 
@@ -662,7 +666,7 @@ MODULE fully_implicit
                                     + U3D_GRID%BASIS_COEFFS(I,P,2)*U3D_GRID%BASIS_COEFFS(I,Q,2) &
                                     + U3D_GRID%BASIS_COEFFS(I,P,3)*U3D_GRID%BASIS_COEFFS(I,Q,3))
                         
-                        IF (JACOBIAN_TYPE == 3) THEN
+                        IF (JACOBIAN_TYPE == 3 .OR. JACOBIAN_TYPE == 4) THEN
                            KPQ = KPQ * (MASS_MATRIX(I)+1)
                         END IF
 
@@ -685,15 +689,18 @@ MODULE fully_implicit
       CALL MatAssemblyBegin(Jmat,MAT_FINAL_ASSEMBLY,ierr)
       CALL MatAssemblyEnd(Jmat,MAT_FINAL_ASSEMBLY,ierr)
 
+      CALL MatView(Jmat,PETSC_VIEWER_DRAW_WORLD,ierr)
+
    END SUBROUTINE FormFunctionAndJacobian
 
 
 
 
-   SUBROUTINE COMPUTE_MASS_MATRICES
+   SUBROUTINE COMPUTE_MASS_MATRICES(part_to_deposit)
 
       IMPLICIT NONE
 
+      TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE, INTENT(IN) :: part_to_deposit
       INTEGER :: JP, IC
 
       REAL(KIND=8) :: CHARGE
@@ -711,21 +718,21 @@ MODULE fully_implicit
       MASS_MATRIX = 0.d0
 
       DO JP = 1, NP_PROC
-         CHARGE = SPECIES(particles(JP)%S_ID)%CHARGE
+         CHARGE = SPECIES(part_to_deposit(JP)%S_ID)%CHARGE
          IF (ABS(CHARGE) .LT. 1.d-6) CYCLE
 
          IF (GRID_TYPE == UNSTRUCTURED) THEN
-            IC = particles(JP)%IC
+            IC = part_to_deposit(JP)%IC
 
             IF (DIMS == 2) THEN
                
-               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/CELL_AREAS(IC)/(ZMAX-ZMIN)*FNUM &
-                                 * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
+               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*part_to_deposit(JP)%DTRIM/EPS0/CELL_AREAS(IC)/(ZMAX-ZMIN)*FNUM &
+                                 * (QE*CHARGE)**2/SPECIES(part_to_deposit(JP)%S_ID)%MOLECULAR_MASS
 
             ELSE IF (DIMS == 3) THEN
 
-               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/CELL_VOLUMES(IC)*FNUM &
-                                 * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
+               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*part_to_deposit(JP)%DTRIM/EPS0/CELL_VOLUMES(IC)*FNUM &
+                                 * (QE*CHARGE)**2/SPECIES(part_to_deposit(JP)%S_ID)%MOLECULAR_MASS
 
             END IF
          ELSE
@@ -773,7 +780,6 @@ MODULE fully_implicit
       PetscInt cols(2000)
       PetscScalar dxdexvals(2000), dxdeyvals(2000), dydexvals(2000), dydeyvals(2000), vals(2000)
       PetscInt first_row, last_row
-      PetscInt f500
 
       PetscViewer  viewer
 
@@ -801,11 +807,11 @@ MODULE fully_implicit
       INTEGER, DIMENSION(3) :: NEXTVERT
       INTEGER, DIMENSION(8) :: EDGEINDEX
       REAL(KIND=8), DIMENSION(8) :: COLLTIMES
-      INTEGER, DIMENSION(200) :: EBARIDX
-      REAL(KIND=8), DIMENSION(200) :: DVXDEX, DVYDEX, DVXDEY, DVYDEY, DXDEX, DYDEX, DXDEY, DYDEY, DTDEX, DTDEY, &
+      INTEGER, DIMENSION(2000) :: EBARIDX
+      REAL(KIND=8), DIMENSION(2000) :: DVXDEX, DVYDEX, DVXDEY, DVYDEY, DXDEX, DYDEX, DXDEY, DYDEY, DTDEX, DTDEY, &
       DTDEXPREC, DTDEYPREC, DALPHADEX, DALPHADEY, DBETADEX, DBETADEY, DGAMMADEX, DGAMMADEY
       REAL(KIND=8) :: NEWVX, NEWVY
-      INTEGER :: LOC, NUMSTEPS
+      INTEGER :: LOC, NUMSTEPS, MAXNUMSTEPS
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, AREA, VALXX, VALXY, VALYX, VALYY
       REAL(KIND=8) :: DPSI1DX, DPSI1DY, DPSI2DX, DPSI2DY, DPSI3DX, DPSI3DY, DPSJ1DX, DPSJ1DY, DPSJ2DX, DPSJ2DY, DPSJ3DX, DPSJ3DY
       INTEGER :: V1I, V2I, V3I, V1J, V2J, V3J, COUNTER
@@ -827,14 +833,14 @@ MODULE fully_implicit
       !    OPEN(66332, FILE='crossings', POSITION='append', STATUS='unknown', ACTION='write')
       ! END IF
 
-      IF (JACOBIAN_TYPE .LT. 1 .OR. JACOBIAN_TYPE .GT. 3) CALL ERROR_ABORT('Jacobian type not supported.')
+      IF (JACOBIAN_TYPE .LT. 1 .OR. JACOBIAN_TYPE .GT. 4) CALL ERROR_ABORT('Jacobian type not supported.')
 
       TOL = 1e-15
 
       SIZE = NCELLS
 
+      MAXNUMSTEPS = 0
       IF (COMPUTE_JACOBIAN .AND. JACOBIAN_TYPE == 1) THEN
-         f500 = 500
          CALL MatCreate(PETSC_COMM_WORLD,dxde,ierr)
          CALL MatSetSizes(dxde,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
          CALL MatSetType(dxde, MATMPIAIJ, ierr)
@@ -1288,6 +1294,8 @@ MODULE fully_implicit
                      NUMSTEPS = LOC
                      EBARIDX(LOC) = IC-1
                   END IF
+                  
+                  IF (NUMSTEPS > MAXNUMSTEPS) MAXNUMSTEPS = NUMSTEPS
 
                   IF (BOUNDCOLL .NE. -1) THEN
                      DTADV = DTCOLL
@@ -1465,6 +1473,8 @@ MODULE fully_implicit
          END IF
 
       END DO ! End loop: DO IP = 1,NP_PROC
+
+      WRITE(*,*) 'Max number of steps on proc ', PROC_ID, ' = ', MAXNUMSTEPS
 
 
       IF (COMPUTE_JACOBIAN .AND. JACOBIAN_TYPE == 1) THEN

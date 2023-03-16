@@ -1095,7 +1095,7 @@ MODULE fields
                         RPRIME(2) = POINT(2) - WIRER*COS(THETA)
                         RPRIME(3) = POINT(3) - WIRER*SIN(THETA)
                         
-                        B_FIELD(IN, 1, :) = B_FIELD(IN, 1, :) + MU0/(4*PI)*CROSS(DL, RPRIME) / &
+                        B_FIELD(IN, 1, :) = B_FIELD(IN, 1, :) + SOLENOIDS(ICOIL)%WIRE_CURRENT*MU0/(4*PI)*CROSS(DL, RPRIME) / &
                         (RPRIME(1)*RPRIME(1) + RPRIME(2)*RPRIME(2) + RPRIME(3)*RPRIME(3))**1.5
                      
                      END DO

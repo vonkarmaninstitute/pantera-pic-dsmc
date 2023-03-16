@@ -17,11 +17,11 @@
 Dimensions:
     2
 Axisymmetric:
-    .FALSE.
+    .TRUE.
 Number_of_cells:
-    256    256    1
+    1    1    1
 Domain_limits:
-    -1.0e-4    1.0e-4    -1.0e-4    1.0e-4    -1.0e-4    1.0e-4
+    -1.0    1.0    0.0    1.0    -3.141592654    3.141592654
 Domain_periodicity:
     .FALSE.   .FALSE.   .FALSE.
 Domain_specular:
@@ -32,9 +32,9 @@ Boundary_temperature:
     300.0
     
 PIC_type:
-    explicit
-!Mesh_file_SU2:
-!    'implicittest.su2'
+    none
+Mesh_file_SU2:
+    'testmesh.su2'
 Bool_dump_moments:
     .FALSE.
 Bool_dump_fluxes:
@@ -53,7 +53,7 @@ Fnum:  ! Ratio of real-to-simulated particles
 Timestep:
     1.0e-9
 Number_of_timesteps:
-    1000
+    1
 Stats_every:
     1
 
@@ -75,7 +75,7 @@ Dump_part_start:
 
 
 Perform_checks:
-    .TRUE.
+    .FALSE.
 
 ! ========= Multispecies ==============================
 
@@ -100,8 +100,8 @@ Collision_type: ! [MCC / DSMC / BGK / NONE]
 !MCC_background_mixture:
 !  Neutrals
 
-BGK_sigma:
-   1.0e-19
+!BGK_sigma:
+!   1.0e-19
 
 ! DSMC VHS collisions
 
@@ -127,11 +127,11 @@ Thermal_bath_Ttr:
 ! ========= Initial particle seed ===================
 
 
-Initial_particles:
-    Ions   1.0e11    0.0    0.0    0.0    300.0    300.0    300.0    0.    0.
+!Initial_particles:
+!    Ions   1.0e11    0.0    0.0    0.0    300.0    300.0    300.0    0.    0.
 
-Initial_particles:
-    Electrons   1.0e11    0.0    0.0    0.0    11600.0    11600.0    11600.0    0.    0.
+!Initial_particles:
+!    Electrons   1.0e11    0.0    0.0    0.0    11600.0    11600.0    11600.0    0.    0.
 
 
     
@@ -170,8 +170,8 @@ Initial_particles:
 !    Emitter    Argon    1.0e15    0.0    0.0    0.0    300.0    300.0    300.0
 
     
-!Solenoid_field:
-!    -0.035    0.055    -0.01    0.06    20    5    1.0
+Solenoid_field:
+    -0.135     0.09    -0.065    0.15    32    25    15.0
     
 ! ========= MPI parallelization =====================
 ! == Style for MPI domain partition can be:

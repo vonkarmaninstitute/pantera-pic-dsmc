@@ -344,15 +344,16 @@ CONTAINS
       REAL(KIND=8) :: XP, YP, ZP, VX, VY, VZ, EROT, EVIB, DTRIM
       INTEGER      :: S_ID, IC
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
-
+      character(len=100) :: iomsg
       WRITE(filename, "(A,A,I0.5,A6,I0.8)") TRIM(ADJUSTL(PARTDUMP_SAVE_PATH)), "proc_", PROC_ID, "_time_", TIMESTEP ! Compose filename
 
       ! Open file for reading
       IF (BOOL_BINARY_OUTPUT) THEN
          OPEN(1010, FILE=filename, ACCESS='SEQUENTIAL', FORM='UNFORMATTED', STATUS='OLD', &
-         CONVERT='BIG_ENDIAN', RECL=80, IOSTAT=ios)
+         CONVERT='BIG_ENDIAN', RECL=80, IOSTAT=ios, IOMSG=iomsg)
 
          IF (ios .NE. 0) THEN
+            WRITE(*,*) 'iomsg was ', iomsg
             CALL ERROR_ABORT('Attention, particle restart file not found! ABORTING.')
          ENDIF
 
@@ -385,6 +386,27 @@ CONTAINS
 
 
    END SUBROUTINE READ_PARTICLES_FILE
+
+
+   SUBROUTINE DUPLICATE_PARTICLES
+
+      IMPLICIT NONE
+
+      INTEGER :: IP, NP_PROC_INITIAL
+      TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
+
+      NP_PROC_INITIAL = NP_PROC
+      DO IP = 1, NP_PROC
+         CALL INIT_PARTICLE(particles(IP)%X, particles(IP)%Y, particles(IP)%Z, &
+         particles(IP)%VX + 10.d0*rf()-5.d0, &
+         particles(IP)%VY + 10.d0*rf()-5.d0, &
+         particles(IP)%VZ + 10.d0*rf()-5.d0, &
+         particles(IP)%EROT, particles(IP)%EVIB, particles(IP)%S_ID, &
+         particles(IP)%IC, particles(IP)%DTRIM, particleNOW) ! Save in particle
+         CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
+      END DO
+
+   END SUBROUTINE DUPLICATE_PARTICLES
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE DUMP_TRAJECTORY_FILE -> dumps particle trajectory to file !

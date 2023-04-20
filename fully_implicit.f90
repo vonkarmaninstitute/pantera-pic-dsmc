@@ -15,7 +15,7 @@ MODULE fully_implicit
 
    IMPLICIT NONE
 
-   Mat Amat, Jmat, Jmfmat
+   Mat Amat, Jmat, Jmfmat, Qmat, Rmat, Qmatfact
    Vec bvec, xvec, x_seq, solvec_seq, xvec_seq, rvec, solvec
    VecScatter ctx
    KSP ksp, kspnk
@@ -31,16 +31,27 @@ MODULE fully_implicit
    SNES snes
    SNESLineSearch linesearch
    PetscViewer viewer
+   IS rowperm, colperm
+   MatFactorInfo  info(MAT_FACTORINFO_SIZE)
 
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CELL_NE, CELL_TE
+   LOGICAL :: JACOBIAN_FREE = .FALSE.
 
    CONTAINS
    
+
+   ! Reminder of JACOBIAN_TYPE:
+   ! 1 --> Exact Jacobian from following all particles and taking all partial derivatives
+   ! 2 --> Approximate Jacobian neglecting d(Dt) terms
+   ! 3 --> ECSIM-like mass matrices. Accumulation is done with particles before advection
+   ! 4 --> ECSIM-like mass matrices. Accumulation is done with particles after advection
+   ! 5 --> The Chacon suggested one. Particle moments taken before advection. Requires a matrix inversion that at the moment does not work.
+   ! 6 --> Boltzmann's relation (with fixed density and temperature), currently not working.
 
 
    SUBROUTINE SOLVE_POISSON_FULLY_IMPLICIT
 
       LOGICAL :: SET_SOLVEC_TO_ZERO = .FALSE.
-
       PetscScalar, POINTER :: solvec_l(:)
 
       CALL SNESCreate(PETSC_COMM_WORLD,snes,ierr)
@@ -54,13 +65,12 @@ MODULE fully_implicit
       CALL VecSetFromOptions(rvec, ierr)
       CALL VecDuplicate(rvec, solvec, ierr)
 
-      CALL SNESSetFunction(snes,rvec,FormFunctionAndJacobian,0,ierr) ! Function and Jacobian computed together
-      !CALL SNESSetFunction(snes,rvec,FormFunction,0,ierr) ! Function and Jacobian computed separately
+
+      !CALL SNESSetFunction(snes,rvec,FormFunctionAndJacobian,0,ierr) ! Function and Jacobian computed together
+      CALL SNESSetFunction(snes,rvec,FormFunction,0,ierr) ! Function and Jacobian computed separately
 
 
-      CALL MatCreate(PETSC_COMM_WORLD,Jmat,ierr)
-      CALL MatSetSizes(Jmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
-      CALL MatSetType(Jmat, MATMPIAIJ, ierr)
+
       !CALL MatSetOption(Jmat,MAT_SPD,PETSC_TRUE,ierr)
       !CALL MatMPIAIJSetPreallocation(Jmat,30,PETSC_NULL_INTEGER,30,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
       !CALL MatSetFromOptions(Jmat,ierr)
@@ -70,14 +80,30 @@ MODULE fully_implicit
       !CALL MatSetSizes(Jmfmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
       !CALL MatSetType(Jmfmat,MATSHELL,ierr)
       !CALL MatSetUp(Jmfmat,ierr)
-      !CALL MatCreateSNESMF(snes,Jmfmat,ierr)
 
 
+      IF (JACOBIAN_FREE) THEN
+         !CALL MatCreateSNESMF(snes,Jmfmat,ierr)
+         !CALL SNESSetJacobian(snes,Jmfmat,Jmat,FormJacobian,0,ierr) ! This should work as matrix-free (JFNK). Jacobian computed independently.
+         CALL MatCreate(PETSC_COMM_WORLD,Jmat,ierr)
+         CALL MatSetSizes(Jmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
+         CALL MatSetType(Jmat, MATMPIAIJ, ierr)
 
-      CALL SNESSetJacobian(snes,Jmat,Jmat,PETSC_NULL_FUNCTION,0,ierr)   ! Use this for the combined computation of residual and Jacobian.
-      !CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobian,0,ierr) ! The expensive but safe one. Jacobian computed independently.
-      !CALL SNESSetJacobian(snes,Jmfmat,Jmat,FormJacobian,0,ierr) ! This should work as matrix-free (JFNK). Jacobian computed independently.
+         CALL MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ctx,Jmfmat,ierr)
+         CALL MatShellSetOperation(Jmfmat,MATOP_MULT,FormJacobianVectorProduct,ierr)
+         WRITE(*,*) 'Done setting up 1.'
+         CALL SNESSetJacobian(snes,Jmfmat,Jmat,FormJacobian,0,ierr) ! The expensive but safe one. Jacobian computed independently.
+         WRITE(*,*) 'Done setting up 2.'
+         CALL SNESSetUseMatrixFree(snes, .TRUE., .TRUE.,ierr)
+         WRITE(*,*) 'Done setting up 3.'
 
+      ELSE
+         CALL MatCreate(PETSC_COMM_WORLD,Jmat,ierr)
+         CALL MatSetSizes(Jmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
+         CALL MatSetType(Jmat, MATMPIAIJ, ierr)
+         !CALL SNESSetJacobian(snes,Jmat,Jmat,PETSC_NULL_FUNCTION,0,ierr)   ! Use this for the combined computation of residual and Jacobian.
+         CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobian,0,ierr) ! The expensive but safe one. Jacobian computed independently.
+      END IF
 
       !abstol = 1.d-5
       !rtol = 1.d-5
@@ -85,9 +111,9 @@ MODULE fully_implicit
       maxit = 10
       maxf = 30
       !CALL SNESSetTolerances(snes, abstol, rtol, stol, maxit, maxf, ierr)
-      CALL SNESSetTolerances(snes, PETSC_DEFAULT_REAL, PETSC_DEFAULT_REAL, PETSC_DEFAULT_REAL, maxit, maxf, ierr)
+      !CALL SNESSetTolerances(snes, PETSC_DEFAULT_REAL, PETSC_DEFAULT_REAL, PETSC_DEFAULT_REAL, maxit, maxf, ierr)
 
-      
+
       ! These three lines to use the direct solver.
       !CALL SNESGetKSP(snes,kspnk,ierr)
       !CALL KSPGetPC(kspnk,pcnk,ierr)
@@ -124,6 +150,7 @@ MODULE fully_implicit
       !CALL MatView(testJ,PETSC_VIEWER_STDOUT_WORLD,ierr)
 
       IF (JACOBIAN_TYPE == 3) CALL COMPUTE_MASS_MATRICES(particles)
+      IF (JACOBIAN_TYPE == 5) CALL COMPUTE_DENSITY_TEMPERATURE(particles)
 
       CALL SNESSolve(snes,PETSC_NULL_VEC,solvec,ierr)
       CALL SNESGetConvergedReason(snes,snesreason,ierr)
@@ -152,6 +179,103 @@ MODULE fully_implicit
    END SUBROUTINE SOLVE_POISSON_FULLY_IMPLICIT
 
 
+   SUBROUTINE FormJacobianVectorProduct(jac, x, y)
+
+
+      Mat jac
+      Vec x, y
+      INTEGER I, IC
+
+      INTEGER :: V1, V2, V3
+      INTEGER :: P, Q, VP, VQ
+      REAL(KIND=8) :: KPQ, VOLUME, AREA
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) 'FormJacobianVectorProduct Called'
+      END IF
+
+      CALL MatCreate(PETSC_COMM_WORLD,jac,ierr)
+      CALL MatSetSizes(jac,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
+      CALL MatSetType(jac, MATMPIAIJ, ierr)
+
+      CALL COMPUTE_MASS_MATRICES(particles)
+
+      CALL MatGetOwnershipRange( jac, Istart, Iend, ierr)
+
+      ! Accumulate Jacobian. All this is in principle not needed since we already have Amat.
+
+      IF (DIMS == 2) THEN
+         DO I = 1, NCELLS
+            AREA = CELL_AREAS(I)
+            
+            ! We need to ADD to a sparse matrix entry.
+            DO P = 1, 3
+               VP = U2D_GRID%CELL_NODES(I,P)
+               IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(VP-1)) THEN
+                     DO Q = 1, 3
+                        VQ = U2D_GRID%CELL_NODES(I,Q)
+                        KPQ = AREA*(U2D_GRID%BASIS_COEFFS(I,P,1)*U2D_GRID%BASIS_COEFFS(I,Q,1) &
+                                  + U2D_GRID%BASIS_COEFFS(I,P,2)*U2D_GRID%BASIS_COEFFS(I,Q,2))
+                        
+                        IF (AXI) THEN
+                           KPQ = KPQ*(U2D_GRID%NODE_COORDS(V1, 2) &
+                                    + U2D_GRID%NODE_COORDS(V2, 2) &
+                                    + U2D_GRID%NODE_COORDS(V3, 2))/3.
+                        END IF
+
+                        IF (JACOBIAN_TYPE == 3 .OR. JACOBIAN_TYPE == 4) THEN
+                           KPQ = KPQ * (MASS_MATRIX(I)+1)
+                        END IF
+
+                        CALL MatSetValues(jac,one,VP-1,one,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
+                     END DO
+                  END IF
+               END IF
+            END DO
+
+         END DO
+      ELSE IF (DIMS == 3) THEN
+         DO I = 1, NCELLS
+            VOLUME = CELL_VOLUMES(I)
+            
+            ! We need to ADD to a sparse matrix entry.
+            DO P = 1, 4
+               VP = U3D_GRID%CELL_NODES(I,P)
+               IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(VP-1)) THEN
+                     DO Q = 1, 4
+                        VQ = U3D_GRID%CELL_NODES(I,Q)
+                        KPQ = VOLUME*(U3D_GRID%BASIS_COEFFS(I,P,1)*U3D_GRID%BASIS_COEFFS(I,Q,1) &
+                                    + U3D_GRID%BASIS_COEFFS(I,P,2)*U3D_GRID%BASIS_COEFFS(I,Q,2) &
+                                    + U3D_GRID%BASIS_COEFFS(I,P,3)*U3D_GRID%BASIS_COEFFS(I,Q,3))
+
+                        IF (JACOBIAN_TYPE == 3 .OR. JACOBIAN_TYPE == 4) THEN
+                           KPQ = KPQ * (MASS_MATRIX(I)+1)
+                        END IF
+
+                        CALL MatSetValues(jac,one,VP-1,one,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
+                     END DO
+                  END IF
+               END IF
+            END DO
+
+         END DO
+      END IF
+
+      CALL MatAssemblyBegin(jac,MAT_FLUSH_ASSEMBLY,ierr)
+      CALL MatAssemblyEnd(jac,MAT_FLUSH_ASSEMBLY,ierr)
+
+      DO I = Istart, Iend-1
+         IF (IS_DIRICHLET(I)) CALL MatSetValues(jac,one,I,one,I,-2.d0,INSERT_VALUES,ierr)
+      END DO
+
+      CALL MatAssemblyBegin(jac,MAT_FINAL_ASSEMBLY,ierr)
+      CALL MatAssemblyEnd(jac,MAT_FINAL_ASSEMBLY,ierr)
+
+      CALL MatMult(jac, x, y, ierr)
+
+   END SUBROUTINE FormJacobianVectorProduct
 
 
    SUBROUTINE FormFunction(snes,x,f,dummy,ierr_l)
@@ -283,13 +407,13 @@ MODULE fully_implicit
 
 
 
-   SUBROUTINE FormJacobian(snes,x,B,jac,dummy,ierr_l)
+   SUBROUTINE FormJacobian(snes,x,jactofill,precond,dummy,ierr_l)
 
       IMPLICIT NONE
 
       SNES snes
       Vec x
-      Mat jac, B
+      Mat jac, B, jactofill, precond
       PetscErrorCode ierr_l
       INTEGER dummy(*)
       INTEGER I, IC
@@ -298,13 +422,23 @@ MODULE fully_implicit
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA
       INTEGER :: V1, V2, V3
       INTEGER :: P, Q, VP, VQ
-      REAL(KIND=8) :: KPQ, VOLUME
+      REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD
       TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: part_adv
+      REAL(KIND=8) :: MPQ, FACTOR1, FACTOR2, ME
+      INTEGER :: ELECTRON_S_ID
 
       IF (PROC_ID == 0) THEN
          WRITE(*,*) 'FormJacobian Called'
       END IF
 
+
+      IF (JACOBIAN_FREE) THEN
+         jac = precond
+         B = jactofill
+      ELSE
+         jac = jactofill
+         B = precond
+      END IF
 
       f30 = 30
       CALL MatMPIAIJSetPreallocation(jac,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
@@ -343,9 +477,25 @@ MODULE fully_implicit
       ALLOCATE(part_adv, SOURCE = particles)
       CALL ADVECT_CN(part_adv, .FALSE., .TRUE., jac)
       IF (JACOBIAN_TYPE == 4) CALL COMPUTE_MASS_MATRICES(part_adv)
+      IF (JACOBIAN_TYPE == 6) CALL COMPUTE_DENSITY_TEMPERATURE(part_adv)
       DEALLOCATE(part_adv)
 
 
+      CALL MatGetOwnershipRange( jac, Istart, Iend, ierr)
+      IF (JACOBIAN_TYPE == 6) THEN
+         DO I = 1, NCELLS
+            AREA = CELL_AREAS(I)
+            DO P = 1, 3
+               VP = U2D_GRID%CELL_NODES(I,P)
+               IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(VP-1)) THEN
+                     VALUETOADD = -QE*QE*5.d11/(EPS0*KB*11600.d0)*AREA/3.
+                     !CALL MatSetValues(jac,one,VP-1,one,VP-1,VALUETOADD,ADD_VALUES,ierr)
+                  END IF
+               END IF
+            END DO
+         END DO
+      END IF
       !CALL MatAssemblyBegin(jac,MAT_FLUSH_ASSEMBLY,ierr)
       !CALL MatAssemblyEnd(jac,MAT_FLUSH_ASSEMBLY,ierr)
 
@@ -373,6 +523,79 @@ MODULE fully_implicit
 
 
       CALL MatGetOwnershipRange( jac, Istart, Iend, ierr)
+
+
+
+
+      IF (JACOBIAN_TYPE == 5) THEN
+
+         CALL MatCreate(PETSC_COMM_WORLD,Qmat,ierr)
+         CALL MatSetSizes(Qmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
+         CALL MatSetType(Qmat, MATMPIAIJ, ierr)
+         CALL MatMPIAIJSetPreallocation(Qmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
+         CALL MatSetFromOptions(Qmat,ierr)
+         CALL MatSetUp(Qmat,ierr)
+
+         CALL MatCreate(PETSC_COMM_WORLD,Rmat,ierr)
+         CALL MatSetSizes(Rmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
+         CALL MatSetType(Rmat, MATMPIAIJ, ierr)
+         CALL MatMPIAIJSetPreallocation(Rmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
+         CALL MatSetFromOptions(Rmat,ierr)
+         CALL MatSetUp(Rmat,ierr)
+
+         ELECTRON_S_ID = SPECIES_NAME_TO_ID('e')
+         ME = SPECIES(ELECTRON_S_ID)%MOLECULAR_MASS
+         IF (DIMS == 2) THEN
+            DO I = 1, NCELLS
+               AREA = CELL_AREAS(I)
+               FACTOR1 = 0.25*DT*DT*KB*CELL_TE(I)/ME
+               FACTOR2 = 0.25*DT*DT*QE*QE*CELL_NE(I)/EPS0/ME
+               ! We need to ADD to a sparse matrix entry.
+               DO P = 1, 3
+                  VP = U2D_GRID%CELL_NODES(I,P)
+                  IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
+                     DO Q = 1, 3
+                        VQ = U2D_GRID%CELL_NODES(I,Q)
+                        IF (Q==P) THEN
+                           MPQ = AREA/6.
+                        ELSE
+                           MPQ = AREA/12.
+                        END IF
+                        KPQ = AREA*(U2D_GRID%BASIS_COEFFS(I,P,1)*U2D_GRID%BASIS_COEFFS(I,Q,1) &
+                                  + U2D_GRID%BASIS_COEFFS(I,P,2)*U2D_GRID%BASIS_COEFFS(I,Q,2))
+                        
+                        CALL MatSetValues(Qmat,one,VP-1,one,VQ-1,MPQ,ADD_VALUES,ierr)
+                        CALL MatSetValues(Qmat,one,VP-1,one,VQ-1,KPQ*FACTOR1,ADD_VALUES,ierr)
+                        CALL MatSetValues(Rmat,one,VP-1,one,VQ-1,KPQ*FACTOR2,ADD_VALUES,ierr)
+                     END DO
+                  END IF
+               END DO
+   
+            END DO
+         ELSE
+            CALL ERROR_ABORT('Not implemented!')
+         END IF
+
+         CALL MatAssemblyBegin(Qmat,MAT_FINAL_ASSEMBLY,ierr)
+         CALL MatAssemblyEnd(Qmat,MAT_FINAL_ASSEMBLY,ierr)
+
+         CALL MatAssemblyBegin(Rmat,MAT_FINAL_ASSEMBLY,ierr)
+         CALL MatAssemblyEnd(Rmat,MAT_FINAL_ASSEMBLY,ierr)
+
+         CALL PetscViewerBinaryOpen(PETSC_COMM_WORLD, 'QMatrix', FILE_MODE_WRITE, viewer, ierr)
+         CALL MatView(Qmat,viewer,ierr)
+         CALL PetscViewerDestroy(viewer,ierr)
+         WRITE(*,*) 'Q written to file.'
+
+         CALL PetscViewerBinaryOpen(PETSC_COMM_WORLD, 'RMatrix', FILE_MODE_WRITE, viewer, ierr)
+         CALL MatView(Rmat,viewer,ierr)
+         CALL PetscViewerDestroy(viewer,ierr)
+         WRITE(*,*) 'R written to file.'
+
+         CALL SLEEP(10)
+
+      END IF
+
 
       ! Accumulate Jacobian. All this is in principle not needed since we already have Amat.
 
@@ -458,6 +681,13 @@ MODULE fully_implicit
       CALL MatAssemblyEnd(B,MAT_FINAL_ASSEMBLY,ierr)
       !B = jac
 
+      
+      CALL PetscViewerBinaryOpen(PETSC_COMM_WORLD, 'JacobianMatrix', FILE_MODE_WRITE, viewer, ierr)
+      CALL MatView(jac,viewer,ierr)
+      CALL PetscViewerDestroy(viewer,ierr)
+      WRITE(*,*) 'Jacobian written to file.'
+      CALL SLEEP(10)
+
    END SUBROUTINE FormJacobian
 
 
@@ -481,6 +711,8 @@ MODULE fully_implicit
       INTEGER :: V1, V2, V3, I, IC
       INTEGER :: P, Q, VP, VQ
       REAL(KIND=8) :: KPQ, VOLUME
+      REAL(KIND=8) :: MPQ, FACTOR1, FACTOR2, ME
+      INTEGER :: ELECTRON_S_ID
 
       TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: part_adv
 
@@ -618,6 +850,82 @@ MODULE fully_implicit
       CALL MatAssemblyEnd(Jmat,MAT_FLUSH_ASSEMBLY,ierr)
       CALL MatGetOwnershipRange( Jmat, Istart, Iend, ierr)
 
+
+
+      IF (JACOBIAN_TYPE == 5) THEN
+
+         CALL MatCreate(PETSC_COMM_WORLD,Qmat,ierr)
+         CALL MatSetSizes(Qmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
+         CALL MatSetType(Qmat, MATMPIAIJ, ierr)
+         CALL MatMPIAIJSetPreallocation(Qmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
+         CALL MatSetFromOptions(Qmat,ierr)
+         CALL MatSetUp(Qmat,ierr)
+
+         CALL MatCreate(PETSC_COMM_WORLD,Rmat,ierr)
+         CALL MatSetSizes(Rmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
+         CALL MatSetType(Rmat, MATMPIAIJ, ierr)
+         CALL MatMPIAIJSetPreallocation(Rmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
+         CALL MatSetFromOptions(Rmat,ierr)
+         CALL MatSetUp(Rmat,ierr)
+
+         ELECTRON_S_ID = SPECIES_NAME_TO_ID('e')
+         ME = SPECIES(ELECTRON_S_ID)%MOLECULAR_MASS
+
+         IF (DIMS == 2) THEN
+            DO I = 1, NCELLS
+               AREA = CELL_AREAS(I)
+               FACTOR1 = 0.25*DT*DT*KB*CELL_TE(I)/ME
+               FACTOR2 = -0.25*DT*DT*QE*QE*CELL_NE(I)/EPS0/ME
+               ! We need to ADD to a sparse matrix entry.
+               DO P = 1, 3
+                  VP = U2D_GRID%CELL_NODES(I,P)
+                  IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
+                     DO Q = 1, 3
+                        VQ = U2D_GRID%CELL_NODES(I,Q)
+                        IF (Q==P) THEN
+                           MPQ = AREA/6.
+                        ELSE
+                           MPQ = AREA/12.
+                        END IF
+                        KPQ = AREA*(U2D_GRID%BASIS_COEFFS(I,P,1)*U2D_GRID%BASIS_COEFFS(I,Q,1) &
+                                  + U2D_GRID%BASIS_COEFFS(I,P,2)*U2D_GRID%BASIS_COEFFS(I,Q,2))
+                        
+                        CALL MatSetValues(Qmat,one,VP-1,one,VQ-1,MPQ,ADD_VALUES,ierr)
+                        CALL MatSetValues(Qmat,one,VP-1,one,VQ-1,KPQ*FACTOR1,ADD_VALUES,ierr)
+                        CALL MatSetValues(Rmat,one,VP-1,one,VQ-1,KPQ*FACTOR2,ADD_VALUES,ierr)
+                     END DO
+                  END IF
+               END DO
+   
+            END DO
+         ELSE
+            CALL ERROR_ABORT('Not implemented!')
+         END IF
+
+         CALL MatAssemblyBegin(Qmat,MAT_FINAL_ASSEMBLY,ierr)
+         CALL MatAssemblyEnd(Qmat,MAT_FINAL_ASSEMBLY,ierr)
+
+         CALL MatAssemblyBegin(Rmat,MAT_FINAL_ASSEMBLY,ierr)
+         CALL MatAssemblyEnd(Rmat,MAT_FINAL_ASSEMBLY,ierr)
+
+         CALL MatGetOrdering(Qmat, MATORDERINGNATURAL, rowperm, colperm, ierr)
+
+         WRITE(*,*) 'Solved MatGetOrdering'
+
+         CALL MatGetFactor(Qmat, MATSOLVERMUMPS, MAT_FACTOR_LU, Qmatfact,ierr)
+         WRITE(*,*) 'Solved MatGetFactor'
+
+         CALL MatLUFactorSymbolic(Qmatfact, Qmat, rowperm, colperm, info, ierr)
+         WRITE(*,*) 'Solved MatLUFactorSymbolic'
+         CALL MatLUFactorNumeric(Qmatfact, Qmat, info,ierr)
+         WRITE(*,*) 'Solved MatLUFactorNumeric'
+         CALL MatMatSolve(Qmatfact, Rmat, Jmat, ierr)
+
+      END IF
+
+      WRITE(*,*) 'Solved MatMat'
+
+
       ! Accumulate Jacobian. All this is in principle not needed since we already have Amat.
 
       IF (DIMS == 2) THEN
@@ -753,6 +1061,140 @@ MODULE fully_implicit
    END SUBROUTINE COMPUTE_MASS_MATRICES
 
 
+
+
+   SUBROUTINE COMPUTE_DENSITY_TEMPERATURE(part_to_deposit)
+
+      IMPLICIT NONE
+
+      TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE, INTENT(IN) :: part_to_deposit
+
+      INTEGER, DIMENSION(:), ALLOCATABLE      :: TIMESTEP_NP
+   
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_VX
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_VY
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_VZ
+
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_VX2
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_VY2
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_VZ2
+
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_TTRX
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_TTRY
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_TTRZ
+      
+      INTEGER :: JP, IC, ELECTRON_S_ID
+      REAL(KIND=8) :: ME, NUMPART
+
+      ELECTRON_S_ID = SPECIES_NAME_TO_ID('e')
+      ME = SPECIES(ELECTRON_S_ID)%MOLECULAR_MASS
+
+      IF (.NOT. GRID_TYPE == UNSTRUCTURED) CALL ERROR_ABORT('Not implemented.')
+
+
+      IF (.NOT. ALLOCATED(CELL_NE)) ALLOCATE(CELL_NE(NCELLS))
+      CELL_NE = 0
+      IF (.NOT. ALLOCATED(CELL_TE)) ALLOCATE(CELL_TE(NCELLS))
+      CELL_TE = 0
+
+      ALLOCATE(TIMESTEP_NP(NCELLS))
+
+      ALLOCATE(TIMESTEP_VX(NCELLS))
+      ALLOCATE(TIMESTEP_VY(NCELLS))
+      ALLOCATE(TIMESTEP_VZ(NCELLS))
+
+      ALLOCATE(TIMESTEP_VX2(NCELLS))
+      ALLOCATE(TIMESTEP_VY2(NCELLS))
+      ALLOCATE(TIMESTEP_VZ2(NCELLS))
+
+      ALLOCATE(TIMESTEP_TTRX(NCELLS))
+      ALLOCATE(TIMESTEP_TTRY(NCELLS))
+      ALLOCATE(TIMESTEP_TTRZ(NCELLS))
+
+      TIMESTEP_NP = 0
+
+      TIMESTEP_VX = 0
+      TIMESTEP_VY = 0
+      TIMESTEP_VZ = 0
+
+      TIMESTEP_VX2 = 0
+      TIMESTEP_VY2 = 0
+      TIMESTEP_VZ2 = 0
+
+      TIMESTEP_TTRX = 0
+      TIMESTEP_TTRY = 0
+      TIMESTEP_TTRZ = 0
+
+      DO JP = 1, NP_PROC
+         IF (part_to_deposit(JP)%S_ID .NE. ELECTRON_S_ID) CYCLE
+
+         IC = part_to_deposit(JP)%IC
+
+         TIMESTEP_NP(IC) = TIMESTEP_NP(IC) + 1
+         TIMESTEP_VX(IC) = TIMESTEP_VX(IC) + part_to_deposit(JP)%VX
+         TIMESTEP_VY(IC) = TIMESTEP_VY(IC) + part_to_deposit(JP)%VY
+         TIMESTEP_VZ(IC) = TIMESTEP_VZ(IC) + part_to_deposit(JP)%VZ
+         TIMESTEP_VX2(IC) = TIMESTEP_VX2(IC) + part_to_deposit(JP)%VX*part_to_deposit(JP)%VX
+         TIMESTEP_VY2(IC) = TIMESTEP_VY2(IC) + part_to_deposit(JP)%VY*part_to_deposit(JP)%VY
+         TIMESTEP_VZ2(IC) = TIMESTEP_VZ2(IC) + part_to_deposit(JP)%VZ*part_to_deposit(JP)%VZ
+
+      END DO
+
+      ! Collect data from all the processes
+      IF (PROC_ID .EQ. 0) THEN
+         CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_NP,  NCELLS, MPI_INTEGER,          MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_VX,  NCELLS, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_VY,  NCELLS, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_VZ,  NCELLS, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_VX2, NCELLS, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_VY2, NCELLS, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_VZ2, NCELLS, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+
+      ELSE
+         CALL MPI_REDUCE(TIMESTEP_NP,   TIMESTEP_NP,  NCELLS, MPI_INTEGER,          MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         CALL MPI_REDUCE(TIMESTEP_VX,   TIMESTEP_VX,  NCELLS, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         CALL MPI_REDUCE(TIMESTEP_VY,   TIMESTEP_VY,  NCELLS, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         CALL MPI_REDUCE(TIMESTEP_VZ,   TIMESTEP_VZ,  NCELLS, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         CALL MPI_REDUCE(TIMESTEP_VX2,  TIMESTEP_VX2, NCELLS, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         CALL MPI_REDUCE(TIMESTEP_VY2,  TIMESTEP_VY2, NCELLS, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         CALL MPI_REDUCE(TIMESTEP_VZ2,  TIMESTEP_VZ2, NCELLS, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      END IF
+
+      DO IC = 1, NCELLS
+         IF (TIMESTEP_NP(IC) .GT. 1) THEN
+            NUMPART = DBLE(TIMESTEP_NP(IC))
+            
+            TIMESTEP_VX(IC) = TIMESTEP_VX(IC) / NUMPART
+            TIMESTEP_VY(IC) = TIMESTEP_VY(IC) / NUMPART
+            TIMESTEP_VZ(IC) = TIMESTEP_VZ(IC) / NUMPART
+            TIMESTEP_TTRX(IC) = ME / KB &
+               * (TIMESTEP_VX2(IC)/NUMPART - TIMESTEP_VX(IC)*TIMESTEP_VX(IC))
+            TIMESTEP_TTRY(IC) = ME / KB &
+               * (TIMESTEP_VY2(IC)/NUMPART - TIMESTEP_VY(IC)*TIMESTEP_VY(IC))
+            TIMESTEP_TTRZ(IC) = ME / KB &
+               * (TIMESTEP_VZ2(IC)/NUMPART - TIMESTEP_VZ(IC)*TIMESTEP_VZ(IC))
+         END IF
+      END DO
+
+      CELL_NE = TIMESTEP_NP*FNUM / CELL_VOLUMES
+      CELL_TE = (TIMESTEP_TTRX + TIMESTEP_TTRY + TIMESTEP_TTRZ) / 3.
+
+      DEALLOCATE(TIMESTEP_NP)
+
+      DEALLOCATE(TIMESTEP_VX)
+      DEALLOCATE(TIMESTEP_VY)
+      DEALLOCATE(TIMESTEP_VZ)
+
+      DEALLOCATE(TIMESTEP_VX2)
+      DEALLOCATE(TIMESTEP_VY2)
+      DEALLOCATE(TIMESTEP_VZ2)
+
+      DEALLOCATE(TIMESTEP_TTRX)
+      DEALLOCATE(TIMESTEP_TTRY)
+      DEALLOCATE(TIMESTEP_TTRZ)
+
+   END SUBROUTINE COMPUTE_DENSITY_TEMPERATURE
+
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE ADVECT_CN -> Advects particles in the domain using a Crank-Nicholson scheme for fully implicit !!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -833,7 +1275,7 @@ MODULE fully_implicit
       !    OPEN(66332, FILE='crossings', POSITION='append', STATUS='unknown', ACTION='write')
       ! END IF
 
-      IF (JACOBIAN_TYPE .LT. 1 .OR. JACOBIAN_TYPE .GT. 4) CALL ERROR_ABORT('Jacobian type not supported.')
+      IF (JACOBIAN_TYPE .LT. 1 .OR. JACOBIAN_TYPE .GT. 6) CALL ERROR_ABORT('Jacobian type not supported.')
 
       TOL = 1e-15
 
@@ -1215,6 +1657,8 @@ MODULE fully_implicit
                      EBARIDX(LOC) = IC-1
                   END IF
 
+                  IF (NUMSTEPS > MAXNUMSTEPS) MAXNUMSTEPS = NUMSTEPS
+
                   QOM = SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS
 
                   IF (BOUNDCOLL .NE. -1) THEN
@@ -1474,7 +1918,7 @@ MODULE fully_implicit
 
       END DO ! End loop: DO IP = 1,NP_PROC
 
-      WRITE(*,*) 'Max number of steps on proc ', PROC_ID, ' = ', MAXNUMSTEPS
+      !WRITE(*,*) 'Max number of steps on proc ', PROC_ID, ' = ', MAXNUMSTEPS
 
 
       IF (COMPUTE_JACOBIAN .AND. JACOBIAN_TYPE == 1) THEN
@@ -1819,6 +2263,32 @@ MODULE fully_implicit
 
       END IF
    END SUBROUTINE APPLY_E_FIELD
+
+
+
+   SUBROUTINE APPLY_B_FIELD(JP, B)
+
+      IMPLICIT NONE
+
+      REAL(KIND=8), DIMENSION(3), INTENT(OUT) :: B
+      INTEGER, INTENT(IN) :: JP
+      INTEGER :: J, VJ, IC
+      REAL(KIND=8) :: PSIJ
+
+      IC = particles(JP)%IC
+      B = 0.d0
+      IF (GRID_TYPE == UNSTRUCTURED) THEN
+         DO J = 1, 3
+            VJ = U2D_GRID%CELL_NODES(IC, J)
+            PSIJ = particles(JP)%X*U2D_GRID%BASIS_COEFFS(IC,J,1) &
+                 + particles(JP)%Y*U2D_GRID%BASIS_COEFFS(IC,J,2) &
+                 + U2D_GRID%BASIS_COEFFS(IC,J,3)
+            B = B + B_FIELD(VJ, 1, :)*PSIJ
+         END DO
+      END IF
+
+
+   END SUBROUTINE APPLY_B_FIELD
 
 
    SUBROUTINE WALL_REACT(IP, REMOVE)

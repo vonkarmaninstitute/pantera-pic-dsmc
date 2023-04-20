@@ -835,6 +835,7 @@ MODULE timecycle
             !PHIBAR_FIELD = 0.d0
             !EBAR_FIELD = 0.d0
             CALL APPLY_E_FIELD(IP, E)
+            CALL APPLY_B_FIELD(IP, B)
             !CALL APPLY_RF_E_FIELD(IP, E)
             
 

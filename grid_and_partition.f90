@@ -1043,7 +1043,7 @@ MODULE grid_and_partition
          Y2 = U2D_GRID%NODE_COORDS(V2, 2)
          Y3 = U2D_GRID%NODE_COORDS(V3, 2)
 
-         ! These are such that PSI_i = SUM_j [ x_j * BASIS_COEFFS(IC,i,j) ] + BASIS_COEFFS(IC,i,4)
+         ! These are such that PSI_i = SUM_j [ x_j * BASIS_COEFFS(IC,i,j) ] + BASIS_COEFFS(IC,i,3)
 
          U2D_GRID%BASIS_COEFFS(I,1,1) =  Y2-Y3
          U2D_GRID%BASIS_COEFFS(I,1,2) = -(X2-X3)

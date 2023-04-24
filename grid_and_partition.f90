@@ -232,6 +232,7 @@ MODULE grid_and_partition
                   CENTROID(I) = (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,1), 2) &
                               +  U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,2), 2) &
                               +  U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,3), 2)) / 3.
+                  CENTROID(I) = rf()
                   ORDER(I) = I
                END DO
          
@@ -251,11 +252,10 @@ MODULE grid_and_partition
             ! END IF
             ! CALL MPI_BARRIER(MPI_COMM_WORLD, ierr)
             ! STOP
-            IF (PROC_ID == 0) THEN
-               WRITE(*,*) 'Starting to sort'
-               CALL QUICKSORT(CENTROID, ORDER, NCELLS)
-               WRITE(*,*) 'Done sorting'
-            END IF
+
+            WRITE(*,*) 'Starting to sort'
+            CALL QUICKSORT(CENTROID, ORDER, NCELLS)
+            WRITE(*,*) 'Done sorting'
 
             IPROC = 0
             DO I = 1, NCELLS

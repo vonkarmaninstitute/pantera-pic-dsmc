@@ -238,18 +238,7 @@ MODULE grid_and_partition
             END IF
 
             WRITE(*,*) 'Started sorting'
-            IF (PROC_ID == 0) THEN
-               ALLOCATE(ARRAY_TEST(10))
-               ALLOCATE(ORDER_TEST(10))
-               ARRAY_TEST = [2.3, 4.4, 0.2, 1.0, 1.12, 7.9, 101.1, 2.1, 67.5, 11.1]
-               WRITE(*,*) ARRAY_TEST
-               ORDER_TEST = [1,2,3,4,5,6,7,8,9,10]
-               CALL QUICKSORT(ARRAY_TEST, ORDER_TEST, 10)
-               WRITE(*,*) ARRAY_TEST
-               WRITE(*,*) ORDER_TEST
-            END IF
-
-            !CALL QUICKSORT(CENTROID, ORDER, NCELLS)
+            CALL QUICKSORT(CENTROID, ORDER, NCELLS)
             WRITE(*,*) 'Ended sorting'
 
             IPROC = 0

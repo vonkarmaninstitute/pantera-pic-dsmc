@@ -151,12 +151,12 @@ MODULE grid_and_partition
 
       INTEGER :: IDCELL
       INTEGER :: NCELLSPP
-      INTEGER :: I, J, IPROC, IP
-      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CENTROID, ARRAY_TEST
+      INTEGER :: I, J, IPROC, IP, IC
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CENTROID
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: WEIGHT
       INTEGER, DIMENSION(:), ALLOCATABLE :: NP_CELLS
       REAL(KIND=8) :: COORDMAX, COORDMIN, WEIGHT_PER_PROC, CUMULATIVE_WEIGHT
-      INTEGER, DIMENSION(:), ALLOCATABLE :: ORDER, ORDER_TEST
+      INTEGER, DIMENSION(:), ALLOCATABLE :: ORDER
 
       ! Weight is a generic measure that is ideally directly proportional to the computational cost for each cell.
 
@@ -237,14 +237,13 @@ MODULE grid_and_partition
          
             END IF
 
-            WRITE(*,*) 'Started sorting'
             CALL QUICKSORT(CENTROID, ORDER, NCELLS)
-            WRITE(*,*) 'Ended sorting'
 
             IPROC = 0
             DO I = 1, NCELLS
-               CUMULATIVE_WEIGHT = CUMULATIVE_WEIGHT + WEIGHT(I)
-               CELL_PROCS(I) = IPROC
+               IC = ORDER(I)
+               CUMULATIVE_WEIGHT = CUMULATIVE_WEIGHT + WEIGHT(IC)
+               CELL_PROCS(IC) = IPROC
 
                IF (CUMULATIVE_WEIGHT > WEIGHT_PER_PROC) THEN
                   IPROC = IPROC + 1

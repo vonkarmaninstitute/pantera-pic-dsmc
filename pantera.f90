@@ -42,6 +42,7 @@ PROGRAM PANTERA
    ! ========= Initial particles seed ======================
    IF (RESTART_TIMESTEP > 0) THEN
       CALL READ_PARTICLES_FILE(RESTART_TIMESTEP)
+      CALL REASSIGN_PARTICLES_TO_CELLS
       tID = RESTART_TIMESTEP
    ELSE
       tID = 0

@@ -221,9 +221,6 @@ CONTAINS
       ! OLD OLD OL A loop is performed on the processes, making sure that
       ! OLD OLD OL processes don't do it simultaneously, messing up the dump.
 
-      USE global
-      USE mpi_common
-
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: TIMESTEP
@@ -251,9 +248,6 @@ CONTAINS
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    SUBROUTINE DUMP_PARTICLES_FILE(TIMESTEP)
-
-      USE global
-      USE mpi_common
 
       IMPLICIT NONE
 
@@ -294,9 +288,6 @@ CONTAINS
 
    SUBROUTINE DUMP_BOUNDARY_PARTICLES_FILE(TIMESTEP)
 
-      USE global
-      USE mpi_common
-
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: TIMESTEP
@@ -331,9 +322,6 @@ CONTAINS
 
 
    SUBROUTINE READ_PARTICLES_FILE(TIMESTEP)
-
-      USE global
-      USE mpi_common
 
       IMPLICIT NONE
 
@@ -388,6 +376,122 @@ CONTAINS
    END SUBROUTINE READ_PARTICLES_FILE
 
 
+
+   SUBROUTINE REASSIGN_PARTICLES_TO_CELLS
+
+      IMPLICIT NONE
+
+      REAL(KIND=8) :: DX, DY, CELLXMIN, CELLXMAX, CELLYMIN, CELLYMAX
+      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, XP, YP, PSIP, epsilon
+      INTEGER :: I, J, K, IC, IMIN, IMAX, JMIN, JMAX, V1, V2, V3, N_PARTITIONS_X, N_PARTITIONS_Y, IP, VP
+      INTEGER, DIMENSION(:,:), ALLOCATABLE :: NINGRIDCELL
+      INTEGER, DIMENSION(:,:,:), ALLOCATABLE :: TRISINGRID
+      LOGICAL :: INSIDE
+
+      N_PARTITIONS_X = 100
+      N_PARTITIONS_Y = 100
+      epsilon = 1.d-9
+
+      ! First we assign the unstructured cells to the cells of a cartesian grid, which is easily indexable.
+      IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
+
+         DX = (XMAX-XMIN)/N_PARTITIONS_X
+         DY = (YMAX-YMIN)/N_PARTITIONS_Y
+         
+         ALLOCATE(NINGRIDCELL(N_PARTITIONS_Y, N_PARTITIONS_X))
+         NINGRIDCELL = 0
+
+         DO IC = 1, NCELLS
+            V1 = U2D_GRID%CELL_NODES(IC,1)
+            V2 = U2D_GRID%CELL_NODES(IC,2)
+            V3 = U2D_GRID%CELL_NODES(IC,3)
+   
+            X1 = U2D_GRID%NODE_COORDS(V1, 1)
+            X2 = U2D_GRID%NODE_COORDS(V2, 1)
+            X3 = U2D_GRID%NODE_COORDS(V3, 1)
+            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
+            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
+            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
+
+            CELLXMIN = MIN(X1, X2, X3)
+            CELLXMAX = MAX(X1, X2, X3)
+            CELLYMIN = MIN(Y1, Y2, Y3)
+            CELLYMAX = MAX(Y1, Y2, Y3)
+
+            IMIN = INT((CELLXMIN - XMIN)/DX)
+            IMAX = INT((CELLXMAX - XMIN)/DX)
+            JMIN = INT((CELLYMIN - YMIN)/DY)
+            JMAX = INT((CELLYMAX - YMIN)/DY)
+
+            DO I = IMIN, IMAX
+               DO J = JMIN, JMAX
+                  NINGRIDCELL(J,I) = NINGRIDCELL(J,I) + 1
+               END DO
+            END DO
+
+         END DO
+
+         ALLOCATE(TRISINGRID(MAXVAL(NINGRIDCELL), N_PARTITIONS_Y, N_PARTITIONS_X))
+         NINGRIDCELL = 0
+
+         DO IC = 1, NCELLS
+            V1 = U2D_GRID%CELL_NODES(IC,1)
+            V2 = U2D_GRID%CELL_NODES(IC,2)
+            V3 = U2D_GRID%CELL_NODES(IC,3)
+   
+            X1 = U2D_GRID%NODE_COORDS(V1, 1)
+            X2 = U2D_GRID%NODE_COORDS(V2, 1)
+            X3 = U2D_GRID%NODE_COORDS(V3, 1)
+            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
+            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
+            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
+
+            CELLXMIN = MIN(X1, X2, X3)
+            CELLXMAX = MAX(X1, X2, X3)
+            CELLYMIN = MIN(Y1, Y2, Y3)
+            CELLYMAX = MAX(Y1, Y2, Y3)
+
+            IMIN = INT((CELLXMIN - XMIN)/DX)
+            IMAX = INT((CELLXMAX - XMIN)/DX)
+            JMIN = INT((CELLYMIN - YMIN)/DY)
+            JMAX = INT((CELLYMAX - YMIN)/DY)
+
+            DO I = IMIN, IMAX
+               DO J = JMIN, JMAX
+                  NINGRIDCELL(J,I) = NINGRIDCELL(J,I) + 1
+                  TRISINGRID(NINGRIDCELL(J,I), J, I) = IC
+               END DO
+            END DO
+
+         END DO
+
+         DO IP = 1, NP_PROC
+            XP = particles(IP)%X
+            YP = particles(IP)%Y
+            I = INT((XP-XMIN)/DX)
+            J = INT((YP-YMIN)/DY)
+            DO K = 1, NINGRIDCELL(J,I)
+               IC = TRISINGRID(K, J, I)
+               ! Check if particle IP (XP, YP) is in unstructured cell IC.
+               INSIDE = .TRUE.
+               DO VP = 1, 3
+                  PSIP = XP*U2D_GRID%BASIS_COEFFS(IC,VP,1) + YP*U2D_GRID%BASIS_COEFFS(IC,VP,2) + U2D_GRID%BASIS_COEFFS(IC,VP,3)
+                  IF (PSIP < -epsilon) INSIDE = .FALSE.
+               END DO
+               IF (INSIDE) THEN
+                  particles(IP)%IC = IC
+                  EXIT
+               END IF
+            END DO
+         END DO
+
+      ELSE
+         CALL ERROR_ABORT('Not implemented!')
+      END IF
+
+   END SUBROUTINE REASSIGN_PARTICLES_TO_CELLS
+
+
    SUBROUTINE DUPLICATE_PARTICLES
 
       IMPLICIT NONE
@@ -413,9 +517,6 @@ CONTAINS
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    SUBROUTINE DUMP_TRAJECTORY_FILE(TIMESTEP)
-
-      USE global
-      USE mpi_common
 
       IMPLICIT NONE
 
@@ -444,9 +545,6 @@ CONTAINS
       ! 
       ! OLD OLD OL A loop is performed on the processes, making sure that
       ! OLD OLD OL processes don't do it simultaneously, messing up the dump.
-
-      USE global
-      USE mpi_common
 
       IMPLICIT NONE
 

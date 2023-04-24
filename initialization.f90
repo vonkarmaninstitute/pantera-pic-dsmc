@@ -1867,8 +1867,11 @@ MODULE initialization
 
       IF (GRID_TYPE == UNSTRUCTURED) THEN
          ALLOCATE(E_FIELD(NCELLS, 1, 3))
+         E_FIELD = 0.d0
          ALLOCATE(B_FIELD(NNODES, 1, 3))
+         B_FIELD = 0.d0
          ALLOCATE(EBAR_FIELD(NCELLS, 1, 3))
+         EBAR_FIELD = 0.d0
       ELSE
          NPX = NX + 1
          IF (DIMS == 2) THEN
@@ -1877,6 +1880,7 @@ MODULE initialization
             NPY = 1
          END IF
          ALLOCATE(E_FIELD(0:NPX-1, 0:NPY-1, 3))
+         E_FIELD = 0.d0
       END IF
 
    END SUBROUTINE INITFIELDS

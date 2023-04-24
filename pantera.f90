@@ -30,7 +30,7 @@ PROGRAM PANTERA
    ! ========= Read input file and init variables ==========
    CALL ONLYMASTERPRINT1(PROC_ID, '> READING INPUT DATA...')
    CALL READINPUT          ! Read input file
-   CALL ASSIGN_CELLS_TO_PROCS
+   
    CALL INITVARIOUS        ! Initialize some additional variables
    CALL INITINJECTION      ! Initialize variables for injection
    CALL INITCOLLISIONS     ! Initialize variables for collisions
@@ -43,10 +43,12 @@ PROGRAM PANTERA
    IF (RESTART_TIMESTEP > 0) THEN
       CALL READ_PARTICLES_FILE(RESTART_TIMESTEP)
       CALL REASSIGN_PARTICLES_TO_CELLS
+      CALL ASSIGN_CELLS_TO_PROCS
       tID = RESTART_TIMESTEP
    ELSE
       tID = 0
       RESTART_TIMESTEP = 0
+      CALL ASSIGN_CELLS_TO_PROCS
       CALL INITIAL_SEED
    END IF
    ! CALL DUMP_PARTICLES_SCREEN

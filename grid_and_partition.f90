@@ -150,10 +150,14 @@ MODULE grid_and_partition
 
       INTEGER :: IDCELL
       INTEGER :: NCELLSPP
-      INTEGER :: I, J
+      INTEGER :: I, J, IPROC, IP
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CENTROID
-      REAL(KIND=8) :: COORDMAX, COORDMIN
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: WEIGHT
+      INTEGER, DIMENSION(:), ALLOCATABLE :: NP_CELLS
+      REAL(KIND=8) :: COORDMAX, COORDMIN, WEIGHT_PER_PROC, CUMULATIVE_WEIGHT
+      INTEGER, DIMENSION(:), ALLOCATABLE :: ORDER
 
+      ! Weight is a generic measure that is ideally directly proportional to the computational cost for each cell.
 
       IF (.NOT. ALLOCATED(CELL_PROCS)) ALLOCATE(CELL_PROCS(NCELLS))
 
@@ -162,39 +166,96 @@ MODULE grid_and_partition
          CELL_PROCS = 0
       
       ELSE IF (GRID_TYPE == UNSTRUCTURED) THEN
+         IF (.FALSE. .OR. DIMS .NE. 2) THEN
 
-         ALLOCATE(CENTROID(NCELLS))
+            ALLOCATE(CENTROID(NCELLS))
 
-         IF (DIMS == 3) THEN
+            IF (DIMS == 3) THEN
+
+               DO I = 1, NCELLS
+                  CENTROID(I) = (U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,1), 2) &
+                              +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,2), 2) &
+                              +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,3), 2) &
+                              +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,4), 2)) / 4.
+               END DO
+         
+               COORDMAX = MAXVAL(U3D_GRID%NODE_COORDS(:,2))
+               COORDMIN = MINVAL(U3D_GRID%NODE_COORDS(:,2))
+               
+            ELSE IF (DIMS == 2) THEN
+
+               DO I = 1, NCELLS
+                  CENTROID(I) = (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,1), 2) &
+                              +  U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,2), 2) &
+                              +  U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,3), 2)) / 3.
+               END DO
+         
+               COORDMAX = MAXVAL(U2D_GRID%NODE_COORDS(:,2))
+               COORDMIN = MINVAL(U2D_GRID%NODE_COORDS(:,2))
+         
+            END IF   
 
             DO I = 1, NCELLS
-               CENTROID(I) = (U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,1), 2) &
-                           +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,2), 2) &
-                           +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,3), 2) &
-                           +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,4), 2)) / 4.
+               CELL_PROCS(I) = INT((CENTROID(I)-COORDMIN)/(COORDMAX-COORDMIN)*REAL(N_MPI_THREADS))
             END DO
+
+            DEALLOCATE(CENTROID)
+
+         ELSE
+
+            ALLOCATE(CENTROID(NCELLS))
+            ALLOCATE(WEIGHT(NCELLS))
+            ALLOCATE(ORDER(NCELLS))
+            ALLOCATE(NP_CELLS(NCELLS))
+            ! Assign weight
+            NP_CELLS = 1
+            DO IP = 1, NP_PROC
+               NP_CELLS(particles(IP)%IC) = NP_CELLS(particles(IP)%IC) + 1
+            END DO
+
+            IF (PROC_ID .EQ. 0) THEN
+               CALL MPI_REDUCE(MPI_IN_PLACE, NP_CELLS, NCELLS, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+            ELSE
+               CALL MPI_REDUCE(NP_CELLS,     NP_CELLS, NCELLS, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+            END IF
       
-            COORDMAX = MAXVAL(U3D_GRID%NODE_COORDS(:,2))
-            COORDMIN = MINVAL(U3D_GRID%NODE_COORDS(:,2))
+            CALL MPI_BCAST(NP_CELLS, NCELLS, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+            WEIGHT = DBLE(NP_CELLS) + SUM(NP_CELLS)/10.
             
-         ELSE IF (DIMS == 2) THEN
+            WEIGHT_PER_PROC = SUM(WEIGHT) / DBLE(N_MPI_THREADS)
 
+            IF (DIMS == 2) THEN
+
+               DO I = 1, NCELLS
+                  CENTROID(I) = (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,1), 2) &
+                              +  U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,2), 2) &
+                              +  U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,3), 2)) / 3.
+                  ORDER(I) = I
+               END DO
+         
+               CALL QUICKSORT(CENTROID, ORDER, NCELLS)
+         
+            END IF
+
+            IPROC = 0
             DO I = 1, NCELLS
-               CENTROID(I) = (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,1), 2) &
-                           +  U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,2), 2) &
-                           +  U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,3), 2)) / 3.
+               CUMULATIVE_WEIGHT = CUMULATIVE_WEIGHT + WEIGHT(I)
+               CELL_PROCS(I) = IPROC
+
+               IF (CUMULATIVE_WEIGHT > WEIGHT_PER_PROC) THEN
+                  IPROC = IPROC + 1
+                  CUMULATIVE_WEIGHT = 0
+               END IF
+
             END DO
-      
-            COORDMAX = MAXVAL(U2D_GRID%NODE_COORDS(:,2))
-            COORDMIN = MINVAL(U2D_GRID%NODE_COORDS(:,2))
-      
-         END IF   
 
-         DO I = 1, NCELLS
-            CELL_PROCS(I) = INT((CENTROID(I)-COORDMIN)/(COORDMAX-COORDMIN)*REAL(N_MPI_THREADS))
-         END DO
+            DEALLOCATE(CENTROID)
+            DEALLOCATE(WEIGHT)
+            DEALLOCATE(ORDER)
+            DEALLOCATE(NP_CELLS)
 
-         DEALLOCATE(CENTROID)
+         END IF
 
       ELSE IF (DOMPART_TYPE == 0) THEN ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ S T R I P S
       !

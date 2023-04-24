@@ -237,7 +237,9 @@ MODULE grid_and_partition
          
             END IF
 
+            WRITE(*,*) 'Starting to sort'
             CALL QUICKSORT(CENTROID, ORDER, NCELLS)
+            WRITE(*,*) 'Done sorting'
 
             IPROC = 0
             DO I = 1, NCELLS

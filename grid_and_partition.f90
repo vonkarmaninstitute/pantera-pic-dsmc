@@ -148,14 +148,15 @@ MODULE grid_and_partition
 
    SUBROUTINE ASSIGN_CELLS_TO_PROCS
 
+
       INTEGER :: IDCELL
       INTEGER :: NCELLSPP
       INTEGER :: I, J, IPROC, IP
-      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CENTROID
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CENTROID, ARRAY_TEST
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: WEIGHT
       INTEGER, DIMENSION(:), ALLOCATABLE :: NP_CELLS
       REAL(KIND=8) :: COORDMAX, COORDMIN, WEIGHT_PER_PROC, CUMULATIVE_WEIGHT
-      INTEGER, DIMENSION(:), ALLOCATABLE :: ORDER
+      INTEGER, DIMENSION(:), ALLOCATABLE :: ORDER, ORDER_TEST
 
       ! Weight is a generic measure that is ideally directly proportional to the computational cost for each cell.
 
@@ -237,7 +238,18 @@ MODULE grid_and_partition
             END IF
 
             WRITE(*,*) 'Started sorting'
-            CALL QUICKSORT(CENTROID, ORDER, NCELLS)
+            IF (PROC_ID == 0) THEN
+               ALLOCATE(ARRAY_TEST(10))
+               ALLOCATE(ORDER_TEST(10))
+               ARRAY_TEST = [2.3, 4.4, 0.2, 1.0, 1.12, 7.9, 101.1, 2.1, 67.5, 11.1]
+               WRITE(*,*) ARRAY_TEST
+               ORDER_TEST = [1,2,3,4,5,6,7,8,9,10]
+               CALL QUICKSORT(ARRAY_TEST, ORDER_TEST, 10)
+               WRITE(*,*) ARRAY_TEST
+               WRITE(*,*) ORDER_TEST
+            END IF
+
+            !CALL QUICKSORT(CENTROID, ORDER, NCELLS)
             WRITE(*,*) 'Ended sorting'
 
             IPROC = 0

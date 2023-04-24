@@ -251,13 +251,11 @@ MODULE grid_and_partition
             ! END IF
             ! CALL MPI_BARRIER(MPI_COMM_WORLD, ierr)
             ! STOP
-
-            WRITE(*,*) CENTROID
-            WRITE(*,*) ORDER
-
-            WRITE(*,*) 'Starting to sort'
-            CALL QUICKSORT(CENTROID, ORDER, NCELLS)
-            WRITE(*,*) 'Done sorting'
+            IF (PROC_ID == 0) THEN
+               WRITE(*,*) 'Starting to sort'
+               CALL QUICKSORT(CENTROID, ORDER, NCELLS)
+               WRITE(*,*) 'Done sorting'
+            END IF
 
             IPROC = 0
             DO I = 1, NCELLS

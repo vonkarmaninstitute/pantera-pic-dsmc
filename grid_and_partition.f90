@@ -237,20 +237,23 @@ MODULE grid_and_partition
          
             END IF
 
-            IF (PROC_ID == 0) THEN
-               ALLOCATE(TEST_ARRAY(100000))
-               ALLOCATE(TEST_ORDER(100000))
-               DO I = 1, 100000
-                  TEST_ORDER(I) = I
-                  TEST_ARRAY(I) = rf()
-               END DO
-               WRITE(*,*) 'Starting to test sort'
-               CALL QUICKSORT(TEST_ARRAY, TEST_ORDER, 100000)
-               WRITE(*,*) 'Done test sorting'
-               WRITE(*,*) TEST_ARRAY
-            END IF
-            CALL MPI_BARRIER(MPI_COMM_WORLD, ierr)
-            STOP
+            ! IF (PROC_ID == 0) THEN
+            !    ALLOCATE(TEST_ARRAY(100000))
+            !    ALLOCATE(TEST_ORDER(100000))
+            !    DO I = 1, 100000
+            !       TEST_ORDER(I) = I
+            !       TEST_ARRAY(I) = rf()
+            !    END DO
+            !    WRITE(*,*) 'Starting to test sort'
+            !    CALL QUICKSORT(TEST_ARRAY, TEST_ORDER, 100000)
+            !    WRITE(*,*) 'Done test sorting'
+            !    WRITE(*,*) TEST_ARRAY
+            ! END IF
+            ! CALL MPI_BARRIER(MPI_COMM_WORLD, ierr)
+            ! STOP
+
+            WRITE(*,*) CENTROID
+            WRITE(*,*) ORDER
 
             WRITE(*,*) 'Starting to sort'
             CALL QUICKSORT(CENTROID, ORDER, NCELLS)

@@ -418,10 +418,10 @@ CONTAINS
             CELLYMIN = MIN(Y1, Y2, Y3)
             CELLYMAX = MAX(Y1, Y2, Y3)
 
-            IMIN = INT((CELLXMIN - XMIN)/DX)
-            IMAX = INT((CELLXMAX - XMIN)/DX)
-            JMIN = INT((CELLYMIN - YMIN)/DY)
-            JMAX = INT((CELLYMAX - YMIN)/DY)
+            IMIN = INT((CELLXMIN - XMIN)/DX) + 1
+            IMAX = INT((CELLXMAX - XMIN)/DX) + 1
+            JMIN = INT((CELLYMIN - YMIN)/DY) + 1
+            JMAX = INT((CELLYMAX - YMIN)/DY) + 1
 
             DO I = IMIN, IMAX
                DO J = JMIN, JMAX
@@ -451,10 +451,10 @@ CONTAINS
             CELLYMIN = MIN(Y1, Y2, Y3)
             CELLYMAX = MAX(Y1, Y2, Y3)
 
-            IMIN = INT((CELLXMIN - XMIN)/DX)
-            IMAX = INT((CELLXMAX - XMIN)/DX)
-            JMIN = INT((CELLYMIN - YMIN)/DY)
-            JMAX = INT((CELLYMAX - YMIN)/DY)
+            IMIN = INT((CELLXMIN - XMIN)/DX) + 1
+            IMAX = INT((CELLXMAX - XMIN)/DX) + 1
+            JMIN = INT((CELLYMIN - YMIN)/DY) + 1
+            JMAX = INT((CELLYMAX - YMIN)/DY) + 1
 
             DO I = IMIN, IMAX
                DO J = JMIN, JMAX
@@ -468,8 +468,8 @@ CONTAINS
          DO IP = 1, NP_PROC
             XP = particles(IP)%X
             YP = particles(IP)%Y
-            I = INT((XP-XMIN)/DX)
-            J = INT((YP-YMIN)/DY)
+            I = INT((XP-XMIN)/DX) + 1
+            J = INT((YP-YMIN)/DY) + 1
             DO K = 1, NINGRIDCELL(J,I)
                IC = TRISINGRID(K, J, I)
                ! Check if particle IP (XP, YP) is in unstructured cell IC.

@@ -234,9 +234,11 @@ MODULE grid_and_partition
                   ORDER(I) = I
                END DO
          
-               CALL QUICKSORT(CENTROID, ORDER, NCELLS)
-         
             END IF
+
+            WRITE(*,*) 'Started sorting'
+            CALL QUICKSORT(CENTROID, ORDER, NCELLS)
+            WRITE(*,*) 'Ended sorting'
 
             IPROC = 0
             DO I = 1, NCELLS

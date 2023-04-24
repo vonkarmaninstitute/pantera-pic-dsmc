@@ -774,7 +774,7 @@ CONTAINS
                RIGHT = RIGHT - 1
             END DO
             DO
-               IF (A(LEFT) >= PIVOT) EXIT
+               IF (A(LEFT) > PIVOT) EXIT
                LEFT = LEFT + 1
             END DO
             IF (LEFT < RIGHT) THEN

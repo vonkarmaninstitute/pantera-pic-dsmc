@@ -233,6 +233,7 @@ MODULE grid_and_partition
                               +  U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,2), 2) &
                               +  U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,3), 2)) / 3.
                   CENTROID(I) = rf()
+                  IF (I == 100 .OR. I == 110) CENTROID(I) = 0.12
                   ORDER(I) = I
                END DO
          

@@ -152,11 +152,11 @@ MODULE grid_and_partition
       INTEGER :: IDCELL
       INTEGER :: NCELLSPP
       INTEGER :: I, J, IPROC, IP, IC
-      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CENTROID
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CENTROID, TEST_ARRAY
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: WEIGHT
       INTEGER, DIMENSION(:), ALLOCATABLE :: NP_CELLS
       REAL(KIND=8) :: COORDMAX, COORDMIN, WEIGHT_PER_PROC, CUMULATIVE_WEIGHT
-      INTEGER, DIMENSION(:), ALLOCATABLE :: ORDER
+      INTEGER, DIMENSION(:), ALLOCATABLE :: ORDER, TEST_ORDER
 
       ! Weight is a generic measure that is ideally directly proportional to the computational cost for each cell.
 
@@ -236,6 +236,21 @@ MODULE grid_and_partition
                END DO
          
             END IF
+
+            IF (PROC_ID == 0) THEN
+               ALLOCATE(TEST_ARRAY(100000))
+               ALLOCATE(TEST_ORDER(100000))
+               DO I = 1, 100000
+                  TEST_ORDER(I) = I
+                  TEST_ARRAY(I) = rf()
+               END DO
+               WRITE(*,*) 'Starting to test sort'
+               CALL QUICKSORT(TEST_ARRAY, TEST_ORDER, 100000)
+               WRITE(*,*) 'Done test sorting'
+               WRITE(*,*) TEST_ARRAY
+            END IF
+            CALL MPI_BARRIER(MPI_COMM_WORLD, ierr)
+            STOP
 
             WRITE(*,*) 'Starting to sort'
             CALL QUICKSORT(CENTROID, ORDER, NCELLS)

@@ -840,25 +840,21 @@ CONTAINS
       REAL(KIND=8) :: PIVOT, TEMPA
 
       IF (LO >= 1 .AND. HI >= 1 .AND. LO < HI) THEN
-         PIVOT = ARRAY( INT(DBLE(HI - LO)/2.) + LO )
+         PIVOT = ARRAY(HI)
          I = LO - 1
-         J = HI + 1
-         DO
-            DO 
+         DO J = LO, HI
+            IF (ARRAY(J) <= PIVOT) THEN
                I = I + 1
-               IF (ARRAY(I) < PIVOT) EXIT
-            END DO
-            DO 
-               J = J - 1
-               IF (ARRAY(J) > PIVOT) EXIT
-            END DO
-            IF (I >= J) EXIT
-            TEMPA = ARRAY(I); ARRAY(I) = ARRAY(J); ARRAY(J) = TEMPA
-            TEMPORDER = ORDER(I); ORDER(I) = ORDER(J); ORDER(J) = TEMPORDER
+               TEMPA = ARRAY(I); ARRAY(I) = ARRAY(J); ARRAY(J) = TEMPA
+               TEMPORDER = ORDER(I); ORDER(I) = ORDER(J); ORDER(J) = TEMPORDER
+            END IF
          END DO
-         P = J
-         CALL WIKIQSORT(ARRAY, ORDER, LO, P)
-         CALL WIKIQSORT(ARRAY, ORDER, P + 1, HI)
+         TEMPA = ARRAY(I+1); ARRAY(I+1) = ARRAY(HI); ARRAY(HI) = TEMPA
+         TEMPORDER = ORDER(I+1); ORDER(I+1) = ORDER(HI); ORDER(HI) = TEMPORDER
+         P = I + 1
+
+         CALL WIKIQSORT(ARRAY, ORDER, LO, P-1)
+         CALL WIKIQSORT(ARRAY, ORDER, P+1, HI)
       END IF
    END SUBROUTINE WIKIQSORT
 

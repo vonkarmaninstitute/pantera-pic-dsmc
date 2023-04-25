@@ -242,6 +242,13 @@ MODULE grid_and_partition
 
             CALL WIKIQSORT(CENTROID, ORDER, 1, NCELLS)
 
+            IF (PROC_ID == 0) THEN
+               DO I = 1, NCELLS-1
+                  IF (CENTROID(I+1) > CENTROID(I)) WRITE(*,*) 'C(', I, ') = ', CENTROID(I), 'C(',    I+1, ') = ', CENTROID(I+1)
+               END DO
+            END IF
+   
+
             IPROC = 0
             DO I = 1, NCELLS
                IC = ORDER(I)

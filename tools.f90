@@ -827,7 +827,7 @@ CONTAINS
          TEMPA = array(pivot); array(pivot) = array(j); array(j) = TEMPA
          TEMPORDER = ORDER(pivot); ORDER(pivot) = ORDER(j); ORDER(j) = TEMPORDER
          call qsort(array(: j - 1), order(: j - 1))
-         call qsort(array(j + 1 : ), order(: j - 1))
+         call qsort(array(j + 1 : ), order(j + 1 : ))
       end if
    end subroutine qsort
 

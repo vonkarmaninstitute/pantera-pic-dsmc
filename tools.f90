@@ -831,6 +831,37 @@ CONTAINS
       end if
    end subroutine qsort
 
+   RECURSIVE SUBROUTINE WIKIQSORT(ARRAY, ORDER, LO, HI)
+
+      INTEGER, INTENT(IN) :: LO, HI
+      REAL(KIND=8), INTENT(INOUT) :: ARRAY(:)
+      INTEGER, INTENT(INOUT) :: ORDER(:)
+      INTEGER :: I, J, P, TEMPORDER
+      REAL(KIND=8) :: PIVOT, TEMPA
+
+      IF (LO >= 1 .AND. HI >= 1 .AND. LO < HI) THEN
+         PIVOT = ARRAY( INT(DBLE(HI - LO)/2.) + LO )
+         I = LO - 1
+         J = HI + 1
+         DO
+            DO 
+               I = I + 1
+               IF (ARRAY(I) < PIVOT) EXIT
+            END DO
+            DO 
+               J = J - 1
+               IF (ARRAY(J) > PIVOT) EXIT
+            END DO
+            IF (I >= J) EXIT
+            TEMPA = ARRAY(I); ARRAY(I) = ARRAY(J); ARRAY(J) = TEMPA
+            TEMPORDER = ORDER(I); ORDER(I) = ORDER(J); ORDER(J) = TEMPORDER
+         END DO
+         P = J
+         CALL WIKIQSORT(ARRAY, ORDER, LO, P)
+         CALL WIKIQSORT(ARRAY, ORDER, P + 1, HI)
+      END IF
+   END SUBROUTINE WIKIQSORT
+
 
    SUBROUTINE TIMER_START(SECTION_ID)
       

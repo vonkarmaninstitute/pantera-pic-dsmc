@@ -770,7 +770,7 @@ CONTAINS
          DO
             IF (LEFT >= RIGHT) EXIT
             DO
-               IF (A(RIGHT) <= PIVOT) EXIT
+               IF (A(RIGHT) < PIVOT) EXIT
                RIGHT = RIGHT - 1
             END DO
             DO
@@ -797,6 +797,41 @@ CONTAINS
    END SUBROUTINE QUICKSORT
 
 
+   ! RECURSIVE SUBROUTINE QUICKSORT1(A,ORDER,NA)
+
+   !    implicit none
+
+   !    INTEGER, INTENT(IN) :: NA
+   !    INTEGER, DIMENSION(NA), INTENT(IN OUT) :: ORDER
+   !    REAL(KIND=8), DIMENSION(NA), INTENT(IN OUT) :: A
+
+
+   !    ! LOCAL VARIABLES
+   !    INTEGER :: LEFT, RIGHT
+   !    REAL(KIND=8) :: PIVOT
+   !    INTEGER :: TEMPORDER
+   !    REAL(KIND=8) :: TEMPA
+   !    INTEGER :: MARKER
+
+
+   !    PIVOT = A(INT(DBLE(NA-1)/2.)+1)   ! Choice a random pivot (not best performance, but avoids worst-case)
+   !    LEFT = 1
+   !    RIGHT = NA
+   !    do
+   !       do while (a(LEFT) < PIVOT)
+   !          LEFT=LEFT+1
+   !       end do
+   !       do while (PIVOT < a(RIGHT))
+   !          RIGHT=RIGHT-1
+   !       end do
+   !       if (LEFT >= RIGHT) exit
+   !       TEMPA = a(LEFT);  a(LEFT) = a(RIGHT);  a(RIGHT) = TEMPA
+   !       LEFT=LEFT+1
+   !       RIGHT=RIGHT-1
+   !    end do
+   !    if (1 < LEFT-1) call quicksort1(a(:LEFT-1), ORDER(:,LEFT-1), LEFT-1)
+   !    if (RIGHT+1 < NA)  call quicksort1(a(RIGHT+1:), ORDER(RIGHT+1:), NA-RIGHT)
+   ! end subroutine quicksort1
 
 
    SUBROUTINE TIMER_START(SECTION_ID)

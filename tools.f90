@@ -842,7 +842,7 @@ CONTAINS
       IF (LO >= 1 .AND. HI >= 1 .AND. LO < HI) THEN
          PIVOT = ARRAY(HI)
          I = LO - 1
-         DO J = LO, HI
+         DO J = LO, HI-1
             IF (ARRAY(J) <= PIVOT) THEN
                I = I + 1
                TEMPA = ARRAY(I); ARRAY(I) = ARRAY(J); ARRAY(J) = TEMPA

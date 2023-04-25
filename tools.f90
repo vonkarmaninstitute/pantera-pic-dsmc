@@ -744,94 +744,7 @@ CONTAINS
    END FUNCTION RANDINT
 
 
-   RECURSIVE SUBROUTINE QUICKSORT(A,ORDER,NA)
-
-      ! DUMMY ARGUMENTS
-      INTEGER, INTENT(IN) :: NA
-      INTEGER, DIMENSION(NA), INTENT(IN OUT) :: ORDER
-      REAL(KIND=8), DIMENSION(NA), INTENT(IN OUT) :: A
-
-      ! LOCAL VARIABLES
-      INTEGER :: LEFT, RIGHT
-      !REAL(KIND=8) :: RANDOM
-      REAL(KIND=8) :: PIVOT
-      INTEGER :: TEMPORDER
-      REAL(KIND=8) :: TEMPA
-      INTEGER :: MARKER
-
-      IF (NA > 1) THEN
-
-         !RANDOM = rf()
-         !PIVOT = A(INT(RANDOM*REAL(NA-1))+1)   ! Choice a random pivot (not best performance, but avoids worst-case)
-         PIVOT = A(INT(DBLE(NA-1)/2.)+1)   ! Choice a random pivot (not best performance, but avoids worst-case)
-         LEFT = 1
-         RIGHT = NA
-         ! Partition loop
-         DO
-            IF (LEFT >= RIGHT) EXIT
-            DO
-               IF (A(RIGHT) < PIVOT) EXIT
-               RIGHT = RIGHT - 1
-            END DO
-            DO
-               IF (A(LEFT) > PIVOT) EXIT
-               LEFT = LEFT + 1
-            END DO
-            IF (LEFT < RIGHT) THEN
-               TEMPA = A(LEFT); A(LEFT) = A(RIGHT); A(RIGHT) = TEMPA
-               TEMPORDER = ORDER(LEFT); ORDER(LEFT) = ORDER(RIGHT); ORDER(RIGHT) = TEMPORDER
-            END IF
-         END DO
-
-         IF (LEFT == RIGHT) THEN
-            MARKER = LEFT + 1
-         ELSE
-            MARKER = LEFT
-         END IF
-
-         CALL QUICKSORT(A(:MARKER-1),ORDER(:MARKER-1),MARKER-1)
-         CALL QUICKSORT(A(MARKER:),ORDER(MARKER:),NA-MARKER+1)
-
-      END IF
-
-   END SUBROUTINE QUICKSORT
-
-
-
-   pure recursive subroutine qsort(array, order)
-      real(KIND=8), intent(inout) :: array(:)
-      integer, intent(inout) :: order(:)
-      integer :: pivot, i, j, TEMPORDER
-      REAL(KIND=8) :: TEMPA
-
-      i = 0
-      j = 0
-      pivot = INT(DBLE(size(array)-1)/2.)+1
-      if (size(array) > 1) then
-         i = lbound(array, dim=1)
-         j = ubound(array, dim=1)
-         do while (i <= j)
-            do while (array(i) > array(pivot))
-                  i = i + 1
-            end do
-            do while (array(pivot) > array(j))
-                  j = j - 1
-            end do
-            if (i >= j) exit
-
-            TEMPA = array(i); array(i) = array(j); array(j) = TEMPA
-            TEMPORDER = ORDER(i); ORDER(i) = ORDER(j); ORDER(j) = TEMPORDER
-            i = i + 1
-            j = j - 1
-         end do
-         TEMPA = array(pivot); array(pivot) = array(j); array(j) = TEMPA
-         TEMPORDER = ORDER(pivot); ORDER(pivot) = ORDER(j); ORDER(j) = TEMPORDER
-         call qsort(array(: j - 1), order(: j - 1))
-         call qsort(array(j + 1 : ), order(j + 1 : ))
-      end if
-   end subroutine qsort
-
-   RECURSIVE SUBROUTINE WIKIQSORT(ARRAY, ORDER, LO, HI)
+   RECURSIVE SUBROUTINE QUICKSORT(ARRAY, ORDER, LO, HI)
 
       INTEGER, INTENT(IN) :: LO, HI
       REAL(KIND=8), INTENT(INOUT) :: ARRAY(:)
@@ -853,10 +766,10 @@ CONTAINS
          TEMPORDER = ORDER(I+1); ORDER(I+1) = ORDER(HI); ORDER(HI) = TEMPORDER
          P = I + 1
 
-         CALL WIKIQSORT(ARRAY, ORDER, LO, P-1)
-         CALL WIKIQSORT(ARRAY, ORDER, P+1, HI)
+         CALL QUICKSORT(ARRAY, ORDER, LO, P-1)
+         CALL QUICKSORT(ARRAY, ORDER, P+1, HI)
       END IF
-   END SUBROUTINE WIKIQSORT
+   END SUBROUTINE QUICKSORT
 
 
    SUBROUTINE TIMER_START(SECTION_ID)

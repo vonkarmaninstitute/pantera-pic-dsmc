@@ -237,7 +237,8 @@ MODULE grid_and_partition
          
             END IF
 
-            CALL QUICKSORT(CENTROID, ORDER, NCELLS)
+            !CALL QUICKSORT(CENTROID, ORDER, NCELLS)
+            CALL qsort(CENTROID, ORDER)
 
             IPROC = 0
             DO I = 1, NCELLS

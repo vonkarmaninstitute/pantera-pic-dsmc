@@ -797,41 +797,39 @@ CONTAINS
    END SUBROUTINE QUICKSORT
 
 
-   ! RECURSIVE SUBROUTINE QUICKSORT1(A,ORDER,NA)
 
-   !    implicit none
+   pure recursive subroutine qsort(array, order)
+      real(KIND=8), intent(inout) :: array(:)
+      integer, intent(inout) :: order(:)
+      integer :: pivot, i, j, TEMPORDER
+      REAL(KIND=8) :: TEMPA
 
-   !    INTEGER, INTENT(IN) :: NA
-   !    INTEGER, DIMENSION(NA), INTENT(IN OUT) :: ORDER
-   !    REAL(KIND=8), DIMENSION(NA), INTENT(IN OUT) :: A
+      i = 0
+      j = 0
+      pivot = INT(DBLE(size(array)-1)/2.)+1
+      if (size(array) > 1) then
+         i = lbound(array, dim=1)
+         j = ubound(array, dim=1)
+         do while (i <= j)
+            do while (array(i) > array(pivot))
+                  i = i + 1
+            end do
+            do while (array(pivot) > array(j))
+                  j = j - 1
+            end do
+            if (i >= j) exit
 
-
-   !    ! LOCAL VARIABLES
-   !    INTEGER :: LEFT, RIGHT
-   !    REAL(KIND=8) :: PIVOT
-   !    INTEGER :: TEMPORDER
-   !    REAL(KIND=8) :: TEMPA
-   !    INTEGER :: MARKER
-
-
-   !    PIVOT = A(INT(DBLE(NA-1)/2.)+1)   ! Choice a random pivot (not best performance, but avoids worst-case)
-   !    LEFT = 1
-   !    RIGHT = NA
-   !    do
-   !       do while (a(LEFT) < PIVOT)
-   !          LEFT=LEFT+1
-   !       end do
-   !       do while (PIVOT < a(RIGHT))
-   !          RIGHT=RIGHT-1
-   !       end do
-   !       if (LEFT >= RIGHT) exit
-   !       TEMPA = a(LEFT);  a(LEFT) = a(RIGHT);  a(RIGHT) = TEMPA
-   !       LEFT=LEFT+1
-   !       RIGHT=RIGHT-1
-   !    end do
-   !    if (1 < LEFT-1) call quicksort1(a(:LEFT-1), ORDER(:,LEFT-1), LEFT-1)
-   !    if (RIGHT+1 < NA)  call quicksort1(a(RIGHT+1:), ORDER(RIGHT+1:), NA-RIGHT)
-   ! end subroutine quicksort1
+            TEMPA = array(i); array(i) = array(j); array(j) = TEMPA
+            TEMPORDER = ORDER(i); ORDER(i) = ORDER(j); ORDER(j) = TEMPORDER
+            i = i + 1
+            j = j - 1
+         end do
+         TEMPA = array(pivot); array(pivot) = array(j); array(j) = TEMPA
+         TEMPORDER = ORDER(pivot); ORDER(pivot) = ORDER(j); ORDER(j) = TEMPORDER
+         call qsort(array(: j - 1), order(: j - 1))
+         call qsort(array(j + 1 : ), order(: j - 1))
+      end if
+   end subroutine qsort
 
 
    SUBROUTINE TIMER_START(SECTION_ID)

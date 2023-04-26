@@ -219,6 +219,9 @@ MODULE fully_implicit
                                   + U2D_GRID%BASIS_COEFFS(I,P,2)*U2D_GRID%BASIS_COEFFS(I,Q,2))
                         
                         IF (AXI) THEN
+                           V1 = U2D_GRID%CELL_NODES(I,1)
+                           V2 = U2D_GRID%CELL_NODES(I,2)
+                           V3 = U2D_GRID%CELL_NODES(I,3)  
                            KPQ = KPQ*(U2D_GRID%NODE_COORDS(V1, 2) &
                                     + U2D_GRID%NODE_COORDS(V2, 2) &
                                     + U2D_GRID%NODE_COORDS(V3, 2))/3.
@@ -614,6 +617,9 @@ MODULE fully_implicit
                                   + U2D_GRID%BASIS_COEFFS(I,P,2)*U2D_GRID%BASIS_COEFFS(I,Q,2))
                         
                         IF (AXI) THEN
+                           V1 = U2D_GRID%CELL_NODES(I,1)
+                           V2 = U2D_GRID%CELL_NODES(I,2)
+                           V3 = U2D_GRID%CELL_NODES(I,3)  
                            KPQ = KPQ*(U2D_GRID%NODE_COORDS(V1, 2) &
                                     + U2D_GRID%NODE_COORDS(V2, 2) &
                                     + U2D_GRID%NODE_COORDS(V3, 2))/3.
@@ -943,6 +949,9 @@ MODULE fully_implicit
                                   + U2D_GRID%BASIS_COEFFS(I,P,2)*U2D_GRID%BASIS_COEFFS(I,Q,2))
                         
                         IF (AXI) THEN
+                           V1 = U2D_GRID%CELL_NODES(I,1)
+                           V2 = U2D_GRID%CELL_NODES(I,2)
+                           V3 = U2D_GRID%CELL_NODES(I,3)  
                            KPQ = KPQ*(U2D_GRID%NODE_COORDS(V1, 2) &
                                     + U2D_GRID%NODE_COORDS(V2, 2) &
                                     + U2D_GRID%NODE_COORDS(V3, 2))/3.

@@ -161,6 +161,7 @@ MODULE fully_implicit
       CALL VecScatterCreateToAll(solvec,ctx,solvec_seq,ierr)
       CALL VecScatterBegin(ctx,solvec,solvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
       CALL VecScatterEnd(ctx,solvec,solvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
+      CALL VecScatterDestroy(ctx, ierr)
 
       CALL VecGetArrayReadF90(solvec_seq,PHI_FIELD_TEMP,ierr)
       IF (ALLOCATED(PHIBAR_FIELD)) DEALLOCATE(PHIBAR_FIELD)
@@ -307,6 +308,7 @@ MODULE fully_implicit
       CALL VecScatterCreateToAll(x,ctx,x_seq,ierr)
       CALL VecScatterBegin(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
       CALL VecScatterEnd(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
+      CALL VecScatterDestroy(ctx, ierr)
 
       ! CALL VecGetArrayReadF90(X_SEQ,PHI_FIELD,ierr)
       CALL VecGetArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
@@ -466,6 +468,7 @@ MODULE fully_implicit
       CALL VecScatterCreateToAll(x,ctx,x_seq,ierr)
       CALL VecScatterBegin(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
       CALL VecScatterEnd(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
+      CALL VecScatterDestroy(ctx, ierr)
 
       ! CALL VecGetArrayReadF90(X_SEQ,PHI_FIELD,ierr)
       CALL VecGetArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
@@ -742,6 +745,7 @@ MODULE fully_implicit
       CALL VecScatterCreateToAll(x,ctx,x_seq,ierr)
       CALL VecScatterBegin(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
       CALL VecScatterEnd(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
+      CALL VecScatterDestroy(ctx, ierr)
 
       ! CALL VecGetArrayReadF90(X_SEQ,PHI_FIELD,ierr)
       CALL VecGetArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
@@ -2373,7 +2377,8 @@ MODULE fully_implicit
       CALL VecScatterCreateToAll(xvec,ctx,xvec_seq,ierr)
       CALL VecScatterBegin(ctx,xvec,xvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
       CALL VecScatterEnd(ctx,xvec,xvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
-
+      CALL VecScatterDestroy(ctx, ierr)
+      
       CALL VecGetArrayReadF90(xvec_seq,PHI_FIELD_TEMP,ierr)
       IF (ALLOCATED(PHI_FIELD)) DEALLOCATE(PHI_FIELD)
       ALLOCATE(PHI_FIELD, SOURCE = PHI_FIELD_TEMP)

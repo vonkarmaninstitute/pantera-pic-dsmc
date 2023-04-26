@@ -582,17 +582,17 @@ MODULE fully_implicit
          CALL MatAssemblyBegin(Rmat,MAT_FINAL_ASSEMBLY,ierr)
          CALL MatAssemblyEnd(Rmat,MAT_FINAL_ASSEMBLY,ierr)
 
-         CALL PetscViewerBinaryOpen(PETSC_COMM_WORLD, 'QMatrix', FILE_MODE_WRITE, viewer, ierr)
-         CALL MatView(Qmat,viewer,ierr)
-         CALL PetscViewerDestroy(viewer,ierr)
-         WRITE(*,*) 'Q written to file.'
+         ! CALL PetscViewerBinaryOpen(PETSC_COMM_WORLD, 'QMatrix', FILE_MODE_WRITE, viewer, ierr)
+         ! CALL MatView(Qmat,viewer,ierr)
+         ! CALL PetscViewerDestroy(viewer,ierr)
+         ! WRITE(*,*) 'Q written to file.'
 
-         CALL PetscViewerBinaryOpen(PETSC_COMM_WORLD, 'RMatrix', FILE_MODE_WRITE, viewer, ierr)
-         CALL MatView(Rmat,viewer,ierr)
-         CALL PetscViewerDestroy(viewer,ierr)
-         WRITE(*,*) 'R written to file.'
+         ! CALL PetscViewerBinaryOpen(PETSC_COMM_WORLD, 'RMatrix', FILE_MODE_WRITE, viewer, ierr)
+         ! CALL MatView(Rmat,viewer,ierr)
+         ! CALL PetscViewerDestroy(viewer,ierr)
+         ! WRITE(*,*) 'R written to file.'
 
-         CALL SLEEP(10)
+         ! CALL SLEEP(10)
 
       END IF
 
@@ -682,11 +682,11 @@ MODULE fully_implicit
       !B = jac
 
       
-      CALL PetscViewerBinaryOpen(PETSC_COMM_WORLD, 'JacobianMatrix', FILE_MODE_WRITE, viewer, ierr)
-      CALL MatView(jac,viewer,ierr)
-      CALL PetscViewerDestroy(viewer,ierr)
-      WRITE(*,*) 'Jacobian written to file.'
-      CALL SLEEP(10)
+      ! CALL PetscViewerBinaryOpen(PETSC_COMM_WORLD, 'JacobianMatrix', FILE_MODE_WRITE, viewer, ierr)
+      ! CALL MatView(jac,viewer,ierr)
+      ! CALL PetscViewerDestroy(viewer,ierr)
+      ! WRITE(*,*) 'Jacobian written to file.'
+      ! CALL SLEEP(10)
 
    END SUBROUTINE FormJacobian
 
@@ -997,7 +997,7 @@ MODULE fully_implicit
       CALL MatAssemblyBegin(Jmat,MAT_FINAL_ASSEMBLY,ierr)
       CALL MatAssemblyEnd(Jmat,MAT_FINAL_ASSEMBLY,ierr)
 
-      CALL MatView(Jmat,PETSC_VIEWER_DRAW_WORLD,ierr)
+      ! CALL MatView(Jmat,PETSC_VIEWER_DRAW_WORLD,ierr)
 
    END SUBROUTINE FormFunctionAndJacobian
 

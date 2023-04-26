@@ -437,14 +437,6 @@ MODULE fully_implicit
       END IF
 
 
-      IF (JACOBIAN_FREE) THEN
-         jac = precond
-         B = jactofill
-      ELSE
-         jac = jactofill
-         B = precond
-      END IF
-
       f30 = 30
       CALL MatMPIAIJSetPreallocation(jac,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
       CALL MatSetFromOptions(jac,ierr)
@@ -696,6 +688,14 @@ MODULE fully_implicit
       ! CALL PetscViewerDestroy(viewer,ierr)
       ! WRITE(*,*) 'Jacobian written to file.'
       ! CALL SLEEP(10)
+
+      IF (JACOBIAN_FREE) THEN
+         precond = jac
+         jactofill = B
+      ELSE
+         jactofill = jac
+         precond = B
+      END IF
 
    END SUBROUTINE FormJacobian
 
@@ -2378,7 +2378,7 @@ MODULE fully_implicit
       CALL VecScatterBegin(ctx,xvec,xvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
       CALL VecScatterEnd(ctx,xvec,xvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
       CALL VecScatterDestroy(ctx, ierr)
-      
+
       CALL VecGetArrayReadF90(xvec_seq,PHI_FIELD_TEMP,ierr)
       IF (ALLOCATED(PHI_FIELD)) DEALLOCATE(PHI_FIELD)
       ALLOCATE(PHI_FIELD, SOURCE = PHI_FIELD_TEMP)

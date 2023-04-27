@@ -680,7 +680,7 @@ MODULE fully_implicit
 
       CALL MatAssemblyBegin(B,MAT_FINAL_ASSEMBLY,ierr)
       CALL MatAssemblyEnd(B,MAT_FINAL_ASSEMBLY,ierr)
-      !B = jac
+      B = jac
 
       
       ! CALL PetscViewerBinaryOpen(PETSC_COMM_WORLD, 'JacobianMatrix', FILE_MODE_WRITE, viewer, ierr)

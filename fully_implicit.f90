@@ -689,6 +689,8 @@ MODULE fully_implicit
       ! WRITE(*,*) 'Jacobian written to file.'
       ! CALL SLEEP(10)
 
+      WRITE(*,*) 'Before the assignment.'
+
       IF (JACOBIAN_FREE) THEN
          precond = jac
          jactofill = B
@@ -696,6 +698,8 @@ MODULE fully_implicit
          jactofill = jac
          precond = B
       END IF
+
+      WRITE(*,*) 'After the assignment.'
 
    END SUBROUTINE FormJacobian
 

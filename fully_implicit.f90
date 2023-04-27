@@ -935,8 +935,6 @@ MODULE fully_implicit
 
       END IF
 
-      WRITE(*,*) 'Solved MatMat'
-
 
       ! Accumulate Jacobian. All this is in principle not needed since we already have Amat.
 

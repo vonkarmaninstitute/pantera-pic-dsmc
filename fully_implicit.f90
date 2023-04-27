@@ -437,6 +437,15 @@ MODULE fully_implicit
       END IF
 
 
+
+      IF (JACOBIAN_FREE) THEN
+         jac = precond
+         B = jactofill
+      ELSE
+         jac = jactofill
+         B = precond
+      END IF
+
       f30 = 30
       CALL MatMPIAIJSetPreallocation(jac,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
       CALL MatSetFromOptions(jac,ierr)
@@ -689,17 +698,6 @@ MODULE fully_implicit
       ! WRITE(*,*) 'Jacobian written to file.'
       ! CALL SLEEP(10)
 
-      WRITE(*,*) 'Before the assignment.'
-
-      IF (JACOBIAN_FREE) THEN
-         precond = jac
-         jactofill = B
-      ELSE
-         jactofill = jac
-         precond = B
-      END IF
-
-      WRITE(*,*) 'After the assignment.'
 
    END SUBROUTINE FormJacobian
 

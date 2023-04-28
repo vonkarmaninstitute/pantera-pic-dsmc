@@ -250,6 +250,7 @@ TYPE(UNSTRUCTURED_3D_GRID_DATA_STRUCTURE) :: U3D_GRID
    INTEGER      :: JACOBIAN_TYPE = 1
    LOGICAL      :: COLOCATED_ELECTRONS = .FALSE.
    LOGICAL      :: RESIDUAL_AND_JACOBIAN_COMBINED = .FALSE.
+   REAL(KIND=8) :: SNES_RTOL = 1.d-9
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Collisions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

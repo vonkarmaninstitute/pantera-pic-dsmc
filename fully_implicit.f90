@@ -118,7 +118,7 @@ MODULE fully_implicit
       maxf = 30
       !CALL SNESSetTolerances(snes, abstol, rtol, stol, maxit, maxf, ierr)
       !CALL SNESSetTolerances(snes, PETSC_DEFAULT_REAL, PETSC_DEFAULT_REAL, PETSC_DEFAULT_REAL, maxit, maxf, ierr)
-
+      CALL SNESSetTolerances(snes, PETSC_DEFAULT_REAL, SNES_RTOL, PETSC_DEFAULT_REAL, maxit, maxf, ierr)
 
       ! These three lines to use the direct solver.
       !CALL SNESGetKSP(snes,kspnk,ierr)

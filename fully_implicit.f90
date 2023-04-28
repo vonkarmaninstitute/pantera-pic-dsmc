@@ -66,8 +66,11 @@ MODULE fully_implicit
       CALL VecDuplicate(rvec, solvec, ierr)
 
 
-      CALL SNESSetFunction(snes,rvec,FormFunctionAndJacobian,0,ierr) ! Function and Jacobian computed together
-      !CALL SNESSetFunction(snes,rvec,FormFunction,0,ierr) ! Function and Jacobian computed separately
+      IF (RESIDUAL_AND_JACOBIAN_COMBINED) THEN
+         CALL SNESSetFunction(snes,rvec,FormFunctionAndJacobian,0,ierr) ! Function and Jacobian computed together
+      ELSE
+         CALL SNESSetFunction(snes,rvec,FormFunction,0,ierr) ! Function and Jacobian computed separately
+      END IF
 
 
 
@@ -101,8 +104,11 @@ MODULE fully_implicit
          CALL MatCreate(PETSC_COMM_WORLD,Jmat,ierr)
          CALL MatSetSizes(Jmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
          CALL MatSetType(Jmat, MATMPIAIJ, ierr)
-         CALL SNESSetJacobian(snes,Jmat,Jmat,PETSC_NULL_FUNCTION,0,ierr)   ! Use this for the combined computation of residual and Jacobian.
-         !CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobian,0,ierr) ! The expensive but safe one. Jacobian computed independently.
+         IF (RESIDUAL_AND_JACOBIAN_COMBINED) THEN
+            CALL SNESSetJacobian(snes,Jmat,Jmat,PETSC_NULL_FUNCTION,0,ierr)   ! Use this for the combined computation of residual and Jacobian.
+         ELSE
+            CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobian,0,ierr) ! The expensive but safe one. Jacobian computed independently.
+         END IF
       END IF
 
       !abstol = 1.d-5

@@ -139,6 +139,7 @@ MODULE initialization
          IF (line=='Fluid_electrons_Te:')      READ(in1,*) BOLTZ_TE
 
          IF (line=='Jacobian_type:')           READ(in1,*) JACOBIAN_TYPE
+         IF (line=='Residual_and_jacobian_combined:') READ(in1,*) RESIDUAL_AND_JACOBIAN_COMBINED
          IF (line=='Colocated_electrons:')     READ(in1,*) COLOCATED_ELECTRONS
          
          ! ~~~~~~~~~~~~~  File output ~~~~~~~~~~~~~~~

@@ -152,11 +152,11 @@ MODULE grid_and_partition
       INTEGER :: IDCELL
       INTEGER :: NCELLSPP
       INTEGER :: I, J, IPROC, IP, IC
-      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CENTROID, TEST_ARRAY
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CENTROID
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: WEIGHT
       INTEGER, DIMENSION(:), ALLOCATABLE :: NP_CELLS
       REAL(KIND=8) :: COORDMAX, COORDMIN, WEIGHT_PER_PROC, CUMULATIVE_WEIGHT
-      INTEGER, DIMENSION(:), ALLOCATABLE :: ORDER, TEST_ORDER
+      INTEGER, DIMENSION(:), ALLOCATABLE :: ORDER
 
       ! Weight is a generic measure that is ideally directly proportional to the computational cost for each cell.
 

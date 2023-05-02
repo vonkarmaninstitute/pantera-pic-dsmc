@@ -1620,7 +1620,11 @@ MODULE initialization
                      IF (DIMS == 2) THEN
                         XP = V1(1) + (V2(1)-V1(1))*S + (V3(1)-V1(1))*T
                         YP = V1(2) + (V2(2)-V1(2))*S + (V3(2)-V1(2))*T
-                        ZP = ZMIN + (ZMAX-ZMIN)*U
+                        IF (AXI) THEN
+                           ZP = 0.d0
+                        ELSE
+                           ZP = ZMIN + (ZMAX-ZMIN)*U
+                        END IF
                      ELSE IF (DIMS == 3) THEN
                         ! http://vcg.isti.cnr.it/publications/papers/rndtetra_a.pdf
 

@@ -387,7 +387,7 @@ CONTAINS
       INTEGER, DIMENSION(:,:), ALLOCATABLE :: NINGRIDCELL
       INTEGER, DIMENSION(:,:,:), ALLOCATABLE :: TRISINGRID
       LOGICAL :: INSIDE
-      REAL(KIND=8) :: MINABSPSI
+      !REAL(KIND=8) :: MINABSPSI
 
       N_PARTITIONS_X = 100
       N_PARTITIONS_Y = 100
@@ -472,18 +472,18 @@ CONTAINS
             I = INT((XP-XMIN)/DX) + 1
             J = INT((YP-YMIN)/DY) + 1
             DO K = 1, NINGRIDCELL(J,I)
-               MINABSPSI = 1.d100
+               !MINABSPSI = 1.d100
                IC = TRISINGRID(K, J, I)
                ! Check if particle IP (XP, YP) is in unstructured cell IC.
                INSIDE = .TRUE.
                DO VP = 1, 3
                   PSIP = XP*U2D_GRID%BASIS_COEFFS(IC,VP,1) + YP*U2D_GRID%BASIS_COEFFS(IC,VP,2) + U2D_GRID%BASIS_COEFFS(IC,VP,3)
                   IF (PSIP < 0) INSIDE = .FALSE.
-                  IF (ABS(PSIP) < MINABSPSI) MINABSPSI = ABS(PSIP)
+                  !IF (ABS(PSIP) < MINABSPSI) MINABSPSI = ABS(PSIP)
                END DO
                IF (INSIDE) THEN
-                  IF (particles(IP)%IC .NE. IC) WRITE(*,*) 'Particle has been found in a different cell! IC=', IC, &
-                  ' instead of ', particles(IP)%IC, '. Minimum ABS(PSI) was ', MINABSPSI
+                  !IF (particles(IP)%IC .NE. IC) WRITE(*,*) 'Particle has been found in a different cell! IC=', IC, &
+                  !' instead of ', particles(IP)%IC, '. Minimum ABS(PSI) was ', MINABSPSI
                   particles(IP)%IC = IC
                   EXIT
                END IF

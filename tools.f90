@@ -479,7 +479,8 @@ CONTAINS
                   IF (PSIP < 0) INSIDE = .FALSE.
                END DO
                IF (INSIDE) THEN
-                  IF (particles(IP)%IC .NE. IC) WRITE(*,*) 'Particle has been found in a different cell!'
+                  IF (particles(IP)%IC .NE. IC) WRITE(*,*) 'Particle has been found in a different cell! IC=', IC, &
+                  ' instead of ', particles(IP)%IC
                   particles(IP)%IC = IC
                   EXIT
                END IF

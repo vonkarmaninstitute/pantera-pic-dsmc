@@ -476,9 +476,10 @@ CONTAINS
                INSIDE = .TRUE.
                DO VP = 1, 3
                   PSIP = XP*U2D_GRID%BASIS_COEFFS(IC,VP,1) + YP*U2D_GRID%BASIS_COEFFS(IC,VP,2) + U2D_GRID%BASIS_COEFFS(IC,VP,3)
-                  IF (PSIP < -epsilon) INSIDE = .FALSE.
+                  IF (PSIP < 0) INSIDE = .FALSE.
                END DO
                IF (INSIDE) THEN
+                  IF (particles(IP)%IC .NE. IC) WRITE(*,*) 'Particle has been found in a different cell!'
                   particles(IP)%IC = IC
                   EXIT
                END IF

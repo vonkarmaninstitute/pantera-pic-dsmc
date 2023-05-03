@@ -2252,7 +2252,7 @@ MODULE fully_implicit
       part_adv(IP)%VZ = part_adv(IP)%VZ + ACC(3) * TIME
 
 
-      IF (AXI) THEN
+      IF (.FALSE.) THEN
          !IF (part_adv(IP)%VZ == 0.d0) WRITE(*,*) 'Particle has exactly zero vz velocity!'
          !part_adv(IP)%X = part_adv(IP)%X + part_adv(IP)%VX * TIME
          !part_adv(IP)%Z = 0.d0

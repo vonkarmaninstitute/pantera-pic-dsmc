@@ -2241,6 +2241,9 @@ MODULE fully_implicit
       REAL(KIND=8) :: R, COSTHETA, SINTHETA, VY, VZ
       TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE, INTENT(INOUT) :: part_adv
 
+
+      IF (part_adv(IP)%Z .NE. 0.d0) WRITE(*,*) 'Particle Z coordinate was not zero but ', part_adv(IP)%Z
+
       ACC = E*SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS
 
       part_adv(IP)%X = part_adv(IP)%X + part_adv(IP)%VX*TIME + 0.5*ACC(1)*TIME*TIME
@@ -2252,7 +2255,7 @@ MODULE fully_implicit
       part_adv(IP)%VZ = part_adv(IP)%VZ + ACC(3) * TIME
 
 
-      IF (.FALSE.) THEN
+      IF (AXI) THEN
          !IF (part_adv(IP)%VZ == 0.d0) WRITE(*,*) 'Particle has exactly zero vz velocity!'
          !part_adv(IP)%X = part_adv(IP)%X + part_adv(IP)%VX * TIME
          !part_adv(IP)%Z = 0.d0

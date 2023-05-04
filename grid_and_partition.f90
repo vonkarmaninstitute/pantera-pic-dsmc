@@ -226,7 +226,17 @@ MODULE grid_and_partition
             
             WEIGHT_PER_PROC = SUM(WEIGHT) / DBLE(N_MPI_THREADS)
 
-            IF (DIMS == 2) THEN
+            IF (DIMS == 3) THEN
+
+               DO I = 1, NCELLS
+                  CENTROID(I) = (U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,1), 2) &
+                              +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,2), 2) &
+                              +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,3), 2) &
+                              +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,4), 2)) / 4.
+                  ORDER(I) = I
+               END DO
+               
+            ELSE IF (DIMS == 2) THEN
 
                DO I = 1, NCELLS
                   CENTROID(I) = (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,1), 2) &

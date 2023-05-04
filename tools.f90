@@ -377,12 +377,165 @@ CONTAINS
 
 
 
-   SUBROUTINE REASSIGN_PARTICLES_TO_CELLS
+   SUBROUTINE REASSIGN_PARTICLES_TO_CELLS_3D
+
+      IMPLICIT NONE
+
+      REAL(KIND=8) :: DX, DY, DZ, CELLXMIN, CELLXMAX, CELLYMIN, CELLYMAX, CELLZMIN, CELLZMAX
+      REAL(KIND=8) :: X1, X2, X3, X4, Y1, Y2, Y3, Y4, Z1, Z2, Z3, Z4, XP, YP, ZP, PSIP
+      INTEGER :: I, J, K, IC, IMIN, IMAX, JMIN, JMAX, KMIN, KMAX, V1, V2, V3, V4
+      INTEGER :: N_PARTITIONS_X, N_PARTITIONS_Y, N_PARTITIONS_Z, IP, VP, CELL
+      INTEGER, DIMENSION(:,:,:), ALLOCATABLE :: NINGRIDCELL
+      INTEGER, DIMENSION(:,:,:,:), ALLOCATABLE :: TETRAINGRID
+      LOGICAL :: INSIDE
+      !REAL(KIND=8) :: MINABSPSI
+
+      N_PARTITIONS_X = 100
+      N_PARTITIONS_Y = 100
+      N_PARTITIONS_Z = 100
+
+      ! First we assign the unstructured cells to the cells of a cartesian grid, which is easily indexable.
+      IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
+
+         DX = (XMAX-XMIN)/N_PARTITIONS_X
+         DY = (YMAX-YMIN)/N_PARTITIONS_Y
+         DZ = (ZMAX-ZMIN)/N_PARTITIONS_Z
+         
+         ALLOCATE(NINGRIDCELL(N_PARTITIONS_Z, N_PARTITIONS_Y, N_PARTITIONS_X))
+         NINGRIDCELL = 0
+
+         DO IC = 1, NCELLS
+            V1 = U3D_GRID%CELL_NODES(IC,1)
+            V2 = U3D_GRID%CELL_NODES(IC,2)
+            V3 = U3D_GRID%CELL_NODES(IC,3)
+            V4 = U3D_GRID%CELL_NODES(IC,4)
+   
+            X1 = U3D_GRID%NODE_COORDS(V1, 1)
+            X2 = U3D_GRID%NODE_COORDS(V2, 1)
+            X3 = U3D_GRID%NODE_COORDS(V3, 1)
+            X4 = U3D_GRID%NODE_COORDS(V4, 1)
+            Y1 = U3D_GRID%NODE_COORDS(V1, 2)
+            Y2 = U3D_GRID%NODE_COORDS(V2, 2)
+            Y3 = U3D_GRID%NODE_COORDS(V3, 2)
+            Y4 = U3D_GRID%NODE_COORDS(V4, 2)
+            Z1 = U3D_GRID%NODE_COORDS(V1, 3)
+            Z2 = U3D_GRID%NODE_COORDS(V2, 3)
+            Z3 = U3D_GRID%NODE_COORDS(V3, 3)
+            Z4 = U3D_GRID%NODE_COORDS(V4, 3)
+
+            CELLXMIN = MIN(X1, X2, X3, X4)
+            CELLXMAX = MAX(X1, X2, X3, X4)
+            CELLYMIN = MIN(Y1, Y2, Y3, Y4)
+            CELLYMAX = MAX(Y1, Y2, Y3, Y4)
+            CELLZMIN = MIN(Z1, Z2, Z3, Z4)
+            CELLZMAX = MAX(Z1, Z2, Z3, Z4)
+
+            IMIN = INT((CELLXMIN - XMIN)/DX) + 1
+            IMAX = INT((CELLXMAX - XMIN)/DX) + 1
+            JMIN = INT((CELLYMIN - YMIN)/DY) + 1
+            JMAX = INT((CELLYMAX - YMIN)/DY) + 1
+            KMIN = INT((CELLZMIN - ZMIN)/DZ) + 1
+            KMAX = INT((CELLZMAX - ZMIN)/DZ) + 1
+
+            DO I = IMIN, IMAX
+               DO J = JMIN, JMAX
+                  DO K = KMIN, KMAX
+                     NINGRIDCELL(K,J,I) = NINGRIDCELL(K,J,I) + 1
+                  END DO
+               END DO
+            END DO
+
+         END DO
+
+         ALLOCATE(TETRAINGRID(MAXVAL(NINGRIDCELL), N_PARTITIONS_Z, N_PARTITIONS_Y, N_PARTITIONS_X))
+         NINGRIDCELL = 0
+
+         DO IC = 1, NCELLS
+            V1 = U3D_GRID%CELL_NODES(IC,1)
+            V2 = U3D_GRID%CELL_NODES(IC,2)
+            V3 = U3D_GRID%CELL_NODES(IC,3)
+            V4 = U3D_GRID%CELL_NODES(IC,4)
+   
+            X1 = U3D_GRID%NODE_COORDS(V1, 1)
+            X2 = U3D_GRID%NODE_COORDS(V2, 1)
+            X3 = U3D_GRID%NODE_COORDS(V3, 1)
+            X4 = U3D_GRID%NODE_COORDS(V4, 1)
+            Y1 = U3D_GRID%NODE_COORDS(V1, 2)
+            Y2 = U3D_GRID%NODE_COORDS(V2, 2)
+            Y3 = U3D_GRID%NODE_COORDS(V3, 2)
+            Y4 = U3D_GRID%NODE_COORDS(V4, 2)
+            Z1 = U3D_GRID%NODE_COORDS(V1, 3)
+            Z2 = U3D_GRID%NODE_COORDS(V2, 3)
+            Z3 = U3D_GRID%NODE_COORDS(V3, 3)
+            Z4 = U3D_GRID%NODE_COORDS(V4, 3)
+
+            CELLXMIN = MIN(X1, X2, X3, X4)
+            CELLXMAX = MAX(X1, X2, X3, X4)
+            CELLYMIN = MIN(Y1, Y2, Y3, Y4)
+            CELLYMAX = MAX(Y1, Y2, Y3, Y4)
+            CELLZMIN = MIN(Z1, Z2, Z3, Z4)
+            CELLZMAX = MAX(Z1, Z2, Z3, Z4)
+
+            IMIN = INT((CELLXMIN - XMIN)/DX) + 1
+            IMAX = INT((CELLXMAX - XMIN)/DX) + 1
+            JMIN = INT((CELLYMIN - YMIN)/DY) + 1
+            JMAX = INT((CELLYMAX - YMIN)/DY) + 1
+            KMIN = INT((CELLZMIN - ZMIN)/DZ) + 1
+            KMAX = INT((CELLZMAX - ZMIN)/DZ) + 1
+
+
+            DO I = IMIN, IMAX
+               DO J = JMIN, JMAX
+                  DO K = KMIN, KMAX
+                     NINGRIDCELL(K,J,I) = NINGRIDCELL(K,J,I) + 1
+                     TETRAINGRID(NINGRIDCELL(k,J,I), K, J, I) = IC
+                  END DO
+               END DO
+            END DO
+
+         END DO
+
+         DO IP = 1, NP_PROC
+            XP = particles(IP)%X
+            YP = particles(IP)%Y
+            ZP = particles(IP)%Z
+            I = INT((XP-XMIN)/DX) + 1
+            J = INT((YP-YMIN)/DY) + 1
+            K = INT((ZP-ZMIN)/DZ) + 1
+            DO CELL = 1, NINGRIDCELL(K,J,I)
+               !MINABSPSI = 1.d100
+               IC = TETRAINGRID(CELL, K, J, I)
+               ! Check if particle IP (XP, YP) is in unstructured cell IC.
+               INSIDE = .TRUE.
+               DO VP = 1, 4
+                  PSIP = XP*U3D_GRID%BASIS_COEFFS(IC,VP,1) + YP*U3D_GRID%BASIS_COEFFS(IC,VP,2) &
+                       + ZP*U3D_GRID%BASIS_COEFFS(IC,VP,3) + U3D_GRID%BASIS_COEFFS(IC,VP,4)
+                  IF (PSIP < 0) INSIDE = .FALSE.
+                  !IF (ABS(PSIP) < MINABSPSI) MINABSPSI = ABS(PSIP)
+               END DO
+               IF (INSIDE) THEN
+                  !IF (particles(IP)%IC .NE. IC) WRITE(*,*) 'Particle has been found in a different cell! IC=', IC, &
+                  !' instead of ', particles(IP)%IC, '. Minimum ABS(PSI) was ', MINABSPSI
+                  particles(IP)%IC = IC
+                  EXIT
+               END IF
+            END DO
+         END DO
+
+      ELSE
+         CALL ERROR_ABORT('Not implemented!')
+      END IF
+
+   END SUBROUTINE REASSIGN_PARTICLES_TO_CELLS_3D
+
+
+
+   SUBROUTINE REASSIGN_PARTICLES_TO_CELLS_2D
 
       IMPLICIT NONE
 
       REAL(KIND=8) :: DX, DY, CELLXMIN, CELLXMAX, CELLYMIN, CELLYMAX
-      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, XP, YP, PSIP, epsilon
+      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, XP, YP, PSIP
       INTEGER :: I, J, K, IC, IMIN, IMAX, JMIN, JMAX, V1, V2, V3, N_PARTITIONS_X, N_PARTITIONS_Y, IP, VP
       INTEGER, DIMENSION(:,:), ALLOCATABLE :: NINGRIDCELL
       INTEGER, DIMENSION(:,:,:), ALLOCATABLE :: TRISINGRID
@@ -391,7 +544,6 @@ CONTAINS
 
       N_PARTITIONS_X = 100
       N_PARTITIONS_Y = 100
-      epsilon = 1.d-9
 
       ! First we assign the unstructured cells to the cells of a cartesian grid, which is easily indexable.
       IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
@@ -494,7 +646,8 @@ CONTAINS
          CALL ERROR_ABORT('Not implemented!')
       END IF
 
-   END SUBROUTINE REASSIGN_PARTICLES_TO_CELLS
+   END SUBROUTINE REASSIGN_PARTICLES_TO_CELLS_2D
+
 
 
    SUBROUTINE DUPLICATE_PARTICLES

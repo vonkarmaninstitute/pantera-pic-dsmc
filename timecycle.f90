@@ -794,6 +794,8 @@ MODULE timecycle
       REAL(KIND=8), DIMENSION(3) :: V_OLD, V_NEW
       REAL(KIND=8), DIMENSION(3) :: E, B
       REAL(KIND=8), DIMENSION(3) :: FACE_NORMAL, FACE_TANG1, FACE_TANG2
+      REAL(KIND=8), DIMENSION(3) :: TANG1, TANG2
+      REAL(KIND=8) :: VDOTTANG1, VRM, RN, R1, R2, THETA1, THETA2, DOT_NORM, VTANGENT
       REAL(KIND=8) :: V_NORM, V_TANG1, V_TANG2, V_PERP, VZ, VDUMMY, EROT, EVIB, VDOTN, WALL_TEMP
       INTEGER :: S_ID
       LOGICAL :: HASCOLLIDED
@@ -1030,13 +1032,13 @@ MODULE timecycle
                   IF (DIMS == 2) THEN
                      NEIGHBOR = U2D_GRID%CELL_NEIGHBORS(IC, BOUNDCOLL)
                      FACE_PG = U2D_GRID%CELL_EDGES_PG(IC, BOUNDCOLL)
-                     FACE_NORMAL = U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,:)
+                     FACE_NORMAL = -U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,:)
                      FACE_TANG1 = [-FACE_NORMAL(2), FACE_NORMAL(1), 0.d0]
                      FACE_TANG2 = [0.d0, 0.d0, 1.d0]
                   ELSE IF (DIMS == 3) THEN
                      NEIGHBOR = U3D_GRID%CELL_NEIGHBORS(IC, BOUNDCOLL)
                      FACE_PG = U3D_GRID%CELL_FACES_PG(IC, BOUNDCOLL)
-                     FACE_NORMAL = U3D_GRID%FACE_NORMAL(IC,BOUNDCOLL,:)
+                     FACE_NORMAL = -U3D_GRID%FACE_NORMAL(IC,BOUNDCOLL,:)
                      FACE_TANG1 = U3D_GRID%FACE_TANG1(IC,BOUNDCOLL,:)
                      FACE_TANG2 = U3D_GRID%FACE_TANG2(IC,BOUNDCOLL,:)
                   END IF
@@ -1088,15 +1090,84 @@ MODULE timecycle
                            V_PERP = FLX(0.d0, WALL_TEMP, SPECIES(S_ID)%MOLECULAR_MASS)
 
 
-                           particles(IP)%VX = - V_PERP*FACE_NORMAL(1) &
-                                              - V_TANG1*FACE_TANG1(1) &
-                                              - V_TANG2*FACE_TANG2(1)
-                           particles(IP)%VY = - V_PERP*FACE_NORMAL(2) &
-                                              - V_TANG1*FACE_TANG1(2) &
-                                              - V_TANG2*FACE_TANG2(2)
-                           particles(IP)%VZ = - V_PERP*FACE_NORMAL(3) &
-                                              - V_TANG1*FACE_TANG1(3) &
-                                              - V_TANG2*FACE_TANG2(3)
+                           particles(IP)%VX = V_PERP*FACE_NORMAL(1) &
+                                            + V_TANG1*FACE_TANG1(1) &
+                                            + V_TANG2*FACE_TANG2(1)
+                           particles(IP)%VY = V_PERP*FACE_NORMAL(2) &
+                                            + V_TANG1*FACE_TANG1(2) &
+                                            + V_TANG2*FACE_TANG2(2)
+                           particles(IP)%VZ = V_PERP*FACE_NORMAL(3) &
+                                            + V_TANG1*FACE_TANG1(3) &
+                                            + V_TANG2*FACE_TANG2(3)
+                           
+                           particles(IP)%EROT = EROT
+                           particles(IP)%EVIB = EVIB
+
+                           IF (GRID_BC(FACE_PG)%DUMP_FLUXES) THEN
+                              particleNOW = particles(IP)
+                              particleNOW%IC = -FACE_PG
+                              CALL ADD_PARTICLE_ARRAY(particleNOW, NP_DUMP_PROC, part_dump)
+                           END IF
+
+                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == CLL) THEN
+                           IF (GRID_BC(FACE_PG)%REACT) THEN
+                              CALL WALL_REACT(IP, REMOVE_PART(IP))
+                           END IF
+
+                           VDOTN = particles(IP)%VX*FACE_NORMAL(1) &
+                                 + particles(IP)%VY*FACE_NORMAL(2) &
+                                 + particles(IP)%VZ*FACE_NORMAL(3)
+
+                           TANG1(1) = particles(IP)%VX - VDOTN*FACE_NORMAL(1)
+                           TANG1(2) = particles(IP)%VY - VDOTN*FACE_NORMAL(2)
+                           TANG1(3) = particles(IP)%VZ - VDOTN*FACE_NORMAL(3)
+
+                           TANG1 = TANG1/NORM2(TANG1)
+
+                           TANG2 = CROSS(FACE_NORMAL, TANG1)
+
+                           VDOTTANG1 = particles(IP)%VX*TANG1(1) &
+                                     + particles(IP)%VY*TANG1(2) &
+                                     + particles(IP)%VZ*TANG1(3)
+
+                           S_ID = particles(IP)%S_ID
+                           WALL_TEMP = GRID_BC(FACE_PG)%WALL_TEMP
+
+                           VRM = SQRT(2.*KB*WALL_TEMP/SPECIES(S_ID)%MOLECULAR_MASS)
+
+                           ! Normal velocity for the CLL model
+                           RN = rf()
+                           DO WHILE (RN < 1.0D-13)
+                              RN = rf()
+                           END DO
+                           R1 = SQRT(-GRID_BC(FACE_PG)%ACC_N*LOG(RN))
+                           THETA1 = 2.*PI*rf()
+                           DOT_NORM = VDOTN/VRM * SQRT(1 - GRID_BC(FACE_PG)%ACC_N)
+                           V_PERP = VRM * SQRT(R1*R1 + DOT_NORM*DOT_NORM + 2.*R1*DOT_NORM*COS(THETA1))
+
+                           ! Tangential velocity for the CLL model
+                           RN = rf()
+                           DO WHILE (RN < 1.0D-13)
+                              RN = rf()
+                           END DO         
+                           R2 = SQRT(-GRID_BC(FACE_PG)%ACC_T*LOG(RN))
+                           THETA2 = 2.*PI*rf()
+                           VTANGENT = VDOTTANG1/VRM * SQRT(1 - GRID_BC(FACE_PG)%ACC_T)
+                           V_TANG1 = VRM * (VTANGENT + R2 * COS(THETA2))
+                           V_TANG2 = VRM * R2 * SIN(THETA2)
+
+                           CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, WALL_TEMP, EROT)
+                           CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, WALL_TEMP, EVIB)
+
+                           particles(IP)%VX = V_PERP*FACE_NORMAL(1) &
+                                            + V_TANG1*FACE_TANG1(1) &
+                                            + V_TANG2*FACE_TANG2(1)
+                           particles(IP)%VY = V_PERP*FACE_NORMAL(2) &
+                                            + V_TANG1*FACE_TANG1(2) &
+                                            + V_TANG2*FACE_TANG2(2)
+                           particles(IP)%VZ = V_PERP*FACE_NORMAL(3) &
+                                            + V_TANG1*FACE_TANG1(3) &
+                                            + V_TANG2*FACE_TANG2(3)
                            
                            particles(IP)%EROT = EROT
                            particles(IP)%EVIB = EVIB

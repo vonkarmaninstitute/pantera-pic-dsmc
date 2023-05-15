@@ -936,6 +936,11 @@ MODULE initialization
       ELSE IF (STRARRAY(2) == 'diffuse') THEN
          GRID_BC(IPG)%PARTICLE_BC = DIFFUSE
          READ(STRARRAY(3), '(ES14.0)') GRID_BC(IPG)%WALL_TEMP
+      ELSE IF (STRARRAY(2) == 'cll') THEN
+         GRID_BC(IPG)%PARTICLE_BC = CLL
+         READ(STRARRAY(3), '(ES14.0)') GRID_BC(IPG)%WALL_TEMP
+         READ(STRARRAY(4), '(ES14.0)') GRID_BC(IPG)%ACC_N
+         READ(STRARRAY(5), '(ES14.0)') GRID_BC(IPG)%ACC_T
       ELSE IF (STRARRAY(2) == 'react') THEN
          GRID_BC(IPG)%REACT = .TRUE.
       ELSE IF (STRARRAY(2) == 'axis') THEN

@@ -15,11 +15,11 @@ MODULE fully_implicit
 
    IMPLICIT NONE
 
-   Mat Amat, Jmat, Jmfmat, Qmat, Rmat, Qmatfact
+   Mat Amat, Jmat, Jmfmat, Qmat, Rmat, Qmatfact, Pmat
    Vec bvec, xvec, x_seq, solvec_seq, xvec_seq, rvec, solvec
    VecScatter ctx
    KSP ksp, kspnk
-   PetscInt one,f9,f6,f30, maxit, maxf
+   PetscInt one, maxit, maxf
    PetscInt Istart, Iend
    PetscReal val, norm, f0, stol, rtol, abstol
    PetscScalar, POINTER :: PHI_FIELD_TEMP(:)
@@ -41,6 +41,7 @@ MODULE fully_implicit
    
 
    ! Reminder of JACOBIAN_TYPE:
+   ! 0 --> Jacobian containing only the FEM-related derivatives (from Poisson's equation and boundary conditions.), no particle term.
    ! 1 --> Exact Jacobian from following all particles and taking all partial derivatives
    ! 2 --> Approximate Jacobian neglecting d(Dt) terms
    ! 3 --> ECSIM-like mass matrices. Accumulation is done with particles before advection
@@ -53,6 +54,7 @@ MODULE fully_implicit
 
       LOGICAL :: SET_SOLVEC_TO_ZERO = .FALSE.
       PetscScalar, POINTER :: solvec_l(:)
+      PetscBool :: flg
 
       CALL SNESCreate(PETSC_COMM_WORLD,snes,ierr)
       !CALL SNESSetType(snes, SNESNEWTONLS ,ierr) ! defalut
@@ -86,36 +88,47 @@ MODULE fully_implicit
 
 
       IF (JACOBIAN_FREE) THEN
-         !CALL MatCreateSNESMF(snes,Jmfmat,ierr)
-         !CALL SNESSetJacobian(snes,Jmfmat,Jmat,FormJacobian,0,ierr) ! This should work as matrix-free (JFNK). Jacobian computed independently.
+         !!!!CALL MatCreateSNESMF(snes,Jmfmat,ierr)
+         !!!!CALL SNESSetJacobian(snes,Jmfmat,Jmat,FormJacobian,0,ierr) ! This should work as matrix-free (JFNK). Jacobian computed independently.
          CALL MatCreate(PETSC_COMM_WORLD,Jmat,ierr)
          CALL MatSetSizes(Jmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
          CALL MatSetType(Jmat, MATMPIAIJ, ierr)
 
          CALL MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ctx,Jmfmat,ierr)
-         CALL MatShellSetOperation(Jmfmat,MATOP_MULT,FormJacobianVectorProduct,ierr)
+         !CALL MatShellSetOperation(Jmfmat,MATOP_MULT,FormJacobianVectorProduct,ierr)
          WRITE(*,*) 'Done setting up 1.'
          CALL SNESSetJacobian(snes,Jmfmat,Jmat,FormJacobian,0,ierr) ! The expensive but safe one. Jacobian computed independently.
          WRITE(*,*) 'Done setting up 2.'
-         CALL SNESSetUseMatrixFree(snes, .TRUE., .TRUE.,ierr)
+         CALL SNESSetUseMatrixFree(snes, .TRUE., .FALSE.,ierr)
          WRITE(*,*) 'Done setting up 3.'
 
       ELSE
          CALL MatCreate(PETSC_COMM_WORLD,Jmat,ierr)
          CALL MatSetSizes(Jmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
          CALL MatSetType(Jmat, MATMPIAIJ, ierr)
+
+         CALL MatCreate(PETSC_COMM_WORLD,Pmat,ierr)
+         CALL MatSetSizes(Pmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
+         CALL MatSetType(Pmat, MATMPIAIJ, ierr)
+
          IF (RESIDUAL_AND_JACOBIAN_COMBINED) THEN
             CALL SNESSetJacobian(snes,Jmat,Jmat,PETSC_NULL_FUNCTION,0,ierr)   ! Use this for the combined computation of residual and Jacobian.
          ELSE
-            CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobian,0,ierr) ! The expensive but safe one. Jacobian computed independently.
+            flg  = PETSC_FALSE
+            CALL PetscOptionsHasName(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,"-snes_mf_operator",flg,ierr)
+            IF (flg) THEN  ! We want only the preconditioner to be filled. The Jacobian is computed from finite differencing.
+               CALL SNESSetJacobian(snes,Jmat,Pmat,FormJacobian,0,ierr) ! The expensive but safe one. Jacobian computed independently.
+            ELSE
+               CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobian,0,ierr) ! The expensive but safe one. Jacobian computed independently.
+            END IF
          END IF
       END IF
 
       !abstol = 1.d-5
       !rtol = 1.d-5
       !stol = 1.d0
-      maxit = 10
-      maxf = 30
+      maxit = 10000 !10
+      maxf = 10000 !30
       !CALL SNESSetTolerances(snes, abstol, rtol, stol, maxit, maxf, ierr)
       !CALL SNESSetTolerances(snes, PETSC_DEFAULT_REAL, PETSC_DEFAULT_REAL, PETSC_DEFAULT_REAL, maxit, maxf, ierr)
       CALL SNESSetTolerances(snes, PETSC_DEFAULT_REAL, SNES_RTOL, PETSC_DEFAULT_REAL, maxit, maxf, ierr)
@@ -125,7 +138,7 @@ MODULE fully_implicit
       !CALL KSPGetPC(kspnk,pcnk,ierr)
       !CALL PCSetType(pcnk,PCLU,ierr)
 
-      !CALL KSPSetTolerances(kspnk,rtol,abstol,PETSC_DEFAULT_REAL,maxit,ierr)
+      !CALL KSPSetTolerances(kspnk,PETSC_DEFAULT_REAL,1.d-3,PETSC_DEFAULT_REAL,PETSC_DEFAULT_INTEGER,ierr)
       !CALL KSPSetTolerances(ksp,1.e-4,PETSC_DEFAULT_REAL,PETSC_DEFAULT_REAL,20,ierr)
 
       CALL SNESSetFromOptions(snes,ierr)
@@ -135,8 +148,6 @@ MODULE fully_implicit
       !  for the nonlinear solver prior to calling SNESSolve().  In particular,
       !  to employ an initial guess of zero, the user should explicitly set
       !  this vector to zero by calling VecSet().
-
-      SET_SOLVEC_TO_ZERO = .FALSE.
 
       IF (SET_SOLVEC_TO_ZERO) THEN
          CALL VecSet(solvec,0.d0,ierr)
@@ -182,11 +193,26 @@ MODULE fully_implicit
       CALL VecDestroy(rvec, ierr)
       CALL SNESDestroy(snes, ierr)
       CALL MatDestroy(Jmat,ierr)
+      CALL MatDestroy(Pmat,ierr)
 
    END SUBROUTINE SOLVE_POISSON_FULLY_IMPLICIT
 
 
    SUBROUTINE FormJacobianVectorProduct(jac, x, y)
+
+      Mat jac
+      Vec x, y
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) 'FormJacobianVectorProduct Called'
+      END IF
+
+
+
+   END SUBROUTINE FormJacobianVectorProduct
+
+
+   SUBROUTINE FormJacobianVectorProduct_old(jac, x, y)
 
 
       Mat jac
@@ -285,7 +311,7 @@ MODULE fully_implicit
 
       CALL MatMult(jac, x, y, ierr)
 
-   END SUBROUTINE FormJacobianVectorProduct
+   END SUBROUTINE FormJacobianVectorProduct_old
 
 
    SUBROUTINE FormFunction(snes,x,f,dummy,ierr_l)
@@ -424,11 +450,11 @@ MODULE fully_implicit
 
       SNES snes
       Vec x
-      Mat jac, B, jactofill, precond
+      Mat  jac, prec, jactofill, precond
       PetscErrorCode ierr_l
+      PetscBool      flg
       INTEGER dummy(*)
       INTEGER I, IC
-      PetscScalar mult
 
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA
       INTEGER :: V1, V2, V3
@@ -443,23 +469,23 @@ MODULE fully_implicit
       END IF
 
 
-
-      IF (JACOBIAN_FREE) THEN
-         jac = precond
-         B = jactofill
-      ELSE
-         jac = jactofill
-         B = precond
+      flg  = PETSC_FALSE
+      CALL PetscOptionsHasName(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,"-snes_mf_operator",flg,ierr)
+      IF (flg) THEN  ! We want only the preconditioner to be filled. The Jacobian is computed from finite differencing.
+         jac  = precond
+         prec = jactofill
+      ELSE ! We want the Jacobian to be filled. The preconditioner should be identically filled.
+         jac  = jactofill
+         prec = precond
       END IF
 
-      f30 = 30
       CALL MatMPIAIJSetPreallocation(jac,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
       CALL MatSetFromOptions(jac,ierr)
       CALL MatSetUp(jac,ierr)
 
 
       !CALL MatConvert(Amat,MATSAME,MAT_INITIAL_MATRIX,jac,ierr)
-      mult = -2.d0
+      !mult = -2.d0
       !CALL MatScale(jac,mult,ierr)
       CALL MatZeroEntries(jac,ierr)
       !CALL MatAssemblyBegin(jac,MAT_FINAL_ASSEMBLY,ierr)
@@ -503,7 +529,7 @@ MODULE fully_implicit
                IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
                   IF (.NOT. IS_DIRICHLET(VP-1)) THEN
                      VALUETOADD = -QE*QE*5.d11/(EPS0*KB*11600.d0)*AREA/3.
-                     !CALL MatSetValues(jac,one,VP-1,one,VP-1,VALUETOADD,ADD_VALUES,ierr)
+                     CALL MatSetValues(jac,one,VP-1,one,VP-1,VALUETOADD,ADD_VALUES,ierr)
                   END IF
                END IF
             END DO
@@ -693,13 +719,30 @@ MODULE fully_implicit
       CALL MatAssemblyBegin(jac,MAT_FINAL_ASSEMBLY,ierr)
       CALL MatAssemblyEnd(jac,MAT_FINAL_ASSEMBLY,ierr)
 
-      CALL MatAssemblyBegin(B,MAT_FINAL_ASSEMBLY,ierr)
-      CALL MatAssemblyEnd(B,MAT_FINAL_ASSEMBLY,ierr)
-      B = jac
+      flg  = PETSC_FALSE
+      CALL PetscOptionsHasName(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,"-snes_mf_operator",flg,ierr)
+      IF (flg) THEN  ! We want only the preconditioner to be filled. The Jacobian is computed from finite differencing.
+         CALL MatSetFromOptions(prec,ierr)
+         CALL MatSetUp(prec,ierr)
+         CALL MatAssemblyBegin(prec,MAT_FINAL_ASSEMBLY,ierr)
+         CALL MatAssemblyEnd(prec,MAT_FINAL_ASSEMBLY,ierr)
+      END IF
 
-      
+
+
+      !jac = prec
+ 
       ! CALL PetscViewerBinaryOpen(PETSC_COMM_WORLD, 'JacobianMatrix', FILE_MODE_WRITE, viewer, ierr)
+      ! CALL PetscViewerDrawOpen(PETSC_COMM_WORLD,PETSC_NULL_CHARACTER, &
+      !                          PETSC_NULL_CHARACTER,0,0,684,684,viewer,ierr)
+      ! CALL MatView(prec,viewer,ierr)
+      ! CALL PetscSleep(5.d0,ierr)
+      ! CALL PetscViewerDestroy(viewer,ierr)
+
+      ! CALL PetscViewerDrawOpen(PETSC_COMM_WORLD,PETSC_NULL_CHARACTER, &
+      ! PETSC_NULL_CHARACTER,0,0,684,684,viewer,ierr)
       ! CALL MatView(jac,viewer,ierr)
+      ! CALL PetscSleep(5.d0,ierr)
       ! CALL PetscViewerDestroy(viewer,ierr)
       ! WRITE(*,*) 'Jacobian written to file.'
       ! CALL SLEEP(10)
@@ -1294,7 +1337,7 @@ MODULE fully_implicit
       !    OPEN(66332, FILE='crossings', POSITION='append', STATUS='unknown', ACTION='write')
       ! END IF
 
-      IF (JACOBIAN_TYPE .LT. 1 .OR. JACOBIAN_TYPE .GT. 6) CALL ERROR_ABORT('Jacobian type not supported.')
+      IF (JACOBIAN_TYPE .LT. 0 .OR. JACOBIAN_TYPE .GT. 6) CALL ERROR_ABORT('Jacobian type not supported.')
 
       TOL = 1e-15
 

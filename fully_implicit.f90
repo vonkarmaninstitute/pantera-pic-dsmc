@@ -35,7 +35,6 @@ MODULE fully_implicit
    MatFactorInfo  info(MAT_FACTORINFO_SIZE)
 
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CELL_NE, CELL_TE
-   LOGICAL :: JACOBIAN_FREE = .FALSE.
 
    CONTAINS
    
@@ -87,51 +86,35 @@ MODULE fully_implicit
       !CALL MatSetUp(Jmfmat,ierr)
 
 
-      IF (JACOBIAN_FREE) THEN
-         !!!!CALL MatCreateSNESMF(snes,Jmfmat,ierr)
-         !!!!CALL SNESSetJacobian(snes,Jmfmat,Jmat,FormJacobian,0,ierr) ! This should work as matrix-free (JFNK). Jacobian computed independently.
-         CALL MatCreate(PETSC_COMM_WORLD,Jmat,ierr)
-         CALL MatSetSizes(Jmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
-         CALL MatSetType(Jmat, MATMPIAIJ, ierr)
+      CALL MatCreate(PETSC_COMM_WORLD,Jmat,ierr)
+      CALL MatSetSizes(Jmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
+      CALL MatSetType(Jmat, MATMPIAIJ, ierr)
 
-         CALL MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ctx,Jmfmat,ierr)
-         !CALL MatShellSetOperation(Jmfmat,MATOP_MULT,FormJacobianVectorProduct,ierr)
-         WRITE(*,*) 'Done setting up 1.'
-         CALL SNESSetJacobian(snes,Jmfmat,Jmat,FormJacobian,0,ierr) ! The expensive but safe one. Jacobian computed independently.
-         WRITE(*,*) 'Done setting up 2.'
-         CALL SNESSetUseMatrixFree(snes, .TRUE., .FALSE.,ierr)
-         WRITE(*,*) 'Done setting up 3.'
+      CALL MatCreate(PETSC_COMM_WORLD,Pmat,ierr)
+      CALL MatSetSizes(Pmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
+      CALL MatSetType(Pmat, MATMPIAIJ, ierr)
 
+      IF (RESIDUAL_AND_JACOBIAN_COMBINED) THEN
+         CALL SNESSetJacobian(snes,Jmat,Jmat,PETSC_NULL_FUNCTION,0,ierr)   ! Use this for the combined computation of residual and Jacobian.
       ELSE
-         CALL MatCreate(PETSC_COMM_WORLD,Jmat,ierr)
-         CALL MatSetSizes(Jmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
-         CALL MatSetType(Jmat, MATMPIAIJ, ierr)
-
-         CALL MatCreate(PETSC_COMM_WORLD,Pmat,ierr)
-         CALL MatSetSizes(Pmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
-         CALL MatSetType(Pmat, MATMPIAIJ, ierr)
-
-         IF (RESIDUAL_AND_JACOBIAN_COMBINED) THEN
-            CALL SNESSetJacobian(snes,Jmat,Jmat,PETSC_NULL_FUNCTION,0,ierr)   ! Use this for the combined computation of residual and Jacobian.
+         flg  = PETSC_FALSE
+         CALL PetscOptionsHasName(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,"-snes_mf_operator",flg,ierr)
+         IF (flg) THEN  ! We want only the preconditioner to be filled. The Jacobian is computed from finite differencing.
+            CALL SNESSetJacobian(snes,Jmat,Pmat,FormJacobian,0,ierr) ! The expensive but safe one. Jacobian computed independently.
          ELSE
-            flg  = PETSC_FALSE
-            CALL PetscOptionsHasName(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,"-snes_mf_operator",flg,ierr)
-            IF (flg) THEN  ! We want only the preconditioner to be filled. The Jacobian is computed from finite differencing.
-               CALL SNESSetJacobian(snes,Jmat,Pmat,FormJacobian,0,ierr) ! The expensive but safe one. Jacobian computed independently.
-            ELSE
-               CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobian,0,ierr) ! The expensive but safe one. Jacobian computed independently.
-            END IF
+            CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobian,0,ierr) ! The expensive but safe one. Jacobian computed independently.
          END IF
       END IF
+
 
       !abstol = 1.d-5
       !rtol = 1.d-5
       !stol = 1.d0
-      maxit = 10000 !10
-      maxf = 10000 !30
+      !maxit = 10000 !10
+      !maxf = 10000 !30
       !CALL SNESSetTolerances(snes, abstol, rtol, stol, maxit, maxf, ierr)
       !CALL SNESSetTolerances(snes, PETSC_DEFAULT_REAL, PETSC_DEFAULT_REAL, PETSC_DEFAULT_REAL, maxit, maxf, ierr)
-      CALL SNESSetTolerances(snes, PETSC_DEFAULT_REAL, SNES_RTOL, PETSC_DEFAULT_REAL, maxit, maxf, ierr)
+      !CALL SNESSetTolerances(snes, PETSC_DEFAULT_REAL, SNES_RTOL, PETSC_DEFAULT_REAL, maxit, maxf, ierr)
 
       ! These three lines to use the direct solver.
       !CALL SNESGetKSP(snes,kspnk,ierr)

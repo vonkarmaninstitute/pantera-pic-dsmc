@@ -116,7 +116,6 @@ MODULE fully_implicit
       !CALL SNESSetTolerances(snes, PETSC_DEFAULT_REAL, PETSC_DEFAULT_REAL, PETSC_DEFAULT_REAL, maxit, maxf, ierr)
       !CALL SNESSetTolerances(snes, PETSC_DEFAULT_REAL, SNES_RTOL, PETSC_DEFAULT_REAL, maxit, maxf, ierr)
 
-      ! These three lines to use the direct solver.
       !CALL SNESGetKSP(snes,kspnk,ierr)
       !CALL KSPGetPC(kspnk,pcnk,ierr)
       !CALL PCSetType(pcnk,PCLU,ierr)
@@ -1305,6 +1304,8 @@ MODULE fully_implicit
       REAL(KIND=8) :: X_TEMP, Y_TEMP, Z_TEMP, VX_TEMP, VY_TEMP, VZ_TEMP
       REAL(KIND=8), DIMENSION(3) :: FACE_NORMAL, FACE_TANG1, FACE_TANG2
       REAL(KIND=8) :: V_TANG1, V_TANG2
+      REAL(KIND=8), DIMENSION(3) :: TANG1, TANG2
+      REAL(KIND=8) :: VDOTTANG1, VRM, RN, R1, R2, THETA1, THETA2, DOT_NORM, VTANGENT
       INTEGER :: NI, NJ, VNI, VNJ
 
       INTEGER :: NCROSSINGS
@@ -1864,6 +1865,70 @@ MODULE fully_implicit
                            
                            part_adv(IP)%EROT = EROT
                            part_adv(IP)%EVIB = EVIB
+
+                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == CLL) THEN
+                           IF (GRID_BC(FACE_PG)%REACT) THEN
+                              CALL WALL_REACT(IP, REMOVE_PART(IP))
+                           END IF
+
+                           VDOTN = part_adv(IP)%VX*FACE_NORMAL(1) &
+                                 + part_adv(IP)%VY*FACE_NORMAL(2) &
+                                 + part_adv(IP)%VZ*FACE_NORMAL(3)
+
+                           TANG1(1) = part_adv(IP)%VX - VDOTN*FACE_NORMAL(1)
+                           TANG1(2) = part_adv(IP)%VY - VDOTN*FACE_NORMAL(2)
+                           TANG1(3) = part_adv(IP)%VZ - VDOTN*FACE_NORMAL(3)
+
+                           TANG1 = TANG1/NORM2(TANG1)
+
+                           TANG2 = CROSS(FACE_NORMAL, TANG1)
+
+                           VDOTTANG1 = part_adv(IP)%VX*TANG1(1) &
+                                     + part_adv(IP)%VY*TANG1(2) &
+                                     + part_adv(IP)%VZ*TANG1(3)
+
+                           S_ID = part_adv(IP)%S_ID
+                           WALL_TEMP = GRID_BC(FACE_PG)%WALL_TEMP
+
+                           VRM = SQRT(2.*KB*WALL_TEMP/SPECIES(S_ID)%MOLECULAR_MASS)
+
+                           ! Normal velocity for the CLL model
+                           RN = rf()
+                           DO WHILE (RN < 1.0D-13)
+                              RN = rf()
+                           END DO
+                           R1 = SQRT(-GRID_BC(FACE_PG)%ACC_N*LOG(RN))
+                           THETA1 = 2.*PI*rf()
+                           DOT_NORM = VDOTN/VRM * SQRT(1 - GRID_BC(FACE_PG)%ACC_N)
+                           V_PERP = VRM * SQRT(R1*R1 + DOT_NORM*DOT_NORM + 2.*R1*DOT_NORM*COS(THETA1))
+
+                           ! Tangential velocity for the CLL model
+                           RN = rf()
+                           DO WHILE (RN < 1.0D-13)
+                              RN = rf()
+                           END DO         
+                           R2 = SQRT(-GRID_BC(FACE_PG)%ACC_T*LOG(RN))
+                           THETA2 = 2.*PI*rf()
+                           VTANGENT = VDOTTANG1/VRM * SQRT(1 - GRID_BC(FACE_PG)%ACC_T)
+                           V_TANG1 = VRM * (VTANGENT + R2 * COS(THETA2))
+                           V_TANG2 = VRM * R2 * SIN(THETA2)
+
+                           CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, WALL_TEMP, EROT)
+                           CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, WALL_TEMP, EVIB)
+
+                           part_adv(IP)%VX = V_PERP*FACE_NORMAL(1) &
+                                           + V_TANG1*FACE_TANG1(1) &
+                                           + V_TANG2*FACE_TANG2(1)
+                           part_adv(IP)%VY = V_PERP*FACE_NORMAL(2) &
+                                           + V_TANG1*FACE_TANG1(2) &
+                                           + V_TANG2*FACE_TANG2(2)
+                           part_adv(IP)%VZ = V_PERP*FACE_NORMAL(3) &
+                                           + V_TANG1*FACE_TANG1(3) &
+                                           + V_TANG2*FACE_TANG2(3)
+                           
+                           part_adv(IP)%EROT = EROT
+                           part_adv(IP)%EVIB = EVIB
+
                         ELSE
                            REMOVE_PART(IP) = .TRUE.
                            part_adv(IP)%DTRIM = 0.d0

@@ -167,7 +167,7 @@ MODULE grid_and_partition
          CELL_PROCS = 0
       
       ELSE IF (GRID_TYPE == UNSTRUCTURED) THEN
-         IF (.FALSE. .OR. DIMS .NE. 2) THEN
+         IF (.TRUE. .OR. DIMS .NE. 2) THEN
 
             ALLOCATE(CENTROID(NCELLS))
 
@@ -222,9 +222,9 @@ MODULE grid_and_partition
       
             CALL MPI_BCAST(NP_CELLS, NCELLS, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
-            WEIGHT = DBLE(NP_CELLS) + SUM(NP_CELLS)/10.
+            WEIGHT = DBLE(NP_CELLS)
             
-            WEIGHT_PER_PROC = SUM(WEIGHT) / DBLE(N_MPI_THREADS)
+            WEIGHT_PER_PROC = 1.05 * SUM(WEIGHT) / DBLE(N_MPI_THREADS)
 
             IF (DIMS == 3) THEN
 

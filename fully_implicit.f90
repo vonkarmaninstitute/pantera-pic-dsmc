@@ -1827,7 +1827,7 @@ MODULE fully_implicit
                         ! Apply particle boundary condition
                         IF (GRID_BC(FACE_PG)%PARTICLE_BC == SPECULAR) THEN
                            IF (GRID_BC(FACE_PG)%REACT) THEN
-                              CALL WALL_REACT(IP, REMOVE_PART(IP))
+                              CALL WALL_REACT(part_adv, IP, REMOVE_PART(IP))
                            END IF
                            
                            VDOTN = part_adv(IP)%VX*FACE_NORMAL(1) &
@@ -1838,7 +1838,7 @@ MODULE fully_implicit
                            part_adv(IP)%VZ = part_adv(IP)%VZ - 2.*VDOTN*FACE_NORMAL(3)
                         ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == DIFFUSE) THEN
                            IF (GRID_BC(FACE_PG)%REACT) THEN
-                              CALL WALL_REACT(IP, REMOVE_PART(IP))
+                              CALL WALL_REACT(part_adv, IP, REMOVE_PART(IP))
                            END IF
 
                            S_ID = part_adv(IP)%S_ID
@@ -1868,7 +1868,7 @@ MODULE fully_implicit
 
                         ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == CLL) THEN
                            IF (GRID_BC(FACE_PG)%REACT) THEN
-                              CALL WALL_REACT(IP, REMOVE_PART(IP))
+                              CALL WALL_REACT(part_adv, IP, REMOVE_PART(IP))
                            END IF
 
                            VDOTN = part_adv(IP)%VX*FACE_NORMAL(1) &
@@ -2423,16 +2423,17 @@ MODULE fully_implicit
    END SUBROUTINE APPLY_B_FIELD
 
 
-   SUBROUTINE WALL_REACT(IP, REMOVE)
+   SUBROUTINE WALL_REACT(part_adv, IP, REMOVE)
       
       IMPLICIT NONE
 
+      TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE, INTENT(INOUT) :: part_adv
       INTEGER, INTENT(IN) :: IP
       LOGICAL, INTENT(OUT) :: REMOVE
       INTEGER :: JS, JR, JP
       REAL(KIND=8) :: PROB_SCALE, VEL_SCALE
 
-      JS = particles(IP)%S_ID
+      JS = part_adv(IP)%S_ID
       PROB_SCALE = 1.
       REMOVE = .FALSE.
       DO JR = 1, N_WALL_REACTIONS
@@ -2441,14 +2442,14 @@ MODULE fully_implicit
                
                IF (WALL_REACTIONS(JR)%N_PROD == 0) THEN
                   REMOVE = .TRUE.
-                  particles(IP)%DTRIM = 0.
+                  part_adv(IP)%DTRIM = 0.
                ELSE IF (WALL_REACTIONS(JR)%N_PROD == 1) THEN
                   JP = WALL_REACTIONS(JR)%P1_SP_ID
-                  particles(IP)%S_ID = JP
+                  part_adv(IP)%S_ID = JP
                   VEL_SCALE = SPECIES(JS)%MOLECULAR_MASS/SPECIES(JP)%MOLECULAR_MASS
-                  particles(IP)%VX = particles(IP)%VX*VEL_SCALE
-                  particles(IP)%VY = particles(IP)%VY*VEL_SCALE
-                  particles(IP)%VZ = particles(IP)%VZ*VEL_SCALE
+                  part_adv(IP)%VX = part_adv(IP)%VX*VEL_SCALE
+                  part_adv(IP)%VY = part_adv(IP)%VY*VEL_SCALE
+                  part_adv(IP)%VZ = part_adv(IP)%VZ*VEL_SCALE
                ELSE
                   CALL ERROR_ABORT('Number of products in wall reaction not supported.')
                END IF

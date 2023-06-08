@@ -173,6 +173,7 @@ MODULE fully_implicit
       ! Cleanup.
       CALL VecDestroy(solvec, ierr)
       CALL VecDestroy(rvec, ierr)
+      CALL VecDestroy(solvec_seq,ierr)
       CALL SNESDestroy(snes, ierr)
       CALL MatDestroy(Jmat,ierr)
       CALL MatDestroy(Pmat,ierr)
@@ -329,6 +330,7 @@ MODULE fully_implicit
       IF (ALLOCATED(PHIBAR_FIELD)) DEALLOCATE(PHIBAR_FIELD)
       ALLOCATE(PHIBAR_FIELD, SOURCE = PHI_FIELD_TEMP)
       CALL VecRestoreArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
+      CALL VecDestroy(x_seq,ierr)
 
       ! Compute the RHS corresponding to PHIBAR_FIELD
       PHI_FIELD_NEW = 2.*PHIBAR_FIELD - PHI_FIELD
@@ -490,6 +492,7 @@ MODULE fully_implicit
       IF (ALLOCATED(PHIBAR_FIELD)) DEALLOCATE(PHIBAR_FIELD)
       ALLOCATE(PHIBAR_FIELD, SOURCE = PHI_FIELD_TEMP)
       CALL VecRestoreArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
+      CALL VecDestroy(x_seq,ierr)
 
       CALL COMPUTE_E_FIELD
 
@@ -785,6 +788,7 @@ MODULE fully_implicit
       IF (ALLOCATED(PHIBAR_FIELD)) DEALLOCATE(PHIBAR_FIELD)
       ALLOCATE(PHIBAR_FIELD, SOURCE = PHI_FIELD_TEMP)
       CALL VecRestoreArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
+      CALL VecDestroy(x_seq,ierr)
 
       ! Compute the RHS corresponding to PHIBAR_FIELD
       PHI_FIELD_NEW = 2.*PHIBAR_FIELD - PHI_FIELD

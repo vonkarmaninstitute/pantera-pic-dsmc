@@ -210,7 +210,10 @@ MODULE timecycle
          ! ########### Perform the conservation checks ###################################
          IF (PERFORM_CHECKS .AND. MOD(tID, CHECKS_EVERY) .EQ. 0) CALL CHECKS
 
-         !CALL REASSIGN_PARTICLES_TO_CELLS ! DBDBDBDBDDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDB
+         IF (PERFORM_CHECKS .AND. MOD(tID, CHECKS_EVERY) .EQ. 0) THEN
+            CALL ONLYMASTERPRINT1(PROC_ID, '---> Checking if particles are in the correct cells.')
+            CALL REASSIGN_PARTICLES_TO_CELLS_2D
+         END IF
 
          ! ~~~~~ Hmm that's it! ~~~~~
 

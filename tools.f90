@@ -634,8 +634,8 @@ CONTAINS
                   !IF (ABS(PSIP) < MINABSPSI) MINABSPSI = ABS(PSIP)
                END DO
                IF (INSIDE) THEN
-                  !IF (particles(IP)%IC .NE. IC) WRITE(*,*) 'Particle has been found in a different cell! IC=', IC, &
-                  !' instead of ', particles(IP)%IC, '. Minimum ABS(PSI) was ', MINABSPSI
+                  IF (particles(IP)%IC .NE. IC) WRITE(*,*) 'Particle has been found in a different cell! IC=', IC, &
+                  ' instead of ', particles(IP)%IC !, '. Minimum ABS(PSI) was ', MINABSPSI
                   particles(IP)%IC = IC
                   EXIT
                END IF

@@ -1327,7 +1327,7 @@ MODULE fully_implicit
 
       IF (JACOBIAN_TYPE .LT. 0 .OR. JACOBIAN_TYPE .GT. 6) CALL ERROR_ABORT('Jacobian type not supported.')
 
-      TOL = 1e-15
+      TOL = 1e-13
 
       SIZE = NCELLS
 
@@ -1575,7 +1575,7 @@ MODULE fully_implicit
                   DTCOLL = part_adv(IP)%DTRIM
                   BOUNDCOLL = -1
                   DO I = 1, 6
-                     IF (COLLTIMES(I) > 0 .AND. COLLTIMES(I) < DTCOLL) THEN
+                     IF (COLLTIMES(I) > TOL .AND. COLLTIMES(I) < DTCOLL) THEN
 
 
                         X_TEMP = part_adv(IP)%X
@@ -1607,6 +1607,10 @@ MODULE fully_implicit
                         IF ((part_adv(IP)%VX*U2D_GRID%EDGE_NORMAL(IC,J,1) + part_adv(IP)%VY*U2D_GRID%EDGE_NORMAL(IC,J,2)) > 0) THEN
                            DTCOLL = COLLTIMES(I)
                            BOUNDCOLL = J
+                        ELSE IF (AXI) THEN ! There is a collision with cell boundary but the rotated velocity points back into the cell.
+                           ! We should move without applying the boundary conditions, and start again from there.
+                           DTCOLL = COLLTIMES(I)
+                           BOUNDCOLL = 0
                         END IF
 
                         part_adv(IP)%X = X_TEMP
@@ -1711,7 +1715,7 @@ MODULE fully_implicit
 
                   QOM = SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS
 
-                  IF (BOUNDCOLL .NE. -1) THEN
+                  IF (BOUNDCOLL > 0) THEN
                      DTADV = DTCOLL
 
                      I = BOUNDCOLL
@@ -1752,7 +1756,7 @@ MODULE fully_implicit
 
                   NEWVX = part_adv(IP)%VX + QOM*E(1)*DTADV
                   NEWVY = part_adv(IP)%VY + QOM*E(2)*DTADV
-                  IF (BOUNDCOLL .NE. -1) THEN
+                  IF (BOUNDCOLL > 0) THEN
                      DXDEX = DXDEX + NEWVX*DTDEX
                      DXDEY = DXDEY + NEWVX*DTDEY
                      DYDEX = DYDEX + NEWVY*DTDEX
@@ -1791,7 +1795,7 @@ MODULE fully_implicit
                   
                   IF (NUMSTEPS > MAXNUMSTEPS) MAXNUMSTEPS = NUMSTEPS
 
-                  IF (BOUNDCOLL .NE. -1) THEN
+                  IF (BOUNDCOLL > 0) THEN
                      DTADV = DTCOLL
                   ELSE
                      DTADV = part_adv(IP)%DTRIM
@@ -1806,7 +1810,7 @@ MODULE fully_implicit
 
 
                ! Do the advection
-               IF (BOUNDCOLL .NE. -1) THEN
+               IF (BOUNDCOLL > 0) THEN
                   CALL MOVE_PARTICLE_CN(part_adv, IP, E, DTCOLL)
                   part_adv(IP)%DTRIM = part_adv(IP)%DTRIM - DTCOLL
 
@@ -1948,6 +1952,9 @@ MODULE fully_implicit
                      NCROSSINGS = NCROSSINGS + 1
                      !WRITE(*,*) 'moved particle to cell: ', IC
                   END IF
+               ELSE IF (BOUNDCOLL == 0) THEN
+                  CALL MOVE_PARTICLE_CN(part_adv, IP, E, DTCOLL)
+                  part_adv(IP)%DTRIM = part_adv(IP)%DTRIM - DTCOLL
                ELSE
                   ! The particle stays within the current cell. End of the motion.
                   CALL MOVE_PARTICLE_CN(part_adv, IP, E, part_adv(IP)%DTRIM)
@@ -2333,7 +2340,7 @@ MODULE fully_implicit
       REAL(KIND=8), DIMENSION(3), INTENT(IN) :: E
       REAL(KIND=8), INTENT(IN) :: TIME
       REAL(KIND=8), DIMENSION(3) :: ACC
-      !REAL(KIND=8) :: R, COSTHETA, SINTHETA, VY, VZ
+      REAL(KIND=8) :: R, COSTHETA, SINTHETA, VY, VZ
       TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE, INTENT(INOUT) :: part_adv
 
 
@@ -2350,22 +2357,21 @@ MODULE fully_implicit
       part_adv(IP)%VZ = part_adv(IP)%VZ + ACC(3) * TIME
 
 
-      ! THIS DOES NOT WORK WITH C-N. INTERSECTION MUST BE FOUND NUMERICALLY OR SOLVING THE 4th ORDER EQUATION.
-      ! IF (AXI) THEN
+      IF (AXI) THEN
          
-      !    R = SQRT((part_adv(IP)%Y)**2 + (part_adv(IP)%Z)**2)
-      !    ! Rotate velocity vector back to x-y plane.
-      !    SINTHETA = part_adv(IP)%Z / R
-      !    COSTHETA = SIGN(SQRT(1.-SINTHETA*SINTHETA), part_adv(IP)%Y)
+         R = SQRT((part_adv(IP)%Y)**2 + (part_adv(IP)%Z)**2)
+         ! Rotate velocity vector back to x-y plane.
+         SINTHETA = part_adv(IP)%Z / R
+         COSTHETA = SIGN(SQRT(1.-SINTHETA*SINTHETA), part_adv(IP)%Y)
 
-      !    part_adv(IP)%Z = 0.d0
+         part_adv(IP)%Z = 0.d0
 
-      !    VZ = part_adv(IP)%VZ
-      !    VY = part_adv(IP)%VY
-      !    part_adv(IP)%VZ = COSTHETA*VZ - SINTHETA*VY
-      !    part_adv(IP)%VY = SINTHETA*VZ + COSTHETA*VY
+         VZ = part_adv(IP)%VZ
+         VY = part_adv(IP)%VY
+         part_adv(IP)%VZ = COSTHETA*VZ - SINTHETA*VY
+         part_adv(IP)%VY = SINTHETA*VZ + COSTHETA*VY
          
-      ! END IF
+      END IF
 
    END SUBROUTINE MOVE_PARTICLE_CN
 

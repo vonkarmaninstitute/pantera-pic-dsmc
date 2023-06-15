@@ -1611,7 +1611,7 @@ MODULE fully_implicit
                            ! We should move without applying the boundary conditions, and start again from there.
                            DTCOLL = COLLTIMES(I)
                            BOUNDCOLL = 0
-                           WRITE(*,*) 'This happened. V dot N was ', &
+                           WRITE(*,*) 'This happened to particle ', IP, ' and V dot N was ', &
                            (part_adv(IP)%VX*U2D_GRID%EDGE_NORMAL(IC,J,1) + part_adv(IP)%VY*U2D_GRID%EDGE_NORMAL(IC,J,2))
                         END IF
 

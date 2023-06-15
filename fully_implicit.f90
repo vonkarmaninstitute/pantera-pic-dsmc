@@ -2370,8 +2370,8 @@ MODULE fully_implicit
 
          VZ = part_adv(IP)%VZ
          VY = part_adv(IP)%VY
-         part_adv(IP)%VZ = COSTHETA*VZ - SINTHETA*VY
-         part_adv(IP)%VY = SINTHETA*VZ + COSTHETA*VY
+         !part_adv(IP)%VZ = COSTHETA*VZ - SINTHETA*VY
+         !part_adv(IP)%VY = SINTHETA*VZ + COSTHETA*VY
          
       END IF
 

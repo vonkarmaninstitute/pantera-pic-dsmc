@@ -1615,8 +1615,8 @@ MODULE fully_implicit
                                  ! After rotation the velocity points back into the cell.
                                  ! We should move without applying the boundary conditions, and start again from there.
                                  BOUNDCOLL = 0
-                                 WRITE(*,*) 'This happened to particle with id ', part_adv(IP)%ID, ' and V dot N was ', &
-                                 (part_adv(IP)%VX*U2D_GRID%EDGE_NORMAL(IC,J,1) + part_adv(IP)%VY*U2D_GRID%EDGE_NORMAL(IC,J,2))
+                                 !WRITE(*,*) 'This happened to particle with id ', part_adv(IP)%ID, ' and V dot N was ', &
+                                 !(part_adv(IP)%VX*U2D_GRID%EDGE_NORMAL(IC,J,1) + part_adv(IP)%VY*U2D_GRID%EDGE_NORMAL(IC,J,2))
                                  ! We should move without applying the boundary conditions, and start again from there.
                               END IF
                            END IF
@@ -1628,8 +1628,8 @@ MODULE fully_implicit
                                  ! After rotation the velocity points out of the cell.
                                  DTCOLL = COLLTIMES(I)
                                  BOUNDCOLL = J
-                                 WRITE(*,*) 'The opposite happened to particle with id ', part_adv(IP)%ID, ' and V dot N was ', &
-                                 (part_adv(IP)%VX*U2D_GRID%EDGE_NORMAL(IC,J,1) + part_adv(IP)%VY*U2D_GRID%EDGE_NORMAL(IC,J,2))
+                                 !WRITE(*,*) 'The opposite happened to particle with id ', part_adv(IP)%ID, ' and V dot N was ', &
+                                 !(part_adv(IP)%VX*U2D_GRID%EDGE_NORMAL(IC,J,1) + part_adv(IP)%VY*U2D_GRID%EDGE_NORMAL(IC,J,2))
                                  ! We should move without applying the boundary conditions, and start again from there.
                               END IF
                            END IF

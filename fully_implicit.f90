@@ -1327,7 +1327,7 @@ MODULE fully_implicit
 
       IF (JACOBIAN_TYPE .LT. 0 .OR. JACOBIAN_TYPE .GT. 6) CALL ERROR_ABORT('Jacobian type not supported.')
 
-      TOL = 1e-13
+      TOL = 1e-30
 
       SIZE = NCELLS
 

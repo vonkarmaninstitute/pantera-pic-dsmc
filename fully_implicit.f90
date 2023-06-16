@@ -1575,7 +1575,7 @@ MODULE fully_implicit
                   DTCOLL = part_adv(IP)%DTRIM
                   BOUNDCOLL = -1
                   DO I = 1, 6
-                     IF (COLLTIMES(I) > TOL .AND. COLLTIMES(I) < DTCOLL) THEN
+                     IF (COLLTIMES(I) > 0 .AND. COLLTIMES(I) < DTCOLL) THEN
 
 
                         X_TEMP = part_adv(IP)%X
@@ -1605,14 +1605,34 @@ MODULE fully_implicit
                         ! ! End of the small check.
                         
                         IF ((part_adv(IP)%VX*U2D_GRID%EDGE_NORMAL(IC,J,1) + part_adv(IP)%VY*U2D_GRID%EDGE_NORMAL(IC,J,2)) > 0) THEN
+                           ! Velocity pre-rotation points outwards.
                            DTCOLL = COLLTIMES(I)
                            BOUNDCOLL = J
-                        ELSE IF (AXI) THEN ! There is a collision with cell boundary but the rotated velocity points back into the cell.
-                           ! We should move without applying the boundary conditions, and start again from there.
-                           DTCOLL = COLLTIMES(I)
-                           BOUNDCOLL = 0
-                           WRITE(*,*) 'This happened to particle with id ', part_adv(IP)%ID, ' and V dot N was ', &
-                           (part_adv(IP)%VX*U2D_GRID%EDGE_NORMAL(IC,J,1) + part_adv(IP)%VY*U2D_GRID%EDGE_NORMAL(IC,J,2))
+                           IF (AXI) THEN
+                              CALL AXI_ROTATE_VELOCITY(part_adv, IP)
+                              IF ((part_adv(IP)%VX*U2D_GRID%EDGE_NORMAL(IC,J,1) &
+                                 + part_adv(IP)%VY*U2D_GRID%EDGE_NORMAL(IC,J,2)) < 0) THEN
+                                 ! After rotation the velocity points back into the cell.
+                                 ! We should move without applying the boundary conditions, and start again from there.
+                                 BOUNDCOLL = 0
+                                 WRITE(*,*) 'This happened to particle with id ', part_adv(IP)%ID, ' and V dot N was ', &
+                                 (part_adv(IP)%VX*U2D_GRID%EDGE_NORMAL(IC,J,1) + part_adv(IP)%VY*U2D_GRID%EDGE_NORMAL(IC,J,2))
+                                 ! We should move without applying the boundary conditions, and start again from there.
+                              END IF
+                           END IF
+                        ELSE
+                           IF (AXI) THEN
+                              CALL AXI_ROTATE_VELOCITY(part_adv, IP)
+                              IF ((part_adv(IP)%VX*U2D_GRID%EDGE_NORMAL(IC,J,1) &
+                                 + part_adv(IP)%VY*U2D_GRID%EDGE_NORMAL(IC,J,2)) > 0) THEN
+                                 ! After rotation the velocity points out of the cell.
+                                 DTCOLL = COLLTIMES(I)
+                                 BOUNDCOLL = J
+                                 WRITE(*,*) 'The opposite happened to particle with id ', part_adv(IP)%ID, ' and V dot N was ', &
+                                 (part_adv(IP)%VX*U2D_GRID%EDGE_NORMAL(IC,J,1) + part_adv(IP)%VY*U2D_GRID%EDGE_NORMAL(IC,J,2))
+                                 ! We should move without applying the boundary conditions, and start again from there.
+                              END IF
+                           END IF
                         END IF
 
                         part_adv(IP)%X = X_TEMP
@@ -1814,6 +1834,7 @@ MODULE fully_implicit
                ! Do the advection
                IF (BOUNDCOLL > 0) THEN
                   CALL MOVE_PARTICLE_CN(part_adv, IP, E, DTCOLL)
+                  IF (AXI .AND. DIMS == 2) CALL AXI_ROTATE_VELOCITY(part_adv, IP)
                   part_adv(IP)%DTRIM = part_adv(IP)%DTRIM - DTCOLL
 
                   IF (DIMS == 2) THEN
@@ -1956,10 +1977,12 @@ MODULE fully_implicit
                   END IF
                ELSE IF (BOUNDCOLL == 0) THEN
                   CALL MOVE_PARTICLE_CN(part_adv, IP, E, DTCOLL)
+                  IF (AXI .AND. DIMS == 2) CALL AXI_ROTATE_VELOCITY(part_adv, IP)
                   part_adv(IP)%DTRIM = part_adv(IP)%DTRIM - DTCOLL
                ELSE
                   ! The particle stays within the current cell. End of the motion.
                   CALL MOVE_PARTICLE_CN(part_adv, IP, E, part_adv(IP)%DTRIM)
+                  IF (AXI .AND. DIMS == 2) CALL AXI_ROTATE_VELOCITY(part_adv, IP)
                   part_adv(IP)%DTRIM = 0.d0
                END IF
             
@@ -2342,7 +2365,6 @@ MODULE fully_implicit
       REAL(KIND=8), DIMENSION(3), INTENT(IN) :: E
       REAL(KIND=8), INTENT(IN) :: TIME
       REAL(KIND=8), DIMENSION(3) :: ACC
-      REAL(KIND=8) :: R, COSTHETA, SINTHETA, VY, VZ
       TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE, INTENT(INOUT) :: part_adv
 
 
@@ -2358,24 +2380,31 @@ MODULE fully_implicit
       part_adv(IP)%VY = part_adv(IP)%VY + ACC(2) * TIME
       part_adv(IP)%VZ = part_adv(IP)%VZ + ACC(3) * TIME
 
-
-      IF (AXI) THEN
-         
-         R = SQRT((part_adv(IP)%Y)**2 + (part_adv(IP)%Z)**2)
-         ! Rotate velocity vector back to x-y plane.
-         SINTHETA = part_adv(IP)%Z / R
-         COSTHETA = SIGN(SQRT(1.-SINTHETA*SINTHETA), part_adv(IP)%Y)
-
-         part_adv(IP)%Z = 0.d0
-
-         VZ = part_adv(IP)%VZ
-         VY = part_adv(IP)%VY
-         !part_adv(IP)%VZ = COSTHETA*VZ - SINTHETA*VY
-         !part_adv(IP)%VY = SINTHETA*VZ + COSTHETA*VY
-         
-      END IF
-
    END SUBROUTINE MOVE_PARTICLE_CN
+
+
+   SUBROUTINE AXI_ROTATE_VELOCITY(part_adv, IP)
+
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN)      :: IP
+      REAL(KIND=8) :: R, COSTHETA, SINTHETA, VY, VZ
+      TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE, INTENT(INOUT) :: part_adv
+               
+      R = SQRT((part_adv(IP)%Y)**2 + (part_adv(IP)%Z)**2)
+      ! Rotate velocity vector back to x-y plane.
+      SINTHETA = part_adv(IP)%Z / R
+      COSTHETA = SIGN(SQRT(1.-SINTHETA*SINTHETA), part_adv(IP)%Y)
+
+      part_adv(IP)%Z = 0.d0
+
+      VZ = part_adv(IP)%VZ
+      VY = part_adv(IP)%VY
+      part_adv(IP)%VZ = COSTHETA*VZ - SINTHETA*VY
+      part_adv(IP)%VY = SINTHETA*VZ + COSTHETA*VY
+
+   END SUBROUTINE AXI_ROTATE_VELOCITY
+ 
 
    SUBROUTINE APPLY_E_FIELD(JP, E)
 

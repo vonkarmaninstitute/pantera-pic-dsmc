@@ -927,8 +927,11 @@ MODULE initialization
       DO I = 1, N_GRID_BC
          IF (GRID_BC(I)%PHYSICAL_GROUP_NAME == STRARRAY(1)) IPG = I
       END DO
-      IF (IPG == -1) CALL ERROR_ABORT('Error in boundary condition definition. Group name not found.')
-
+      IF (IPG == -1) THEN
+         WRITE(*,*) 'Group ', STRARRAY(1), ' not found.'
+         CALL ERROR_ABORT('Error in boundary condition definition. Group name not found.')
+      END IF
+      
       IF (STRARRAY(2) == 'vacuum') THEN
          GRID_BC(IPG)%PARTICLE_BC = VACUUM
       ELSE IF (STRARRAY(2) == 'specular') THEN

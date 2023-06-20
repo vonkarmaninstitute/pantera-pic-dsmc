@@ -50,6 +50,7 @@ MODULE fields
       REAL(KIND=8) :: KIJ, VOLUME
       INTEGER :: EDGE_PG
       LOGICAL, DIMENSION(:), ALLOCATABLE :: IS_UNUSED
+      REAL(KIND=8) :: EPS_REL
 
       SIZE = NNODES
 
@@ -133,6 +134,11 @@ MODULE fields
             !DIRICHLET(0) = 0.d0
 
             DO I = 1, NCELLS
+               IF (U2D_GRID%CELL_PG(I) == -1) THEN
+                  EPS_REL = 1.d0
+               ELSE
+                  EPS_REL = GRID_BC(U2D_GRID%CELL_PG(I))%EPS_REL
+               END IF
                AREA = CELL_AREAS(I)
                V1 = U2D_GRID%CELL_NODES(I,1)
                V2 = U2D_GRID%CELL_NODES(I,2)
@@ -143,12 +149,12 @@ MODULE fields
                Y1 = U2D_GRID%NODE_COORDS(V1, 2)
                Y2 = U2D_GRID%NODE_COORDS(V2, 2)
                Y3 = U2D_GRID%NODE_COORDS(V3, 2)
-               K11 = 0.25*((Y2-Y3)**2 + (X2-X3)**2)/AREA
-               K22 = 0.25*((Y1-Y3)**2 + (X1-X3)**2)/AREA
-               K33 = 0.25*((Y2-Y1)**2 + (X2-X1)**2)/AREA
-               K12 =-0.25*((Y2-Y3)*(Y1-Y3) + (X2-X3)*(X1-X3))/AREA
-               K23 = 0.25*((Y1-Y3)*(Y2-Y1) + (X1-X3)*(X2-X1))/AREA
-               K13 =-0.25*((Y2-Y3)*(Y2-Y1) + (X2-X3)*(X2-X1))/AREA
+               K11 = 0.25*((Y2-Y3)**2 + (X2-X3)**2)/AREA*EPS_REL
+               K22 = 0.25*((Y1-Y3)**2 + (X1-X3)**2)/AREA*EPS_REL
+               K33 = 0.25*((Y2-Y1)**2 + (X2-X1)**2)/AREA*EPS_REL
+               K12 =-0.25*((Y2-Y3)*(Y1-Y3) + (X2-X3)*(X1-X3))/AREA*EPS_REL
+               K23 = 0.25*((Y1-Y3)*(Y2-Y1) + (X1-X3)*(X2-X1))/AREA*EPS_REL
+               K13 =-0.25*((Y2-Y3)*(Y2-Y1) + (X2-X3)*(X2-X1))/AREA*EPS_REL
                IF (AXI) THEN
                   K11 = K11*(Y1+Y2+Y3)/3.
                   K22 = K22*(Y1+Y2+Y3)/3.
@@ -292,6 +298,11 @@ MODULE fields
             !DIRICHLET(0) = 0.d0
 
             DO I = 1, NCELLS
+               IF (U3D_GRID%CELL_PG(I) == -1) THEN
+                  EPS_REL = 1.d0
+               ELSE
+                  EPS_REL = GRID_BC(U3D_GRID%CELL_PG(I))%EPS_REL
+               END IF
 
                VOLUME = CELL_VOLUMES(I)
 
@@ -303,7 +314,7 @@ MODULE fields
                            VQ = U3D_GRID%CELL_NODES(I,Q) - 1
                            KIJ = VOLUME*(U3D_GRID%BASIS_COEFFS(I,P,1)*U3D_GRID%BASIS_COEFFS(I,Q,1) &
                                        + U3D_GRID%BASIS_COEFFS(I,P,2)*U3D_GRID%BASIS_COEFFS(I,Q,2) &
-                                       + U3D_GRID%BASIS_COEFFS(I,P,3)*U3D_GRID%BASIS_COEFFS(I,Q,3))
+                                       + U3D_GRID%BASIS_COEFFS(I,P,3)*U3D_GRID%BASIS_COEFFS(I,Q,3)) * EPS_REL
                            CALL MatSetValues(Amat,one,VP,one,VQ,KIJ,ADD_VALUES,ierr)
                         END DO
                      END IF

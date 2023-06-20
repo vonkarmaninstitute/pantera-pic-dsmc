@@ -2523,7 +2523,7 @@ MODULE fully_implicit
       ! Set solver type to direct (LU). Could be MUMPS but must install with --download-mumps
       !CALL KSPGetPC(ksp,pc,ierr)
       !CALL PCSetType(pc,PCLU,ierr)
-      !CALL KSPSetFromOptions(ksp,ierr)
+      CALL KSPSetFromOptions(ksp,ierr)
 
       !abstol = 1.d-15
       !rtol = 1.d-15

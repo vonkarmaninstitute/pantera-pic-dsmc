@@ -772,7 +772,8 @@ MODULE grid_and_partition
 
       INTEGER, DIMENSION(:,:), ALLOCATABLE      :: TEMP_CELL_NEIGHBORS
 
-      INTEGER, DIMENSION(2) :: VLIST, WHICH1, WHICH2
+      INTEGER, DIMENSION(2) :: VLIST2, WHICH1, WHICH2
+      INTEGER, DIMENSION(3) :: VLIST3
 
       INTEGER, DIMENSION(:), ALLOCATABLE :: N_CELLS_WITH_NODE, CELL_WITH_NODE, IOF
       INTEGER :: IDX, JN, JC1, JC2
@@ -818,6 +819,9 @@ MODULE grid_and_partition
 
             ALLOCATE(U2D_GRID%CELL_EDGES_PG(U2D_GRID%NUM_CELLS, 3))
             U2D_GRID%CELL_EDGES_PG = -1
+
+            ALLOCATE(U2D_GRID%CELL_PG(U2D_GRID%NUM_CELLS))
+            U2D_GRID%CELL_PG = -1
       
          ELSE IF (LINE == 'NMARK=') THEN
 
@@ -896,7 +900,7 @@ MODULE grid_and_partition
             END DO
          ELSE IF (LINE == 'NMARK=') THEN
 
-            ! Assign physical groups to cell edges.
+            ! Assign physical groups to cells/cell edges.
 
             ALLOCATE(GRID_BC(NUM)) ! Append the physical group to the list
             N_GRID_BC = NUM
@@ -910,32 +914,64 @@ MODULE grid_and_partition
                READ(in5,*, IOSTAT=ReasonEOF) LINE, NUMELEMS
 
                DO J = 1, NUMELEMS
-                  READ(in5,*, IOSTAT=ReasonEOF) ELEM_TYPE, VLIST
-                  IF (ELEM_TYPE .NE. 3) WRITE(*,*) 'Error! element type was not line.'
-                  VLIST = VLIST + 1
+                  READ(in5,'(A)', IOSTAT=ReasonEOF) LINE
 
-                  JN = VLIST(1)
-                  IF (N_CELLS_WITH_NODE(JN) > 0) THEN
-                     DO IDX = 0, N_CELLS_WITH_NODE(JN) - 1
-                        JC1 = CELL_WITH_NODE(IOF(JN) + IDX)
-                        FOUND = 0
-                        DO V1 = 1, 3
-                           IF (ANY(VLIST == U2D_GRID%CELL_NODES(JC1,V1))) THEN
-                              FOUND = FOUND + 1
-                              WHICH1(FOUND) = V1
+                  READ(LINE,*) ELEM_TYPE
+
+                  IF (ELEM_TYPE == 3) THEN ! element in physical group is a cell edge (segment).
+
+                     READ(LINE,*) ELEM_TYPE, VLIST2
+                     
+                     VLIST2 = VLIST2 + 1
+
+                     JN = VLIST2(1)
+                     IF (N_CELLS_WITH_NODE(JN) > 0) THEN
+                        DO IDX = 0, N_CELLS_WITH_NODE(JN) - 1
+                           JC1 = CELL_WITH_NODE(IOF(JN) + IDX)
+                           FOUND = 0
+                           DO V1 = 1, 3
+                              IF (ANY(VLIST2 == U2D_GRID%CELL_NODES(JC1,V1))) THEN
+                                 FOUND = FOUND + 1
+                                 WHICH1(FOUND) = V1
+                              END IF
+                           END DO
+            
+                           IF (FOUND == 2) THEN
+                              IF (ANY(WHICH1 == 1) .AND. ANY(WHICH1 == 2)) THEN
+                                 U2D_GRID%CELL_EDGES_PG(JC1, 1) = I
+                              ELSE IF (ANY(WHICH1 == 2) .AND. ANY(WHICH1 == 3)) THEN
+                                 U2D_GRID%CELL_EDGES_PG(JC1, 2) = I
+                              ELSE IF (ANY(WHICH1 == 3) .AND. ANY(WHICH1 == 1)) THEN
+                                 U2D_GRID%CELL_EDGES_PG(JC1, 3) = I
+                              END IF
                            END IF
                         END DO
-         
-                        IF (FOUND == 2) THEN
-                           IF (ANY(WHICH1 == 1) .AND. ANY(WHICH1 == 2)) THEN
-                              U2D_GRID%CELL_EDGES_PG(JC1, 1) = I
-                           ELSE IF (ANY(WHICH1 == 2) .AND. ANY(WHICH1 == 3)) THEN
-                              U2D_GRID%CELL_EDGES_PG(JC1, 2) = I
-                           ELSE IF (ANY(WHICH1 == 3) .AND. ANY(WHICH1 == 1)) THEN
-                              U2D_GRID%CELL_EDGES_PG(JC1, 3) = I
+                     END IF
+
+                  ELSE IF (ELEM_TYPE == 5) THEN ! element in physical group is a cell (simplex).
+                     READ(LINE,*) ELEM_TYPE, VLIST3
+                     
+                     VLIST3 = VLIST3 + 1
+
+                     JN = VLIST3(1)
+                     IF (N_CELLS_WITH_NODE(JN) > 0) THEN
+                        DO IDX = 0, N_CELLS_WITH_NODE(JN) - 1
+                           JC1 = CELL_WITH_NODE(IOF(JN) + IDX)
+                           FOUND = 0
+                           DO V1 = 1, 3
+                              IF (ANY(VLIST3 == U2D_GRID%CELL_NODES(JC1,V1))) THEN
+                                 FOUND = FOUND + 1
+                              END IF
+                           END DO
+            
+                           IF (FOUND == 3) THEN
+                              U2D_GRID%CELL_PG(JC1) = I
                            END IF
-                        END IF
-                     END DO
+                        END DO
+                     END IF
+
+                  ELSE
+                     WRITE(*,*) 'Error! element type was not line or triangle.'
                   END IF
 
                END DO
@@ -1169,7 +1205,8 @@ MODULE grid_and_partition
 
       INTEGER, DIMENSION(:,:), ALLOCATABLE      :: TEMP_CELL_NEIGHBORS
 
-      INTEGER, DIMENSION(3) :: VLIST, WHICH1, WHICH2
+      INTEGER, DIMENSION(3) :: VLIST3, WHICH1, WHICH2
+      INTEGER, DIMENSION(4) :: VLIST4
 
       INTEGER, DIMENSION(:), ALLOCATABLE :: N_CELLS_WITH_NODE, CELL_WITH_NODE, IOF
       INTEGER :: IDX, JN, JC1, JC2
@@ -1216,6 +1253,9 @@ MODULE grid_and_partition
 
             ALLOCATE(U3D_GRID%CELL_FACES_PG(U3D_GRID%NUM_CELLS, 4))
             U3D_GRID%CELL_FACES_PG = -1
+            ALLOCATE(U3D_GRID%CELL_PG(U3D_GRID%NUM_CELLS))
+            U3D_GRID%CELL_PG = -1
+
          ELSE IF (LINE == 'NMARK=') THEN
             DO I = 1, NUM
                READ(in5,*, IOSTAT=ReasonEOF) LINE, GROUPNAME
@@ -1304,40 +1344,72 @@ MODULE grid_and_partition
                READ(in5,*, IOSTAT=ReasonEOF) LINE, NUMELEMS
 
                DO J = 1, NUMELEMS
-                  READ(in5,*, IOSTAT=ReasonEOF) ELEM_TYPE, VLIST
-                  IF (ELEM_TYPE .NE. 5) CALL ERROR_ABORT('Error! element type was not triangle.')
-                  VLIST = VLIST + 1
+                  READ(in5,'(A)', IOSTAT=ReasonEOF) LINE
 
-                  JN = VLIST(1)
-                  IF (N_CELLS_WITH_NODE(JN) > 0) THEN
-                     DO IDX = 0, N_CELLS_WITH_NODE(JN) - 1
-                        JC1 = CELL_WITH_NODE(IOF(JN) + IDX)
-                        FOUND = 0
-                        DO V1 = 1, 4
-                           IF (ANY(VLIST == U3D_GRID%CELL_NODES(JC1,V1))) THEN
-                              FOUND = FOUND + 1
-                              WHICH1(FOUND) = V1
+                  READ(LINE,*) ELEM_TYPE
+
+                  IF (ELEM_TYPE == 5) THEN ! element in physical group is a cell cell (simplex).
+
+                     READ(LINE,*) ELEM_TYPE, VLIST3
+
+                     VLIST3 = VLIST3 + 1
+
+                     JN = VLIST3(1)
+                     IF (N_CELLS_WITH_NODE(JN) > 0) THEN
+                        DO IDX = 0, N_CELLS_WITH_NODE(JN) - 1
+                           JC1 = CELL_WITH_NODE(IOF(JN) + IDX)
+                           FOUND = 0
+                           DO V1 = 1, 4
+                              IF (ANY(VLIST3 == U3D_GRID%CELL_NODES(JC1,V1))) THEN
+                                 FOUND = FOUND + 1
+                                 WHICH1(FOUND) = V1
+                              END IF
+                           END DO
+            
+                           IF (FOUND == 3) THEN
+               
+                              IF (ANY(WHICH1 == 1)) THEN
+                                 IF (ANY(WHICH1 == 2)) THEN
+                                    IF (ANY(WHICH1 == 3))  THEN
+                                       U3D_GRID%CELL_FACES_PG(JC1, 1) = I
+                                    ELSE IF (ANY(WHICH1 == 4)) THEN
+                                       U3D_GRID%CELL_FACES_PG(JC1, 2) = I
+                                    END IF
+                                 ELSE IF (ANY(WHICH1 == 3)) THEN
+                                    IF (ANY(WHICH1 == 4)) U3D_GRID%CELL_FACES_PG(JC1, 4) = I
+                                 END IF
+                              ELSE IF (ANY(WHICH1 == 2)) THEN
+                                 IF (ANY(WHICH1 == 3) .AND. ANY(WHICH1 == 4)) U3D_GRID%CELL_FACES_PG(JC1, 3) = I
+                              END IF
+
                            END IF
                         END DO
-         
-                        IF (FOUND == 3) THEN
-            
-                           IF (ANY(WHICH1 == 1)) THEN
-                              IF (ANY(WHICH1 == 2)) THEN
-                                 IF (ANY(WHICH1 == 3))  THEN
-                                    U3D_GRID%CELL_FACES_PG(JC1, 1) = I
-                                 ELSE IF (ANY(WHICH1 == 4)) THEN
-                                    U3D_GRID%CELL_FACES_PG(JC1, 2) = I
-                                 END IF
-                              ELSE IF (ANY(WHICH1 == 3)) THEN
-                                 IF (ANY(WHICH1 == 4)) U3D_GRID%CELL_FACES_PG(JC1, 4) = I
-                              END IF
-                           ELSE IF (ANY(WHICH1 == 2)) THEN
-                              IF (ANY(WHICH1 == 3) .AND. ANY(WHICH1 == 4)) U3D_GRID%CELL_FACES_PG(JC1, 3) = I
-                           END IF
+                     END IF
 
-                        END IF
-                     END DO
+                  ELSE IF (ELEM_TYPE == 10) THEN ! element in physical group is a tetrahedron.
+                     READ(LINE,*) ELEM_TYPE, VLIST4
+                     
+                     VLIST4 = VLIST4 + 1
+
+                     JN = VLIST4(1)
+                     IF (N_CELLS_WITH_NODE(JN) > 0) THEN
+                        DO IDX = 0, N_CELLS_WITH_NODE(JN) - 1
+                           JC1 = CELL_WITH_NODE(IOF(JN) + IDX)
+                           FOUND = 0
+                           DO V1 = 1, 4
+                              IF (ANY(VLIST4 == U3D_GRID%CELL_NODES(JC1,V1))) THEN
+                                 FOUND = FOUND + 1
+                              END IF
+                           END DO
+            
+                           IF (FOUND == 4) THEN
+                              U3D_GRID%CELL_PG(JC1) = I
+                           END IF
+                        END DO
+                     END IF
+
+                  ELSE
+                     WRITE(*,*) 'Error! element type was not triangle or prism.'
                   END IF
 
                END DO

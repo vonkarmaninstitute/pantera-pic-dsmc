@@ -93,6 +93,11 @@ MODULE initialization
             CALL DEF_BOUNDARY_CONDITION(BC_DEFINITION)
          END IF
 
+         IF (line=='Domain_type:') THEN
+            READ(in1,'(A)') BC_DEFINITION
+            CALL DEF_DOMAIN_TYPE(BC_DEFINITION)
+         END IF
+
          IF (line=='Boundary_emit:') THEN
             READ(in1,'(A)') BC_DEFINITION
             CALL DEF_BOUNDARY_EMIT(BC_DEFINITION)
@@ -980,6 +985,43 @@ MODULE initialization
 
    END SUBROUTINE DEF_BOUNDARY_CONDITION
 
+
+
+
+   SUBROUTINE DEF_DOMAIN_TYPE(DEFINITION)
+
+      IMPLICIT NONE
+
+      CHARACTER(LEN=*), INTENT(IN) :: DEFINITION
+
+      INTEGER :: N_STR, I, IPG
+      CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
+
+
+      CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
+
+      ! phys_group type parameters
+      IPG = -1
+      DO I = 1, N_GRID_BC
+         IF (GRID_BC(I)%PHYSICAL_GROUP_NAME == STRARRAY(1)) IPG = I
+      END DO
+      IF (IPG == -1) THEN
+         WRITE(*,*) 'Group ', STRARRAY(1), ' not found.'
+         CALL ERROR_ABORT('Error in domain type definition. Group name not found.')
+      END IF
+      
+      IF (STRARRAY(2) == 'fluid') THEN
+         GRID_BC(IPG)%VOLUME_BC = FLUID
+      ELSE IF (STRARRAY(2) == 'solid') THEN
+         GRID_BC(IPG)%VOLUME_BC = SOLID
+      ELSE
+         CALL ERROR_ABORT('Error in boundary condition definition.')
+      END IF
+
+      READ(STRARRAY(3), '(ES14.0)') GRID_BC(IPG)%EPS_REL
+
+
+   END SUBROUTINE DEF_DOMAIN_TYPE
 
 
 

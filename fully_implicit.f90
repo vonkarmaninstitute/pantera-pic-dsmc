@@ -1321,6 +1321,11 @@ MODULE fully_implicit
 
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: DXDEBAR, DVDEBAR
 
+      LOGICAL :: FLUIDBOUNDARY
+      INTEGER :: NEIGHBORPG
+      REAL(KIND=8) :: CHARGE, K, PSIP, RHO_Q
+      INTEGER :: VP
+
       ! IF (tID == 4 .AND. FINAL) THEN
       !    OPEN(66332, FILE='crossings', POSITION='append', STATUS='unknown', ACTION='write')
       ! END IF
@@ -1837,14 +1842,33 @@ MODULE fully_implicit
                   IF (AXI .AND. DIMS == 2) CALL AXI_ROTATE_VELOCITY(part_adv, IP)
                   part_adv(IP)%DTRIM = part_adv(IP)%DTRIM - DTCOLL
 
+                  FLUIDBOUNDARY = .FALSE.
                   IF (DIMS == 2) THEN
                      NEIGHBOR = U2D_GRID%CELL_NEIGHBORS(IC, BOUNDCOLL)
+                     IF (NEIGHBOR == -1) THEN
+                        FLUIDBOUNDARY = .TRUE.
+                     ELSE
+                        NEIGHBORPG = U2D_GRID%CELL_PG(NEIGHBOR)
+                        IF (NEIGHBORPG .NE. -1) THEN
+                           IF (GRID_BC(NEIGHBORPG)%VOLUME_BC == SOLID) FLUIDBOUNDARY = .TRUE.
+                        END IF
+                     END IF
+
                      FACE_PG = U2D_GRID%CELL_EDGES_PG(IC, BOUNDCOLL)
                      FACE_NORMAL = U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,:)
                      FACE_TANG1 = [-FACE_NORMAL(2), FACE_NORMAL(1), 0.d0]
                      FACE_TANG2 = [0.d0, 0.d0, 1.d0]
                   ELSE IF (DIMS == 3) THEN
                      NEIGHBOR = U3D_GRID%CELL_NEIGHBORS(IC, BOUNDCOLL)
+                     IF (NEIGHBOR == -1) THEN
+                        FLUIDBOUNDARY = .TRUE.
+                     ELSE
+                        NEIGHBORPG = U3D_GRID%CELL_PG(NEIGHBOR)
+                        IF (NEIGHBORPG .NE. -1) THEN
+                           IF (GRID_BC(NEIGHBORPG)%VOLUME_BC == SOLID) FLUIDBOUNDARY = .TRUE.
+                        END IF
+                     END IF
+                     
                      FACE_PG = U3D_GRID%CELL_FACES_PG(IC, BOUNDCOLL)
                      FACE_NORMAL = U3D_GRID%FACE_NORMAL(IC,BOUNDCOLL,:)
                      FACE_TANG1 = U3D_GRID%FACE_TANG1(IC,BOUNDCOLL,:)
@@ -1852,9 +1876,35 @@ MODULE fully_implicit
                   END IF
 
                   ! Move to new cell
-                  IF (NEIGHBOR == -1) THEN
+                  IF (FLUIDBOUNDARY) THEN
                      ! The particle is at the boundary of the domain
                      IF (FACE_PG .NE. -1) THEN
+
+                        CHARGE = SPECIES(part_adv(IP)%S_ID)%CHARGE
+                        IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. ABS(CHARGE) .GE. 1.d-6 .AND. FINAL) THEN
+                           K = QE/(EPS0*EPS_SCALING**2)
+                           IF (DIMS == 2) THEN
+                              RHO_Q = K*CHARGE*FNUM/(ZMAX-ZMIN)
+                              DO I = 1, 3
+                                 VP = U2D_GRID%CELL_NODES(IC,I)
+                                 PSIP = U2D_GRID%BASIS_COEFFS(IC,I,1)*part_adv(IP)%X &
+                                      + U2D_GRID%BASIS_COEFFS(IC,I,2)*part_adv(IP)%Y &
+                                      + U2D_GRID%BASIS_COEFFS(IC,I,3)
+                                 SURFACE_CHARGE(VP) = SURFACE_CHARGE(VP) + RHO_Q*PSIP
+                              END DO
+                           ELSE IF (DIMS == 3) THEN
+                              RHO_Q = K*CHARGE*FNUM
+                              DO I = 1, 4
+                                 VP = U3D_GRID%CELL_NODES(IC,I)
+                                 PSIP = U3D_GRID%BASIS_COEFFS(IC,I,1)*part_adv(IP)%X &
+                                      + U3D_GRID%BASIS_COEFFS(IC,I,2)*part_adv(IP)%Y &
+                                      + U3D_GRID%BASIS_COEFFS(IC,I,3)*part_adv(IP)%Z &
+                                      + U3D_GRID%BASIS_COEFFS(IC,I,4)
+                                 SURFACE_CHARGE(VP) = SURFACE_CHARGE(VP) + RHO_Q*PSIP
+                              END DO
+                           END IF
+                        END IF
+
                         ! Apply particle boundary condition
                         IF (GRID_BC(FACE_PG)%PARTICLE_BC == SPECULAR) THEN
                            IF (GRID_BC(FACE_PG)%REACT) THEN
@@ -2820,6 +2870,7 @@ MODULE fully_implicit
          END IF
       END DO
 
+      RHS = RHS + SURFACE_CHARGE
 
       SIZE = NNODES
 

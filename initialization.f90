@@ -964,6 +964,8 @@ MODULE initialization
       ELSE IF (STRARRAY(2) == 'neumann') THEN
          GRID_BC(IPG)%FIELD_BC = NEUMANN_BC
          READ(STRARRAY(3), '(ES14.0)') GRID_BC(IPG)%WALL_EFIELD
+      ELSE IF (STRARRAY(2) == 'dielectric') THEN
+         GRID_BC(IPG)%FIELD_BC = DIELECTRIC_BC
       !!! BCs for both particles and field
       ELSE IF (STRARRAY(2) == 'periodic_master') THEN
          GRID_BC(IPG)%PARTICLE_BC = PERIODIC_MASTER
@@ -1615,7 +1617,7 @@ MODULE initialization
 
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
       REAL(KIND=8)  :: M
-      INTEGER       :: S_ID, ELECTRON_S_ID, i, ITASK
+      INTEGER       :: S_ID, ELECTRON_S_ID, i, ITASK, CELL_PG
 
       ! Print message 
       CALL ONLYMASTERPRINT1(PROC_ID, '> SEEDING INITIAL PARTICLES IN THE DOMAIN...')
@@ -1640,6 +1642,16 @@ MODULE initialization
 
             IF (GRID_TYPE == UNSTRUCTURED) THEN
                DO IC = 1, NCELLS
+                  IF (DIMS == 2) THEN
+                     CELL_PG = U2D_GRID%CELL_PG(IC)
+                  ELSE IF (DIMS == 3) THEN
+                     CELL_PG = U3D_GRID%CELL_PG(IC)
+                  END IF
+                  IF (CELL_PG .NE. -1) THEN
+                     IF (GRID_BC(CELL_PG)%VOLUME_BC == SOLID) CYCLE
+                  END IF
+
+
                   ! Compute number of particles of this species per process to be created in this cell.
                   NP_INIT = RANDINT(INITIAL_PARTICLES_TASKS(ITASK)%NRHO/(FNUM*SPECIES(S_ID)%SPWT)*CELL_VOLUMES(IC)* &
                               MIXTURES(INITIAL_PARTICLES_TASKS(ITASK)%MIX_ID)%COMPONENTS(i)%MOLFRAC/N_MPI_THREADS)
@@ -1928,6 +1940,8 @@ MODULE initialization
          B_FIELD = 0.d0
          ALLOCATE(EBAR_FIELD(NCELLS, 1, 3))
          EBAR_FIELD = 0.d0
+         ALLOCATE(SURFACE_CHARGE(NNODES))
+         SURFACE_CHARGE = 0.d0
       ELSE
          NPX = NX + 1
          IF (DIMS == 2) THEN

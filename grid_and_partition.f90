@@ -168,7 +168,7 @@ MODULE grid_and_partition
          CELL_PROCS = 0
       
       ELSE IF (GRID_TYPE == UNSTRUCTURED) THEN
-         IF (LOAD_BALANCE_EVERY == 0) THEN
+         IF (.NOT. LOAD_BALANCE) THEN
 
             ALLOCATE(CENTROID(NCELLS))
 
@@ -194,6 +194,8 @@ MODULE grid_and_partition
          
                COORDMAX = MAXVAL(CENTROID)
                COORDMIN = MINVAL(CENTROID)
+
+               WRITE(*,*) 'COORDMAX = ', COORDMAX, 'COORDMIN = ', COORDMIN
                
             ELSE IF (DIMS == 2) THEN
 

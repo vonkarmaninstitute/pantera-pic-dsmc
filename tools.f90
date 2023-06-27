@@ -488,7 +488,7 @@ CONTAINS
                DO J = JMIN, JMAX
                   DO K = KMIN, KMAX
                      NINGRIDCELL(K,J,I) = NINGRIDCELL(K,J,I) + 1
-                     TETRAINGRID(NINGRIDCELL(k,J,I), K, J, I) = IC
+                     TETRAINGRID(NINGRIDCELL(K,J,I), K, J, I) = IC
                   END DO
                END DO
             END DO

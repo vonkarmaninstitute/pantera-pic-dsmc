@@ -277,6 +277,7 @@ MODULE initialization
             END IF
          END IF
 
+         IF (line=='Load_balance:')    READ(in1,*) LOAD_BALANCE
          IF (line=='Load_balance_every:')    READ(in1,*) LOAD_BALANCE_EVERY
 
          IF (line=='Partition_num_blocks:')    READ(in1,*) N_BLOCKS_X, N_BLOCKS_Y

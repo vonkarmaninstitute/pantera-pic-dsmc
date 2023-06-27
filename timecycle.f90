@@ -107,9 +107,10 @@ MODULE timecycle
          !CALL FIXED_IONIZATION
 
          ! ########### Perform load balancing ###################################
-
-         IF (tID .GT. 0 .AND. MOD(tID, LOAD_BALANCE_EVERY) .EQ. 0) THEN
-            CALL ASSIGN_CELLS_TO_PROCS
+         IF (LOAD_BALANCE) THEN
+            IF (tID .GT. 0 .AND. MOD(tID, LOAD_BALANCE_EVERY) .EQ. 0) THEN
+               CALL ASSIGN_CELLS_TO_PROCS
+            END IF
          END IF
 
          ! ########### Exchange particles among processes ##########################

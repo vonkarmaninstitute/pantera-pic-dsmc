@@ -365,7 +365,6 @@ TYPE(UNSTRUCTURED_3D_GRID_DATA_STRUCTURE) :: U3D_GRID
    !!!!!!!!! MPI parallelization !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-   INTEGER      :: DOMPART_TYPE = -1  ! Type of domain partition (init to -1 to recognize)
    INTEGER      :: N_BLOCKS_X, N_BLOCKS_Y ! Used for "block" partitioning
 
 

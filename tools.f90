@@ -503,6 +503,7 @@ CONTAINS
             IF (XP < XMIN .OR. XP > XMAX .OR. YP < YMIN .OR. YP > YMAX .OR.ZP < ZMIN .OR. ZP > ZMAX) THEN
                WRITE(*,*) 'Error during restart! Particle found ouside the domain.'
                WRITE(*,*) 'Particle position [x, y, z]=[ ', XP, ', ', YP, ', ', ZP, ']'
+               WRITE(*,*) 'Particle species: ', SPECIES(particles(IP)%S_ID)%NAME
             END IF
 
             I = INT((XP-XMIN)/DX) + 1
@@ -532,6 +533,7 @@ CONTAINS
             IF (.NOT. INSIDE_DOMAIN) THEN
                WRITE(*,*) 'Error during restart! Particle found ouside the domain.'
                WRITE(*,*) 'Particle position [x, y, z]=[ ', XP, ', ', YP, ', ', ZP, ']'
+               WRITE(*,*) 'Particle species: ', SPECIES(particles(IP)%S_ID)%NAME
             END IF
          END DO
 

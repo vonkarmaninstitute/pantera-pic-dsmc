@@ -1313,7 +1313,6 @@ MODULE fully_implicit
       INTEGER :: NI, NJ, VNI, VNJ
 
       INTEGER :: NCROSSINGS
-      REAL(KIND=8) :: TOL
 
       INTEGER :: NCOLSXX, NCOLSXY, NCOLSYX, NCOLSYY
       INTEGER, DIMENSION(:), ALLOCATABLE :: COLSXX, COLSXY, COLSYX, COLSYY
@@ -1331,8 +1330,6 @@ MODULE fully_implicit
       ! END IF
 
       IF (JACOBIAN_TYPE .LT. 0 .OR. JACOBIAN_TYPE .GT. 6) CALL ERROR_ABORT('Jacobian type not supported.')
-
-      TOL = 1e-30
 
       SIZE = NCELLS
 

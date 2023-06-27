@@ -28,7 +28,7 @@ MODULE initialization
 
       CHARACTER*512      :: MIXTURE_DEFINITION, VSS_PARAMS_FILENAME, LINESOURCE_DEFINITION, WALL_DEFINITION
       CHARACTER*512      :: BC_DEFINITION, SOLENOID_DEFINITION
-      CHARACTER*64       :: MIX_BOUNDINJECT_NAME, DSMC_COLL_MIX_NAME, MCC_BG_MIX_NAME, PIC_TYPE_STRING
+      CHARACTER*64       :: MIX_BOUNDINJECT_NAME, DSMC_COLL_MIX_NAME, MCC_BG_MIX_NAME, PIC_TYPE_STRING, PARTITION_STYLE_STRING
 
       ! Open input file for reading
       OPEN(UNIT=in1,FILE='input', STATUS='old',IOSTAT=ios)
@@ -260,7 +260,25 @@ MODULE initialization
          END IF
 
          ! ~~~~~~~~~~~~~  MPI parallelization settings ~~~~~~~~~~~~~~~
-         IF (line=='Partition_style:')         READ(in1,*) DOMPART_TYPE
+         IF (line=='Partition_style:') THEN
+            READ(in1,*) PARTITION_STYLE_STRING
+            IF (PARTITION_STYLE_STRING == "stripsx") THEN
+               PARTITION_STYLE = STRIPSX
+            ELSE IF (PARTITION_STYLE_STRING == "stripsy") THEN
+               PARTITION_STYLE = STRIPSY
+            ELSE IF (PARTITION_STYLE_STRING == "stripsz") THEN
+               PARTITION_STYLE = STRIPSZ
+            ELSE IF (PARTITION_STYLE_STRING == "slicesx") THEN
+               PARTITION_STYLE = SLICESX
+            ELSE IF (PARTITION_STYLE_STRING == "slicesz") THEN
+               PARTITION_STYLE = SLICESZ
+            ELSE
+               CALL ERROR_ABORT('Partition style is not specified correctly in input script.')
+            END IF
+         END IF
+
+         IF (line=='Load_balance_every:')    READ(in1,*) LOAD_BALANCE_EVERY
+
          IF (line=='Partition_num_blocks:')    READ(in1,*) N_BLOCKS_X, N_BLOCKS_Y
 
          

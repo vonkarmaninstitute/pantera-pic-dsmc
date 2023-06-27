@@ -106,13 +106,19 @@ MODULE timecycle
 
          !CALL FIXED_IONIZATION
 
-         ! ########### Advect particles and update field ############################################
+         ! ########### Perform load balancing ###################################
+
+         IF (tID .GT. 0 .AND. MOD(tID, LOAD_BALANCE_EVERY) .EQ. 0) THEN
+            CALL ASSIGN_CELLS_TO_PROCS
+         END IF
 
          ! ########### Exchange particles among processes ##########################
 
          CALL TIMER_START(5)
          CALL EXCHANGE
          CALL TIMER_STOP(5)
+
+         ! ########### Advect particles and update field ############################################
 
          IF (PIC_TYPE == EXPLICIT) THEN
             CALL TIMER_START(3)

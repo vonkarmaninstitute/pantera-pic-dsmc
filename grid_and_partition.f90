@@ -149,14 +149,15 @@ MODULE grid_and_partition
    SUBROUTINE ASSIGN_CELLS_TO_PROCS
 
 
-      INTEGER :: IDCELL
-      INTEGER :: NCELLSPP
-      INTEGER :: I, J, IPROC, IP, IC
+      !INTEGER :: IDCELL
+      !INTEGER :: NCELLSPP
+      INTEGER :: I, IPROC, IP, IC
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CENTROID
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: WEIGHT
       INTEGER, DIMENSION(:), ALLOCATABLE :: NP_CELLS
       REAL(KIND=8) :: COORDMAX, COORDMIN, WEIGHT_PER_PROC, CUMULATIVE_WEIGHT
       INTEGER, DIMENSION(:), ALLOCATABLE :: ORDER
+      REAL(KIND=8), DIMENSION(3) :: CELLCENTROID
 
       ! Weight is a generic measure that is ideally directly proportional to the computational cost for each cell.
 
@@ -167,37 +168,59 @@ MODULE grid_and_partition
          CELL_PROCS = 0
       
       ELSE IF (GRID_TYPE == UNSTRUCTURED) THEN
-         IF (.TRUE. .OR. DIMS .NE. 2) THEN
+         IF (LOAD_BALANCE_EVERY == 0) THEN
 
             ALLOCATE(CENTROID(NCELLS))
 
             IF (DIMS == 3) THEN
 
                DO I = 1, NCELLS
-                  CENTROID(I) = (U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,1), 2) &
-                              +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,2), 2) &
-                              +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,3), 2) &
-                              +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,4), 2)) / 4.
+                  CELLCENTROID = (U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,1), :) &
+                               +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,2), :) &
+                               +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,3), :) &
+                               +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,4), :)) / 4.
+                  IF (PARTITION_STYLE == STRIPSX) THEN
+                     CENTROID(I) = CELLCENTROID(1)
+                  ELSE IF (PARTITION_STYLE == STRIPSY) THEN
+                     CENTROID(I) = CELLCENTROID(2)
+                  ELSE IF (PARTITION_STYLE == STRIPSZ) THEN
+                     CENTROID(I) = CELLCENTROID(3)
+                  ELSE IF (PARTITION_STYLE == SLICESX) THEN
+                     CENTROID(I) = ATAN2(CELLCENTROID(2), CELLCENTROID(3))
+                  ELSE
+                     CALL ERROR_ABORT('The specified partition style is not supported. Aborting!')
+                  END IF
                END DO
          
-               COORDMAX = MAXVAL(U3D_GRID%NODE_COORDS(:,2))
-               COORDMIN = MINVAL(U3D_GRID%NODE_COORDS(:,2))
+               COORDMAX = MAXVAL(CENTROID)
+               COORDMIN = MINVAL(CENTROID)
                
             ELSE IF (DIMS == 2) THEN
 
                DO I = 1, NCELLS
-                  CENTROID(I) = (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,1), 2) &
-                              +  U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,2), 2) &
-                              +  U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,3), 2)) / 3.
+                  CELLCENTROID = (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,1), :) &
+                               +  U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,2), :) &
+                               +  U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,3), :)) / 3.
+                  IF (PARTITION_STYLE == STRIPSX) THEN
+                     CENTROID(I) = CELLCENTROID(1)
+                  ELSE IF (PARTITION_STYLE == STRIPSY) THEN
+                     CENTROID(I) = CELLCENTROID(2)
+                  ELSE IF (PARTITION_STYLE == SLICESZ) THEN
+                     CENTROID(I) = ATAN2(CELLCENTROID(2), CELLCENTROID(1))
+                  ELSE
+                     CALL ERROR_ABORT('The specified partition style is not supported. Aborting!')
+                  END IF
                END DO
          
-               COORDMAX = MAXVAL(U2D_GRID%NODE_COORDS(:,2))
-               COORDMIN = MINVAL(U2D_GRID%NODE_COORDS(:,2))
+               COORDMAX = MAXVAL(CENTROID)
+               COORDMIN = MINVAL(CENTROID)
          
             END IF   
 
             DO I = 1, NCELLS
                CELL_PROCS(I) = INT((CENTROID(I)-COORDMIN)/(COORDMAX-COORDMIN)*REAL(N_MPI_THREADS))
+               IF (CELL_PROCS(I) < 0) CELL_PROCS(I) = 0
+               IF (CELL_PROCS(I) >= N_MPI_THREADS) CELL_PROCS(I) = N_MPI_THREADS - 1
             END DO
 
             DEALLOCATE(CENTROID)
@@ -209,7 +232,7 @@ MODULE grid_and_partition
             ALLOCATE(ORDER(NCELLS))
             ALLOCATE(NP_CELLS(NCELLS))
             ! Assign weight
-            NP_CELLS = 1
+            NP_CELLS = 0
             DO IP = 1, NP_PROC
                NP_CELLS(particles(IP)%IC) = NP_CELLS(particles(IP)%IC) + 1
             END DO
@@ -224,28 +247,46 @@ MODULE grid_and_partition
 
             WEIGHT = DBLE(NP_CELLS)
             
-            WEIGHT_PER_PROC = 1.05 * SUM(WEIGHT) / DBLE(N_MPI_THREADS)
+            WEIGHT = WEIGHT + 0.1*SUM(WEIGHT) / DBLE(N_MPI_THREADS)
+            
+            WEIGHT_PER_PROC = SUM(WEIGHT) / DBLE(N_MPI_THREADS)
 
             IF (DIMS == 3) THEN
 
                DO I = 1, NCELLS
-                  CENTROID(I) = (U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,1), 2) &
-                              +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,2), 2) &
-                              +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,3), 2) &
-                              +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,4), 2)) / 4.
+                  CELLCENTROID = (U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,1), :) &
+                               +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,2), :) &
+                               +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,3), :) &
+                               +  U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(I,4), :)) / 4.
+                  IF (PARTITION_STYLE == STRIPSX) THEN
+                     CENTROID(I) = CELLCENTROID(1)
+                  ELSE IF (PARTITION_STYLE == STRIPSY) THEN
+                     CENTROID(I) = CELLCENTROID(2)
+                  ELSE IF (PARTITION_STYLE == STRIPSZ) THEN
+                     CENTROID(I) = CELLCENTROID(3)
+                  END IF
+
                   ORDER(I) = I
                END DO
                
             ELSE IF (DIMS == 2) THEN
 
                DO I = 1, NCELLS
-                  CENTROID(I) = (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,1), 2) &
-                              +  U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,2), 2) &
-                              +  U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,3), 2)) / 3.
+                  CELLCENTROID = (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,1), :) &
+                               +  U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,2), :) &
+                               +  U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(I,3), :)) / 3.
+                  IF (PARTITION_STYLE == STRIPSX) THEN
+                     CENTROID(I) = CELLCENTROID(1)
+                  ELSE IF (PARTITION_STYLE == STRIPSY) THEN
+                     CENTROID(I) = CELLCENTROID(2)
+                  ELSE IF (PARTITION_STYLE == STRIPSZ) THEN
+                     CALL ERROR_ABORT('The specified partition style is not supported. Aborting!')
+                  END IF
+
                   ORDER(I) = I
                END DO
          
-            END IF
+            END IF   
 
             CALL QUICKSORT(CENTROID, ORDER, 1, NCELLS)
 
@@ -268,42 +309,45 @@ MODULE grid_and_partition
             DEALLOCATE(NP_CELLS)
 
          END IF
-
-      ELSE IF (DOMPART_TYPE == 0) THEN ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ S T R I P S
-      !
-      ! Domain partition type: strips
-      !
-      ! This domain partition assigns the same number of grid cells to every process.
-      ! The domain partition is thus in strips along the "x" axis, as the cells are assumed 
-      ! to be numbered along x.
-
-         NCELLSPP = CEILING(REAL(NCELLS)/REAL(N_MPI_THREADS))
-
-         DO IDCELL = 1, NCELLS
-            ! 3) Here is the process ID 
-            CELL_PROCS(IDCELL) = INT((IDCELL-1)/NCELLSPP) ! Before was giving wrong result for peculiar combinations of NCELLS and NCELLSPP
-         END DO
-
-      ELSE IF (DOMPART_TYPE == 1) THEN ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ B L O C K S
-      !
-      ! Domain partition type: blocks
-      !
-      ! This domain partition style divides the domain into blocks
-      ! Note that blocks in this definition are independent from cells! IT IS POSSIBLE TO
-      ! GENERALIZE IT.
-
-         DO IDCELL = 1, NCELLS
-            I = MOD(IDCELL - 1, NX)
-            J = (IDCELL - 1)/NX
-            CELL_PROCS(IDCELL) = I*N_BLOCKS_X/NX + N_BLOCKS_X*(J*N_BLOCKS_Y/NY)
-         END DO
-
-      ELSE ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ E R R O R
-
-         WRITE(*,*) 'ATTENTION! Value for variable DOMPART_TYPE = ', DOMPART_TYPE
-         WRITE(*,*) ' not recognized! Check input file!! In: PROC_FROM_POSITION() ABORTING!'
-         STOP
+      ELSE
+         CALL ERROR_ABORT('The specified partition style is not supported. Aborting!')
       END IF
+
+      ! ELSE IF (DOMPART_TYPE == 0) THEN ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ S T R I P S
+      ! !
+      ! ! Domain partition type: strips
+      ! !
+      ! ! This domain partition assigns the same number of grid cells to every process.
+      ! ! The domain partition is thus in strips along the "x" axis, as the cells are assumed 
+      ! ! to be numbered along x.
+
+      !    NCELLSPP = CEILING(REAL(NCELLS)/REAL(N_MPI_THREADS))
+
+      !    DO IDCELL = 1, NCELLS
+      !       ! 3) Here is the process ID 
+      !       CELL_PROCS(IDCELL) = INT((IDCELL-1)/NCELLSPP) ! Before was giving wrong result for peculiar combinations of NCELLS and NCELLSPP
+      !    END DO
+
+      ! ELSE IF (DOMPART_TYPE == 1) THEN ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ B L O C K S
+      ! !
+      ! ! Domain partition type: blocks
+      ! !
+      ! ! This domain partition style divides the domain into blocks
+      ! ! Note that blocks in this definition are independent from cells! IT IS POSSIBLE TO
+      ! ! GENERALIZE IT.
+
+      !    DO IDCELL = 1, NCELLS
+      !       I = MOD(IDCELL - 1, NX)
+      !       J = (IDCELL - 1)/NX
+      !       CELL_PROCS(IDCELL) = I*N_BLOCKS_X/NX + N_BLOCKS_X*(J*N_BLOCKS_Y/NY)
+      !    END DO
+
+      ! ELSE ! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ E R R O R
+
+      !    WRITE(*,*) 'ATTENTION! Value for variable DOMPART_TYPE = ', DOMPART_TYPE
+      !    WRITE(*,*) ' not recognized! Check input file!! In: PROC_FROM_POSITION() ABORTING!'
+      !    STOP
+      ! END IF
 
    END SUBROUTINE ASSIGN_CELLS_TO_PROCS
 

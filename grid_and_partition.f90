@@ -249,7 +249,7 @@ MODULE grid_and_partition
 
             WEIGHT = DBLE(NP_CELLS)
             
-            WEIGHT = WEIGHT + 0.1*SUM(WEIGHT) / DBLE(N_MPI_THREADS)
+            WEIGHT = WEIGHT + 0.1*SUM(WEIGHT) / DBLE(NCELLS)
             
             WEIGHT_PER_PROC = SUM(WEIGHT) / DBLE(N_MPI_THREADS)
 

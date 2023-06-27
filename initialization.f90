@@ -408,18 +408,6 @@ MODULE initialization
          string = 'Number of MPI processes:'
          WRITE(*,'(A5,A50,I9)') '    ', string, N_MPI_THREADS     
 
-         IF (DOMPART_TYPE .EQ. 0) THEN ! Strips
-             string = 'Partition style: strips'
-             WRITE(*,'(A5,A50)') '    ', string     
-
-         ELSE IF (DOMPART_TYPE .EQ. 1) THEN ! Blocks
-             string = 'Partition style: blocks'
-             WRITE(*,'(A5,A50)') '    ', string
-
-             string = 'Number of partitions along X and Y:'
-             WRITE(*,'(A5,A50,I9,I9)') '    ', string, N_BLOCKS_X, N_BLOCKS_Y
-         END IF
-
          ! ~~~~ Multispecies ~~~~
          WRITE(*,*) '  =========== Species ========================='
          WRITE(*,*) '    ','File read'
@@ -1846,40 +1834,6 @@ MODULE initialization
             CALL ERROR_ABORT('ERROR! For axisymmetric simulations, YMIN cannot be reacting.')
          END IF
       END IF
-
-      ! ------------ MPI settings --------------------------------
-      IF (DOMPART_TYPE == -1) THEN ! It's the initialization value. It was not recognized.
-
-         IF (N_MPI_THREADS == 1) THEN ! Serial running, no problem.
-            ! Then chill, it's fine, don't do anything.
-
-         ELSE 
-            WRITE(*,*)
-            WRITE(*,*) '****************************************************************************'
-            WRITE(*,*) '* ERROR! No partitioning strategy specified in the input file.              '
-            WRITE(*,*) '* Use keyword "Partition_style:" ABORTING!'
-            WRITE(*,*) '****************************************************************************'
-            WRITE(*,*)
-            STOP
-
-         END IF
-
-      END IF
-
-      IF (DOMPART_TYPE == 1) THEN ! "blocks" domain partition
-
-         IF (N_MPI_THREADS /= N_BLOCKS_X*N_BLOCKS_Y) THEN
-            WRITE(*,*)
-            WRITE(*,*) '****************************************************************************'
-            WRITE(*,*) '* ERROR! Number of MPI threads is different than number of blocks'
-            WRITE(*,*) '* specified in the input file! ABORTING!'
-            WRITE(*,*) '****************************************************************************'
-            WRITE(*,*)
-            STOP
-         END IF
-
-      END IF
-
 
 
    END SUBROUTINE INPUT_DATA_SANITY_CHECK

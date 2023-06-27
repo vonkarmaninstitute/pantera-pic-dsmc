@@ -387,7 +387,7 @@ CONTAINS
       INTEGER :: N_PARTITIONS_X, N_PARTITIONS_Y, N_PARTITIONS_Z, IP, VP, CELL
       INTEGER, DIMENSION(:,:,:), ALLOCATABLE :: NINGRIDCELL
       INTEGER, DIMENSION(:,:,:,:), ALLOCATABLE :: TETRAINGRID
-      LOGICAL :: INSIDE
+      LOGICAL :: INSIDE, INSIDE_DOMAIN
       !REAL(KIND=8) :: MINABSPSI
 
       N_PARTITIONS_X = 100
@@ -499,9 +499,17 @@ CONTAINS
             XP = particles(IP)%X
             YP = particles(IP)%Y
             ZP = particles(IP)%Z
+            
+            IF (XP < XMIN .OR. XP > XMAX .OR. YP < YMIN .OR. YP > YMAX .OR.ZP < ZMIN .OR. ZP > ZMAX) THEN
+               WRITE(*,*) 'Error during restart! Particle found ouside the domain.'
+               WRITE(*,*) 'Particle position [x, y, z]=[ ', XP, ', ', YP, ', ', ZP, ']'
+            END IF
+
             I = INT((XP-XMIN)/DX) + 1
             J = INT((YP-YMIN)/DY) + 1
             K = INT((ZP-ZMIN)/DZ) + 1
+
+            INSIDE_DOMAIN = .FALSE.
             DO CELL = 1, NINGRIDCELL(K,J,I)
                !MINABSPSI = 1.d100
                IC = TETRAINGRID(CELL, K, J, I)
@@ -516,10 +524,15 @@ CONTAINS
                IF (INSIDE) THEN
                   !IF (particles(IP)%IC .NE. IC) WRITE(*,*) 'Particle has been found in a different cell! IC=', IC, &
                   !' instead of ', particles(IP)%IC, '. Minimum ABS(PSI) was ', MINABSPSI
+                  INSIDE_DOMAIN = .TRUE.
                   particles(IP)%IC = IC
                   EXIT
                END IF
             END DO
+            IF (.NOT. INSIDE_DOMAIN) THEN
+               WRITE(*,*) 'Error during restart! Particle found ouside the domain.'
+               WRITE(*,*) 'Particle position [x, y, z]=[ ', XP, ', ', YP, ', ', ZP, ']'
+            END IF
          END DO
 
       ELSE

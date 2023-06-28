@@ -1700,10 +1700,10 @@ MODULE fully_implicit
                         J = EDGEINDEX(I)
 
                         ! A small check that we actually found an intersection.
-                        CHECKVALUE = U3D_GRID%CELL_FACES_COEFFS(IC,I,1)*part_adv(IP)%X &
-                        + U3D_GRID%CELL_FACES_COEFFS(IC,I,2)*part_adv(IP)%Y &
-                        + U3D_GRID%CELL_FACES_COEFFS(IC,I,3)*part_adv(IP)%Z &
-                        + U3D_GRID%CELL_FACES_COEFFS(IC,I,4)
+                        CHECKVALUE = U3D_GRID%CELL_FACES_COEFFS(IC,J,1)*part_adv(IP)%X &
+                        + U3D_GRID%CELL_FACES_COEFFS(IC,J,2)*part_adv(IP)%Y &
+                        + U3D_GRID%CELL_FACES_COEFFS(IC,J,3)*part_adv(IP)%Z &
+                        + U3D_GRID%CELL_FACES_COEFFS(IC,J,4)
                         IF (CHECKVALUE > 1.0d-12) WRITE(*,*) 'Checkvalue too large! = ', CHECKVALUE
                         ! End of the small check.
                         

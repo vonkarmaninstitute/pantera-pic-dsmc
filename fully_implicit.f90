@@ -1704,7 +1704,7 @@ MODULE fully_implicit
                         + U3D_GRID%CELL_FACES_COEFFS(IC,J,2)*part_adv(IP)%Y &
                         + U3D_GRID%CELL_FACES_COEFFS(IC,J,3)*part_adv(IP)%Z &
                         + U3D_GRID%CELL_FACES_COEFFS(IC,J,4)
-                        IF (CHECKVALUE > 1.0d-12) WRITE(*,*) 'Checkvalue too large! = ', CHECKVALUE
+                        IF (ABS(CHECKVALUE) > 1.0d-12) WRITE(*,*) 'Checkvalue too large! = ', CHECKVALUE
                         ! End of the small check.
                         
                         IF ((part_adv(IP)%VX*U3D_GRID%FACE_NORMAL(IC,J,1) &

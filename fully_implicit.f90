@@ -1325,6 +1325,8 @@ MODULE fully_implicit
       REAL(KIND=8) :: CHARGE, K, PSIP, RHO_Q
       INTEGER :: VP
 
+      REAL(KIND=8) :: CHECKVALUE
+
       ! IF (tID == 4 .AND. FINAL) THEN
       !    OPEN(66332, FILE='crossings', POSITION='append', STATUS='unknown', ACTION='write')
       ! END IF
@@ -1683,7 +1685,7 @@ MODULE fully_implicit
                   DTCOLL = part_adv(IP)%DTRIM
                   BOUNDCOLL = -1
                   DO I = 1, 8
-                     IF (COLLTIMES(I) > 0 .AND. COLLTIMES(I) < DTCOLL) THEN
+                     IF (COLLTIMES(I) > 0 .AND. COLLTIMES(I) <= DTCOLL) THEN
 
 
                         X_TEMP = part_adv(IP)%X
@@ -1696,6 +1698,14 @@ MODULE fully_implicit
 
                         CALL MOVE_PARTICLE_CN(part_adv, IP, E, COLLTIMES(I))
                         J = EDGEINDEX(I)
+
+                        ! A small check that we actually found an intersection.
+                        CHECKVALUE = U3D_GRID%CELL_FACES_COEFFS(IC,I,1)*part_adv(IP)%X &
+                        + U3D_GRID%CELL_FACES_COEFFS(IC,I,2)*part_adv(IP)%Y &
+                        + U3D_GRID%CELL_FACES_COEFFS(IC,I,3)*part_adv(IP)%Z &
+                        + U3D_GRID%CELL_FACES_COEFFS(IC,I,4)
+                        IF (CHECKVALUE > 1.0d-12) WRITE(*,*) 'Checkvalue too large! = ', CHECKVALUE
+                        ! End of the small check.
                         
                         IF ((part_adv(IP)%VX*U3D_GRID%FACE_NORMAL(IC,J,1) &
                            + part_adv(IP)%VY*U3D_GRID%FACE_NORMAL(IC,J,2) &

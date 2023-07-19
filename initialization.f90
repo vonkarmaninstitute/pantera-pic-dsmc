@@ -154,6 +154,7 @@ MODULE initialization
          IF (line=='Particle_dump_output:')    READ(in1,*) PARTDUMP_SAVE_PATH
          IF (line=='Trajectory_dump_output:')  READ(in1,*) TRAJDUMP_SAVE_PATH
          IF (line=='Fluxes_dump_output:')      READ(in1,*) FLUXDUMP_SAVE_PATH
+         IF (line=='Checks_output:')           READ(in1,*) CHECKS_SAVE_PATH
          IF (line=='Binary_output:')           READ(in1,*) BOOL_BINARY_OUTPUT
          IF (line=='Dump_part_every:')         READ(in1,*) DUMP_EVERY
          IF (line=='Dump_part_start:')         READ(in1,*) DUMP_START
@@ -476,9 +477,13 @@ MODULE initialization
          READ(line,*) &
          NAME, MOLWT, MOLECULAR_MASS, ROTDOF, ROTREL, VIBDOF, VIBREL, VIBTEMP, SPWT, CHARGE
       
-         ALLOCATE(TEMP_SPECIES(N_SPECIES+1)) ! Append the species to the list
-         TEMP_SPECIES(1:N_SPECIES) = SPECIES(1:N_SPECIES)
-         CALL MOVE_ALLOC(TEMP_SPECIES, SPECIES)
+         IF (ALLOCATED(SPECIES)) THEN
+            ALLOCATE(TEMP_SPECIES(N_SPECIES+1)) ! Append the species to the list
+            TEMP_SPECIES(1:N_SPECIES) = SPECIES(1:N_SPECIES)
+            CALL MOVE_ALLOC(TEMP_SPECIES, SPECIES)
+         ELSE
+            ALLOCATE(SPECIES(1))
+         END IF
          N_SPECIES = N_SPECIES + 1
 
          SPECIES(N_SPECIES)%NAME = NAME
@@ -822,9 +827,13 @@ MODULE initialization
       END DO
 
 
-      ALLOCATE(TEMP_MIXTURES(N_MIXTURES+1)) ! Append the mixture to the list
-      TEMP_MIXTURES(1:N_MIXTURES) = MIXTURES(1:N_MIXTURES)
-      CALL MOVE_ALLOC(TEMP_MIXTURES, MIXTURES)
+      IF (ALLOCATED(MIXTURES)) THEN
+         ALLOCATE(TEMP_MIXTURES(N_MIXTURES+1)) ! Append the mixture to the list
+         TEMP_MIXTURES(1:N_MIXTURES) = MIXTURES(1:N_MIXTURES)
+         CALL MOVE_ALLOC(TEMP_MIXTURES, MIXTURES)
+      ELSE
+         ALLOCATE(MIXTURES(1))
+      END IF
       N_MIXTURES = N_MIXTURES + 1
 
       MIXTURES(N_MIXTURES)%NAME = MIX_NAME
@@ -850,10 +859,13 @@ MODULE initialization
       INTEGER      :: MIX_ID
       TYPE(LINESOURCE), DIMENSION(:), ALLOCATABLE :: TEMP_LINESOURCES
 
-      
-      ALLOCATE(TEMP_LINESOURCES(N_LINESOURCES+1)) ! Append the mixture to the list
-      TEMP_LINESOURCES(1:N_LINESOURCES) = LINESOURCES
-      CALL MOVE_ALLOC(TEMP_LINESOURCES, LINESOURCES)
+      IF (ALLOCATED(LINESOURCES)) THEN
+         ALLOCATE(TEMP_LINESOURCES(N_LINESOURCES+1)) ! Append the mixture to the list
+         TEMP_LINESOURCES(1:N_LINESOURCES) = LINESOURCES(1:N_LINESOURCES)
+         CALL MOVE_ALLOC(TEMP_LINESOURCES, LINESOURCES)
+      ELSE
+         ALLOCATE(LINESOURCES(1))
+      END IF
       N_LINESOURCES = N_LINESOURCES + 1
 
 
@@ -893,10 +905,13 @@ MODULE initialization
 
       TYPE(WALL), DIMENSION(:), ALLOCATABLE :: TEMP_WALLS
 
-      
-      ALLOCATE(TEMP_WALLS(N_WALLS+1))
-      TEMP_WALLS(1:N_WALLS) = WALLS
-      CALL MOVE_ALLOC(TEMP_WALLS, WALLS)
+      IF (ALLOCATED(WALLS)) THEN
+         ALLOCATE(TEMP_WALLS(N_WALLS+1))
+         TEMP_WALLS(1:N_WALLS) = WALLS(1:N_WALLS)
+         CALL MOVE_ALLOC(TEMP_WALLS, WALLS)
+      ELSE
+         ALLOCATE(WALLS(1))
+      END IF
       N_WALLS = N_WALLS + 1
 
 
@@ -1106,9 +1121,13 @@ MODULE initialization
             DO I = 1, 3
                IF (U2D_GRID%CELL_EDGES_PG(IC,I) == IPG) THEN
                   
-                  ALLOCATE(TEMP_EMIT_TASKS(N_EMIT_TASKS+1)) ! Append the mixture to the list
-                  TEMP_EMIT_TASKS(1:N_EMIT_TASKS) = EMIT_TASKS(1:N_EMIT_TASKS)
-                  CALL MOVE_ALLOC(TEMP_EMIT_TASKS, EMIT_TASKS)
+                  IF (ALLOCATED(EMIT_TASKS)) THEN
+                     ALLOCATE(TEMP_EMIT_TASKS(N_EMIT_TASKS+1)) ! Append the mixture to the list
+                     TEMP_EMIT_TASKS(1:N_EMIT_TASKS) = EMIT_TASKS(1:N_EMIT_TASKS)
+                     CALL MOVE_ALLOC(TEMP_EMIT_TASKS, EMIT_TASKS)
+                  ELSE
+                     ALLOCATE(EMIT_TASKS(1))
+                  END IF
                   N_EMIT_TASKS = N_EMIT_TASKS + 1
    
                   EMIT_TASKS(N_EMIT_TASKS)%NRHO = NRHO
@@ -1142,9 +1161,13 @@ MODULE initialization
          DO IC = 1, NCELLS
             DO I = 1, 4
                IF (U3D_GRID%CELL_FACES_PG(IC,I) == IPG) THEN
-                  ALLOCATE(TEMP_EMIT_TASKS(N_EMIT_TASKS+1)) ! Append the mixture to the list
-                  TEMP_EMIT_TASKS(1:N_EMIT_TASKS) = EMIT_TASKS(1:N_EMIT_TASKS)
-                  CALL MOVE_ALLOC(TEMP_EMIT_TASKS, EMIT_TASKS)
+                  IF (ALLOCATED(EMIT_TASKS)) THEN
+                     ALLOCATE(TEMP_EMIT_TASKS(N_EMIT_TASKS+1)) ! Append the mixture to the list
+                     TEMP_EMIT_TASKS(1:N_EMIT_TASKS) = EMIT_TASKS(1:N_EMIT_TASKS)
+                     CALL MOVE_ALLOC(TEMP_EMIT_TASKS, EMIT_TASKS)
+                  ELSE
+                     ALLOCATE(EMIT_TASKS(1))
+                  END IF
                   N_EMIT_TASKS = N_EMIT_TASKS + 1
    
                   EMIT_TASKS(N_EMIT_TASKS)%NRHO = NRHO
@@ -1207,9 +1230,13 @@ MODULE initialization
       WRITE(*,*) 'Read initial particle seed definition. Parameters: ', MIX_NAME, ', ', MIX_ID, ', ', NRHO, ', ',&
        UX, ', ', UY, ', ', UZ, ', ', TTRAX, ', ', TTRAY, ', ', TTRAZ, ', ', TROT, ', ', TVIB
 
-      ALLOCATE(TEMP_INITIAL_PARTICLES_TASK(N_INITIAL_PARTICLES_TASKS+1)) ! Append the mixture to the list
-      TEMP_INITIAL_PARTICLES_TASK(1:N_INITIAL_PARTICLES_TASKS) = INITIAL_PARTICLES_TASKS(1:N_INITIAL_PARTICLES_TASKS)
-      CALL MOVE_ALLOC(TEMP_INITIAL_PARTICLES_TASK, INITIAL_PARTICLES_TASKS)
+      IF (ALLOCATED(INITIAL_PARTICLES_TASKS)) THEN
+         ALLOCATE(TEMP_INITIAL_PARTICLES_TASK(N_INITIAL_PARTICLES_TASKS+1)) ! Append the mixture to the list
+         TEMP_INITIAL_PARTICLES_TASK(1:N_INITIAL_PARTICLES_TASKS) = INITIAL_PARTICLES_TASKS(1:N_INITIAL_PARTICLES_TASKS)
+         CALL MOVE_ALLOC(TEMP_INITIAL_PARTICLES_TASK, INITIAL_PARTICLES_TASKS)
+      ELSE
+         ALLOCATE(INITIAL_PARTICLES_TASKS(1))
+      END IF
       N_INITIAL_PARTICLES_TASKS = N_INITIAL_PARTICLES_TASKS + 1
 
       INITIAL_PARTICLES_TASKS(N_INITIAL_PARTICLES_TASKS)%NRHO = NRHO
@@ -1260,9 +1287,13 @@ MODULE initialization
       WRITE(*,*) 'Read volume inject definition. Parameters: ', MIX_NAME, ', ', MIX_ID, ', ', NRHODOT, ', ',&
        UX, ', ', UY, ', ', UZ, ', ', TTRAX, ', ', TTRAY, ', ', TTRAZ, ', ', TROT, ', ', TVIB
 
-      ALLOCATE(TEMP_VOLUME_INJECT_TASK(N_VOLUME_INJECT_TASKS+1)) ! Append the mixture to the list
-      TEMP_VOLUME_INJECT_TASK(1:N_VOLUME_INJECT_TASKS) = VOLUME_INJECT_TASKS(1:N_VOLUME_INJECT_TASKS)
-      CALL MOVE_ALLOC(TEMP_VOLUME_INJECT_TASK, VOLUME_INJECT_TASKS)
+      IF (ALLOCATED(VOLUME_INJECT_TASKS)) THEN
+         ALLOCATE(TEMP_VOLUME_INJECT_TASK(N_VOLUME_INJECT_TASKS+1)) ! Append the mixture to the list
+         TEMP_VOLUME_INJECT_TASK(1:N_VOLUME_INJECT_TASKS) = VOLUME_INJECT_TASKS(1:N_VOLUME_INJECT_TASKS)
+         CALL MOVE_ALLOC(TEMP_VOLUME_INJECT_TASK, VOLUME_INJECT_TASKS)
+      ELSE
+         ALLOCATE(VOLUME_INJECT_TASKS(1))
+      END IF
       N_VOLUME_INJECT_TASKS = N_VOLUME_INJECT_TASKS + 1
 
       VOLUME_INJECT_TASKS(N_VOLUME_INJECT_TASKS)%NRHODOT = NRHODOT
@@ -1289,10 +1320,13 @@ MODULE initialization
       CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
       TYPE(SOLENOID), DIMENSION(:), ALLOCATABLE :: TEMP_SOLENOIDS
       
-
-      ALLOCATE(TEMP_SOLENOIDS(N_SOLENOIDS+1))
-      TEMP_SOLENOIDS(1:N_SOLENOIDS) = SOLENOIDS(1:N_SOLENOIDS)
-      CALL MOVE_ALLOC(TEMP_SOLENOIDS, SOLENOIDS)
+      IF (ALLOCATED(SOLENOIDS)) THEN
+         ALLOCATE(TEMP_SOLENOIDS(N_SOLENOIDS+1))
+         TEMP_SOLENOIDS(1:N_SOLENOIDS) = SOLENOIDS(1:N_SOLENOIDS)
+         CALL MOVE_ALLOC(TEMP_SOLENOIDS, SOLENOIDS)
+      ELSE
+         ALLOCATE(SOLENOIDS(1))
+      END IF
       N_SOLENOIDS = N_SOLENOIDS + 1
 
       CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
@@ -1315,17 +1349,21 @@ MODULE initialization
 
       IMPLICIT NONE
 
-      CHARACTER*64, INTENT(IN) :: FILENAME
+      CHARACTER*256, INTENT(IN) :: FILENAME
       
       INTEGER, PARAMETER :: in3 = 457
+      INTEGER, PARAMETER :: in4 = 754
       INTEGER            :: ios
       CHARACTER*512      :: line
-      INTEGER            :: ReasonEOF
+      INTEGER            :: ReasonEOF, ReasonEOFCS
 
       CHARACTER(LEN=80)   :: DEFINITION
       INTEGER :: N_STR, index
       CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
       TYPE(REACTIONS_DATA_STRUCTURE) :: NEW_REACTION
+      INTEGER :: I, NROWS
+      CHARACTER*512      :: LINECS
+      CHARACTER*256      :: REACTION_FILENAME
       
       !CHARACTER*64 :: SP_NAME
       !INTEGER      :: SP_ID
@@ -1380,26 +1418,82 @@ MODULE initialization
             NEW_REACTION%P3_SP_ID = REACTION_SPECIES_NAME_TO_ID(STRARRAY(9))
          END IF
       
+         IF (STRARRAY(4) == '-CEX->') THEN
+            NEW_REACTION%IS_CEX = .TRUE.
+         ELSE
+            NEW_REACTION%IS_CEX = .FALSE.
+         END IF
 
          READ(in3,'(A)', IOSTAT=ReasonEOF) DEFINITION ! Read reaction parameters line
          CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
-         IF (STRARRAY(4) == '-CEX->') THEN
-            NEW_REACTION%IS_CEX = .TRUE.
-            NEW_REACTION%EA = 0.d0
-            READ(STRARRAY(1), '(ES14.0)') NEW_REACTION%C1
-            READ(STRARRAY(2), '(ES14.0)') NEW_REACTION%C2
-         ELSE
-            NEW_REACTION%IS_CEX = .FALSE.
-            READ(STRARRAY(1), '(ES14.0)') NEW_REACTION%A
-            READ(STRARRAY(2), '(ES14.0)') NEW_REACTION%N
-            READ(STRARRAY(3), '(ES14.0)') NEW_REACTION%EA
+         IF (STRARRAY(1) == 'tce') THEN
+            NEW_REACTION%TYPE = TCE
+            IF (NEW_REACTION%IS_CEX) THEN
+               NEW_REACTION%EA = 0.d0
+               READ(STRARRAY(2), '(ES14.0)') NEW_REACTION%C1
+               READ(STRARRAY(3), '(ES14.0)') NEW_REACTION%C2
+            ELSE
+               READ(STRARRAY(2), '(ES14.0)') NEW_REACTION%A
+               READ(STRARRAY(3), '(ES14.0)') NEW_REACTION%N
+               READ(STRARRAY(4), '(ES14.0)') NEW_REACTION%EA
+            END IF
+         ELSE IF (STRARRAY(1) == 'lxcat') THEN
+            NEW_REACTION%TYPE = LXCAT
+            READ(STRARRAY(2), *) NEW_REACTION%EA
+            READ(STRARRAY(3), *) REACTION_FILENAME
+
+
+            OPEN(UNIT=in4,FILE=REACTION_FILENAME, STATUS='old',IOSTAT=ios)
+
+            IF (ios .NE. 0) THEN
+               CALL ERROR_ABORT('Attention, reactions cross section file not found! ABORTING.')
+            ENDIF
+      
+            LINECS = '' ! Init empty
+
+            DO
+               READ(in4,'(A)', IOSTAT=ReasonEOFCS) LINECS
+               IF (ReasonEOFCS < 0) CALL ERROR_ABORT('Attention, reactions cross section file format error! ABORTING.')
+                  
+               IF (LINECS(1:5) == '-----') EXIT
+            END DO
+            NROWS = 0
+            DO
+               READ(in4,'(A)', IOSTAT=ReasonEOFCS) LINECS  
+               IF (ReasonEOFCS < 0) CALL ERROR_ABORT('Attention, reactions cross section file format error! ABORTING.')
+                  
+               IF (LINECS(1:5) == '-----') EXIT
+               NROWS = NROWS + 1
+            END DO
+            REWIND(in4)
+            ALLOCATE(NEW_REACTION%TABLE_ENERGY(NROWS))
+            ALLOCATE(NEW_REACTION%TABLE_CS(NROWS))
+            DO
+               READ(in4,'(A)', IOSTAT=ReasonEOFCS) LINECS
+               IF (ReasonEOFCS < 0) CALL ERROR_ABORT('Attention, reactions cross section file format error! ABORTING.')
+                  
+               IF (LINECS(1:5) == '-----') EXIT
+            END DO
+            DO I = 1, NROWS
+               READ(in4,'(A)', IOSTAT=ReasonEOFCS) LINECS
+               IF (ReasonEOFCS < 0) CALL ERROR_ABORT('Attention, reactions cross section file format error! ABORTING.')
+               READ(LINECS, *) NEW_REACTION%TABLE_ENERGY(I), NEW_REACTION%TABLE_CS(I)
+            END DO
+
+            CLOSE(in4)
+
          END IF
+
 
          IF (ReasonEOF < 0) EXIT ! End of file reached
          
-         ALLOCATE(TEMP_REACTIONS(N_REACTIONS+1)) ! Append the mixture to the list
-         TEMP_REACTIONS(1:N_REACTIONS) = REACTIONS(1:N_REACTIONS)
-         CALL MOVE_ALLOC(TEMP_REACTIONS, REACTIONS)
+         IF (ALLOCATED(REACTIONS)) THEN
+            ALLOCATE(TEMP_REACTIONS(N_REACTIONS+1)) ! Append the mixture to the list
+            TEMP_REACTIONS(1:N_REACTIONS) = REACTIONS(1:N_REACTIONS)
+            CALL MOVE_ALLOC(TEMP_REACTIONS, REACTIONS)
+         ELSE
+            ALLOCATE(REACTIONS(1))
+         END IF
          N_REACTIONS = N_REACTIONS + 1
          REACTIONS(N_REACTIONS) = NEW_REACTION
 
@@ -1411,19 +1505,25 @@ MODULE initialization
 
       IF (PROC_ID == 0) THEN
          DO index = 1, N_REACTIONS
+            WRITE(*,*) 'Reaction ', index, 'Has 2 reactants with ids:', REACTIONS(index)%R1_SP_ID, ' and ', &
+            REACTIONS(index)%R2_SP_ID
             IF (REACTIONS(index)%N_PROD == 2) THEN
-               WRITE(*,*) 'Reaction ', index, 'Has 2 reactants with ids:', REACTIONS(index)%R1_SP_ID, ' and ', & 
-               REACTIONS(index)%R2_SP_ID
                WRITE(*,*) REACTIONS(index)%N_PROD, 'products with ids:',  REACTIONS(index)%P1_SP_ID, ' and ', &
                REACTIONS(index)%P2_SP_ID
-               WRITE(*,*) 'Parameters:', REACTIONS(index)%A, REACTIONS(index)%N, REACTIONS(index)%EA
                IF (REACTIONS(index)%IS_CEX) WRITE(*,*) 'This is a CEX reaction'
             ELSE IF (REACTIONS(index)%N_PROD == 3) THEN
-               WRITE(*,*) 'Reaction ', index, 'Has 2 reactants with ids:', REACTIONS(index)%R1_SP_ID, ' and ', &
-               REACTIONS(index)%R2_SP_ID
                WRITE(*,*) REACTIONS(index)%N_PROD, 'products with ids:',  REACTIONS(index)%P1_SP_ID, ', ', &
                REACTIONS(index)%P2_SP_ID, ' and ', REACTIONS(index)%P3_SP_ID
+            END IF
+            IF (REACTIONS(index)%TYPE == TCE) THEN
                WRITE(*,*) 'Parameters:', REACTIONS(index)%A, REACTIONS(index)%N, REACTIONS(index)%EA
+            ELSE IF (REACTIONS(index)%TYPE == LXCAT) THEN
+               WRITE(*,*) 'Reaction ', index, ' is from tabulated data in LxCat format.'
+               WRITE(*,*) 'Activation energy: ', REACTIONS(index)%EA
+               WRITE(*,*) 'Here are the energies (eV): ', REACTIONS(index)%TABLE_ENERGY
+               WRITE(*,*) 'And here are the cross sections (1/m^2): ', REACTIONS(index)%TABLE_CS
+            ELSE
+               WRITE(*,*) 'Reaction ', index, ' is not defined!'
             END IF
          END DO
       END IF
@@ -1503,9 +1603,13 @@ MODULE initialization
 
          IF (ReasonEOF < 0) EXIT ! End of file reached
          
-         ALLOCATE(TEMP_WALL_REACTIONS(N_WALL_REACTIONS+1)) ! Append the mixture to the list
-         TEMP_WALL_REACTIONS(1:N_WALL_REACTIONS) = WALL_REACTIONS(1:N_WALL_REACTIONS)
-         CALL MOVE_ALLOC(TEMP_WALL_REACTIONS, WALL_REACTIONS)
+         IF (ALLOCATED(WALL_REACTIONS)) THEN
+            ALLOCATE(TEMP_WALL_REACTIONS(N_WALL_REACTIONS+1)) ! Append the mixture to the list
+            TEMP_WALL_REACTIONS(1:N_WALL_REACTIONS) = WALL_REACTIONS(1:N_WALL_REACTIONS)
+            CALL MOVE_ALLOC(TEMP_WALL_REACTIONS, WALL_REACTIONS)
+         ELSE
+            ALLOCATE(WALL_REACTIONS(1))
+         END IF
          N_WALL_REACTIONS = N_WALL_REACTIONS + 1
          WALL_REACTIONS(N_WALL_REACTIONS) = NEW_REACTION
 

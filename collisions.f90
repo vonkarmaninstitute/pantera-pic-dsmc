@@ -172,8 +172,8 @@ MODULE collisions
 
       INTEGER      :: IOFJ,IOLJ,NPCJ,JP1,JP2,JCOL, JP, INDJ, I, JR
       INTEGER      :: SP_ID1, SP_ID2, P1_SP_ID, P2_SP_ID, P3_SP_ID
-      INTEGER      :: NCOLL,NCOLLMAX_INT
-      REAL(KIND=8) :: SIGMA, ALPHA, NCOLLMAX,FCORR,VR,VR2,rfp
+      INTEGER      :: NCOLL,NCOLLMAX_INT, IDX
+      REAL(KIND=8) :: SIGMA, COLLSIGMA, ALPHA, NCOLLMAX,FCORR,VR,VR2,rfp
       REAL(KIND=8) :: OMEGA, CREF, MRED, COLLPROB, PTCE
       REAL(KIND=8) :: TRDOF, PROT1, PROT2, PVIB1, PVIB2, EI, ETR, ECOLL, TOTDOF, EA, EROT, EVIB
       !REAL(KIND=8) :: B,C,EINT,ETOT,ETR,PHI,SITETA,VRX,VRY,VRZ
@@ -314,12 +314,13 @@ MODULE collisions
 
          ! Compute (simulated) collision probability
          IF (ABS(OMEGA-0.5) .LT. 1.d-6) THEN
-            COLLPROB = FCORR/(SIGMAMAX*VRMAX)*VR*SIGMA
+            COLLSIGMA = SIGMA
          ELSE
             IF (SIGMAMAX*VRMAX .LT. 1e-20) CALL ERROR_ABORT('The product is zero!')
             IF (VR .LT. 1e-20) CYCLE !CALL ERROR_ABORT('VR is zero!')
-            COLLPROB = FCORR/(SIGMAMAX*VRMAX)*VR*SIGMA*(VR/CREF)**(1.-2.*OMEGA)
+            COLLSIGMA = SIGMA*(VR/CREF)**(1.-2.*OMEGA)
          END IF
+         COLLPROB = FCORR/(SIGMAMAX*VRMAX)*VR*COLLSIGMA
 
 
          IF ( rfp .LT. COLLPROB ) THEN
@@ -350,10 +351,17 @@ MODULE collisions
                END IF
 
                EA = REACTIONS(JR)%EA
-               IF (ECOLL .LE. EA) CYCLE
-               rfp = rf()
-               PTCE = REACTIONS(JR)%C1 * (ECOLL-EA)**REACTIONS(JR)%C2 * (1.-EA/ECOLL)**REACTIONS(JR)%C3
+
+               IF (REACTIONS(JR)%TYPE == TCE) THEN
+                  IF (ECOLL .LE. EA) CYCLE
+                  PTCE = REACTIONS(JR)%C1 * (ECOLL-EA)**REACTIONS(JR)%C2 * (1.-EA/ECOLL)**REACTIONS(JR)%C3
+               ELSE IF (REACTIONS(JR)%TYPE == LXCAT) THEN
+                  IDX = BINARY_SEARCH(ETR, REACTIONS(JR)%TABLE_ENERGY) ! to manage the external cases!
+                  PTCE = REACTIONS(JR)%TABLE_CS(IDX) + (ETR - REACTIONS(JR)%TABLE_ENERGY(IDX)) * &
+                         (REACTIONS(JR)%TABLE_CS(IDX+1)-REACTIONS(JR)%TABLE_CS(IDX))
+               END IF
                ! Here we suppose that the probability is so low that we can test sequentially with acceptable error
+               rfp = rf()
                IF (rfp .LT. PTCE) THEN
                   SKIP = .TRUE.
                   ! React

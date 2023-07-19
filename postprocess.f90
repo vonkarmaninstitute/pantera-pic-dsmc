@@ -1029,6 +1029,8 @@ MODULE postprocess
       REAL(KIND=8)                       :: TOT_KE, TOT_IE, TOT_FE, TOT_EE, PHI, CURRENT_TIME
       REAL(KIND=8)                       :: CFNUM
 
+      CHARACTER*256                      :: file_name
+
       ALLOCATE(TOT_NUM(N_SPECIES))
 
       TOT_NUM = 0
@@ -1108,7 +1110,8 @@ MODULE postprocess
          ! WRITE(*,*) 'Total energy:          ', TOT_KE+TOT_IE+TOT_FE+TOT_EE, ' [J]'
          ! WRITE(*,*) ' '
 
-         OPEN(54331, FILE='conservation_checks', POSITION='append', STATUS='unknown', ACTION='write')
+         WRITE(file_name,'(A, A)') TRIM(ADJUSTL(CHECKS_SAVE_PATH)), 'conservation_checks'
+         OPEN(54331, FILE=file_name, POSITION='append', STATUS='unknown', ACTION='write')
          WRITE(54331,*) CURRENT_TIME, TOT_NUM, TOT_MOMENTUM, TOT_KE, TOT_IE, TOT_EE, TOT_KE+TOT_IE+TOT_EE !TOT_FE, TOT_EE
          CLOSE(54331)
 

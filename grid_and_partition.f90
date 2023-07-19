@@ -77,50 +77,6 @@ MODULE grid_and_partition
 
    END SUBROUTINE CELL_FROM_POSITION
 
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   ! SUBROUTINE BINARY_SEARCH -> Finds the INDEX such that                           !
-   ! ARRAY(INDEX) < VALUE < ARRAY(INDEX+1), where ARRAY is monotonically increasing. !
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-   FUNCTION BINARY_SEARCH(VALUE, ARRAY) RESULT(INDEX)
-
-      IMPLICIT NONE
-
-      REAL(KIND=8), INTENT(IN) :: VALUE
-      INTEGER :: L, R
-      REAL(KIND=8), DIMENSION(:), INTENT(IN) :: ARRAY
-      INTEGER :: INDEX
-
-      L = LBOUND(ARRAY, DIM=1)
-      R = UBOUND(ARRAY, DIM=1)
-
-      INDEX = -1
-      IF (VALUE .LT. ARRAY(L) .OR. VALUE .GT. ARRAY(R)) THEN
-         WRITE(*,*) 'Particle out of bounds!'
-         RETURN
-      ELSE IF (R == L+1) THEN
-         INDEX = L
-         RETURN
-      ELSE
-         DO
-            INDEX = (L+R)/2
-            IF (ARRAY(INDEX) .LE. VALUE) THEN
-               IF (ARRAY(INDEX+1) .GT. VALUE) RETURN
-               L = INDEX
-            ELSE
-               IF (ARRAY(INDEX-1) .LE. VALUE) THEN
-                  INDEX = INDEX-1
-                  RETURN
-               END IF
-               R = INDEX
-            END IF
-         END DO
-         RETURN
-      END IF
-
-   END FUNCTION BINARY_SEARCH
-
-
 
    SUBROUTINE PROC_FROM_CELL(IDCELL, IDPROC)
 

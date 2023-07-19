@@ -1699,13 +1699,13 @@ MODULE fully_implicit
                         CALL MOVE_PARTICLE_CN(part_adv, IP, E, COLLTIMES(I))
                         J = EDGEINDEX(I)
 
-                        ! A small check that we actually found an intersection.
-                        CHECKVALUE = U3D_GRID%CELL_FACES_COEFFS(IC,J,1)*part_adv(IP)%X &
-                        + U3D_GRID%CELL_FACES_COEFFS(IC,J,2)*part_adv(IP)%Y &
-                        + U3D_GRID%CELL_FACES_COEFFS(IC,J,3)*part_adv(IP)%Z &
-                        + U3D_GRID%CELL_FACES_COEFFS(IC,J,4)
-                        IF (ABS(CHECKVALUE) > 1.0d-12) WRITE(*,*) 'Checkvalue too large! = ', CHECKVALUE
-                        ! End of the small check.
+                        ! ! A small check that we actually found an intersection.
+                        ! CHECKVALUE = U3D_GRID%CELL_FACES_COEFFS(IC,J,1)*part_adv(IP)%X &
+                        ! + U3D_GRID%CELL_FACES_COEFFS(IC,J,2)*part_adv(IP)%Y &
+                        ! + U3D_GRID%CELL_FACES_COEFFS(IC,J,3)*part_adv(IP)%Z &
+                        ! + U3D_GRID%CELL_FACES_COEFFS(IC,J,4)
+                        ! IF (ABS(CHECKVALUE) > 1.0d-12) WRITE(*,*) 'Checkvalue too large! = ', CHECKVALUE
+                        ! ! End of the small check.
                         
                         IF ((part_adv(IP)%VX*U3D_GRID%FACE_NORMAL(IC,J,1) &
                            + part_adv(IP)%VY*U3D_GRID%FACE_NORMAL(IC,J,2) &

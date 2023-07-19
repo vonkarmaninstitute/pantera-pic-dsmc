@@ -33,8 +33,8 @@ Boundary_temperature:
     
 PIC_type:
     none
-Mesh_file_SU2:
-    'testmesh.su2'
+!Mesh_file_SU2:
+!    'testmesh.su2'
 Bool_dump_moments:
     .FALSE.
 Bool_dump_fluxes:
@@ -117,8 +117,8 @@ Thermal_bath_Ttr:
 
 
 ! ========= Reactions ==============================
-!Reactions_file:
-!    ar.react
+Reactions_file:
+    ar.react
 
 !Wall_reactions_file:
 !    ar.wall

@@ -988,7 +988,7 @@ MODULE fully_implicit
                                   + U2D_GRID%BASIS_COEFFS(2,P,I)*U2D_GRID%BASIS_COEFFS(2,Q,I))
                         
                         IF (AXI) THEN
-                           V1 = U2D_GRID%CELL_NODES(1.I)
+                           V1 = U2D_GRID%CELL_NODES(1,I)
                            V2 = U2D_GRID%CELL_NODES(2,I)
                            V3 = U2D_GRID%CELL_NODES(3,I)  
                            KPQ = KPQ*(U2D_GRID%NODE_COORDS(2, V1) &

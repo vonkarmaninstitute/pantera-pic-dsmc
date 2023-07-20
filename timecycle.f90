@@ -33,6 +33,7 @@ MODULE timecycle
       IF (PIC_TYPE .NE. NONE) THEN
 
          CALL DEPOSIT_CHARGE(particles)
+         CALL SETUP_POISSON
          CALL SOLVE_POISSON
          PHIBAR_FIELD = PHI_FIELD
          CALL COMPUTE_E_FIELD

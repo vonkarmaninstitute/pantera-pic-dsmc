@@ -2563,16 +2563,13 @@ MODULE fully_implicit
    END SUBROUTINE WALL_REACT
 
 
-
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   ! SUBROUTINE SOLVE_POISSON -> Solves the Poisson equation with the RHS RHS !
+   ! SUBROUTINE SETUP_POISSON -> Solves the Poisson equation with the RHS RHS !
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-   SUBROUTINE SOLVE_POISSON
+   SUBROUTINE SETUP_POISSON
 
       IMPLICIT NONE
-
-      ! Solve the linear system  (Amat*PHI_FIELD = bvec)
 
       CALL KSPCreate(PETSC_COMM_WORLD,ksp,ierr)
       CALL KSPSetOperators(ksp,Amat,Amat,ierr)
@@ -2587,6 +2584,18 @@ MODULE fully_implicit
       !maxit = 50
       !CALL KSPSetTolerances(ksp,rtol,abstol,PETSC_DEFAULT_REAL,maxit,ierr)
 
+   END SUBROUTINE SETUP_POISSON
+
+
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE SOLVE_POISSON -> Solves the Poisson equation with the RHS RHS !
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+   SUBROUTINE SOLVE_POISSON
+
+      IMPLICIT NONE
+
+      ! Solve the linear system  (Amat*PHI_FIELD = bvec)
       CALL KSPSolve(ksp,bvec,xvec,ierr)
 
       CALL KSPGetConvergedReason(ksp,reason,ierr)
@@ -2605,7 +2614,7 @@ MODULE fully_implicit
       CALL VecScatterDestroy(ctx,ierr)
       CALL VecDestroy(xvec_seq,ierr)
 
-      CALL KSPDestroy(ksp,ierr)
+      !!CALL KSPDestroy(ksp,ierr)
 
       !CALL VecRestoreArrayReadF90(X_SEQ,PHI_FIELD,ierr)
 

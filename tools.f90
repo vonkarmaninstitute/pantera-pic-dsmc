@@ -405,23 +405,23 @@ CONTAINS
          NINGRIDCELL = 0
 
          DO IC = 1, NCELLS
-            V1 = U3D_GRID%CELL_NODES(IC,1)
-            V2 = U3D_GRID%CELL_NODES(IC,2)
-            V3 = U3D_GRID%CELL_NODES(IC,3)
-            V4 = U3D_GRID%CELL_NODES(IC,4)
+            V1 = U3D_GRID%CELL_NODES(1,IC)
+            V2 = U3D_GRID%CELL_NODES(2,IC)
+            V3 = U3D_GRID%CELL_NODES(3,IC)
+            V4 = U3D_GRID%CELL_NODES(4,IC)
    
-            X1 = U3D_GRID%NODE_COORDS(V1, 1)
-            X2 = U3D_GRID%NODE_COORDS(V2, 1)
-            X3 = U3D_GRID%NODE_COORDS(V3, 1)
-            X4 = U3D_GRID%NODE_COORDS(V4, 1)
-            Y1 = U3D_GRID%NODE_COORDS(V1, 2)
-            Y2 = U3D_GRID%NODE_COORDS(V2, 2)
-            Y3 = U3D_GRID%NODE_COORDS(V3, 2)
-            Y4 = U3D_GRID%NODE_COORDS(V4, 2)
-            Z1 = U3D_GRID%NODE_COORDS(V1, 3)
-            Z2 = U3D_GRID%NODE_COORDS(V2, 3)
-            Z3 = U3D_GRID%NODE_COORDS(V3, 3)
-            Z4 = U3D_GRID%NODE_COORDS(V4, 3)
+            X1 = U3D_GRID%NODE_COORDS(1, V1)
+            X2 = U3D_GRID%NODE_COORDS(1, V2)
+            X3 = U3D_GRID%NODE_COORDS(1, V3)
+            X4 = U3D_GRID%NODE_COORDS(1, V4)
+            Y1 = U3D_GRID%NODE_COORDS(2, V1)
+            Y2 = U3D_GRID%NODE_COORDS(2, V2)
+            Y3 = U3D_GRID%NODE_COORDS(2, V3)
+            Y4 = U3D_GRID%NODE_COORDS(2, V4)
+            Z1 = U3D_GRID%NODE_COORDS(3, V1)
+            Z2 = U3D_GRID%NODE_COORDS(3, V2)
+            Z3 = U3D_GRID%NODE_COORDS(3, V3)
+            Z4 = U3D_GRID%NODE_COORDS(3, V4)
 
             CELLXMIN = MIN(X1, X2, X3, X4)
             CELLXMAX = MAX(X1, X2, X3, X4)
@@ -451,23 +451,23 @@ CONTAINS
          NINGRIDCELL = 0
 
          DO IC = 1, NCELLS
-            V1 = U3D_GRID%CELL_NODES(IC,1)
-            V2 = U3D_GRID%CELL_NODES(IC,2)
-            V3 = U3D_GRID%CELL_NODES(IC,3)
-            V4 = U3D_GRID%CELL_NODES(IC,4)
+            V1 = U3D_GRID%CELL_NODES(1,IC)
+            V2 = U3D_GRID%CELL_NODES(2,IC)
+            V3 = U3D_GRID%CELL_NODES(3,IC)
+            V4 = U3D_GRID%CELL_NODES(4,IC)
    
-            X1 = U3D_GRID%NODE_COORDS(V1, 1)
-            X2 = U3D_GRID%NODE_COORDS(V2, 1)
-            X3 = U3D_GRID%NODE_COORDS(V3, 1)
-            X4 = U3D_GRID%NODE_COORDS(V4, 1)
-            Y1 = U3D_GRID%NODE_COORDS(V1, 2)
-            Y2 = U3D_GRID%NODE_COORDS(V2, 2)
-            Y3 = U3D_GRID%NODE_COORDS(V3, 2)
-            Y4 = U3D_GRID%NODE_COORDS(V4, 2)
-            Z1 = U3D_GRID%NODE_COORDS(V1, 3)
-            Z2 = U3D_GRID%NODE_COORDS(V2, 3)
-            Z3 = U3D_GRID%NODE_COORDS(V3, 3)
-            Z4 = U3D_GRID%NODE_COORDS(V4, 3)
+            X1 = U3D_GRID%NODE_COORDS(1, V1)
+            X2 = U3D_GRID%NODE_COORDS(1, V2)
+            X3 = U3D_GRID%NODE_COORDS(1, V3)
+            X4 = U3D_GRID%NODE_COORDS(1, V4)
+            Y1 = U3D_GRID%NODE_COORDS(2, V1)
+            Y2 = U3D_GRID%NODE_COORDS(2, V2)
+            Y3 = U3D_GRID%NODE_COORDS(2, V3)
+            Y4 = U3D_GRID%NODE_COORDS(2, V4)
+            Z1 = U3D_GRID%NODE_COORDS(3, V1)
+            Z2 = U3D_GRID%NODE_COORDS(3, V2)
+            Z3 = U3D_GRID%NODE_COORDS(3, V3)
+            Z4 = U3D_GRID%NODE_COORDS(3, V4)
 
             CELLXMIN = MIN(X1, X2, X3, X4)
             CELLXMAX = MAX(X1, X2, X3, X4)
@@ -517,8 +517,8 @@ CONTAINS
                ! Check if particle IP (XP, YP) is in unstructured cell IC.
                INSIDE = .TRUE.
                DO VP = 1, 4
-                  PSIP = XP*U3D_GRID%BASIS_COEFFS(IC,VP,1) + YP*U3D_GRID%BASIS_COEFFS(IC,VP,2) &
-                       + ZP*U3D_GRID%BASIS_COEFFS(IC,VP,3) + U3D_GRID%BASIS_COEFFS(IC,VP,4)
+                  PSIP = XP*U3D_GRID%BASIS_COEFFS(1,VP,IC) + YP*U3D_GRID%BASIS_COEFFS(2,VP,IC) &
+                       + ZP*U3D_GRID%BASIS_COEFFS(3,VP,IC) + U3D_GRID%BASIS_COEFFS(4,VP,IC)
                   IF (PSIP < 0) INSIDE = .FALSE.
                   !IF (ABS(PSIP) < MINABSPSI) MINABSPSI = ABS(PSIP)
                END DO
@@ -570,16 +570,16 @@ CONTAINS
          NINGRIDCELL = 0
 
          DO IC = 1, NCELLS
-            V1 = U2D_GRID%CELL_NODES(IC,1)
-            V2 = U2D_GRID%CELL_NODES(IC,2)
-            V3 = U2D_GRID%CELL_NODES(IC,3)
+            V1 = U2D_GRID%CELL_NODES(1,IC)
+            V2 = U2D_GRID%CELL_NODES(2,IC)
+            V3 = U2D_GRID%CELL_NODES(3,IC)
    
-            X1 = U2D_GRID%NODE_COORDS(V1, 1)
-            X2 = U2D_GRID%NODE_COORDS(V2, 1)
-            X3 = U2D_GRID%NODE_COORDS(V3, 1)
-            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
+            X1 = U2D_GRID%NODE_COORDS(1, V1)
+            X2 = U2D_GRID%NODE_COORDS(1, V2)
+            X3 = U2D_GRID%NODE_COORDS(1, V3)
+            Y1 = U2D_GRID%NODE_COORDS(2, V1)
+            Y2 = U2D_GRID%NODE_COORDS(2, V2)
+            Y3 = U2D_GRID%NODE_COORDS(2, V3)
 
             CELLXMIN = MIN(X1, X2, X3)
             CELLXMAX = MAX(X1, X2, X3)
@@ -603,16 +603,16 @@ CONTAINS
          NINGRIDCELL = 0
 
          DO IC = 1, NCELLS
-            V1 = U2D_GRID%CELL_NODES(IC,1)
-            V2 = U2D_GRID%CELL_NODES(IC,2)
-            V3 = U2D_GRID%CELL_NODES(IC,3)
+            V1 = U2D_GRID%CELL_NODES(1,IC)
+            V2 = U2D_GRID%CELL_NODES(2,IC)
+            V3 = U2D_GRID%CELL_NODES(3,IC)
    
-            X1 = U2D_GRID%NODE_COORDS(V1, 1)
-            X2 = U2D_GRID%NODE_COORDS(V2, 1)
-            X3 = U2D_GRID%NODE_COORDS(V3, 1)
-            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
+            X1 = U2D_GRID%NODE_COORDS(1, V1)
+            X2 = U2D_GRID%NODE_COORDS(1, V2)
+            X3 = U2D_GRID%NODE_COORDS(1, V3)
+            Y1 = U2D_GRID%NODE_COORDS(2, V1)
+            Y2 = U2D_GRID%NODE_COORDS(2, V2)
+            Y3 = U2D_GRID%NODE_COORDS(2, V3)
 
             CELLXMIN = MIN(X1, X2, X3)
             CELLXMAX = MAX(X1, X2, X3)
@@ -644,7 +644,7 @@ CONTAINS
                ! Check if particle IP (XP, YP) is in unstructured cell IC.
                INSIDE = .TRUE.
                DO VP = 1, 3
-                  PSIP = XP*U2D_GRID%BASIS_COEFFS(IC,VP,1) + YP*U2D_GRID%BASIS_COEFFS(IC,VP,2) + U2D_GRID%BASIS_COEFFS(IC,VP,3)
+                  PSIP = XP*U2D_GRID%BASIS_COEFFS(1,VP,IC) + YP*U2D_GRID%BASIS_COEFFS(2,VP,IC) + U2D_GRID%BASIS_COEFFS(3,VP,IC)
                   IF (PSIP < 0) INSIDE = .FALSE.
                   IF (ABS(PSIP) < MINABSPSI) MINABSPSI = ABS(PSIP)
                END DO

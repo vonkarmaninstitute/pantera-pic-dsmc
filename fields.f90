@@ -94,12 +94,12 @@ MODULE fields
             IS_UNUSED = .TRUE.
 
             DO I = 1, NCELLS
-               V1 = U2D_GRID%CELL_NODES(I,1)
-               V2 = U2D_GRID%CELL_NODES(I,2)
-               V3 = U2D_GRID%CELL_NODES(I,3)
+               V1 = U2D_GRID%CELL_NODES(1,I)
+               V2 = U2D_GRID%CELL_NODES(2,I)
+               V3 = U2D_GRID%CELL_NODES(3,I)
                IS_UNUSED(V1-1) = .FALSE.; IS_UNUSED(V2-1) = .FALSE.; IS_UNUSED(V3-1) = .FALSE.
                DO J = 1, 3
-                  EDGE_PG = U2D_GRID%CELL_EDGES_PG(I, J)
+                  EDGE_PG = U2D_GRID%CELL_EDGES_PG(J, I)
                   IF (EDGE_PG .NE. -1) THEN
                      IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC) THEN
                         IF (J==1) THEN
@@ -140,15 +140,15 @@ MODULE fields
                   EPS_REL = GRID_BC(U2D_GRID%CELL_PG(I))%EPS_REL
                END IF
                AREA = CELL_AREAS(I)
-               V1 = U2D_GRID%CELL_NODES(I,1)
-               V2 = U2D_GRID%CELL_NODES(I,2)
-               V3 = U2D_GRID%CELL_NODES(I,3)            
-               X1 = U2D_GRID%NODE_COORDS(V1, 1)
-               X2 = U2D_GRID%NODE_COORDS(V2, 1)
-               X3 = U2D_GRID%NODE_COORDS(V3, 1)
-               Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-               Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-               Y3 = U2D_GRID%NODE_COORDS(V3, 2)
+               V1 = U2D_GRID%CELL_NODES(1,I)
+               V2 = U2D_GRID%CELL_NODES(2,I)
+               V3 = U2D_GRID%CELL_NODES(3,I)            
+               X1 = U2D_GRID%NODE_COORDS(1, V1)
+               X2 = U2D_GRID%NODE_COORDS(1, V2)
+               X3 = U2D_GRID%NODE_COORDS(1, V3)
+               Y1 = U2D_GRID%NODE_COORDS(2, V1)
+               Y2 = U2D_GRID%NODE_COORDS(2, V2)
+               Y3 = U2D_GRID%NODE_COORDS(2, V3)
                K11 = 0.25*((Y2-Y3)**2 + (X2-X3)**2)/AREA*EPS_REL
                K22 = 0.25*((Y1-Y3)**2 + (X1-X3)**2)/AREA*EPS_REL
                K33 = 0.25*((Y2-Y1)**2 + (X2-X1)**2)/AREA*EPS_REL
@@ -188,7 +188,7 @@ MODULE fields
                END IF
 
                DO J = 1, 3
-                  EDGE_PG = U2D_GRID%CELL_EDGES_PG(I, J)
+                  EDGE_PG = U2D_GRID%CELL_EDGES_PG(J, I)
                   IF (EDGE_PG == -1) CYCLE
                   IF (GRID_BC(EDGE_PG)%FIELD_BC == NEUMANN_BC) THEN
 
@@ -229,15 +229,15 @@ MODULE fields
             IS_UNUSED = .TRUE.
 
             DO I = 1, NCELLS
-               V1 = U3D_GRID%CELL_NODES(I,1)
-               V2 = U3D_GRID%CELL_NODES(I,2)
-               V3 = U3D_GRID%CELL_NODES(I,3)
-               V4 = U3D_GRID%CELL_NODES(I,4)
+               V1 = U3D_GRID%CELL_NODES(1,I)
+               V2 = U3D_GRID%CELL_NODES(2,I)
+               V3 = U3D_GRID%CELL_NODES(3,I)
+               V4 = U3D_GRID%CELL_NODES(4,I)
                IS_UNUSED(V1-1) = .FALSE.; IS_UNUSED(V2-1) = .FALSE.
                IS_UNUSED(V3-1) = .FALSE.; IS_UNUSED(V4-1) = .FALSE.
 
                DO J = 1, 4
-                  EDGE_PG = U3D_GRID%CELL_FACES_PG(I, J)
+                  EDGE_PG = U3D_GRID%CELL_FACES_PG(J, I)
                   IF (EDGE_PG .NE. -1) THEN
                      IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC) THEN
                         IF (J==1) THEN
@@ -307,14 +307,14 @@ MODULE fields
                VOLUME = CELL_VOLUMES(I)
 
                DO P = 1, 4
-                  VP = U3D_GRID%CELL_NODES(I,P) - 1
+                  VP = U3D_GRID%CELL_NODES(P,I) - 1
                   IF (VP >= Istart .AND. VP < Iend) THEN
                      IF (.NOT. IS_DIRICHLET(VP)) THEN
                         DO Q = 1, 4
-                           VQ = U3D_GRID%CELL_NODES(I,Q) - 1
-                           KIJ = VOLUME*(U3D_GRID%BASIS_COEFFS(I,P,1)*U3D_GRID%BASIS_COEFFS(I,Q,1) &
-                                       + U3D_GRID%BASIS_COEFFS(I,P,2)*U3D_GRID%BASIS_COEFFS(I,Q,2) &
-                                       + U3D_GRID%BASIS_COEFFS(I,P,3)*U3D_GRID%BASIS_COEFFS(I,Q,3)) * EPS_REL
+                           VQ = U3D_GRID%CELL_NODES(Q,I) - 1
+                           KIJ = VOLUME*(U3D_GRID%BASIS_COEFFS(1,P,I)*U3D_GRID%BASIS_COEFFS(1,Q,I) &
+                                       + U3D_GRID%BASIS_COEFFS(2,P,I)*U3D_GRID%BASIS_COEFFS(2,Q,I) &
+                                       + U3D_GRID%BASIS_COEFFS(3,P,I)*U3D_GRID%BASIS_COEFFS(3,Q,I)) * EPS_REL
                            CALL MatSetValues(Amat,one,VP,one,VQ,KIJ,ADD_VALUES,ierr)
                         END DO
                      END IF
@@ -322,11 +322,11 @@ MODULE fields
                END DO
 
                DO J = 1, 4
-                  EDGE_PG = U3D_GRID%CELL_FACES_PG(I, J)
+                  EDGE_PG = U3D_GRID%CELL_FACES_PG(J, I)
                   IF (EDGE_PG == -1) CYCLE
                   IF (GRID_BC(EDGE_PG)%FIELD_BC == NEUMANN_BC) THEN
 
-                     FACEAREA = U3D_GRID%FACE_AREA(I, J)
+                     FACEAREA = U3D_GRID%FACE_AREA(J, I)
                      IF (J==1) THEN
                         IF (.NOT. IS_DIRICHLET(V1-1)) THEN
                            NEUMANN(V1-1) = NEUMANN(V1-1) + GRID_BC(EDGE_PG)%WALL_EFIELD * FACEAREA/3.
@@ -569,9 +569,9 @@ MODULE fields
 
          IF (DIMS == 2) THEN
             DO I = 1, NCELLS
-               V1 = U2D_GRID%CELL_NODES(I,1)
-               V2 = U2D_GRID%CELL_NODES(I,2)
-               V3 = U2D_GRID%CELL_NODES(I,3)
+               V1 = U2D_GRID%CELL_NODES(1,I)
+               V2 = U2D_GRID%CELL_NODES(2,I)
+               V3 = U2D_GRID%CELL_NODES(3,I)
 
                !IF ((V1-1 < Istart .OR. V1-1 >= Iend) .AND. &
                !    (V2-1 < Istart .OR. V2-1 >= Iend) .AND. &
@@ -579,7 +579,7 @@ MODULE fields
 
                IS_UNUSED(V1-1) = .FALSE.; IS_UNUSED(V2-1) = .FALSE.; IS_UNUSED(V3-1) = .FALSE.
                DO J = 1, 3
-                  EDGE_PG = U2D_GRID%CELL_EDGES_PG(I, J)
+                  EDGE_PG = U2D_GRID%CELL_EDGES_PG(J, I)
                   IF (EDGE_PG .NE. -1) THEN
                      IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC) THEN
                         IF (J==1) THEN
@@ -614,21 +614,21 @@ MODULE fields
             !DIRICHLET(0) = 0.d0
 
             DO I = 1, NCELLS
-               V1 = U2D_GRID%CELL_NODES(I,1)
-               V2 = U2D_GRID%CELL_NODES(I,2)
-               V3 = U2D_GRID%CELL_NODES(I,3)
+               V1 = U2D_GRID%CELL_NODES(1,I)
+               V2 = U2D_GRID%CELL_NODES(2,I)
+               V3 = U2D_GRID%CELL_NODES(3,I)
                
                !IF ((V1-1 < Istart .OR. V1-1 >= Iend) .AND. &
                !    (V2-1 < Istart .OR. V2-1 >= Iend) .AND. &
                !    (V3-1 < Istart .OR. V3-1 >= Iend)) CYCLE
 
                AREA = CELL_AREAS(I)
-               X1 = U2D_GRID%NODE_COORDS(V1, 1)
-               X2 = U2D_GRID%NODE_COORDS(V2, 1)
-               X3 = U2D_GRID%NODE_COORDS(V3, 1)
-               Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-               Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-               Y3 = U2D_GRID%NODE_COORDS(V3, 2)
+               X1 = U2D_GRID%NODE_COORDS(1, V1)
+               X2 = U2D_GRID%NODE_COORDS(1, V2)
+               X3 = U2D_GRID%NODE_COORDS(1, V3)
+               Y1 = U2D_GRID%NODE_COORDS(2, V1)
+               Y2 = U2D_GRID%NODE_COORDS(2, V2)
+               Y3 = U2D_GRID%NODE_COORDS(2, V3)
                K11 = 0.25*((Y2-Y3)**2 + (X2-X3)**2)/AREA
                K22 = 0.25*((Y1-Y3)**2 + (X1-X3)**2)/AREA
                K33 = 0.25*((Y2-Y1)**2 + (X2-X1)**2)/AREA
@@ -697,7 +697,7 @@ MODULE fields
                END IF
             ! Neumann part has to be included only if the derivative changes in time.
             !    DO J = 1, 3
-            !       EDGE_PG = U2D_GRID%CELL_EDGES_PG(I, J)
+            !       EDGE_PG = U2D_GRID%CELL_EDGES_PG(J, I)
             !       IF (EDGE_PG == -1) CYCLE
             !       IF (GRID_BC(EDGE_PG)%FIELD_BC == NEUMANN_BC) THEN
 
@@ -734,15 +734,15 @@ MODULE fields
          ELSE IF (DIMS == 3) THEN
 
             DO I = 1, NCELLS
-               V1 = U3D_GRID%CELL_NODES(I,1)
-               V2 = U3D_GRID%CELL_NODES(I,2)
-               V3 = U3D_GRID%CELL_NODES(I,3)
-               V4 = U3D_GRID%CELL_NODES(I,4)
+               V1 = U3D_GRID%CELL_NODES(1,I)
+               V2 = U3D_GRID%CELL_NODES(2,I)
+               V3 = U3D_GRID%CELL_NODES(3,I)
+               V4 = U3D_GRID%CELL_NODES(4,I)
                IS_UNUSED(V1-1) = .FALSE.; IS_UNUSED(V2-1) = .FALSE.
                IS_UNUSED(V3-1) = .FALSE.; IS_UNUSED(V4-1) = .FALSE.
 
                DO J = 1, 4
-                  EDGE_PG = U3D_GRID%CELL_FACES_PG(I, J)
+                  EDGE_PG = U3D_GRID%CELL_FACES_PG(J, I)
                   IF (EDGE_PG .NE. -1) THEN
                      IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC) THEN
                         IF (J==1) THEN
@@ -806,14 +806,14 @@ MODULE fields
                VOLUME = CELL_VOLUMES(I)
 
                DO P = 1, 4
-                  VP = U3D_GRID%CELL_NODES(I,P) - 1
+                  VP = U3D_GRID%CELL_NODES(P,I) - 1
                   IF (VP >= Istart .AND. VP < Iend) THEN
                      IF (.NOT. IS_DIRICHLET(VP)) THEN
                         DO Q = 1, 4
-                           VQ = U3D_GRID%CELL_NODES(I,Q) - 1
-                           KIJ = VOLUME*(U3D_GRID%BASIS_COEFFS(I,P,1)*U3D_GRID%BASIS_COEFFS(I,Q,1) &
-                                       + U3D_GRID%BASIS_COEFFS(I,P,2)*U3D_GRID%BASIS_COEFFS(I,Q,2) &
-                                       + U3D_GRID%BASIS_COEFFS(I,P,3)*U3D_GRID%BASIS_COEFFS(I,Q,3))
+                           VQ = U3D_GRID%CELL_NODES(Q,I) - 1
+                           KIJ = VOLUME*(U3D_GRID%BASIS_COEFFS(1,P,I)*U3D_GRID%BASIS_COEFFS(1,Q,I) &
+                                       + U3D_GRID%BASIS_COEFFS(2,P,I)*U3D_GRID%BASIS_COEFFS(2,Q,I) &
+                                       + U3D_GRID%BASIS_COEFFS(3,P,I)*U3D_GRID%BASIS_COEFFS(3,Q,I))
                            CALL MatSetValues(Amat,one,VP,one,VQ,(MASS_MATRIX(I)+1.)*KIJ,ADD_VALUES,ierr)
                            val = PHI_FIELD(VQ+1)*KIJ
                            CALL VecSetValues(bvec,one,VP,val,ADD_VALUES,ierr)
@@ -902,16 +902,16 @@ MODULE fields
                
                AREA = CELL_AREAS(IC)
 
-               V1 = U2D_GRID%CELL_NODES(IC,1)
-               V2 = U2D_GRID%CELL_NODES(IC,2)
-               V3 = U2D_GRID%CELL_NODES(IC,3)            
+               V1 = U2D_GRID%CELL_NODES(1,IC)
+               V2 = U2D_GRID%CELL_NODES(2,IC)
+               V3 = U2D_GRID%CELL_NODES(3,IC)            
 
-               DPSI1DX = U2D_GRID%BASIS_COEFFS(IC,1,1)
-               DPSI2DX = U2D_GRID%BASIS_COEFFS(IC,2,1)
-               DPSI3DX = U2D_GRID%BASIS_COEFFS(IC,3,1)
-               DPSI1DY = U2D_GRID%BASIS_COEFFS(IC,1,2)
-               DPSI2DY = U2D_GRID%BASIS_COEFFS(IC,2,2)
-               DPSI3DY = U2D_GRID%BASIS_COEFFS(IC,3,2)
+               DPSI1DX = U2D_GRID%BASIS_COEFFS(1,1,IC)
+               DPSI2DX = U2D_GRID%BASIS_COEFFS(1,2,IC)
+               DPSI3DX = U2D_GRID%BASIS_COEFFS(1,3,IC)
+               DPSI1DY = U2D_GRID%BASIS_COEFFS(2,1,IC)
+               DPSI2DY = U2D_GRID%BASIS_COEFFS(2,2,IC)
+               DPSI3DY = U2D_GRID%BASIS_COEFFS(2,3,IC)
                
                IF (AXI) THEN
                   J_FIELD(V1-1) = J_FIELD(V1-1) &
@@ -938,10 +938,10 @@ MODULE fields
             ELSE IF (DIMS == 3) THEN
                
                DO P = 1, 4
-                  VP = U3D_GRID%CELL_NODES(IC,P) - 1
-                  J_FIELD(VP) = J_FIELD(VP) + FNUM*QE*CHARGE*(particles(JP)%VX*U3D_GRID%BASIS_COEFFS(IC,P,1) &
-                                                            + particles(JP)%VY*U3D_GRID%BASIS_COEFFS(IC,P,2) &
-                                                            + particles(JP)%VZ*U3D_GRID%BASIS_COEFFS(IC,P,3))*particles(JP)%DTRIM
+                  VP = U3D_GRID%CELL_NODES(P,IC) - 1
+                  J_FIELD(VP) = J_FIELD(VP) + FNUM*QE*CHARGE*(particles(JP)%VX*U3D_GRID%BASIS_COEFFS(1,P,IC) &
+                                                            + particles(JP)%VY*U3D_GRID%BASIS_COEFFS(2,P,IC) &
+                                                            + particles(JP)%VZ*U3D_GRID%BASIS_COEFFS(3,P,IC))*particles(JP)%DTRIM
                END DO
                MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/CELL_VOLUMES(IC)*FNUM &
                                     * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
@@ -1022,15 +1022,15 @@ MODULE fields
          IF (GRID_TYPE == UNSTRUCTURED) THEN
             IC = particles(JP)%IC
             AREA = CELL_AREAS(IC)
-            V1 = U2D_GRID%CELL_NODES(IC,1)
-            V2 = U2D_GRID%CELL_NODES(IC,2)
-            V3 = U2D_GRID%CELL_NODES(IC,3)            
-            X1 = U2D_GRID%NODE_COORDS(V1, 1)
-            X2 = U2D_GRID%NODE_COORDS(V2, 1)
-            X3 = U2D_GRID%NODE_COORDS(V3, 1)
-            Y1 = U2D_GRID%NODE_COORDS(V1, 2)
-            Y2 = U2D_GRID%NODE_COORDS(V2, 2)
-            Y3 = U2D_GRID%NODE_COORDS(V3, 2)
+            V1 = U2D_GRID%CELL_NODES(1,IC)
+            V2 = U2D_GRID%CELL_NODES(2,IC)
+            V3 = U2D_GRID%CELL_NODES(3,IC)            
+            X1 = U2D_GRID%NODE_COORDS(1, V1)
+            X2 = U2D_GRID%NODE_COORDS(1, V2)
+            X3 = U2D_GRID%NODE_COORDS(1, V3)
+            Y1 = U2D_GRID%NODE_COORDS(2, V1)
+            Y2 = U2D_GRID%NODE_COORDS(2, V2)
+            Y3 = U2D_GRID%NODE_COORDS(2, V3)
             XP = particles(JP)%X
             YP = particles(JP)%Y
             PSI1 = 0.5*( (Y2-Y3)*(XP-X3) - (X2-X3)*(YP-Y3))/AREA/(ZMAX-ZMIN)
@@ -1072,7 +1072,7 @@ MODULE fields
 
          DO ICOIL = 1, N_SOLENOIDS
             DO IN = 1, U2D_GRID%NUM_NODES
-               POINT = U2D_GRID%NODE_COORDS(IN, :)
+               POINT = U2D_GRID%NODE_COORDS(:, IN)
                DO IX = 1, SOLENOIDS(ICOIL)%N_WIRES_X
                   
                   IF (SOLENOIDS(ICOIL)%N_WIRES_X == 1) THEN
@@ -1103,7 +1103,7 @@ MODULE fields
                         RPRIME(2) = POINT(2) - WIRER*COS(THETA)
                         RPRIME(3) = POINT(3) - WIRER*SIN(THETA)
                         
-                        B_FIELD(IN, 1, :) = B_FIELD(IN, 1, :) + SOLENOIDS(ICOIL)%WIRE_CURRENT*MU0/(4*PI)*CROSS(DL, RPRIME) / &
+                        B_FIELD(:, 1, IN) = B_FIELD(:, 1, IN) + SOLENOIDS(ICOIL)%WIRE_CURRENT*MU0/(4*PI)*CROSS(DL, RPRIME) / &
                         (RPRIME(1)*RPRIME(1) + RPRIME(2)*RPRIME(2) + RPRIME(3)*RPRIME(3))**1.5
                      
                      END DO

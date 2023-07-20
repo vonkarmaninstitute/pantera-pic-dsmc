@@ -254,22 +254,22 @@ MODULE timecycle
          IC = EMIT_TASK%IC
 
          IF (DIMS == 2) THEN
-            X1 = U2D_GRID%NODE_COORDS(EMIT_TASK%IV1, 1)
-            Y1 = U2D_GRID%NODE_COORDS(EMIT_TASK%IV1, 2)
-            X2 = U2D_GRID%NODE_COORDS(EMIT_TASK%IV2, 1)
-            Y2 = U2D_GRID%NODE_COORDS(EMIT_TASK%IV2, 2)
+            X1 = U2D_GRID%NODE_COORDS(1, EMIT_TASK%IV1)
+            Y1 = U2D_GRID%NODE_COORDS(2, EMIT_TASK%IV1)
+            X2 = U2D_GRID%NODE_COORDS(1, EMIT_TASK%IV2)
+            Y2 = U2D_GRID%NODE_COORDS(2, EMIT_TASK%IV2)
 
-            FACE_NORMAL = U2D_GRID%EDGE_NORMAL(IC,EMIT_TASK%IFACE,:)
+            FACE_NORMAL = U2D_GRID%EDGE_NORMAL(:,EMIT_TASK%IFACE,IC)
             FACE_TANG1 = [-FACE_NORMAL(2), FACE_NORMAL(1), 0.d0]
             FACE_TANG2 = [0.d0, 0.d0, 1.d0]
          ELSE IF (DIMS == 3) THEN
-            FACE_NORMAL = U3D_GRID%FACE_NORMAL(IC,EMIT_TASK%IFACE,:)
-            FACE_TANG1 = U3D_GRID%FACE_TANG1(IC,EMIT_TASK%IFACE,:)
-            FACE_TANG2 = U3D_GRID%FACE_TANG2(IC,EMIT_TASK%IFACE,:)
+            FACE_NORMAL = U3D_GRID%FACE_NORMAL(:,EMIT_TASK%IFACE,IC)
+            FACE_TANG1 = U3D_GRID%FACE_TANG1(:,EMIT_TASK%IFACE,IC)
+            FACE_TANG2 = U3D_GRID%FACE_TANG2(:,EMIT_TASK%IFACE,IC)
 
-            V1 = U3D_GRID%NODE_COORDS(U3D_GRID%FACE_NODES(IC,EMIT_TASK%IFACE,1),:)
-            V2 = U3D_GRID%NODE_COORDS(U3D_GRID%FACE_NODES(IC,EMIT_TASK%IFACE,2),:)
-            V3 = U3D_GRID%NODE_COORDS(U3D_GRID%FACE_NODES(IC,EMIT_TASK%IFACE,3),:)
+            V1 = U3D_GRID%NODE_COORDS(:,U3D_GRID%FACE_NODES(1,EMIT_TASK%IFACE,IC))
+            V2 = U3D_GRID%NODE_COORDS(:,U3D_GRID%FACE_NODES(2,EMIT_TASK%IFACE,IC))
+            V3 = U3D_GRID%NODE_COORDS(:,U3D_GRID%FACE_NODES(3,EMIT_TASK%IFACE,IC))
          END IF
 
          DO IS = 1, MIXTURES(EMIT_TASK%MIX_ID)%N_COMPONENTS ! Loop on mixture components
@@ -398,9 +398,9 @@ MODULE timecycle
                               MIXTURES(VOLUME_INJECT_TASKS(ITASK)%MIX_ID)%COMPONENTS(i)%MOLFRAC/N_MPI_THREADS)
                   IF (NP_INIT == 0) CYCLE
 
-                  V1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,1),:)
-                  V2 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,2),:)
-                  V3 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,3),:)
+                  V1 = U2D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(1,IC))
+                  V2 = U2D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(2,IC))
+                  V3 = U2D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(3,IC))
 
                   DO IP = 1, NP_INIT
 
@@ -921,10 +921,10 @@ MODULE timecycle
                      ! We are axisymmetric
                      CANDIDATE_DTCOLL = DTCOLL
                      ! Compute auxiliary parameters
-                     EDGE_X1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),1)
-                     EDGE_Y1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),2)
+                     EDGE_X1 = U2D_GRID%NODE_COORDS(1,U2D_GRID%CELL_NODES(I,IC))
+                     EDGE_Y1 = U2D_GRID%NODE_COORDS(2,U2D_GRID%CELL_NODES(I,IC))
 
-                     IF (ABS(U2D_GRID%EDGE_NORMAL(IC,I,2)) < 1.d-10 ) THEN
+                     IF (ABS(U2D_GRID%EDGE_NORMAL(2,I,IC)) < 1.d-10 ) THEN
                         ! Vertical wall
                         SOL1 = (EDGE_X1 - particles(IP)%X)/particles(IP)%VX
                         IF (SOL1 >= 0 .AND. SOL1 < DTCOLL) THEN
@@ -935,7 +935,7 @@ MODULE timecycle
                         END IF
                      ELSE
                         ! Non-vertical wall
-                        ALPHA = -U2D_GRID%EDGE_NORMAL(IC,I,1)/U2D_GRID%EDGE_NORMAL(IC,I,2)
+                        ALPHA = -U2D_GRID%EDGE_NORMAL(1,I,IC)/U2D_GRID%EDGE_NORMAL(2,I,IC)
                         BETA  = (particles(IP)%X - EDGE_X1)*ALPHA
 
                         COEFA = particles(IP)%VY**2 + particles(IP)%VZ**2 - ALPHA*ALPHA*particles(IP)%VX**2
@@ -980,11 +980,11 @@ MODULE timecycle
                      IF (GOODSOL /= 0) THEN
                         DO SOL = 1, GOODSOL
                            CALL MOVE_PARTICLE(IP, TEST(SOL))
-                           IF ((particles(IP)%VX*U2D_GRID%EDGE_NORMAL(IC,I,1) &
-                              + particles(IP)%VY*U2D_GRID%EDGE_NORMAL(IC,I,2)) > 0) THEN
+                           IF ((particles(IP)%VX*U2D_GRID%EDGE_NORMAL(1,I,IC) &
+                              + particles(IP)%VY*U2D_GRID%EDGE_NORMAL(2,I,IC)) > 0) THEN
 
-                              COLLDIST = -U2D_GRID%EDGE_NORMAL(IC,I,2)*(particles(IP)%X-EDGE_X1)/U2D_GRID%CELL_EDGES_LEN(IC,I) &
-                                         +U2D_GRID%EDGE_NORMAL(IC,I,1)*(particles(IP)%Y-EDGE_Y1)/U2D_GRID%CELL_EDGES_LEN(IC,I)
+                              COLLDIST = -U2D_GRID%EDGE_NORMAL(2,I,IC)*(particles(IP)%X-EDGE_X1)/U2D_GRID%CELL_EDGES_LEN(I,IC) &
+                                         +U2D_GRID%EDGE_NORMAL(1,I,IC)*(particles(IP)%Y-EDGE_Y1)/U2D_GRID%CELL_EDGES_LEN(I,IC)
                               IF ((COLLDIST .GE. 0) .AND. (COLLDIST .LE. 1)) THEN
                                  ! Collision happens!
                                  DTCOLL = TEST(SOL)
@@ -1001,11 +1001,11 @@ MODULE timecycle
                   ! We are not axisymmetric (valid also for simplified axisymmetric procedure)
                   IF (DIMS == 2) THEN
                      DO I = 1, 3
-                        VN = particles(IP)%VX * U2D_GRID%EDGE_NORMAL(IC,I,1) &
-                           + particles(IP)%VY * U2D_GRID%EDGE_NORMAL(IC,I,2)
+                        VN = particles(IP)%VX * U2D_GRID%EDGE_NORMAL(1,I,IC) &
+                           + particles(IP)%VY * U2D_GRID%EDGE_NORMAL(2,I,IC)
                         ! Compute the distance from the boundary
-                        DX = (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),1) - particles(IP)%X) * U2D_GRID%EDGE_NORMAL(IC,I,1) &
-                           + (U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,I),2) - particles(IP)%Y) * U2D_GRID%EDGE_NORMAL(IC,I,2)
+                        DX = (U2D_GRID%NODE_COORDS(1,U2D_GRID%CELL_NODES(I,IC)) - particles(IP)%X) * U2D_GRID%EDGE_NORMAL(1,I,IC) &
+                           + (U2D_GRID%NODE_COORDS(2,U2D_GRID%CELL_NODES(I,IC)) - particles(IP)%Y) * U2D_GRID%EDGE_NORMAL(2,I,IC)
                         ! Check if a collision happens (sooner than previously calculated)
                         IF (VN .GE. 0. .AND. VN * DTCOLL .GT. DX) THEN
 
@@ -1018,13 +1018,13 @@ MODULE timecycle
                      END DO
                   ELSE IF (DIMS == 3) THEN
                      DO I = 1, 4
-                        VN = particles(IP)%VX * U3D_GRID%FACE_NORMAL(IC,I,1) &
-                           + particles(IP)%VY * U3D_GRID%FACE_NORMAL(IC,I,2) &
-                           + particles(IP)%VZ * U3D_GRID%FACE_NORMAL(IC,I,3)
+                        VN = particles(IP)%VX * U3D_GRID%FACE_NORMAL(1,I,IC) &
+                           + particles(IP)%VY * U3D_GRID%FACE_NORMAL(2,I,IC) &
+                           + particles(IP)%VZ * U3D_GRID%FACE_NORMAL(3,I,IC)
                         ! Compute the distance from the boundary
-                        DX = (U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(IC,I),1) - particles(IP)%X) * U3D_GRID%FACE_NORMAL(IC,I,1) &
-                           + (U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(IC,I),2) - particles(IP)%Y) * U3D_GRID%FACE_NORMAL(IC,I,2) &
-                           + (U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(IC,I),3) - particles(IP)%Z) * U3D_GRID%FACE_NORMAL(IC,I,3)
+                        DX = (U3D_GRID%NODE_COORDS(1,U3D_GRID%CELL_NODES(I,IC)) - particles(IP)%X) * U3D_GRID%FACE_NORMAL(1,I,IC) &
+                           + (U3D_GRID%NODE_COORDS(2,U3D_GRID%CELL_NODES(I,IC)) - particles(IP)%Y) * U3D_GRID%FACE_NORMAL(2,I,IC) &
+                           + (U3D_GRID%NODE_COORDS(3,U3D_GRID%CELL_NODES(I,IC)) - particles(IP)%Z) * U3D_GRID%FACE_NORMAL(3,I,IC)
                         ! Check if a collision happens (sooner than previously calculated)
                         IF (VN .GE. 0. .AND. VN * DTCOLL .GT. DX) THEN
 
@@ -1046,7 +1046,7 @@ MODULE timecycle
 
                   FLUIDBOUNDARY = .FALSE.
                   IF (DIMS == 2) THEN
-                     NEIGHBOR = U2D_GRID%CELL_NEIGHBORS(IC, BOUNDCOLL)
+                     NEIGHBOR = U2D_GRID%CELL_NEIGHBORS(BOUNDCOLL, IC)
                      IF (NEIGHBOR == -1) THEN
                         FLUIDBOUNDARY = .TRUE.
                      ELSE
@@ -1056,12 +1056,12 @@ MODULE timecycle
                         END IF
                      END IF
 
-                     FACE_PG = U2D_GRID%CELL_EDGES_PG(IC, BOUNDCOLL)
-                     FACE_NORMAL = -U2D_GRID%EDGE_NORMAL(IC,BOUNDCOLL,:)
+                     FACE_PG = U2D_GRID%CELL_EDGES_PG(BOUNDCOLL, IC)
+                     FACE_NORMAL = -U2D_GRID%EDGE_NORMAL(:,BOUNDCOLL,IC)
                      FACE_TANG1 = [-FACE_NORMAL(2), FACE_NORMAL(1), 0.d0]
                      FACE_TANG2 = [0.d0, 0.d0, 1.d0]
                   ELSE IF (DIMS == 3) THEN
-                     NEIGHBOR = U3D_GRID%CELL_NEIGHBORS(IC, BOUNDCOLL)
+                     NEIGHBOR = U3D_GRID%CELL_NEIGHBORS(BOUNDCOLL, IC)
                      IF (NEIGHBOR == -1) THEN
                         FLUIDBOUNDARY = .TRUE.
                      ELSE
@@ -1071,10 +1071,10 @@ MODULE timecycle
                         END IF
                      END IF
 
-                     FACE_PG = U3D_GRID%CELL_FACES_PG(IC, BOUNDCOLL)
-                     FACE_NORMAL = -U3D_GRID%FACE_NORMAL(IC,BOUNDCOLL,:)
-                     FACE_TANG1 = U3D_GRID%FACE_TANG1(IC,BOUNDCOLL,:)
-                     FACE_TANG2 = U3D_GRID%FACE_TANG2(IC,BOUNDCOLL,:)
+                     FACE_PG = U3D_GRID%CELL_FACES_PG(BOUNDCOLL,IC)
+                     FACE_NORMAL = -U3D_GRID%FACE_NORMAL(:,BOUNDCOLL,IC)
+                     FACE_TANG1 = U3D_GRID%FACE_TANG1(:,BOUNDCOLL,IC)
+                     FACE_TANG2 = U3D_GRID%FACE_TANG2(:,BOUNDCOLL,IC)
                   END IF
 
 
@@ -1095,20 +1095,20 @@ MODULE timecycle
                            IF (DIMS == 2) THEN
                               RHO_Q = K*CHARGE*FNUM/(ZMAX-ZMIN)
                               DO I = 1, 3
-                                 VP = U2D_GRID%CELL_NODES(IC,I)
-                                 PSIP = U2D_GRID%BASIS_COEFFS(IC,I,1)*particles(IP)%X &
-                                      + U2D_GRID%BASIS_COEFFS(IC,I,2)*particles(IP)%Y &
-                                      + U2D_GRID%BASIS_COEFFS(IC,I,3)
+                                 VP = U2D_GRID%CELL_NODES(I,IC)
+                                 PSIP = U2D_GRID%BASIS_COEFFS(1,I,IC)*particles(IP)%X &
+                                      + U2D_GRID%BASIS_COEFFS(2,I,IC)*particles(IP)%Y &
+                                      + U2D_GRID%BASIS_COEFFS(3,I,IC)
                                  SURFACE_CHARGE(VP) = SURFACE_CHARGE(VP) + RHO_Q*PSIP
                               END DO
                            ELSE IF (DIMS == 3) THEN
                               RHO_Q = K*CHARGE*FNUM
                               DO I = 1, 4
-                                 VP = U3D_GRID%CELL_NODES(IC,I)
-                                 PSIP = U3D_GRID%BASIS_COEFFS(IC,I,1)*particles(IP)%X &
-                                      + U3D_GRID%BASIS_COEFFS(IC,I,2)*particles(IP)%Y &
-                                      + U3D_GRID%BASIS_COEFFS(IC,I,3)*particles(IP)%Z &
-                                      + U3D_GRID%BASIS_COEFFS(IC,I,4)
+                                 VP = U3D_GRID%CELL_NODES(I,IC)
+                                 PSIP = U3D_GRID%BASIS_COEFFS(1,I,IC)*particles(IP)%X &
+                                      + U3D_GRID%BASIS_COEFFS(2,I,IC)*particles(IP)%Y &
+                                      + U3D_GRID%BASIS_COEFFS(3,I,IC)*particles(IP)%Z &
+                                      + U3D_GRID%BASIS_COEFFS(4,I,IC)
                                  SURFACE_CHARGE(VP) = SURFACE_CHARGE(VP) + RHO_Q*PSIP
                               END DO
                            END IF

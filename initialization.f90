@@ -997,7 +997,7 @@ MODULE initialization
 
          ! DO J = 1, U2D_GRID%NUM_CELLS
          !    DO K = 1, 3
-         !       IF (U2D_GRID%CELL_EDGES_PG(J, K) == IPG) THEN
+         !       IF (U2D_GRID%CELL_EDGES_PG(K, J) == IPG) THEN
          !          ! This is the periodic edge. Find its corresponding neighbor.
          !       END IF
          !    END DO
@@ -1119,7 +1119,7 @@ MODULE initialization
       IF (DIMS == 2) THEN 
          DO IC = 1, NCELLS
             DO I = 1, 3
-               IF (U2D_GRID%CELL_EDGES_PG(IC,I) == IPG) THEN
+               IF (U2D_GRID%CELL_EDGES_PG(I,IC) == IPG) THEN
                   
                   IF (ALLOCATED(EMIT_TASKS)) THEN
                      ALLOCATE(TEMP_EMIT_TASKS(N_EMIT_TASKS+1)) ! Append the mixture to the list
@@ -1143,14 +1143,14 @@ MODULE initialization
    
                   
                   IF (I == 1) THEN
-                     EMIT_TASKS(N_EMIT_TASKS)%IV1 = U2D_GRID%CELL_NODES(IC,1)
-                     EMIT_TASKS(N_EMIT_TASKS)%IV2 = U2D_GRID%CELL_NODES(IC,2)
+                     EMIT_TASKS(N_EMIT_TASKS)%IV1 = U2D_GRID%CELL_NODES(1,IC)
+                     EMIT_TASKS(N_EMIT_TASKS)%IV2 = U2D_GRID%CELL_NODES(2,IC)
                   ELSE IF (I == 2) THEN
-                     EMIT_TASKS(N_EMIT_TASKS)%IV1 = U2D_GRID%CELL_NODES(IC,2)
-                     EMIT_TASKS(N_EMIT_TASKS)%IV2 = U2D_GRID%CELL_NODES(IC,3)
+                     EMIT_TASKS(N_EMIT_TASKS)%IV1 = U2D_GRID%CELL_NODES(2,IC)
+                     EMIT_TASKS(N_EMIT_TASKS)%IV2 = U2D_GRID%CELL_NODES(3,IC)
                   ELSE
-                     EMIT_TASKS(N_EMIT_TASKS)%IV1 = U2D_GRID%CELL_NODES(IC,3)
-                     EMIT_TASKS(N_EMIT_TASKS)%IV2 = U2D_GRID%CELL_NODES(IC,1)
+                     EMIT_TASKS(N_EMIT_TASKS)%IV1 = U2D_GRID%CELL_NODES(3,IC)
+                     EMIT_TASKS(N_EMIT_TASKS)%IV2 = U2D_GRID%CELL_NODES(1,IC)
                   END IF
    
                   ! NFS WILL BE INITIALIZED LATER.
@@ -1160,7 +1160,7 @@ MODULE initialization
       ELSE IF (DIMS == 3) THEN
          DO IC = 1, NCELLS
             DO I = 1, 4
-               IF (U3D_GRID%CELL_FACES_PG(IC,I) == IPG) THEN
+               IF (U3D_GRID%CELL_FACES_PG(I,IC) == IPG) THEN
                   IF (ALLOCATED(EMIT_TASKS)) THEN
                      ALLOCATE(TEMP_EMIT_TASKS(N_EMIT_TASKS+1)) ! Append the mixture to the list
                      TEMP_EMIT_TASKS(1:N_EMIT_TASKS) = EMIT_TASKS(1:N_EMIT_TASKS)
@@ -1769,14 +1769,14 @@ MODULE initialization
                   IF (NP_INIT == 0) CYCLE
 
                   IF (DIMS == 2) THEN
-                     V1 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,1),:)
-                     V2 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,2),:)
-                     V3 = U2D_GRID%NODE_COORDS(U2D_GRID%CELL_NODES(IC,3),:)
+                     V1 = U2D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(1,IC))
+                     V2 = U2D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(2,IC))
+                     V3 = U2D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(3,IC))
                   ELSE IF (DIMS == 3) THEN
-                     V1 = U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(IC,1),:)
-                     V2 = U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(IC,2),:)
-                     V3 = U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(IC,3),:)
-                     V4 = U3D_GRID%NODE_COORDS(U3D_GRID%CELL_NODES(IC,4),:)
+                     V1 = U3D_GRID%NODE_COORDS(:,U3D_GRID%CELL_NODES(1,IC))
+                     V2 = U3D_GRID%NODE_COORDS(:,U3D_GRID%CELL_NODES(2,IC))
+                     V3 = U3D_GRID%NODE_COORDS(:,U3D_GRID%CELL_NODES(3,IC))
+                     V4 = U3D_GRID%NODE_COORDS(:,U3D_GRID%CELL_NODES(4,IC))
                   END IF
 
                   DO IP = 1, NP_INIT
@@ -2011,11 +2011,11 @@ MODULE initialization
       IMPLICIT NONE
 
       IF (GRID_TYPE == UNSTRUCTURED) THEN
-         ALLOCATE(E_FIELD(NCELLS, 1, 3))
+         ALLOCATE(E_FIELD(3, 1, NCELLS))
          E_FIELD = 0.d0
-         ALLOCATE(B_FIELD(NNODES, 1, 3))
+         ALLOCATE(B_FIELD(3, 1, NNODES))
          B_FIELD = 0.d0
-         ALLOCATE(EBAR_FIELD(NCELLS, 1, 3))
+         ALLOCATE(EBAR_FIELD(3, 1, NCELLS))
          EBAR_FIELD = 0.d0
          ALLOCATE(SURFACE_CHARGE(NNODES))
          SURFACE_CHARGE = 0.d0
@@ -2026,7 +2026,7 @@ MODULE initialization
          ELSE
             NPY = 1
          END IF
-         ALLOCATE(E_FIELD(0:NPX-1, 0:NPY-1, 3))
+         ALLOCATE(E_FIELD(3, 0:NPY-1, 0:NPX-1))
          E_FIELD = 0.d0
       END IF
 
@@ -2255,15 +2255,15 @@ MODULE initialization
 
          IF (DIMS == 2) THEN
 
-            X1 = U2D_GRID%NODE_COORDS(EMIT_TASKS(ITASK)%IV1, 1)
-            Y1 = U2D_GRID%NODE_COORDS(EMIT_TASKS(ITASK)%IV1, 2)
-            X2 = U2D_GRID%NODE_COORDS(EMIT_TASKS(ITASK)%IV2, 1)
-            Y2 = U2D_GRID%NODE_COORDS(EMIT_TASKS(ITASK)%IV2, 2)
+            X1 = U2D_GRID%NODE_COORDS(1, EMIT_TASKS(ITASK)%IV1)
+            Y1 = U2D_GRID%NODE_COORDS(2, EMIT_TASKS(ITASK)%IV1)
+            X2 = U2D_GRID%NODE_COORDS(1, EMIT_TASKS(ITASK)%IV2)
+            Y2 = U2D_GRID%NODE_COORDS(2, EMIT_TASKS(ITASK)%IV2)
 
             LINELENGTH = SQRT((X2-X1)**2 + (Y2-Y1)**2)
 
-            NORMX = -U2D_GRID%EDGE_NORMAL(EMIT_TASKS(ITASK)%IC, EMIT_TASKS(ITASK)%IFACE, 1)
-            NORMY = -U2D_GRID%EDGE_NORMAL(EMIT_TASKS(ITASK)%IC, EMIT_TASKS(ITASK)%IFACE, 2)
+            NORMX = -U2D_GRID%EDGE_NORMAL(1, EMIT_TASKS(ITASK)%IFACE, EMIT_TASKS(ITASK)%IC)
+            NORMY = -U2D_GRID%EDGE_NORMAL(2, EMIT_TASKS(ITASK)%IFACE, EMIT_TASKS(ITASK)%IC)
             NORMZ = 0
 
             IF (AXI) THEN
@@ -2273,11 +2273,11 @@ MODULE initialization
             END IF
 
          ELSE IF (DIMS == 3) THEN
-            NORMX = -U3D_GRID%FACE_NORMAL(EMIT_TASKS(ITASK)%IC, EMIT_TASKS(ITASK)%IFACE, 1)
-            NORMY = -U3D_GRID%FACE_NORMAL(EMIT_TASKS(ITASK)%IC, EMIT_TASKS(ITASK)%IFACE, 2)
-            NORMZ = -U3D_GRID%FACE_NORMAL(EMIT_TASKS(ITASK)%IC, EMIT_TASKS(ITASK)%IFACE, 3)
+            NORMX = -U3D_GRID%FACE_NORMAL(1, EMIT_TASKS(ITASK)%IFACE, EMIT_TASKS(ITASK)%IC)
+            NORMY = -U3D_GRID%FACE_NORMAL(2, EMIT_TASKS(ITASK)%IFACE, EMIT_TASKS(ITASK)%IC)
+            NORMZ = -U3D_GRID%FACE_NORMAL(3, EMIT_TASKS(ITASK)%IFACE, EMIT_TASKS(ITASK)%IC)
             
-            AREA = U3D_GRID%FACE_AREA(EMIT_TASKS(ITASK)%IC, EMIT_TASKS(ITASK)%IFACE)
+            AREA = U3D_GRID%FACE_AREA(EMIT_TASKS(ITASK)%IFACE, EMIT_TASKS(ITASK)%IC)
          END IF
 
 

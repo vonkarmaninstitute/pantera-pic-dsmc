@@ -489,12 +489,12 @@ MODULE postprocess
 
                WRITE(54321) 'POINTS '//ITOA(U2D_GRID%NUM_NODES)//' double'//ACHAR(10)
                DO I = 1, U2D_GRID%NUM_NODES
-                  WRITE(54321) U2D_GRID%NODE_COORDS(I,:)
+                  WRITE(54321) U2D_GRID%NODE_COORDS(:,I)
                END DO
 
                WRITE(54321) 'CELLS '//ITOA(U2D_GRID%NUM_CELLS)//' '//ITOA(4*U2D_GRID%NUM_CELLS)//ACHAR(10)
                DO I = 1, U2D_GRID%NUM_CELLS
-                  WRITE(54321) 3, (U2D_GRID%CELL_NODES(I,:) - 1)
+                  WRITE(54321) 3, (U2D_GRID%CELL_NODES(:,I) - 1)
                END DO
 
                WRITE(54321) 'CELL_TYPES '//ITOA(U2D_GRID%NUM_CELLS)//ACHAR(10)
@@ -506,12 +506,12 @@ MODULE postprocess
 
                WRITE(54321) 'POINTS '//ITOA(U3D_GRID%NUM_NODES)//' double'//ACHAR(10)
                DO I = 1, U3D_GRID%NUM_NODES
-                  WRITE(54321) U3D_GRID%NODE_COORDS(I,:)
+                  WRITE(54321) U3D_GRID%NODE_COORDS(:,I)
                END DO
 
                WRITE(54321) 'CELLS '//ITOA(U3D_GRID%NUM_CELLS)//' '//ITOA(5*U3D_GRID%NUM_CELLS)//ACHAR(10)
                DO I = 1, U3D_GRID%NUM_CELLS
-                  WRITE(54321) 4, (U3D_GRID%CELL_NODES(I,:) - 1)
+                  WRITE(54321) 4, (U3D_GRID%CELL_NODES(:,I) - 1)
                END DO
 
                WRITE(54321) 'CELL_TYPES '//ITOA(U3D_GRID%NUM_CELLS)//ACHAR(10)
@@ -639,13 +639,13 @@ MODULE postprocess
                IF (GRID_TYPE == UNSTRUCTURED) THEN
                   WRITE(54321) 'FIELD FieldData '//ITOA(3)//ACHAR(10)
                   WRITE(54321) 'E_X '//ITOA(1)//' '//ITOA( NCELLS )//' double'//ACHAR(10)
-                  WRITE(54321) E_FIELD(:,:,1), ACHAR(10)
+                  WRITE(54321) E_FIELD(1,:,:), ACHAR(10)
 
                   WRITE(54321) 'E_Y '//ITOA(1)//' '//ITOA( NCELLS )//' double'//ACHAR(10)
-                  WRITE(54321) E_FIELD(:,:,2), ACHAR(10)
+                  WRITE(54321) E_FIELD(2,:,:), ACHAR(10)
 
                   WRITE(54321) 'E_Z '//ITOA(1)//' '//ITOA( NCELLS )//' double'//ACHAR(10)
-                  WRITE(54321) E_FIELD(:,:,3), ACHAR(10)
+                  WRITE(54321) E_FIELD(3,:,:), ACHAR(10)
 
                   WRITE(54321) 'POINT_DATA '//ITOA( NNODES )//ACHAR(10)
                   IF (BOOL_FLUID_ELECTRONS) THEN
@@ -664,13 +664,13 @@ MODULE postprocess
                   WRITE(54321) PHIBAR_FIELD, ACHAR(10)
 
                   WRITE(54321) 'B_X '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
-                  WRITE(54321) B_FIELD(:,:,1), ACHAR(10)
+                  WRITE(54321) B_FIELD(1,:,:), ACHAR(10)
 
                   WRITE(54321) 'B_Y '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
-                  WRITE(54321) B_FIELD(:,:,2), ACHAR(10)
+                  WRITE(54321) B_FIELD(2,:,:), ACHAR(10)
 
                   WRITE(54321) 'B_Z '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
-                  WRITE(54321) B_FIELD(:,:,3), ACHAR(10)
+                  WRITE(54321) B_FIELD(3,:,:), ACHAR(10)
 
                   IF (BOOL_FLUID_ELECTRONS) THEN
                      WRITE(54321) 'NRHO_E_BOLTZ '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
@@ -687,13 +687,13 @@ MODULE postprocess
                   WRITE(54321) AVG_PHI, ACHAR(10)
 
                   WRITE(54321) 'E_X '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
-                  WRITE(54321) E_FIELD(:,:,1), ACHAR(10)
+                  WRITE(54321) E_FIELD(1,:,:), ACHAR(10)
 
                   WRITE(54321) 'E_Y '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
-                  WRITE(54321) E_FIELD(:,:,2), ACHAR(10)
+                  WRITE(54321) E_FIELD(2,:,:), ACHAR(10)
 
                   WRITE(54321) 'E_Z '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
-                  WRITE(54321) E_FIELD(:,:,3), ACHAR(10)
+                  WRITE(54321) E_FIELD(3,:,:), ACHAR(10)
                END IF
             END IF
 
@@ -711,12 +711,12 @@ MODULE postprocess
                
                WRITE(54321,'(A,I10,A7)') 'POINTS', U2D_GRID%NUM_NODES, 'double'
                DO I = 1, U2D_GRID%NUM_NODES
-                  WRITE(54321,*) U2D_GRID%NODE_COORDS(I,:)
+                  WRITE(54321,*) U2D_GRID%NODE_COORDS(:,I)
                END DO
 
                WRITE(54321,'(A,I10,I10)') 'CELLS', U2D_GRID%NUM_CELLS, 4*U2D_GRID%NUM_CELLS 
                DO I = 1, U2D_GRID%NUM_CELLS
-                  WRITE(54321,*) 3, (U2D_GRID%CELL_NODES(I,:) - 1)
+                  WRITE(54321,*) 3, (U2D_GRID%CELL_NODES(:,I) - 1)
                END DO
 
                WRITE(54321,'(A,I10)') 'CELL_TYPES', U2D_GRID%NUM_CELLS
@@ -728,12 +728,12 @@ MODULE postprocess
                
                WRITE(54321,'(A,I10,A7)') 'POINTS', U3D_GRID%NUM_NODES, 'double'
                DO I = 1, U3D_GRID%NUM_NODES
-                  WRITE(54321,*) U3D_GRID%NODE_COORDS(I,:)
+                  WRITE(54321,*) U3D_GRID%NODE_COORDS(:,I)
                END DO
 
                WRITE(54321,'(A,I10,I10)') 'CELLS', U3D_GRID%NUM_CELLS, 5*U3D_GRID%NUM_CELLS 
                DO I = 1, U3D_GRID%NUM_CELLS
-                  WRITE(54321,*) 4, (U3D_GRID%CELL_NODES(I,:) - 1)
+                  WRITE(54321,*) 4, (U3D_GRID%CELL_NODES(:,I) - 1)
                END DO
 
                WRITE(54321,'(A,I10)') 'CELL_TYPES', U3D_GRID%NUM_CELLS
@@ -862,13 +862,13 @@ MODULE postprocess
                   WRITE(54321,'(A,I10)') 'FIELD FieldData', 3
 
                   WRITE(54321,'(A,I10,I10,A7)') 'E_X', 1, NCELLS, 'double'
-                  WRITE(54321,*) E_FIELD(:,:,1)
+                  WRITE(54321,*) E_FIELD(1,:,:)
 
                   WRITE(54321,'(A,I10,I10,A7)') 'E_Y', 1, NCELLS, 'double'
-                  WRITE(54321,*) E_FIELD(:,:,2)
+                  WRITE(54321,*) E_FIELD(2,:,:)
 
                   WRITE(54321,'(A,I10,I10,A7)') 'E_Z', 1, NCELLS, 'double'
-                  WRITE(54321,*) E_FIELD(:,:,3)
+                  WRITE(54321,*) E_FIELD(3,:,:)
 
                   WRITE(54321,'(A,I10)') 'POINT_DATA', NNODES
                   WRITE(54321,'(A,I10)') 'FIELD FieldData', 6
@@ -883,13 +883,13 @@ MODULE postprocess
                   WRITE(54321,*) PHIBAR_FIELD
 
                   WRITE(54321,'(A,I10,I10,A7)') 'B_X', 1, NNODES, 'double'
-                  WRITE(54321,*) B_FIELD(:,:,1)
+                  WRITE(54321,*) B_FIELD(1,:,:)
 
                   WRITE(54321,'(A,I10,I10,A7)') 'B_Y', 1, NNODES, 'double'
-                  WRITE(54321,*) B_FIELD(:,:,2)
+                  WRITE(54321,*) B_FIELD(2,:,:)
 
                   WRITE(54321,'(A,I10,I10,A7)') 'B_Z', 1, NNODES, 'double'
-                  WRITE(54321,*) B_FIELD(:,:,3)
+                  WRITE(54321,*) B_FIELD(3,:,:)
 
 
                ELSE
@@ -903,13 +903,13 @@ MODULE postprocess
                   WRITE(54321,*) AVG_PHI
 
                   WRITE(54321,'(A,I10,I10,A7)') 'E_X', 1, NNODES, 'double'
-                  WRITE(54321,*) E_FIELD(:,:,1)
+                  WRITE(54321,*) E_FIELD(1,:,:)
 
                   WRITE(54321,'(A,I10,I10,A7)') 'E_Y', 1, NNODES, 'double'
-                  WRITE(54321,*) E_FIELD(:,:,2)
+                  WRITE(54321,*) E_FIELD(2,:,:)
 
                   WRITE(54321,'(A,I10,I10,A7)') 'E_Z', 1, NNODES, 'double'
-                  WRITE(54321,*) E_FIELD(:,:,3)
+                  WRITE(54321,*) E_FIELD(3,:,:)
                END IF
             END IF
 
@@ -1087,7 +1087,7 @@ MODULE postprocess
          IF (GRID_TYPE == UNSTRUCTURED) THEN
             TOT_EE = 0.d0
             DO JC = 1, NCELLS
-               TOT_EE = TOT_EE + (E_FIELD(JC, 1, 1)**2 + E_FIELD(JC, 1, 2)**2 + E_FIELD(JC, 1, 3)**2)*CELL_VOLUMES(JC)
+               TOT_EE = TOT_EE + (E_FIELD(1, 1, JC)**2 + E_FIELD(2, 1, JC)**2 + E_FIELD(3, 1, JC)**2)*CELL_VOLUMES(JC)
             END DO
             TOT_EE = TOT_EE *0.5*EPS0
          ELSE

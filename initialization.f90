@@ -155,6 +155,14 @@ MODULE initialization
          IF (line=='Trajectory_dump_output:')  READ(in1,*) TRAJDUMP_SAVE_PATH
          IF (line=='Fluxes_dump_output:')      READ(in1,*) FLUXDUMP_SAVE_PATH
          IF (line=='Checks_output:')           READ(in1,*) CHECKS_SAVE_PATH
+         IF (line=='All_output_path:') THEN
+            READ(in1,*) FLOWFIELD_SAVE_PATH
+            CHECKS_SAVE_PATH = FLOWFIELD_SAVE_PATH
+            FLUXDUMP_SAVE_PATH = FLOWFIELD_SAVE_PATH
+            TRAJDUMP_SAVE_PATH = FLOWFIELD_SAVE_PATH
+            PARTDUMP_SAVE_PATH = FLOWFIELD_SAVE_PATH
+            RESIDUAL_SAVE_PATH = FLOWFIELD_SAVE_PATH
+         END IF
          IF (line=='Binary_output:')           READ(in1,*) BOOL_BINARY_OUTPUT
          IF (line=='Dump_part_every:')         READ(in1,*) DUMP_EVERY
          IF (line=='Dump_part_start:')         READ(in1,*) DUMP_START

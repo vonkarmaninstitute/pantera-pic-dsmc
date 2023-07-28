@@ -31,6 +31,7 @@ MODULE global
    CHARACTER*256 :: TRAJDUMP_SAVE_PATH
    CHARACTER*256 :: PARTDUMP_SAVE_PATH
    CHARACTER*256 :: CHECKS_SAVE_PATH
+   CHARACTER*256 :: RESIDUAL_SAVE_PATH
 
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

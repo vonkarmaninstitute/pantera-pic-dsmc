@@ -306,6 +306,7 @@ MODULE fully_implicit
       PetscErrorCode ierr_l
       INTEGER dummy(*)
       PetscScalar, POINTER :: RESIDUAL(:)
+      CHARACTER(LEN=512)  :: filename
 
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA
       INTEGER :: V1, V2, V3, I
@@ -420,6 +421,11 @@ MODULE fully_implicit
       IF (PROC_ID == 0) THEN
          !WRITE(*,*) ' PHI_FIELD = ', PHI_FIELD
          WRITE(*,*) '||RESIDUAL|| = ', norm !, ' with potential ', PHIBAR_FIELD
+
+         WRITE(filename, "(A,A)") TRIM(ADJUSTL(RESIDUAL_SAVE_PATH)), "residuals" ! Compose filename   
+         OPEN(66331, FILE=filename, POSITION='append', STATUS='unknown', ACTION='write')
+         WRITE(66331,*) tID, norm
+         CLOSE(66331)
       END IF
 
       DEALLOCATE(RHS_NEW)
@@ -751,6 +757,7 @@ MODULE fully_implicit
       PetscErrorCode ierr_l
       INTEGER dummy(*)
       PetscScalar, POINTER :: RESIDUAL(:)
+      CHARACTER(LEN=512)  :: filename
 
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA
       INTEGER :: V1, V2, V3, I, IC
@@ -879,8 +886,9 @@ MODULE fully_implicit
       IF (PROC_ID == 0) THEN
          !WRITE(*,*) ' PHI_FIELD = ', PHI_FIELD
          WRITE(*,*) '||RESIDUAL|| = ', norm !, ' with potential ', PHIBAR_FIELD
-
-         OPEN(66331, FILE='residuals', POSITION='append', STATUS='unknown', ACTION='write')
+   
+         WRITE(filename, "(A,A)") TRIM(ADJUSTL(RESIDUAL_SAVE_PATH)), "residuals" ! Compose filename   
+         OPEN(66331, FILE=filename, POSITION='append', STATUS='unknown', ACTION='write')
          WRITE(66331,*) tID, norm
          CLOSE(66331)
       END IF

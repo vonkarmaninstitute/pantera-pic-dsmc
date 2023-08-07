@@ -508,6 +508,7 @@ MODULE fully_implicit
       CALL ADVECT_CN(part_adv, .FALSE., .TRUE., jac)
       IF (JACOBIAN_TYPE == 4) CALL COMPUTE_MASS_MATRICES(part_adv)
       IF (JACOBIAN_TYPE == 6) CALL COMPUTE_DENSITY_TEMPERATURE(part_adv)
+      IF (JACOBIAN_TYPE == 7) CALL COMPUTE_DENSITY_TEMPERATURE(part_adv)
       DEALLOCATE(part_adv)
 
 
@@ -520,6 +521,21 @@ MODULE fully_implicit
                IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
                   IF (.NOT. IS_DIRICHLET(VP-1)) THEN
                      VALUETOADD = -QE*QE*5.d11/(EPS0*KB*11600.d0)*AREA/3.
+                     CALL MatSetValues(jac,one,VP-1,one,VP-1,VALUETOADD,ADD_VALUES,ierr)
+                  END IF
+               END IF
+            END DO
+         END DO
+      END IF
+
+      IF (JACOBIAN_TYPE == 7) THEN
+         DO I = 1, NCELLS
+            AREA = CELL_AREAS(I)
+            DO P = 1, 3
+               VP = U2D_GRID%CELL_NODES(P,I)
+               IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(VP-1)) THEN
+                     VALUETOADD = -QE*QE*CELL_NE(I)/(EPS0*KB*CELL_TE(I))*AREA/3.
                      CALL MatSetValues(jac,one,VP-1,one,VP-1,VALUETOADD,ADD_VALUES,ierr)
                   END IF
                END IF
@@ -1339,7 +1355,7 @@ MODULE fully_implicit
       !    OPEN(66332, FILE='crossings', POSITION='append', STATUS='unknown', ACTION='write')
       ! END IF
 
-      IF (JACOBIAN_TYPE .LT. 0 .OR. JACOBIAN_TYPE .GT. 6) CALL ERROR_ABORT('Jacobian type not supported.')
+      IF (JACOBIAN_TYPE .LT. 0 .OR. JACOBIAN_TYPE .GT. 7) CALL ERROR_ABORT('Jacobian type not supported.')
 
       SIZE = NCELLS
 

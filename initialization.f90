@@ -2299,6 +2299,7 @@ MODULE initialization
             U_NORM = EMIT_TASKS(ITASK)%UX*NORMX + EMIT_TASKS(ITASK)%UY*NORMY + EMIT_TASKS(ITASK)%UZ*NORMZ ! Molecular speed ratio normal to boundary
             EMIT_TASKS(ITASK)%U_NORM = U_NORM
             S_NORM = U_NORM*BETA
+            WRITE(*,*) 'Normal = [', NORMX, ', ', NORMY, ', ', NORMZ, '], S_NORM = ', S_NORM
 
             FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-S_NORM**2) &
                            + SQRT(PI)*S_NORM*(1.+ERF1(S_NORM)))      ! Tot number flux emitted

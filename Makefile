@@ -4,7 +4,7 @@
 
 # GNU Compiler
 CMP  = mpifort -c -cpp -I$(PETSC_DIR)/include
-LNK   = mpifort -cpp
+LNK  = mpifort -cpp
 OPTF = -O3 -fimplicit-none
 
 # A few more compiler flags for GNU fortran that could be useful:

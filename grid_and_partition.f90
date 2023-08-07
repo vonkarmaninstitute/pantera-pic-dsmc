@@ -1541,9 +1541,9 @@ MODULE grid_and_partition
 
       DO I = 1, U3D_GRID%NUM_CELLS
          DO J = 1, 4
-            V1 = U3D_GRID%CELL_NODES(I,IND(J,1))
-            V2 = U3D_GRID%CELL_NODES(I,IND(J,2))
-            V3 = U3D_GRID%CELL_NODES(I,IND(J,3))
+            V1 = U3D_GRID%CELL_NODES(IND(J,1),I)
+            V2 = U3D_GRID%CELL_NODES(IND(J,2),I)
+            V3 = U3D_GRID%CELL_NODES(IND(J,3),I)
 
             U3D_GRID%FACE_NODES(1,J,I) = V1
             U3D_GRID%FACE_NODES(2,J,I) = V2

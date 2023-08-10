@@ -239,7 +239,7 @@ MODULE timecycle
       IMPLICIT NONE
    
       INTEGER      :: IP, IC, IS, NFS, ITASK
-      REAL(KIND=8) :: DTFRAC, Vdummy, V_NORM, V_TANG1, V_TANG2, BETA, X1, X2, Y1, Y2, R, P, Q, S, T
+      REAL(KIND=8) :: DTFRAC, Vdummy, V_NORM, V_TANG1, V_TANG2, BETA, BETA_E, X1, X2, Y1, Y2, R, P, Q, S, T
       REAL(KIND=8) :: X, Y, Z, VX, VY, VZ, EROT, EVIB 
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
       REAL(KIND=8), DIMENSION(3) :: FACE_NORMAL, FACE_TANG1, FACE_TANG2, V1, V2, V3
@@ -286,6 +286,7 @@ MODULE timecycle
             END IF
 
             BETA = 1./SQRT(2.*KB/M*EMIT_TASK%TTRA)
+            IF (COLOCATED_ELECTRONS) BETA_E = 1./SQRT(2.*KB/SPECIES(ELECTRON_S_ID)%MOLECULAR_MASS*COLOCATED_ELECTRONS_TTRA)
 
             DO IP = 1, NFS ! Loop on particles to be injected
 
@@ -359,15 +360,26 @@ MODULE timecycle
                ! Modification to inject electrons colocated with ions.
                IF (COLOCATED_ELECTRONS .AND. SPECIES(S_ID)%CHARGE == 1) THEN
                         
-                  CALL MAXWELL(INITIAL_PARTICLES_TASKS(ITASK)%UX, &
-                              INITIAL_PARTICLES_TASKS(ITASK)%UY, &
-                              INITIAL_PARTICLES_TASKS(ITASK)%UZ, &
-                              COLOCATED_ELECTRONS_TTRA, &
-                              COLOCATED_ELECTRONS_TTRA, &
-                              COLOCATED_ELECTRONS_TTRA, &
-                              VX, VY, VZ, SPECIES(ELECTRON_S_ID)%MOLECULAR_MASS)
+                  CALL MAXWELL(0.d0, 0.d0, 0.d0, &
+                  COLOCATED_ELECTRONS_TTRA, COLOCATED_ELECTRONS_TTRA, COLOCATED_ELECTRONS_TTRA, &
+                  Vdummy, V_TANG1, V_TANG2, SPECIES(ELECTRON_S_ID)%MOLECULAR_MASS)
+   
+                  V_NORM = FLX(EMIT_TASK%U_NORM*BETA_E, COLOCATED_ELECTRONS_TTRA, SPECIES(ELECTRON_S_ID)%MOLECULAR_MASS)
+   
+                  VX = EMIT_TASK%UX &
+                     - V_NORM*FACE_NORMAL(1) &
+                     - V_TANG1*FACE_TANG1(1) &
+                     - V_TANG2*FACE_TANG2(1)
+                  VY = EMIT_TASK%UY &
+                     - V_NORM*FACE_NORMAL(2) &
+                     - V_TANG1*FACE_TANG1(2) &
+                     - V_TANG2*FACE_TANG2(2)
+                  VZ = EMIT_TASK%UZ &
+                     - V_NORM*FACE_NORMAL(3) &
+                     - V_TANG1*FACE_TANG1(3) &
+                     - V_TANG2*FACE_TANG2(3)
 
-                  CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,0.d0,0.d0,ELECTRON_S_ID,IC,DT, particleNOW) ! Save in particle
+                  CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,0.d0,0.d0,ELECTRON_S_ID,IC,DTFRAC, particleNOW) ! Save in particle
                   CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
                END IF
                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

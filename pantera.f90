@@ -38,7 +38,6 @@ PROGRAM PANTERA
    CALL INITFIELDS         ! Initialize electromagnetic fields
    CALL COMPUTE_B_FIELD_FROM_SOLENOIDS
 
-   IF (PIC_TYPE .NE. NONE) CALL ASSEMBLE_POISSON
    ! ========= Initial particles seed ======================
    IF (RESTART_TIMESTEP > 0) THEN
       CALL READ_PARTICLES_FILE(RESTART_TIMESTEP)
@@ -60,6 +59,8 @@ PROGRAM PANTERA
    ! CALL DUMP_PARTICLES_SCREEN
    
    CALL EXCHANGE
+
+   IF (PIC_TYPE .NE. NONE) CALL ASSEMBLE_POISSON
 
    ! ========= Time loop ===================================
    CALL MPI_BARRIER(MPI_COMM_WORLD, ierr)

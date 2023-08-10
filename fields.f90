@@ -71,6 +71,7 @@ MODULE fields
 
       one = 1
 
+      CALL MatDestroy(Amat,ierr)
       CALL MatCreate(PETSC_COMM_WORLD,Amat,ierr)
       CALL MatSetSizes( Amat,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
       CALL MatSetType( Amat, MATMPIAIJ, ierr)
@@ -296,6 +297,7 @@ MODULE fields
 
             !IS_DIRICHLET(0) = .TRUE.    ! DBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDDBDBDBDBDBDBDB
             !DIRICHLET(0) = 0.d0
+            IF (PIC_TYPE == EXPLICITLIMITED) CALL COMPUTE_DENSITY_TEMPERATURE(particles)
 
             DO I = 1, NCELLS
                IF (U3D_GRID%CELL_PG(I) == -1) THEN
@@ -315,6 +317,9 @@ MODULE fields
                            KIJ = VOLUME*(U3D_GRID%BASIS_COEFFS(1,P,I)*U3D_GRID%BASIS_COEFFS(1,Q,I) &
                                        + U3D_GRID%BASIS_COEFFS(2,P,I)*U3D_GRID%BASIS_COEFFS(2,Q,I) &
                                        + U3D_GRID%BASIS_COEFFS(3,P,I)*U3D_GRID%BASIS_COEFFS(3,Q,I)) * EPS_REL
+                           IF (PIC_TYPE == EXPLICITLIMITED) THEN
+                              IF (CELL_TE(I) > 0) KIJ = KIJ * (1. + VOLUME**(2./3.)*(CELL_NE(I)*QE**2/(EPS0*KB*CELL_TE(I))))
+                           END IF
                            CALL MatSetValues(Amat,one,VP,one,VQ,KIJ,ADD_VALUES,ierr)
                         END DO
                      END IF

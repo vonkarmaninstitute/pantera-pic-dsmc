@@ -133,6 +133,8 @@ MODULE initialization
                PIC_TYPE = FULLYIMPLICIT
             ELSE IF (PIC_TYPE_STRING == "semiimplicit") THEN
                PIC_TYPE = SEMIIMPLICIT
+            ELSE IF (PIC_TYPE_STRING == "explicitlimited") THEN
+               PIC_TYPE = EXPLICITLIMITED
             ELSE
                CALL ERROR_ABORT('PIC type is not specified correctly in input script.')
             END IF

@@ -133,6 +133,20 @@ MODULE timecycle
             CALL SOLVE_POISSON
             CALL COMPUTE_E_FIELD
             CALL TIMER_STOP(2)
+
+         ELSE IF (PIC_TYPE == EXPLICITLIMITED) THEN
+               CALL TIMER_START(3)
+               CALL ADVECT
+               CALL TIMER_STOP(3)
+   
+               CALL DEPOSIT_CHARGE(particles)
+   
+               CALL TIMER_START(2)
+               CALL ASSEMBLE_POISSON
+               CALL SETUP_POISSON
+               CALL SOLVE_POISSON
+               CALL COMPUTE_E_FIELD
+               CALL TIMER_STOP(2)
          
          ELSE IF (PIC_TYPE == SEMIIMPLICIT) THEN
          

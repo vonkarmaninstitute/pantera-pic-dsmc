@@ -81,8 +81,10 @@ MODULE fields
       CALL MatSetUp( Amat, ierr)
       CALL MatGetOwnershipRange( Amat, Istart, Iend, ierr)
 
+      CALL VecDestroy(xvec,ierr)
       CALL MatCreateVecs( Amat, PETSC_NULL_VEC, xvec, ierr)
       CALL VecSetFromOptions( xvec, ierr)
+      CALL VecDestroy(bvec,ierr)
       CALL VecDuplicate( xvec, bvec, ierr)
 
 

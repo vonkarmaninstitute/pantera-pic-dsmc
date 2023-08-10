@@ -2601,6 +2601,7 @@ MODULE fully_implicit
 
       IMPLICIT NONE
 
+      CALL KSPDestroy(ksp,ierr)
       CALL KSPCreate(PETSC_COMM_WORLD,ksp,ierr)
       CALL KSPSetOperators(ksp,Amat,Amat,ierr)
 

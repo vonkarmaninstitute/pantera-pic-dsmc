@@ -145,7 +145,10 @@ MODULE initialization
 
          IF (line=='Jacobian_type:')           READ(in1,*) JACOBIAN_TYPE
          IF (line=='Residual_and_jacobian_combined:') READ(in1,*) RESIDUAL_AND_JACOBIAN_COMBINED
-         IF (line=='Colocated_electrons:')     READ(in1,*) COLOCATED_ELECTRONS
+         IF (line=='Colocated_electrons:') THEN
+            READ(in1,*) COLOCATED_ELECTRONS_TTRA
+            COLOCATED_ELECTRONS = .TRUE.
+         END IF
          IF (line=='SNES_rtol:')               READ(in1,*) SNES_RTOL
          
          ! ~~~~~~~~~~~~~  File output ~~~~~~~~~~~~~~~
@@ -1741,7 +1744,7 @@ MODULE initialization
       ! Print message 
       CALL ONLYMASTERPRINT1(PROC_ID, '> SEEDING INITIAL PARTICLES IN THE DOMAIN...')
      
-      ELECTRON_S_ID = SPECIES_NAME_TO_ID('e')
+      IF (COLOCATED_ELECTRONS) ELECTRON_S_ID = SPECIES_NAME_TO_ID('e')
 
       ! Compute number of particles to be seeded
       !NP_INIT = NINT(NRHO_INIT/FNUM*(XMAX-XMIN)*(YMAX-YMIN)*(ZMAX-ZMIN))
@@ -1757,7 +1760,7 @@ MODULE initialization
             
             S_ID = MIXTURES(INITIAL_PARTICLES_TASKS(ITASK)%MIX_ID)%COMPONENTS(i)%ID
 
-            IF (COLOCATED_ELECTRONS .AND. S_ID == ELECTRON_S_ID) CYCLE
+            !IF (COLOCATED_ELECTRONS .AND. S_ID == ELECTRON_S_ID) CYCLE
 
             IF (GRID_TYPE == UNSTRUCTURED) THEN
                DO IC = 1, NCELLS
@@ -1851,9 +1854,9 @@ MODULE initialization
                         CALL MAXWELL(INITIAL_PARTICLES_TASKS(ITASK)%UX, &
                                     INITIAL_PARTICLES_TASKS(ITASK)%UY, &
                                     INITIAL_PARTICLES_TASKS(ITASK)%UZ, &
-                                    11600.d0, &
-                                    11600.d0, &
-                                    11600.d0, &
+                                    COLOCATED_ELECTRONS_TTRA, &
+                                    COLOCATED_ELECTRONS_TTRA, &
+                                    COLOCATED_ELECTRONS_TTRA, &
                                     VXP, VYP, VZP, SPECIES(ELECTRON_S_ID)%MOLECULAR_MASS)
 
                         CALL INIT_PARTICLE(XP,YP,ZP,VXP,VYP,VZP,0.d0,0.d0,ELECTRON_S_ID,IC,DT, particleNOW) ! Save in particle
@@ -2299,7 +2302,6 @@ MODULE initialization
             U_NORM = EMIT_TASKS(ITASK)%UX*NORMX + EMIT_TASKS(ITASK)%UY*NORMY + EMIT_TASKS(ITASK)%UZ*NORMZ ! Molecular speed ratio normal to boundary
             EMIT_TASKS(ITASK)%U_NORM = U_NORM
             S_NORM = U_NORM*BETA
-            WRITE(*,*) 'Normal = [', NORMX, ', ', NORMY, ', ', NORMZ, '], S_NORM = ', S_NORM
 
             FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-S_NORM**2) &
                            + SQRT(PI)*S_NORM*(1.+ERF1(S_NORM)))      ! Tot number flux emitted

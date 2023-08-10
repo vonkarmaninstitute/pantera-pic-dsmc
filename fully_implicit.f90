@@ -401,7 +401,9 @@ MODULE fully_implicit
 
       !  Advect the particles using the guessed new potential
       ALLOCATE(part_adv, SOURCE = particles)
+      CALL TIMER_START(3)
       CALL ADVECT_CN(part_adv, .FALSE., .FALSE., Jmat)
+      CALL TIMER_STOP(3)
       CALL DEPOSIT_CHARGE(part_adv)
       DEALLOCATE(part_adv)
 
@@ -505,7 +507,9 @@ MODULE fully_implicit
       !CALL MatView(jac,PETSC_VIEWER_STDOUT_WORLD,ierr)
       !  Advect the particles using the guessed new potential
       ALLOCATE(part_adv, SOURCE = particles)
+      CALL TIMER_START(3)
       CALL ADVECT_CN(part_adv, .FALSE., .TRUE., jac)
+      CALL TIMER_STOP(3)
       IF (JACOBIAN_TYPE == 4) CALL COMPUTE_MASS_MATRICES(part_adv)
       IF (JACOBIAN_TYPE == 6) CALL COMPUTE_DENSITY_TEMPERATURE(part_adv)
       IF (JACOBIAN_TYPE == 7) CALL COMPUTE_DENSITY_TEMPERATURE(part_adv)
@@ -881,7 +885,9 @@ MODULE fully_implicit
 
       !  Advect the particles using the guessed new potential
       ALLOCATE(part_adv, SOURCE = particles)
+      CALL TIMER_START(3)
       CALL ADVECT_CN(part_adv, .FALSE., .TRUE., Jmat)
+      CALL TIMER_STOP(3)
       CALL DEPOSIT_CHARGE(part_adv)
       IF (JACOBIAN_TYPE == 4) CALL COMPUTE_MASS_MATRICES(part_adv)
       DEALLOCATE(part_adv)

@@ -244,10 +244,12 @@ MODULE timecycle
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
       REAL(KIND=8), DIMENSION(3) :: FACE_NORMAL, FACE_TANG1, FACE_TANG2, V1, V2, V3
    
-      INTEGER :: S_ID
+      INTEGER :: S_ID, ELECTRON_S_ID
       REAL(KIND=8) :: M
 
       TYPE(EMIT_TASK_DATA_STRUCTURE) :: EMIT_TASK
+
+      IF (COLOCATED_ELECTRONS) ELECTRON_S_ID = SPECIES_NAME_TO_ID('e')
 
       DO ITASK = 1, N_EMIT_TASKS
          EMIT_TASK = EMIT_TASKS(ITASK)
@@ -352,6 +354,23 @@ MODULE timecycle
                ! Init a particle object and assign it to the local vector of particles
                CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EROT,EVIB,S_ID,IC,DTFRAC,  particleNOW)
                CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles)
+
+               !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+               ! Modification to inject electrons colocated with ions.
+               IF (COLOCATED_ELECTRONS .AND. SPECIES(S_ID)%CHARGE == 1) THEN
+                        
+                  CALL MAXWELL(INITIAL_PARTICLES_TASKS(ITASK)%UX, &
+                              INITIAL_PARTICLES_TASKS(ITASK)%UY, &
+                              INITIAL_PARTICLES_TASKS(ITASK)%UZ, &
+                              COLOCATED_ELECTRONS_TTRA, &
+                              COLOCATED_ELECTRONS_TTRA, &
+                              COLOCATED_ELECTRONS_TTRA, &
+                              VX, VY, VZ, SPECIES(ELECTRON_S_ID)%MOLECULAR_MASS)
+
+                  CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,0.d0,0.d0,ELECTRON_S_ID,IC,DT, particleNOW) ! Save in particle
+                  CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
+               END IF
+               !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
             END DO
 

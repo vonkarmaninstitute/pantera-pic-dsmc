@@ -310,7 +310,17 @@ MODULE fields
 
                VOLUME = CELL_VOLUMES(I)
 
+               IF (PIC_TYPE == EXPLICITLIMITED) THEN
+                  IF (CELL_TE(I) > 0) THEN
+                     RATIO = VOLUME**(2./3.)*(CELL_NE(I)*QE**2/(EPS0*KB*CELL_TE(I)))
+                     WRITE(*,*) 'Cell ', I, ' T= ', CELL_TE(I), ' n= ', CELL_NE(I), ' dx^2/lD^2= ', RATIO
+                  ELSE
+                     RATIO = 0 
+                  END IF
+               END IF
+
                DO P = 1, 4
+
                   VP = U3D_GRID%CELL_NODES(P,I) - 1
                   IF (VP >= Istart .AND. VP < Iend) THEN
                      IF (.NOT. IS_DIRICHLET(VP)) THEN
@@ -319,13 +329,7 @@ MODULE fields
                            KIJ = VOLUME*(U3D_GRID%BASIS_COEFFS(1,P,I)*U3D_GRID%BASIS_COEFFS(1,Q,I) &
                                        + U3D_GRID%BASIS_COEFFS(2,P,I)*U3D_GRID%BASIS_COEFFS(2,Q,I) &
                                        + U3D_GRID%BASIS_COEFFS(3,P,I)*U3D_GRID%BASIS_COEFFS(3,Q,I)) * EPS_REL
-                           IF (PIC_TYPE == EXPLICITLIMITED) THEN
-                              IF (CELL_TE(I) > 0) THEN
-                                 RATIO = VOLUME**(2./3.)*(CELL_NE(I)*QE**2/(EPS0*KB*CELL_TE(I)))
-                                 IF (MOD(I, 100) == 0) WRITE(*,*) RATIO
-                                 KIJ = KIJ * (1. + RATIO)
-                              END IF
-                           END IF
+                           IF (PIC_TYPE == EXPLICITLIMITED) KIJ = KIJ * (1. + RATIO)
                            CALL MatSetValues(Amat,one,VP,one,VQ,KIJ,ADD_VALUES,ierr)
                         END DO
                      END IF

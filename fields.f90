@@ -50,7 +50,7 @@ MODULE fields
       REAL(KIND=8) :: KIJ, VOLUME
       INTEGER :: EDGE_PG
       LOGICAL, DIMENSION(:), ALLOCATABLE :: IS_UNUSED
-      REAL(KIND=8) :: EPS_REL
+      REAL(KIND=8) :: EPS_REL, RATIO
 
       SIZE = NNODES
 
@@ -320,7 +320,11 @@ MODULE fields
                                        + U3D_GRID%BASIS_COEFFS(2,P,I)*U3D_GRID%BASIS_COEFFS(2,Q,I) &
                                        + U3D_GRID%BASIS_COEFFS(3,P,I)*U3D_GRID%BASIS_COEFFS(3,Q,I)) * EPS_REL
                            IF (PIC_TYPE == EXPLICITLIMITED) THEN
-                              IF (CELL_TE(I) > 0) KIJ = KIJ * (1. + VOLUME**(2./3.)*(CELL_NE(I)*QE**2/(EPS0*KB*CELL_TE(I))))
+                              IF (CELL_TE(I) > 0) THEN
+                                 RATIO = VOLUME**(2./3.)*(CELL_NE(I)*QE**2/(EPS0*KB*CELL_TE(I)))
+                                 IF (MOD(I, 100) == 0) WRITE(*,*) RATIO
+                                 KIJ = KIJ * (1. + RATIO)
+                              END IF
                            END IF
                            CALL MatSetValues(Amat,one,VP,one,VQ,KIJ,ADD_VALUES,ierr)
                         END DO

@@ -637,7 +637,11 @@ MODULE postprocess
 
             IF (PIC_TYPE .NE. NONE) THEN
                IF (GRID_TYPE == UNSTRUCTURED) THEN
-                  WRITE(54321) 'FIELD FieldData '//ITOA(3)//ACHAR(10)
+                  IF (PIC_TYPE == EXPLICITLIMITED) THEN
+                     WRITE(54321) 'FIELD FieldData '//ITOA(4)//ACHAR(10)
+                  ELSE
+                     WRITE(54321) 'FIELD FieldData '//ITOA(3)//ACHAR(10)
+                  END IF
                   WRITE(54321) 'E_X '//ITOA(1)//' '//ITOA( NCELLS )//' double'//ACHAR(10)
                   WRITE(54321) E_FIELD(1,:,:), ACHAR(10)
 
@@ -646,6 +650,12 @@ MODULE postprocess
 
                   WRITE(54321) 'E_Z '//ITOA(1)//' '//ITOA( NCELLS )//' double'//ACHAR(10)
                   WRITE(54321) E_FIELD(3,:,:), ACHAR(10)
+
+                  IF (PIC_TYPE == EXPLICITLIMITED) THEN
+                     WRITE(54321) 'DXLDRATIO '//ITOA(1)//' '//ITOA( NCELLS )//' double'//ACHAR(10)
+                     WRITE(54321) DXLDRATIO, ACHAR(10)
+                  END IF
+
 
                   WRITE(54321) 'POINT_DATA '//ITOA( NNODES )//ACHAR(10)
                   IF (BOOL_FLUID_ELECTRONS) THEN

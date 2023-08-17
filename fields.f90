@@ -133,6 +133,21 @@ MODULE fields
                END DO
             END DO
 
+
+            IF (PIC_TYPE == EXPLICITLIMITED) THEN
+               CALL COMPUTE_DENSITY_TEMPERATURE(particles)
+               IF (.NOT. ALLOCATED(DXLDRATIO)) ALLOCATE(DXLDRATIO(NCELLS))
+               DO I = 1, NCELLS
+                  AREA = CELL_AREAS(I)
+                  IF (CELL_TE(I) > 0) THEN
+                     DXLDRATIO(I) = AREA*(CELL_NE(I)*QE**2/(EPS0*KB*CELL_TE(I)))
+                     !WRITE(*,*) 'Cell ', I, ' T= ', CELL_TE(I), ' n= ', CELL_NE(I), ' dx^2/lD^2= ', RATIO
+                  ELSE
+                     DXLDRATIO(I) = 0
+                  END IF
+               END DO
+            END IF
+
             !IS_DIRICHLET(0) = .TRUE.    ! DBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDDBDBDBDBDBDBDB
             !DIRICHLET(0) = 0.d0
 
@@ -165,6 +180,15 @@ MODULE fields
                   K12 = K12*(Y1+Y2+Y3)/3.
                   K23 = K23*(Y1+Y2+Y3)/3.
                   K13 = K13*(Y1+Y2+Y3)/3.
+               END IF
+
+               IF (PIC_TYPE == EXPLICITLIMITED) THEN
+                  K11 = K11 * (1. + DXLDRATIO(I))
+                  K22 = K22 * (1. + DXLDRATIO(I))
+                  K33 = K33 * (1. + DXLDRATIO(I))
+                  K12 = K12 * (1. + DXLDRATIO(I))
+                  K23 = K23 * (1. + DXLDRATIO(I))
+                  K13 = K13 * (1. + DXLDRATIO(I))
                END IF
 
                ! We need to ADD to a sparse matrix entry.

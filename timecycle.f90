@@ -867,6 +867,8 @@ MODULE timecycle
       REAL(KIND=8) :: CHARGE, K, PSIP, RHO_Q
       INTEGER :: VP
 
+      !REAL(KIND=8) :: VXPRE, VYPRE, VZPRE
+
 
       E = [0.d0, 0.d0, 0.d0]
       B = [0.d0, 0.d0, 0.d0]
@@ -1223,6 +1225,10 @@ MODULE timecycle
                               CALL WALL_REACT(particles, IP, REMOVE_PART(IP))
                            END IF
 
+                           VXPRE = particles(IP)%VX
+                           VYPRE = particles(IP)%VY
+                           VZPRE = particles(IP)%VZ
+
                            VDOTN = particles(IP)%VX*FACE_NORMAL(1) &
                                  + particles(IP)%VY*FACE_NORMAL(2) &
                                  + particles(IP)%VZ*FACE_NORMAL(3)
@@ -1269,17 +1275,22 @@ MODULE timecycle
                            CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, WALL_TEMP, EVIB)
 
                            particles(IP)%VX = V_PERP*FACE_NORMAL(1) &
-                                            + V_TANG1*FACE_TANG1(1) &
-                                            + V_TANG2*FACE_TANG2(1)
+                                            + V_TANG1*TANG1(1) &
+                                            + V_TANG2*TANG2(1)
                            particles(IP)%VY = V_PERP*FACE_NORMAL(2) &
-                                            + V_TANG1*FACE_TANG1(2) &
-                                            + V_TANG2*FACE_TANG2(2)
+                                            + V_TANG1*TANG1(2) &
+                                            + V_TANG2*TANG2(2)
                            particles(IP)%VZ = V_PERP*FACE_NORMAL(3) &
-                                            + V_TANG1*FACE_TANG1(3) &
-                                            + V_TANG2*FACE_TANG2(3)
+                                            + V_TANG1*TANG1(3) &
+                                            + V_TANG2*TANG2(3)
                            
                            particles(IP)%EROT = EROT
                            particles(IP)%EVIB = EVIB
+
+                           !OPEN(66341, FILE='clldump', POSITION='append', STATUS='unknown', ACTION='write')
+                           !WRITE(66341,*) VXPRE, ', ', VYPRE, ', ', VZPRE, ', ', &
+                           !particles(IP)%VX, ', ', particles(IP)%VY, ', ', particles(IP)%VZ
+                           !CLOSE(66341)
 
                            IF (GRID_BC(FACE_PG)%DUMP_FLUXES) THEN
                               particleNOW = particles(IP)

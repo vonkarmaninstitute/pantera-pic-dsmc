@@ -2038,14 +2038,14 @@ MODULE fully_implicit
                            CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, WALL_TEMP, EVIB)
 
                            part_adv(IP)%VX = V_PERP*FACE_NORMAL(1) &
-                                           + V_TANG1*FACE_TANG1(1) &
-                                           + V_TANG2*FACE_TANG2(1)
+                                           + V_TANG1*TANG1(1) &
+                                           + V_TANG2*TANG2(1)
                            part_adv(IP)%VY = V_PERP*FACE_NORMAL(2) &
-                                           + V_TANG1*FACE_TANG1(2) &
-                                           + V_TANG2*FACE_TANG2(2)
+                                           + V_TANG1*TANG1(2) &
+                                           + V_TANG2*TANG2(2)
                            part_adv(IP)%VZ = V_PERP*FACE_NORMAL(3) &
-                                           + V_TANG1*FACE_TANG1(3) &
-                                           + V_TANG2*FACE_TANG2(3)
+                                           + V_TANG1*TANG1(3) &
+                                           + V_TANG2*TANG2(3)
                            
                            part_adv(IP)%EROT = EROT
                            part_adv(IP)%EVIB = EVIB

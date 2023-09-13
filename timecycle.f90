@@ -1225,9 +1225,9 @@ MODULE timecycle
                               CALL WALL_REACT(particles, IP, REMOVE_PART(IP))
                            END IF
 
-                           VXPRE = particles(IP)%VX
-                           VYPRE = particles(IP)%VY
-                           VZPRE = particles(IP)%VZ
+                           !VXPRE = particles(IP)%VX
+                           !VYPRE = particles(IP)%VY
+                           !VZPRE = particles(IP)%VZ
 
                            VDOTN = particles(IP)%VX*FACE_NORMAL(1) &
                                  + particles(IP)%VY*FACE_NORMAL(2) &

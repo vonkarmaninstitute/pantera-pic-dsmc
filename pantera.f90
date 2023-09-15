@@ -65,6 +65,7 @@ PROGRAM PANTERA
    ! ========= Time loop ===================================
    CALL MPI_BARRIER(MPI_COMM_WORLD, ierr)
    CALL ONLYMASTERPRINT1(PROC_ID, '> STARTING TIME LOOP...')
+   !FLUSH(101)
    CALL TIME_LOOP
 
    ! CALL DUMP_PARTICLES_SCREEN

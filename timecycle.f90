@@ -98,6 +98,8 @@ MODULE timecycle
             CALL TIMER_SUMMARY
          END IF
          
+         !FLUSH(101)
+
          ! ########### Inject particles from boundaries/injection sources ##########
 
          CALL BOUNDARIES_INJECT

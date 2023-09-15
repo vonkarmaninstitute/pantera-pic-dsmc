@@ -88,26 +88,32 @@ USE mpi_common
 
       TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: COPYARRAY
 
-      NP = NP + 1 ! Increase number of particles in array
+      IF (NP > 0) THEN
+         NP = NP + 1 ! Increase number of particles in array
 
-      IF ( NP > SIZE(particlesARRAY) ) THEN  ! Array too small
+         IF ( NP > SIZE(particlesARRAY) ) THEN  ! Array too small
 
-        ! Make backup copy of particles array
-        ALLOCATE(COPYARRAY(NP-1))
-        COPYARRAY = particlesARRAY
+         ! Make backup copy of particles array
+         ALLOCATE(COPYARRAY(NP-1))
+         COPYARRAY(1:NP-1) = particlesARRAY(1:NP-1)
 
-        ! Reallocate particles array to 5 times its size
-        DEALLOCATE(particlesARRAY)
-        ALLOCATE(particlesARRAY(5*NP))
+         ! Reallocate particles array to 5 times its size
+         DEALLOCATE(particlesARRAY)
+         ALLOCATE(particlesARRAY(5*NP))
 
-        ! Re-copy the elements 
-        particlesARRAY(1:NP-1) = COPYARRAY(1:NP-1)
+         ! Re-copy the elements 
+         particlesARRAY(1:NP-1) = COPYARRAY(1:NP-1)
 
-        DEALLOCATE(COPYARRAY)
+         DEALLOCATE(COPYARRAY)
+         END IF
+         
+         ! Add particle to array
+         particlesARRAY(NP) = particleNOW
+      ELSE
+         NP = NP + 1 ! Increase number of particles in array
+         IF (.NOT. ALLOCATED(particlesARRAY)) ALLOCATE(particlesARRAY(1))
+         particlesARRAY(1) = particleNOW
       END IF
-      
-      ! Add particle to array
-      particlesARRAY(NP) = particleNOW
 
    END SUBROUTINE ADD_PARTICLE_ARRAY
 

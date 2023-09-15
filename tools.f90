@@ -296,26 +296,27 @@ CONTAINS
 
 
       ! Dump particles that hit a boundary to file
-      WRITE(filename, "(A,A,I0.5,A6,I0.8)") TRIM(ADJUSTL(PARTDUMP_SAVE_PATH)), "bound_proc_", PROC_ID ! Compose filename
+      WRITE(filename, "(A,A,I0.5)") TRIM(ADJUSTL(PARTDUMP_SAVE_PATH)), "bound_proc_", PROC_ID ! Compose filename
 
       ! Open file for writing
       IF (BOOL_BINARY_OUTPUT) THEN
-         OPEN(12, FILE=filename, ACCESS='SEQUENTIAL', FORM='UNFORMATTED', STATUS='OLD', CONVERT='BIG_ENDIAN', RECL=84)
+         OPEN(28479, FILE=filename, ACCESS='SEQUENTIAL', POSITION='APPEND', FORM='UNFORMATTED', &
+         STATUS='UNKNOWN', CONVERT='BIG_ENDIAN', RECL=84)
          DO IP = 1, NP_DUMP_PROC
-            WRITE(12) TIMESTEP, part_dump(IP)%X, part_dump(IP)%Y, part_dump(IP)%Z, &
+            WRITE(28479) TIMESTEP, part_dump(IP)%X, part_dump(IP)%Y, part_dump(IP)%Z, &
             part_dump(IP)%VX, part_dump(IP)%VY, part_dump(IP)%VZ, part_dump(IP)%EROT, part_dump(IP)%EVIB, &
             part_dump(IP)%S_ID, part_dump(IP)%IC, part_dump(IP)%DTRIM
          END DO
-         CLOSE(12)
+         CLOSE(28479)
       ELSE
-         OPEN(12, FILE=filename )
-         !WRITE(10,*) '% X | Y | Z | VX | VY | VZ | EROT | EVIB | S_ID | IPG | DTRIM'
+         OPEN(28479, FILE=filename )
+         !WRITE(10,*) '% TIMESTEP | X | Y | Z | VX | VY | VZ | EROT | EVIB | S_ID | IPG | DTRIM'
          DO IP = 1, NP_DUMP_PROC
-            WRITE(12,*) TIMESTEP, part_dump(IP)%X, part_dump(IP)%Y, part_dump(IP)%Z, &
+            WRITE(28479,*) TIMESTEP, part_dump(IP)%X, part_dump(IP)%Y, part_dump(IP)%Z, &
             part_dump(IP)%VX, part_dump(IP)%VY, part_dump(IP)%VZ, part_dump(IP)%EROT, part_dump(IP)%EVIB, &
             part_dump(IP)%S_ID, part_dump(IP)%IC, part_dump(IP)%DTRIM
          END DO
-         CLOSE(12)
+         CLOSE(28479)
       END IF
 
    END SUBROUTINE DUMP_BOUNDARY_PARTICLES_FILE
@@ -374,6 +375,62 @@ CONTAINS
 
 
    END SUBROUTINE READ_PARTICLES_FILE
+
+
+
+
+   SUBROUTINE READ_INJECT_FILE
+
+      IMPLICIT NONE
+
+      CHARACTER(LEN=512)  :: filename
+      INTEGER :: ios
+
+      REAL(KIND=8) :: XP, YP, ZP, VX, VY, VZ, EROT, EVIB, DTRIM
+      INTEGER      :: S_ID, IC, TIMESTEP
+      TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
+      character(len=100) :: iomsg
+      WRITE(filename, "(A,A,A,I0.5)") TRIM(ADJUSTL(PARTDUMP_SAVE_PATH)), TRIM(ADJUSTL(INJECT_FILENAME)), "proc_", PROC_ID ! Compose filename
+
+      ! Open file for reading
+      IF (BOOL_BINARY_OUTPUT) THEN
+         OPEN(1030, FILE=filename, ACCESS='SEQUENTIAL', FORM='UNFORMATTED', STATUS='OLD', &
+         CONVERT='BIG_ENDIAN', RECL=84, IOSTAT=ios, IOMSG=iomsg)
+
+         IF (ios .NE. 0) THEN
+            WRITE(*,*) 'iomsg was ', iomsg
+            CALL ERROR_ABORT('Attention, particle inject file not found! ABORTING.')
+         ENDIF
+
+         DO
+            READ(1030, IOSTAT=ios) TIMESTEP, XP, YP, ZP, VX, VY, VZ, EROT, EVIB, S_ID, IC, DTRIM
+
+            IF (ios < 0) EXIT
+            CALL INIT_PARTICLE(XP,YP,ZP,VX,VY,VZ,EROT,EVIB,S_ID,IC,DTRIM, particleNOW) ! Save in particle
+            CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, part_inject) ! Add particle to local array
+         END DO
+
+         CLOSE(1030)
+      ELSE
+         OPEN(1030, FILE=filename, STATUS='OLD', IOSTAT=ios)
+         
+         IF (ios .NE. 0) THEN
+            CALL ERROR_ABORT('Attention, particle inject file not found! ABORTING.')
+         ENDIF
+
+         DO
+            READ(1030,*,IOSTAT=ios) TIMESTEP, XP, YP, ZP, VX, VY, VZ, EROT, EVIB, S_ID, IC, DTRIM
+            IF (ios < 0) EXIT
+            CALL INIT_PARTICLE(XP,YP,ZP,VX,VY,VZ,EROT,EVIB,S_ID,IC,DTRIM, particleNOW) ! Save in particle
+            CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, part_inject) ! Add particle to local array
+         END DO
+
+         CLOSE(1030)
+      END IF
+
+
+
+   END SUBROUTINE READ_INJECT_FILE
 
 
 

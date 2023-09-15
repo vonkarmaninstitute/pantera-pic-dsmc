@@ -171,8 +171,8 @@ MODULE initialization
          IF (line=='Binary_output:')           READ(in1,*) BOOL_BINARY_OUTPUT
          IF (line=='Dump_part_every:')         READ(in1,*) DUMP_EVERY
          IF (line=='Dump_part_start:')         READ(in1,*) DUMP_START
-         IF (line=='Dump_bound_every:')         READ(in1,*) DUMP_BOUND_EVERY
-         IF (line=='Dump_bound_start:')         READ(in1,*) DUMP_BOUND_START
+         IF (line=='Dump_bound_every:')        READ(in1,*) DUMP_BOUND_EVERY
+         IF (line=='Dump_bound_start:')        READ(in1,*) DUMP_BOUND_START
          IF (line=='Dump_grid_avgevery:')      READ(in1,*) DUMP_GRID_AVG_EVERY
          IF (line=='Dump_grid_start:')         READ(in1,*) DUMP_GRID_START
          IF (line=='Dump_grid_numavgs:')       READ(in1,*) DUMP_GRID_N_AVG
@@ -180,6 +180,13 @@ MODULE initialization
          IF (line=='Bool_dump_fluxes:')        READ(in1,*) BOOL_DUMP_FLUXES
          IF (line=='Dump_traj_start:')         READ(in1,*) TRAJECTORY_DUMP_START
          IF (line=='Dump_traj_number:')        READ(in1,*) TRAJECTORY_DUMP_NUMBER
+
+         IF (line=='Inject_from_file:') THEN
+            READ(in1,*) INJECT_FILENAME
+            CALL READ_INJECT_FILE
+         END IF
+
+         IF (line=='Inject_probability:')      READ(in1,*) INJECT_PROBABILITY
 
          ! ~~~~~~~~~~~~~  Multispecies ~~~~~~~~~~~~~~~
          IF (line=='Species_file:') THEN
@@ -1967,10 +1974,6 @@ MODULE initialization
  
       INTEGER :: I, J
       REAL(KIND=8) :: CELL_YMIN, CELL_YMAX
-
-      ! ~~~~~~~~ Initial allocation for vector of particles in each process ~~~~~~~~
-      NP_PROC = 0
-      ALLOCATE(particles(0))
 
       ! ~~~~~~~~ Initialize RNG (random number generator) ~~~~~~~~~~
 

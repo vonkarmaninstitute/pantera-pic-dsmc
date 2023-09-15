@@ -425,7 +425,7 @@ MODULE timecycle
 
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
       REAL(KIND=8)  :: M
-      INTEGER       :: S_ID, i, ITASK
+      INTEGER       :: S_ID, I, J, N_INJECT, ITASK
      
       ! Compute number of particles to be seeded
       !NP_INIT = NINT(NRHO_INIT/FNUM*(XMAX-XMIN)*(YMAX-YMIN)*(ZMAX-ZMIN))
@@ -437,7 +437,7 @@ MODULE timecycle
 
       DO ITASK = 1, N_VOLUME_INJECT_TASKS
          ! Create particles in the domain
-         DO i = 1, MIXTURES(VOLUME_INJECT_TASKS(ITASK)%MIX_ID)%N_COMPONENTS
+         DO I = 1, MIXTURES(VOLUME_INJECT_TASKS(ITASK)%MIX_ID)%N_COMPONENTS
             
             S_ID = MIXTURES(VOLUME_INJECT_TASKS(ITASK)%MIX_ID)%COMPONENTS(i)%ID
             IF (GRID_TYPE == UNSTRUCTURED) THEN
@@ -539,6 +539,22 @@ MODULE timecycle
             END IF
          END DO
       END DO
+
+
+
+
+
+      IF (BOOL_INJECT_FROM_FILE) THEN
+         DO I = 1, NP_INJECT_PROC
+            N_INJECT = INT(INJECT_PROBABILITY + rf())
+            particleNOW = part_inject(I)
+            DO J = 1, N_INJECT
+               particleNOW%DTRIM = rf()*DT
+               CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
+            END DO
+         END DO
+      END IF
+
       ! ~~~~~~ At this point, exchange particles among processes ~~~~~~
 
    END SUBROUTINE VOLUME_INJECT
@@ -1134,9 +1150,8 @@ MODULE timecycle
 
                      IF (FACE_PG .NE. -1) THEN
 
-                        IF (GRID_BC(FACE_PG)%DUMP_FLUXES) THEN
+                        IF (GRID_BC(FACE_PG)%DUMP_FLUXES .AND. (tID .GE. DUMP_BOUND_START)) THEN
                            particleNOW = particles(IP)
-                           particleNOW%IC = FACE_PG
                            CALL ADD_PARTICLE_ARRAY(particleNOW, NP_DUMP_PROC, part_dump)
                         END IF
                         
@@ -1178,12 +1193,6 @@ MODULE timecycle
                            particles(IP)%VY = particles(IP)%VY - 2.*VDOTN*FACE_NORMAL(2)
                            particles(IP)%VZ = particles(IP)%VZ - 2.*VDOTN*FACE_NORMAL(3)
 
-                           IF (GRID_BC(FACE_PG)%DUMP_FLUXES) THEN
-                              particleNOW = particles(IP)
-                              particleNOW%IC = -FACE_PG
-                              CALL ADD_PARTICLE_ARRAY(particleNOW, NP_DUMP_PROC, part_dump)
-                           END IF
-
                         ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == DIFFUSE) THEN
                            IF (GRID_BC(FACE_PG)%REACT) THEN
                               CALL WALL_REACT(particles, IP, REMOVE_PART(IP))
@@ -1213,12 +1222,6 @@ MODULE timecycle
                            
                            particles(IP)%EROT = EROT
                            particles(IP)%EVIB = EVIB
-
-                           IF (GRID_BC(FACE_PG)%DUMP_FLUXES) THEN
-                              particleNOW = particles(IP)
-                              particleNOW%IC = -FACE_PG
-                              CALL ADD_PARTICLE_ARRAY(particleNOW, NP_DUMP_PROC, part_dump)
-                           END IF
 
                         ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == CLL) THEN
                            IF (GRID_BC(FACE_PG)%REACT) THEN
@@ -1291,12 +1294,6 @@ MODULE timecycle
                            !WRITE(66341,*) VXPRE, ', ', VYPRE, ', ', VZPRE, ', ', &
                            !particles(IP)%VX, ', ', particles(IP)%VY, ', ', particles(IP)%VZ
                            !CLOSE(66341)
-
-                           IF (GRID_BC(FACE_PG)%DUMP_FLUXES) THEN
-                              particleNOW = particles(IP)
-                              particleNOW%IC = -FACE_PG
-                              CALL ADD_PARTICLE_ARRAY(particleNOW, NP_DUMP_PROC, part_dump)
-                           END IF
 
                         ELSE
                            REMOVE_PART(IP) = .TRUE.
@@ -1803,11 +1800,14 @@ MODULE timecycle
       DEALLOCATE(LOCAL_WALL_COLL_COUNT)
 
 
-      IF ((tID .GE. DUMP_BOUND_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
-         IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_EVERY) .EQ. 0) CALL DUMP_BOUNDARY_PARTICLES_FILE(tID)
+      IF ((tID .GT. DUMP_BOUND_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
+         IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_EVERY) .EQ. 0) THEN
+            CALL DUMP_BOUNDARY_PARTICLES_FILE(tID)
+            IF (ALLOCATED(part_dump)) DEALLOCATE(part_dump)
+            NP_DUMP_PROC = 0
+         END IF
       END IF
-      IF (ALLOCATED(part_dump)) DEALLOCATE(part_dump)
-      NP_DUMP_PROC = 0
+
 
 
    END SUBROUTINE ADVECT

@@ -22,16 +22,20 @@ MODULE global
    ! Particle variables and arrays !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-   INTEGER :: NP_PROC ! Number of particles in local MPI process
+   INTEGER :: NP_PROC = 0 ! Number of particles in local MPI process
    INTEGER :: MPI_PARTICLE_DATA_STRUCTURE ! We need this for MPI
-   TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: particles, part_dump
-   INTEGER :: NP_DUMP_PROC
+   TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: particles, part_dump, part_inject
+   INTEGER :: NP_DUMP_PROC = 0
+   INTEGER :: NP_INJECT_PROC = 0
    INTEGER :: TRAJECTORY_DUMP_START = -1
    INTEGER :: TRAJECTORY_DUMP_NUMBER = 0
    CHARACTER*256 :: TRAJDUMP_SAVE_PATH
    CHARACTER*256 :: PARTDUMP_SAVE_PATH
    CHARACTER*256 :: CHECKS_SAVE_PATH
    CHARACTER*256 :: RESIDUAL_SAVE_PATH
+   CHARACTER*256 :: INJECT_FILENAME
+   REAL(KIND=8) :: INJECT_PROBABILITY = 1
+   LOGICAL :: BOOL_INJECT_FROM_FILE = .FALSE.
 
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

@@ -407,7 +407,7 @@ CONTAINS
 
             IF (ios < 0) EXIT
             CALL INIT_PARTICLE(XP,YP,ZP,VX,VY,VZ,EROT,EVIB,S_ID,IC,DTRIM, particleNOW) ! Save in particle
-            CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, part_inject) ! Add particle to local array
+            CALL ADD_PARTICLE_ARRAY(particleNOW, NP_INJECT_PROC, part_inject) ! Add particle to local array
          END DO
 
          CLOSE(1030)
@@ -422,7 +422,7 @@ CONTAINS
             READ(1030,*,IOSTAT=ios) TIMESTEP, XP, YP, ZP, VX, VY, VZ, EROT, EVIB, S_ID, IC, DTRIM
             IF (ios < 0) EXIT
             CALL INIT_PARTICLE(XP,YP,ZP,VX,VY,VZ,EROT,EVIB,S_ID,IC,DTRIM, particleNOW) ! Save in particle
-            CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, part_inject) ! Add particle to local array
+            CALL ADD_PARTICLE_ARRAY(particleNOW, NP_INJECT_PROC, part_inject) ! Add particle to local array
          END DO
 
          CLOSE(1030)
@@ -611,11 +611,14 @@ CONTAINS
       INTEGER :: I, J, K, IC, IMIN, IMAX, JMIN, JMAX, V1, V2, V3, N_PARTITIONS_X, N_PARTITIONS_Y, IP, VP
       INTEGER, DIMENSION(:,:), ALLOCATABLE :: NINGRIDCELL
       INTEGER, DIMENSION(:,:,:), ALLOCATABLE :: TRISINGRID
-      LOGICAL :: INSIDE
+      LOGICAL :: INSIDE, CELLFOUND
       REAL(KIND=8) :: MINABSPSI
+      LOGICAL, DIMENSION(:), ALLOCATABLE :: REMOVE_PART
 
       N_PARTITIONS_X = 100
       N_PARTITIONS_Y = 100
+      ALLOCATE(REMOVE_PART(NP_PROC))
+      REMOVE_PART = .FALSE.
 
       ! First we assign the unstructured cells to the cells of a cartesian grid, which is easily indexable.
       IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
@@ -693,8 +696,14 @@ CONTAINS
          DO IP = 1, NP_PROC
             XP = particles(IP)%X
             YP = particles(IP)%Y
+            IF (XP < XMIN .OR. XP > XMAX .OR. YP < YMIN .OR. YP > YMAX) THEN
+               WRITE(*,*) 'Particle with ID ', particles(IP)%ID, 'is out of the domain. Deleting it.'
+               REMOVE_PART(IP) = .TRUE.
+               CYCLE
+            END IF
             I = INT((XP-XMIN)/DX) + 1
             J = INT((YP-YMIN)/DY) + 1
+            CELLFOUND = .FALSE.
             DO K = 1, NINGRIDCELL(J,I)
                MINABSPSI = 1.d100
                IC = TRISINGRID(K, J, I)
@@ -710,9 +719,20 @@ CONTAINS
                   ' has been found in a different cell! IC=', IC, &
                   ' instead of ', particles(IP)%IC, '. Minimum ABS(PSI) was ', MINABSPSI
                   particles(IP)%IC = IC
+                  CELLFOUND = .TRUE.
                   EXIT
                END IF
             END DO
+            IF (.NOT. CELLFOUND) THEN
+               WRITE(*,*) 'Particle with ID ', particles(IP)%ID, 'is out of the domain. Deleting it.'
+               REMOVE_PART(IP) = .TRUE.
+            END IF
+         END DO
+
+         IP = NP_PROC
+         DO WHILE (IP .GE. 1)
+            IF (REMOVE_PART(IP)) CALL REMOVE_PARTICLE_ARRAY(IP, particles, NP_PROC)
+            IP = IP - 1
          END DO
 
       ELSE

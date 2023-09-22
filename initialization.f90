@@ -182,6 +182,7 @@ MODULE initialization
          IF (line=='Dump_traj_number:')        READ(in1,*) TRAJECTORY_DUMP_NUMBER
 
          IF (line=='Inject_from_file:') THEN
+            BOOL_INJECT_FROM_FILE = .TRUE.
             READ(in1,*) INJECT_FILENAME
             CALL READ_INJECT_FILE
          END IF

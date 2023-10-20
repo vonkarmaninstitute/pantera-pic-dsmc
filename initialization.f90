@@ -1775,8 +1775,10 @@ MODULE initialization
             IF (GRID_TYPE == UNSTRUCTURED) THEN
                DO IC = 1, NCELLS
                   IF (DIMS == 2) THEN
+                     IF (U2D_GRID%CELL_PROC(IC) .NE. PROC_ID) CYCLE
                      CELL_PG = U2D_GRID%CELL_PG(IC)
                   ELSE IF (DIMS == 3) THEN
+                     IF (U3D_GRID%CELL_PROC(IC) .NE. PROC_ID) CYCLE
                      CELL_PG = U3D_GRID%CELL_PG(IC)
                   END IF
                   IF (CELL_PG .NE. -1) THEN
@@ -1784,9 +1786,9 @@ MODULE initialization
                   END IF
 
 
-                  ! Compute number of particles of this species per process to be created in this cell.
+                  ! Compute number of particles of this species to be created in this cell.
                   NP_INIT = RANDINT(INITIAL_PARTICLES_TASKS(ITASK)%NRHO/(FNUM*SPECIES(S_ID)%SPWT)*CELL_VOLUMES(IC)* &
-                              MIXTURES(INITIAL_PARTICLES_TASKS(ITASK)%MIX_ID)%COMPONENTS(i)%MOLFRAC/N_MPI_THREADS)
+                              MIXTURES(INITIAL_PARTICLES_TASKS(ITASK)%MIX_ID)%COMPONENTS(i)%MOLFRAC)
                   IF (NP_INIT == 0) CYCLE
 
                   IF (DIMS == 2) THEN

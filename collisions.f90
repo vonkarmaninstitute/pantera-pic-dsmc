@@ -102,8 +102,8 @@ MODULE collisions
       INTEGER                            :: JP, JC, IDX
       INTEGER                            :: NCOLLREAL
 
-      ALLOCATE(NPC(U2D_GRID%NUM_CELLS))
-      ALLOCATE(IOF(U2D_GRID%NUM_CELLS))
+      ALLOCATE(NPC(NCELLS))
+      ALLOCATE(IOF(NCELLS))
 
       ! Count the number of particles in each cell, to allocate arrays later
       NPC = 0

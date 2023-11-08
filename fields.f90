@@ -26,6 +26,8 @@ MODULE fields
       !PetscCallMPIA(MPI_Comm_size(PETSC_COMM_WORLD,size,ierr)) ---> N_MPI_THREADS
       !PetscCallMPIA(MPI_Comm_rank(PETSC_COMM_WORLD,rank,ierr)) ---> PROC_ID
 
+      CALL PetscPopSignalHandler(ierr)
+
    END SUBROUTINE PETSC_INIT
 
 
@@ -43,7 +45,7 @@ MODULE fields
       INTEGER :: SIZE
       REAL(KIND=8) :: HX, HY
       REAL(KIND=8) :: AX, AY, BX, BY, CX, CY, H1X, H2X, H1Y, H2Y, R
-      REAL(KIND=8) :: X1, X2, X3, X4, Y1, Y2, Y3, Y4, Z1, Z2, Z3, Z4
+      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3
       REAL(KIND=8) :: K11, K22, K33, K12, K23, K13, AREA, EDGELENGTH, FACEAREA
       INTEGER :: V1, V2, V3, V4
       INTEGER :: P, Q, VP, VQ
@@ -567,7 +569,7 @@ MODULE fields
    SUBROUTINE ASSEMBLE_AMPERE
 
       INTEGER :: I, J
-      INTEGER :: MAXNNZ, SIZE
+      INTEGER :: SIZE
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA, VOLUME
       REAL(KIND=8) :: K11TILDE, K22TILDE, K33TILDE, K12TILDE, K23TILDE, K13TILDE, KIJ
       INTEGER :: V1, V2, V3, V4, P, Q, VP, VQ
@@ -918,8 +920,7 @@ MODULE fields
 
       REAL(KIND=8) :: CHARGE
       REAL(KIND=8) :: AREA
-      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3
-      INTEGER :: V1, V2, V3, V4, SIZE, SIZEC, P, VP
+      INTEGER :: V1, V2, V3, SIZE, SIZEC, P, VP
       REAL(KIND=8) :: DPSI1DX, DPSI2DX, DPSI3DX, DPSI1DY, DPSI2DY, DPSI3DY
 
 
@@ -1059,40 +1060,56 @@ MODULE fields
       INTEGER, INTENT(IN) :: JP
       REAL(KIND=8), DIMENSION(4) :: WEIGHTS
       INTEGER, DIMENSION(4) :: INDICES, INDI, INDJ
-      INTEGER :: IC, V1, V2, V3
-      REAL(KIND=8) :: AREA, X1, X2, X3, Y1, Y2, Y3, XP, YP, PSI1, PSI2, PSI3
+      INTEGER :: IC, VI, I
+      REAL(KIND=8) :: XP, YP, ZP, PSII
 
-      IF (DIMS == 2) THEN
-         IF (GRID_TYPE == UNSTRUCTURED) THEN
+      
+      IF (GRID_TYPE == UNSTRUCTURED) THEN
+         IF (DIMS == 2) THEN
+
             IC = particles(JP)%IC
-            AREA = CELL_AREAS(IC)
-            V1 = U2D_GRID%CELL_NODES(1,IC)
-            V2 = U2D_GRID%CELL_NODES(2,IC)
-            V3 = U2D_GRID%CELL_NODES(3,IC)            
-            X1 = U2D_GRID%NODE_COORDS(1, V1)
-            X2 = U2D_GRID%NODE_COORDS(1, V2)
-            X3 = U2D_GRID%NODE_COORDS(1, V3)
-            Y1 = U2D_GRID%NODE_COORDS(2, V1)
-            Y2 = U2D_GRID%NODE_COORDS(2, V2)
-            Y3 = U2D_GRID%NODE_COORDS(2, V3)
+
             XP = particles(JP)%X
             YP = particles(JP)%Y
-            PSI1 = 0.5*( (Y2-Y3)*(XP-X3) - (X2-X3)*(YP-Y3))/AREA/(ZMAX-ZMIN)
-            PSI2 = 0.5*(-(Y1-Y3)*(XP-X3) + (X1-X3)*(YP-Y3))/AREA/(ZMAX-ZMIN)
-            PSI3 = 0.5*(-(Y2-Y1)*(XP-X1) + (X2-X1)*(YP-Y1))/AREA/(ZMAX-ZMIN)
 
-            PHI = PSI1*PHI_FIELD(V1) + PSI2*PHI_FIELD(V2) + PSI3*PHI_FIELD(V3)
-         ELSE
+            PHI = 0.d0
+            DO I = 1, 3
+               VI = U2D_GRID%CELL_NODES(I,IC)
+               PSII = XP*U2D_GRID%BASIS_COEFFS(1,I,IC) + YP*U2D_GRID%BASIS_COEFFS(2,I,IC) + U2D_GRID%BASIS_COEFFS(3,I,IC)
+               PHI = PHI + PSII*PHI_FIELD(VI)
+            END DO
+
+         ELSE IF (DIMS == 3) THEN
+
+            IC = particles(JP)%IC
+
+            XP = particles(JP)%X
+            YP = particles(JP)%Y
+            ZP = particles(JP)%Z
+
+            PHI = 0.d0
+            DO I = 1, 4
+               VI = U3D_GRID%CELL_NODES(I,IC)
+               PSII = XP*U3D_GRID%BASIS_COEFFS(1,I,IC) &
+                    + YP*U3D_GRID%BASIS_COEFFS(2,I,IC) &
+                    + ZP*U3D_GRID%BASIS_COEFFS(3,I,IC) &
+                       + U3D_GRID%BASIS_COEFFS(4,I,IC)
+               PHI = PHI + PSII*PHI_FIELD(VI)
+            END DO
+
+         END IF
+      ELSE
+         IF (DIMS == 2) THEN
             CALL COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)
             PHI = WEIGHTS(1)*PHI_FIELD(INDICES(1)+1) + &
                   WEIGHTS(2)*PHI_FIELD(INDICES(2)+1) + &
                   WEIGHTS(3)*PHI_FIELD(INDICES(3)+1) + &
                   WEIGHTS(4)*PHI_FIELD(INDICES(4)+1)
+         ELSE
+            CALL COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)
+            PHI = WEIGHTS(1)*PHI_FIELD(INDICES(1)+1) + &
+                  WEIGHTS(2)*PHI_FIELD(INDICES(2)+1)
          END IF
-      ELSE
-         CALL COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)
-         PHI = WEIGHTS(1)*PHI_FIELD(INDICES(1)+1) + &
-               WEIGHTS(2)*PHI_FIELD(INDICES(2)+1)
       END IF
       
    END SUBROUTINE APPLY_POTENTIAL

@@ -200,7 +200,7 @@ MODULE fully_implicit
 
       Mat jac
       Vec x, y
-      INTEGER I, IC
+      INTEGER :: I
 
       INTEGER :: V1, V2, V3
       INTEGER :: P, Q, VP, VQ
@@ -446,9 +446,9 @@ MODULE fully_implicit
       PetscErrorCode ierr_l
       PetscBool      flg
       INTEGER dummy(*)
-      INTEGER I, IC
+      INTEGER I
 
-      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA
+      REAL(KIND=8) :: AREA
       INTEGER :: V1, V2, V3
       INTEGER :: P, Q, VP, VQ
       REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD
@@ -780,7 +780,7 @@ MODULE fully_implicit
       CHARACTER(LEN=512)  :: filename
 
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA
-      INTEGER :: V1, V2, V3, I, IC
+      INTEGER :: V1, V2, V3, I
       INTEGER :: P, Q, VP, VQ
       REAL(KIND=8) :: KPQ, VOLUME
       REAL(KIND=8) :: MPQ, FACTOR1, FACTOR2, ME
@@ -1298,32 +1298,30 @@ MODULE fully_implicit
 
       Mat jac
       Mat dxde, dxdexmat, dxdeymat, dydexmat, dydeymat
-      PetscInt row
+      !PetscInt row
       PetscInt ncols
       PetscInt cols(2000)
       PetscScalar dxdexvals(2000), dxdeyvals(2000), dydexvals(2000), dydeyvals(2000), vals(2000)
       PetscInt first_row, last_row
 
-      PetscViewer  viewer
+      !PetscViewer  viewer
 
       LOGICAL, INTENT(IN) :: FINAL, COMPUTE_JACOBIAN
       TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE, INTENT(INOUT) :: part_adv
 
-      INTEGER      :: IP, IC, I, J, SOL, OLD_IC, II, JJ, SIZE
-      INTEGER      :: BOUNDCOLL, WALLCOLL, GOODSOL, FACE_PG, NEIGHBOR
-      REAL(KIND=8) :: DTCOLL, TOTDTCOLL, CANDIDATE_DTCOLL, rfp, QOM
-      REAL(KIND=8) :: COEFA, COEFB, COEFC, DELTA, SOL1, SOL2, ALPHA, BETA, GAMMA, DTADV
-      REAL(KIND=8), DIMENSION(2) :: TEST
+      INTEGER      :: IP, IC, I, J, OLD_IC, JJ, SIZE
+      INTEGER      :: BOUNDCOLL, FACE_PG, NEIGHBOR
+      REAL(KIND=8) :: DTCOLL, TOTDTCOLL, rfp, QOM
+      REAL(KIND=8) :: COEFA, COEFB, COEFC, DELTA, ALPHA, BETA, GAMMA, DTADV
+      !REAL(KIND=8), DIMENSION(2) :: TEST
       REAL(KIND=8), DIMENSION(4) :: NORMX, NORMY, XW, YW, ZW, BOUNDPOS
       ! REAL(KIND=8) :: XCOLL, YCOLL, ZCOLL
-      REAL(KIND=8) :: VN, DX
       LOGICAL, DIMENSION(:), ALLOCATABLE :: REMOVE_PART
-      REAL(KIND=8), DIMENSION(3) :: V_OLD, V_NEW
       REAL(KIND=8), DIMENSION(3) :: E, B
-      REAL(KIND=8) :: V_NORM, V_PARA, V_PERP, VZ, VDUMMY, EROT, EVIB, VDOTN, WALL_TEMP
+      REAL(KIND=8) ::V_PERP, VDUMMY, EROT, EVIB, VDOTN, WALL_TEMP
       INTEGER :: S_ID
       LOGICAL :: HASCOLLIDED
-      REAL(KIND=8) :: XCOLL, YCOLL, COLLDIST, EDGE_X1, EDGE_Y1, EDGE_X2, EDGE_Y2
+      REAL(KIND=8) :: EDGE_X1, EDGE_Y1, EDGE_X2, EDGE_Y2
       INTEGER, DIMENSION(:), ALLOCATABLE :: LOCAL_BOUNDARY_COLL_COUNT, LOCAL_WALL_COLL_COUNT
       REAL(KIND=8) :: WEIGHT_RATIO
       TYPE(PARTICLE_DATA_STRUCTURE) :: NEWparticle
@@ -1335,9 +1333,9 @@ MODULE fully_implicit
       DTDEXPREC, DTDEYPREC, DALPHADEX, DALPHADEY, DBETADEX, DBETADEY, DGAMMADEX, DGAMMADEY
       REAL(KIND=8) :: NEWVX, NEWVY
       INTEGER :: LOC, NUMSTEPS, MAXNUMSTEPS
-      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, AREA, VALXX, VALXY, VALYX, VALYY
+      REAL(KIND=8) :: VALXX, VALXY, VALYX, VALYY
       REAL(KIND=8) :: DPSI1DX, DPSI1DY, DPSI2DX, DPSI2DY, DPSI3DX, DPSI3DY, DPSJ1DX, DPSJ1DY, DPSJ2DX, DPSJ2DY, DPSJ3DX, DPSJ3DY
-      INTEGER :: V1I, V2I, V3I, V1J, V2J, V3J, COUNTER
+      INTEGER :: V1I, V2I, V3I, V1J, V2J, V3J
       REAL(KIND=8) :: X_TEMP, Y_TEMP, Z_TEMP, VX_TEMP, VY_TEMP, VZ_TEMP
       REAL(KIND=8), DIMENSION(3) :: FACE_NORMAL, FACE_TANG1, FACE_TANG2
       REAL(KIND=8) :: V_TANG1, V_TANG2
@@ -1358,7 +1356,7 @@ MODULE fully_implicit
       REAL(KIND=8) :: CHARGE, K, PSIP, RHO_Q
       INTEGER :: VP
 
-      REAL(KIND=8) :: CHECKVALUE
+      !REAL(KIND=8) :: CHECKVALUE
 
       ! IF (tID == 4 .AND. FINAL) THEN
       !    OPEN(66332, FILE='crossings', POSITION='append', STATUS='unknown', ACTION='write')
@@ -1898,7 +1896,7 @@ MODULE fully_implicit
                      FACE_NORMAL = U2D_GRID%EDGE_NORMAL(:,BOUNDCOLL,IC)
                      FACE_TANG1 = [-FACE_NORMAL(2), FACE_NORMAL(1), 0.d0]
                      FACE_TANG2 = [0.d0, 0.d0, 1.d0]
-                  ELSE IF (DIMS == 3) THEN
+                  ELSE
                      NEIGHBOR = U3D_GRID%CELL_NEIGHBORS(BOUNDCOLL, IC)
                      IF (NEIGHBOR == -1) THEN
                         FLUIDBOUNDARY = .TRUE.
@@ -2663,8 +2661,7 @@ MODULE fully_implicit
 
       REAL(KIND=8) :: HX, HY
       INTEGER :: I, J, P, VP, ID
-      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, AREA, VOL
-      INTEGER :: V1, V2, V3, SIZE
+      INTEGER :: SIZE
       INTEGER :: ICENTER, INORTH, ISOUTH, IEAST, IWEST
 
       HX = (XMAX-XMIN)/DBLE(NX)
@@ -2856,12 +2853,11 @@ MODULE fully_implicit
       INTEGER :: JP, I, IC
 
       REAL(KIND=8) :: K, RHO_Q, CHARGE
-      REAL(KIND=8) :: VOL, CFNUM, AREA
+      REAL(KIND=8) :: VOL, CFNUM
       REAL(KIND=8), DIMENSION(4) :: WEIGHTS
       INTEGER, DIMENSION(4) :: INDICES, INDI, INDJ
-      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, XP, YP
-      INTEGER :: V1, V2, V3, SIZE, P, VP
-      REAL(KIND=8) :: PSI1, PSI2, PSI3, PSIP
+      INTEGER :: SIZE, P, VP
+      REAL(KIND=8) :: PSIP
 
       K = QE/(EPS0*EPS_SCALING**2) ! [V m] Elementary charge / Dielectric constant of vacuum
 

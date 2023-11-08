@@ -1204,12 +1204,12 @@ CONTAINS
          DO
             INDEX = (L+R)/2
             IF (TABLE_EN(INDEX) .LE. VALUE_EN) THEN
-               IF (TABLE_EN(INDEX+1) .GT. VALUE_EN) RETURN
+               IF (TABLE_EN(INDEX+1) .GT. VALUE_EN) EXIT
                L = INDEX
             ELSE
                IF (TABLE_EN(INDEX-1) .LE. VALUE_EN) THEN
                   INDEX = INDEX-1
-                  RETURN
+                  EXIT
                END IF
                R = INDEX
             END IF

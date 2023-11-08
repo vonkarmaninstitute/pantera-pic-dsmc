@@ -1775,10 +1775,10 @@ MODULE initialization
             IF (GRID_TYPE == UNSTRUCTURED) THEN
                DO IC = 1, NCELLS
                   IF (DIMS == 2) THEN
-                     IF (U2D_GRID%CELL_PROC(IC) .NE. PROC_ID) CYCLE
+                     IF (CELL_PROCS(IC) .NE. PROC_ID) CYCLE
                      CELL_PG = U2D_GRID%CELL_PG(IC)
-                  ELSE IF (DIMS == 3) THEN
-                     IF (U3D_GRID%CELL_PROC(IC) .NE. PROC_ID) CYCLE
+                  ELSE
+                     IF (CELL_PROCS(IC) .NE. PROC_ID) CYCLE
                      CELL_PG = U3D_GRID%CELL_PG(IC)
                   END IF
                   IF (CELL_PG .NE. -1) THEN
@@ -1795,7 +1795,8 @@ MODULE initialization
                      V1 = U2D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(1,IC))
                      V2 = U2D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(2,IC))
                      V3 = U2D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(3,IC))
-                  ELSE IF (DIMS == 3) THEN
+                     V4 = 0
+                  ELSE
                      V1 = U3D_GRID%NODE_COORDS(:,U3D_GRID%CELL_NODES(1,IC))
                      V2 = U3D_GRID%NODE_COORDS(:,U3D_GRID%CELL_NODES(2,IC))
                      V3 = U3D_GRID%NODE_COORDS(:,U3D_GRID%CELL_NODES(3,IC))
@@ -1821,7 +1822,7 @@ MODULE initialization
                         ELSE
                            ZP = ZMIN + (ZMAX-ZMIN)*U
                         END IF
-                     ELSE IF (DIMS == 3) THEN
+                     ELSE
                         ! http://vcg.isti.cnr.it/publications/papers/rndtetra_a.pdf
 
                         IF (S+T+U <= 1) THEN
@@ -2291,7 +2292,7 @@ MODULE initialization
                AREA = LINELENGTH*(ZMAX-ZMIN)
             END IF
 
-         ELSE IF (DIMS == 3) THEN
+         ELSE
             NORMX = -U3D_GRID%FACE_NORMAL(1, EMIT_TASKS(ITASK)%IFACE, EMIT_TASKS(ITASK)%IC)
             NORMY = -U3D_GRID%FACE_NORMAL(2, EMIT_TASKS(ITASK)%IFACE, EMIT_TASKS(ITASK)%IC)
             NORMZ = -U3D_GRID%FACE_NORMAL(3, EMIT_TASKS(ITASK)%IFACE, EMIT_TASKS(ITASK)%IC)

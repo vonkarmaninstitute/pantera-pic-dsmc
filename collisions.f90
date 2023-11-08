@@ -359,6 +359,8 @@ MODULE collisions
                   IDX = BINARY_SEARCH(ETR, REACTIONS(JR)%TABLE_ENERGY) ! to manage the external cases!
                   PTCE = REACTIONS(JR)%TABLE_CS(IDX) + (ETR - REACTIONS(JR)%TABLE_ENERGY(IDX)) * &
                          (REACTIONS(JR)%TABLE_CS(IDX+1)-REACTIONS(JR)%TABLE_CS(IDX))
+               ELSE
+                  PTCE = 0
                END IF
                ! Here we suppose that the probability is so low that we can test sequentially with acceptable error
                rfp = rf()

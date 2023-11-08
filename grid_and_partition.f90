@@ -249,6 +249,7 @@ MODULE grid_and_partition
             CALL QUICKSORT(CENTROID, ORDER, 1, NCELLS)
 
             IPROC = 0
+            CUMULATIVE_WEIGHT = 0
             DO I = 1, NCELLS
                IC = ORDER(I)
                CUMULATIVE_WEIGHT = CUMULATIVE_WEIGHT + WEIGHT(IC)
@@ -618,6 +619,7 @@ MODULE grid_and_partition
       WRITE(*,*) '==========================================='
       WRITE(*,*) 'Reading grid file.'
       WRITE(*,*) '==========================================='
+      NUM_CELLS = 0
       DO
          READ(in5,*, IOSTAT=ReasonEOF) LINE
          WRITE(*,*) 'Read line:', LINE
@@ -676,6 +678,9 @@ MODULE grid_and_partition
       ! Done reading
       CLOSE(in5)
 
+      IF (NUM_CELLS == 0) THEN
+         CALL ERROR_ABORT('Attention, mesh file does not contain any cell! ABORTING.')
+      ENDIF
 
 
       WRITE(*,*) 'Read grid file. It contains ', U2D_GRID%NUM_POINTS, &

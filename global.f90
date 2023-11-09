@@ -238,7 +238,8 @@ TYPE(UNSTRUCTURED_3D_GRID_DATA_STRUCTURE) :: U3D_GRID
    LOGICAL, DIMENSION(:), ALLOCATABLE :: IS_NEUMANN
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: SURFACE_CHARGE 
 
-
+   
+   REAL(KIND=8), DIMENSION(3) :: EXTERNAL_B_FIELD = 0
    ! This is used for defining static magnetic fields from solenoids.
    INTEGER         :: N_SOLENOIDS = 0
 

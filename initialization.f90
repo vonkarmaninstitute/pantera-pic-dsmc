@@ -108,6 +108,8 @@ MODULE initialization
             CALL DEF_SOLENOID(SOLENOID_DEFINITION)
          END IF
 
+         IF (line=='External_B_field:') READ(in1,*) EXTERNAL_B_FIELD(1), EXTERNAL_B_FIELD(2), EXTERNAL_B_FIELD(3)
+
          IF (line=='Boundary_dump_fluxes:') THEN
             READ(in1,'(A)') BC_DEFINITION
             CALL DEF_BOUNDARY_DUMP_FLUXES(BC_DEFINITION)

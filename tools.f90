@@ -1221,4 +1221,62 @@ CONTAINS
    END FUNCTION INTERP_CS
 
 
+   SUBROUTINE SKIP_TO(UNIT, STR, STAT)
+
+      IMPLICIT NONE
+
+      CHARACTER(*), INTENT(IN) :: STR
+      INTEGER, INTENT(IN) :: UNIT
+      INTEGER, INTENT(OUT) :: STAT
+      CHARACTER :: CH
+      INTEGER :: IO
+    
+      DO
+         READ(UNIT, IOSTAT=IO) CH
+
+         IF (IO/=0) THEN
+            STAT = 1
+            RETURN
+         END IF
+    
+         IF (CH==STR(1:1)) THEN
+            IF (LEN(STR) == 1) THEN
+               STAT = 0
+               RETURN
+            END IF
+            CALL CHECK(UNIT, STR(2:), STAT)
+            IF (STAT == 0) RETURN
+         END IF
+    
+      END DO
+   END SUBROUTINE
+
+    
+   SUBROUTINE CHECK(UNIT, STR, STAT)
+      CHARACTER(*), INTENT(IN) :: STR
+      INTEGER, INTENT(IN) :: UNIT
+      INTEGER, INTENT(OUT) :: STAT
+      CHARACTER :: CH
+      INTEGER :: I, IO
+
+      STAT = 1
+      I = 0
+
+      DO
+         I = I + 1
+
+         READ(UNIT, IOSTAT=IO) CH
+
+         IF (IO/=0) RETURN
+
+         IF (CH/=STR(I:I)) RETURN
+
+         IF (I==LEN(STR)) THEN
+            STAT = 0
+            RETURN
+         END IF
+      END DO
+   END SUBROUTINE CHECK
+
+
 END MODULE tools

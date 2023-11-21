@@ -26,7 +26,7 @@ MODULE initialization
       CHARACTER*512      :: line
       INTEGER            :: ReasonEOF
 
-      CHARACTER*512      :: MIXTURE_DEFINITION, VSS_PARAMS_FILENAME, LINESOURCE_DEFINITION, WALL_DEFINITION
+      CHARACTER*512      :: MIXTURE_DEFINITION, VSS_PARAMS_FILENAME, LINESOURCE_DEFINITION, WALL_DEFINITION, MCC_BG_FILENAME
       CHARACTER*512      :: BC_DEFINITION, SOLENOID_DEFINITION
       CHARACTER*64       :: MIX_BOUNDINJECT_NAME, DSMC_COLL_MIX_NAME, MCC_BG_MIX_NAME, PIC_TYPE_STRING, PARTITION_STYLE_STRING
 
@@ -209,6 +209,10 @@ MODULE initialization
          IF (line=='MCC_background_mixture:') THEN
             READ(in1,*) MCC_BG_MIX_NAME
             MCC_BG_MIX = MIXTURE_NAME_TO_ID(MCC_BG_MIX_NAME)
+         END IF
+         IF (line=='MCC_background_file:') THEN
+            READ(in1,*) MCC_BG_FILENAME
+            CALL READ_MCC_BACKGROUND_FILE(MCC_BG_FILENAME)
          END IF
          IF (line=='VSS_parameters_file:')     THEN
             READ(in1,*) VSS_PARAMS_FILENAME
@@ -2421,6 +2425,82 @@ MODULE initialization
    END SUBROUTINE INITREACTIONS
 
 
+   SUBROUTINE READ_MCC_BACKGROUND_FILE(FILENAME)
+
+      IMPLICIT NONE
+
+      CHARACTER*512, INTENT(IN) :: FILENAME
+      CHARACTER*80      :: line
+      INTEGER, PARAMETER :: in5 = 5557
+      INTEGER            :: ios
+      INTEGER            :: ReasonEOF
+      INTEGER            :: N_STR, SP_ID, I, STAT
+      CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
+
+      ! Open input file for reading
+      !OPEN(UNIT=in5,FILE=FILENAME, STATUS='old',IOSTAT=ios)
+
+      IF (BOOL_BINARY_OUTPUT) THEN
+         OPEN(UNIT=in5, FILE=FILENAME, STATUS='OLD', IOSTAT=ios, ACCESS='STREAM', CONVERT='BIG_ENDIAN')
+      ELSE
+         OPEN(UNIT=in5, FILE=FILENAME, STATUS='OLD', IOSTAT=ios, FORM='FORMATTED')
+      END IF
+
+      IF (ios.NE.0) THEN
+         CALL ERROR_ABORT('Attention, vtk file not found! ABORTING.')
+      END IF
+
+      ALLOCATE(MCC_BG_CELL_NRHO(N_SPECIES, NCELLS))
+
+      ! ++++++++ Read until the end of file ++++++++
+      IF (BOOL_BINARY_OUTPUT) THEN
+         DO
+            CALL SKIP_TO(in5, 'nrho_mean_', STAT)
+
+            READ(in5, IOSTAT=ReasonEOF) line ! Read line
+            IF (ReasonEOF < 0) EXIT ! End of file reached
+
+            SP_ID = SPECIES_NAME_TO_ID(line)
+            IF (SP_ID == -1) CALL ERROR_ABORT('Error! Species in MCC background vtk file not found.')
+
+            WRITE(*,*) 'Found data for species ', SP_ID
+            CALL SKIP_TO(in5, ACHAR(10), STAT)
+
+            READ(in5, IOSTAT=ReasonEOF) MCC_BG_CELL_NRHO(SP_ID, :)
+            IF (ReasonEOF < 0) EXIT ! End of file reached
+
+
+            !IF (line(2:11) == 'nrho_mean_') THEN
+            !   SP_ID = SPECIES_NAME_TO_ID(line(12:30))
+            !   WRITE(*,*) 'Line found!: ', line(2:30)
+            !   IF (SP_ID == -1) CALL ERROR_ABORT('Error! Species in MCC background vtk file not found.')
+
+            !   READ(in5, IOSTAT=ReasonEOF) MCC_BG_CELL_NRHO(SP_ID, :)
+            !   IF (ReasonEOF < 0) EXIT ! End of file reached
+            !   WRITE(*,*) MCC_BG_CELL_NRHO(SP_ID, :)
+            !END IF
+         END DO ! Loop for reading input file
+      ELSE
+         DO
+            READ(in5, IOSTAT=ReasonEOF) line ! Read line
+            CALL SPLIT_STR(line, ' ', STRARRAY, N_STR)
+            IF (STRARRAY(1)(1:10) == 'nrho_mean_') THEN
+               SP_ID = SPECIES_NAME_TO_ID(STRARRAY(1)(11:))
+               IF (SP_ID == -1) CALL ERROR_ABORT('Error! Species in MCC background vtk file not found.')
+
+               READ(in5, IOSTAT=ReasonEOF) MCC_BG_CELL_NRHO(SP_ID, :)
+               IF (ReasonEOF < 0) EXIT ! End of file reached
+            END IF
+         END DO
+      END IF
+
+      CLOSE(in5) ! Close input file
+
+      BOOL_BG_DENSITY_FILE = .TRUE.
+
+      WRITE(*,*) 'Done reading.'
+
+   END SUBROUTINE READ_MCC_BACKGROUND_FILE
 
 
 END MODULE initialization

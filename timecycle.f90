@@ -1899,7 +1899,7 @@ MODULE timecycle
       IMPLICIT NONE
 
       INTEGER      :: JP1, JP2, JR, I, J, SP_ID1, SP_ID2, P1_SP_ID, P2_SP_ID, P3_SP_ID, NP_PROC_INITIAL
-      REAL(KIND=8) :: P_COLL, PTCE, rfp
+      REAL(KIND=8) :: P_COLL, PTCE, rfp, BG_NRHO
       REAL(KIND=8) :: SIGMA, OMEGA, CREF, ALPHA, FRAC
       REAL(KIND=8) :: PI2
       REAL(KIND=8), DIMENSION(3) :: C1, C2, GREL, W
@@ -1920,6 +1920,14 @@ MODULE timecycle
 
          DO J = 1, MIXTURES(MCC_BG_MIX)%N_COMPONENTS
             SP_ID2 = MIXTURES(MCC_BG_MIX)%COMPONENTS(J)%ID
+
+            IF (BOOL_BG_DENSITY_FILE) THEN
+               BG_NRHO = MCC_BG_CELL_NRHO(SP_ID2, particles(JP1)%IC)
+            ELSE
+               FRAC = MIXTURES(MCC_BG_MIX)%COMPONENTS(J)%MOLFRAC
+               BG_NRHO = FRAC*MCC_BG_DENS
+            END IF
+            IF (BG_NRHO == 0) CYCLE
             
             !SIGMA = PI * (0.5 * (SPECIES(SP_ID1)%DIAM + SPECIES(SP_ID2)%DIAM))**2
             !OMEGA = 0.5 * (SPECIES(SP_ID1)%OMEGA + SPECIES(SP_ID2)%OMEGA)
@@ -1944,8 +1952,7 @@ MODULE timecycle
             
 
             ! Compute collision probability
-            FRAC = MIXTURES(MCC_BG_MIX)%COMPONENTS(J)%MOLFRAC
-            P_COLL = 1 - exp(-DT*MCC_BG_DENS*FRAC*VR*SIGMA*(VR/CREF)**(1.-2.*OMEGA))
+            P_COLL = 1 - exp(-DT*BG_NRHO*VR*SIGMA*(VR/CREF)**(1.-2.*OMEGA))
 
             ! Try the collision
             IF (rf() < P_COLL) THEN ! Collision happens

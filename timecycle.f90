@@ -19,7 +19,7 @@ MODULE timecycle
 
       IMPLICIT NONE
    
-      INTEGER :: NP_TOT, NCOLL_TOT
+      INTEGER :: NP_TOT, NCOLL_TOT, NREAC_TOT
       REAL(KIND=8) :: CURRENT_TIME, CURRENT_CPU_TIME, EST_TIME
 
       CHARACTER(len=512) :: stringTMP
@@ -81,13 +81,16 @@ MODULE timecycle
          IF (MOD(tID, STATS_EVERY) .EQ. 0) THEN
             CALL MPI_REDUCE(NP_PROC, NP_TOT, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
             CALL MPI_REDUCE(TIMESTEP_COLL, NCOLL_TOT, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+            CALL MPI_REDUCE(TIMESTEP_REAC, NREAC_TOT, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
             
 
-            WRITE(stringTMP, '(A13,I8,A4,I8,A9,ES14.3,A17,F10.1,A27,F10.1,A28,I10,A25,I10)') '   Timestep: ', tID, ' of ', NT, &
+            WRITE(stringTMP, '(A13,I8,A4,I8,A9,ES14.3,A17,F10.1,A27,F10.1,A28,I10,A25,I10,A24,I10)') &
+                           '   Timestep: ', tID, ' of ', NT, &
                            ' - time: ', CURRENT_TIME, ' [s] - CPU time: ', CURRENT_CPU_TIME, &
                            ' [s] - est. time required: ', EST_TIME, &
                            ' [h] - number of particles: ', NP_TOT, &
-                           ' - number of collisions: ', NCOLL_TOT
+                           ' - number of collisions: ', NCOLL_TOT, &
+                           ' - number of reactions: ', NREAC_TOT
 
             CALL ONLYMASTERPRINT1(PROC_ID, TRIM(stringTMP))
 
@@ -422,8 +425,8 @@ MODULE timecycle
       REAL(KIND=8)       :: Xp, Yp, Zp, VXp, VYp, VZp, EROT, EVIB, DOMAIN_VOLUME
       INTEGER            :: CID
 
-      REAL(KIND=8), DIMENSION(3) :: V1, V2, V3
-      REAL(KIND=8)       :: XI, ETA, ETATEMP
+      REAL(KIND=8), DIMENSION(3) :: V1, V2, V3, V4
+      REAL(KIND=8)       :: P, Q, R, S, T, U
 
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
       REAL(KIND=8)  :: M
@@ -443,43 +446,73 @@ MODULE timecycle
             
             S_ID = MIXTURES(VOLUME_INJECT_TASKS(ITASK)%MIX_ID)%COMPONENTS(i)%ID
             IF (GRID_TYPE == UNSTRUCTURED) THEN
-               DO IC = 1, U2D_GRID%NUM_CELLS
+
+               DO IC = 1, NCELLS
                   ! Compute number of particles of this species per process to be created in this cell.
                   NP_INIT = RANDINT(DT*VOLUME_INJECT_TASKS(ITASK)%NRHODOT/(FNUM*SPECIES(S_ID)%SPWT)*CELL_VOLUMES(IC)* &
                               MIXTURES(VOLUME_INJECT_TASKS(ITASK)%MIX_ID)%COMPONENTS(i)%MOLFRAC/N_MPI_THREADS)
                   IF (NP_INIT == 0) CYCLE
 
-                  V1 = U2D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(1,IC))
-                  V2 = U2D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(2,IC))
-                  V3 = U2D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(3,IC))
+                  IF (DIMS == 2) THEN
+                     V1 = U2D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(1,IC))
+                     V2 = U2D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(2,IC))
+                     V3 = U2D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(3,IC))
+                     V4 = 0
+                  ELSE
+                     V1 = U3D_GRID%NODE_COORDS(:,U3D_GRID%CELL_NODES(1,IC))
+                     V2 = U3D_GRID%NODE_COORDS(:,U3D_GRID%CELL_NODES(2,IC))
+                     V3 = U3D_GRID%NODE_COORDS(:,U3D_GRID%CELL_NODES(3,IC))
+                     V4 = U3D_GRID%NODE_COORDS(:,U3D_GRID%CELL_NODES(4,IC))
+                  END IF
 
                   DO IP = 1, NP_INIT
 
                      ! Create particle position randomly in the cell
-                     XI = rf()
-                     ETATEMP = rf()
-                     IF (ETATEMP > 1-XI) THEN
-                        ETA = 1-XI
-                        XI = 1-ETATEMP
-                     ELSE
-                        ETA = ETATEMP
+                     S = rf()
+                     T = rf()
+                     U = rf()
+                     
+                     IF (S+T > 1) THEN
+                        S = 1-S; T = 1-T
                      END IF
 
-                     XP = V1(1) + (V2(1)-V1(1))*XI + (V3(1)-V1(1))*ETA
-                     YP = V1(2) + (V2(2)-V1(2))*XI + (V3(2)-V1(2))*ETA
-                     ZP = ZMIN + (ZMAX-ZMIN)*rf()
+                     IF (DIMS == 2) THEN
+                        XP = V1(1) + (V2(1)-V1(1))*S + (V3(1)-V1(1))*T
+                        YP = V1(2) + (V2(2)-V1(2))*S + (V3(2)-V1(2))*T
+                        IF (AXI) THEN
+                           ZP = 0.d0
+                        ELSE
+                           ZP = ZMIN + (ZMAX-ZMIN)*U
+                        END IF
+                     ELSE
+                        ! http://vcg.isti.cnr.it/publications/papers/rndtetra_a.pdf
 
-                     !IF (XP > 0.25 .OR. XP < -0.25 .OR. YP > 0.25 .OR. YP < -0.25) CYCLE
+                        IF (S+T+U <= 1) THEN
+                           P = S; Q = T; R = U
+                        ELSE
+                           IF (T+U > 1) THEN
+                              P = S; Q = 1-U; R = 1-S-T
+                           ELSE
+                              P = 1-T-U; Q = T; R = S+T+U-1
+                           END IF
+                        END IF
+
+                        XP = V1(1) + (V2(1)-V1(1))*P + (V3(1)-V1(1))*Q + (V4(1)-V1(1))*R
+                        YP = V1(2) + (V2(2)-V1(2))*P + (V3(2)-V1(2))*Q + (V4(2)-V1(2))*R
+                        ZP = V1(3) + (V2(3)-V1(3))*P + (V3(3)-V1(3))*Q + (V4(3)-V1(3))*R
+                     END IF
+
+                     IF (XP > 0 .OR. XP  < -0.015) CYCLE
 
                      ! Assign velocity and energy following a Boltzmann distribution
                      M = SPECIES(S_ID)%MOLECULAR_MASS
                      CALL MAXWELL(VOLUME_INJECT_TASKS(ITASK)%UX, &
-                                  VOLUME_INJECT_TASKS(ITASK)%UY, &
-                                  VOLUME_INJECT_TASKS(ITASK)%UZ, &
-                                  VOLUME_INJECT_TASKS(ITASK)%TTRAX, &
-                                  VOLUME_INJECT_TASKS(ITASK)%TTRAY, &
-                                  VOLUME_INJECT_TASKS(ITASK)%TTRAZ, &
-                                  VXP, VYP, VZP, M)
+                                 VOLUME_INJECT_TASKS(ITASK)%UY, &
+                                 VOLUME_INJECT_TASKS(ITASK)%UZ, &
+                                 VOLUME_INJECT_TASKS(ITASK)%TTRAX, &
+                                 VOLUME_INJECT_TASKS(ITASK)%TTRAY, &
+                                 VOLUME_INJECT_TASKS(ITASK)%TTRAZ, &
+                                 VXP, VYP, VZP, M)
 
                      CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, VOLUME_INJECT_TASKS(ITASK)%TROT, EROT)
                      CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, VOLUME_INJECT_TASKS(ITASK)%TVIB, EVIB)
@@ -488,6 +521,7 @@ MODULE timecycle
                      CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
                   END DO
                END DO
+               
             ELSE ! Structured grid
                ! Compute number of particles of this species per process to be created.
                !IF (AXI) THEN
@@ -1078,7 +1112,7 @@ MODULE timecycle
                         DX = (U2D_GRID%NODE_COORDS(1,U2D_GRID%CELL_NODES(I,IC)) - particles(IP)%X) * U2D_GRID%EDGE_NORMAL(1,I,IC) &
                            + (U2D_GRID%NODE_COORDS(2,U2D_GRID%CELL_NODES(I,IC)) - particles(IP)%Y) * U2D_GRID%EDGE_NORMAL(2,I,IC)
                         ! Check if a collision happens (sooner than previously calculated)
-                        IF (VN .GE. 0. .AND. VN * DTCOLL .GT. DX) THEN
+                        IF (VN .GE. 0. .AND. VN * DTCOLL .GE. DX) THEN
 
                            DTCOLL = DX/VN
                            BOUNDCOLL = I
@@ -1097,7 +1131,7 @@ MODULE timecycle
                            + (U3D_GRID%NODE_COORDS(2,U3D_GRID%CELL_NODES(I,IC)) - particles(IP)%Y) * U3D_GRID%FACE_NORMAL(2,I,IC) &
                            + (U3D_GRID%NODE_COORDS(3,U3D_GRID%CELL_NODES(I,IC)) - particles(IP)%Z) * U3D_GRID%FACE_NORMAL(3,I,IC)
                         ! Check if a collision happens (sooner than previously calculated)
-                        IF (VN .GE. 0. .AND. VN * DTCOLL .GT. DX) THEN
+                        IF (VN .GE. 0. .AND. VN * DTCOLL .GE. DX) THEN
 
                            DTCOLL = DX/VN
                            BOUNDCOLL = I
@@ -1900,7 +1934,7 @@ MODULE timecycle
 
       INTEGER      :: JP1, JP2, JR, I, J, SP_ID1, SP_ID2, P1_SP_ID, P2_SP_ID, P3_SP_ID, NP_PROC_INITIAL
       REAL(KIND=8) :: P_COLL, PTCE, rfp, BG_NRHO
-      REAL(KIND=8) :: SIGMA, OMEGA, CREF, ALPHA, FRAC
+      REAL(KIND=8) :: SIGMA, OMEGA, CREF, ALPHA, FRAC, SIGMA_R
       REAL(KIND=8) :: PI2
       REAL(KIND=8), DIMENSION(3) :: C1, C2, GREL, W
       REAL(KIND=8) :: GX, GY, GZ, G
@@ -1913,6 +1947,7 @@ MODULE timecycle
       PI2 = 2*PI
 
       TIMESTEP_COLL = 0
+      TIMESTEP_REAC = 0
 
       NP_PROC_INITIAL = NP_PROC
       DO JP1 = 1,NP_PROC_INITIAL
@@ -1989,6 +2024,8 @@ MODULE timecycle
                particles(JP1)%EVIB + particles(JP2)%EVIB
                SKIP = .FALSE.
                DO JR = 1, N_REACTIONS
+                  !WRITE(*,*) 'Checking reaction with R1 = ', REACTIONS(JR)%R1_SP_ID, 'R2 = ', REACTIONS(JR)%R2_SP_ID, &
+                  !' against particles with ids ',  SP_ID1, SP_ID2
                   ! Check if species in collision belong to this reaction.
                   ! If they don't, check the next reaction.
                   ! Not very efficient with many reactions
@@ -2004,11 +2041,22 @@ MODULE timecycle
       
                   EA = REACTIONS(JR)%EA
                   IF (ECOLL .LE. EA) CYCLE
+
+                  IF (REACTIONS(JR)%TYPE == TCE) THEN
+                     IF (ECOLL .LE. EA) CYCLE
+                     PTCE = REACTIONS(JR)%C1 * (ECOLL-EA)**REACTIONS(JR)%C2 * (1.-EA/ECOLL)**REACTIONS(JR)%C3
+                  ELSE IF (REACTIONS(JR)%TYPE == LXCAT) THEN
+                     SIGMA_R = INTERP_CS(ETR, REACTIONS(JR)%TABLE_ENERGY, REACTIONS(JR)%TABLE_CS)
+                     PTCE = SIGMA_R / (SIGMA*(VR/CREF)**(1.-2.*OMEGA))
+                  ELSE
+                     PTCE = 0
+                  END IF
                   rfp = rf()
-                  PTCE = REACTIONS(JR)%C1 * (ECOLL-EA)**REACTIONS(JR)%C2 * (1.-EA/ECOLL)**REACTIONS(JR)%C3
                   ! Here we suppose that the probability is so low that we can test sequentially with acceptable error
                   IF (rfp .LT. PTCE) THEN
                      SKIP = .TRUE.
+                     TIMESTEP_REAC = TIMESTEP_REAC + 1
+                     !WRITE(*,*) 'Reacting!'
                      ! React
                      ECOLL = ECOLL - EA
 

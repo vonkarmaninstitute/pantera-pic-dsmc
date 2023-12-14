@@ -291,6 +291,7 @@ TYPE(UNSTRUCTURED_3D_GRID_DATA_STRUCTURE) :: U3D_GRID
    LOGICAL           :: BOOL_BG_DENSITY_FILE = .FALSE.
    INTEGER           :: DSMC_COLL_MIX
    INTEGER           :: TIMESTEP_COLL
+   INTEGER           :: TIMESTEP_REAC
    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: VSS_GREFS ! Matrix of reference relative velocities for VSS
    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: VSS_SIGMAS ! Matrix of reference cross sections for VSS
    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: VSS_ALPHAS ! Matrix of reference scattering coeff. for VSS

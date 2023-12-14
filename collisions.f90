@@ -64,6 +64,7 @@ MODULE collisions
    
       ! Compute collisions between particles
       TIMESTEP_COLL = 0
+      TIMESTEP_REAC = 0
       DO JC = 1, NCELLS
          IF (NPC(JC) .GT. 1) THEN
             ! For cells where there is at least two particles, call the collision procedure.
@@ -136,6 +137,7 @@ MODULE collisions
    
       ! Compute collisions between particles
       TIMESTEP_COLL = 0
+      TIMESTEP_REAC = 0
       DO JC = 1, NCELLS
          IF (NPC(JC) .GT. 1) THEN
             ! For cells where there is at least two particles, call the collision procedure.
@@ -172,8 +174,8 @@ MODULE collisions
 
       INTEGER      :: IOFJ,IOLJ,NPCJ,JP1,JP2,JCOL, JP, INDJ, I, JR
       INTEGER      :: SP_ID1, SP_ID2, P1_SP_ID, P2_SP_ID, P3_SP_ID
-      INTEGER      :: NCOLL,NCOLLMAX_INT, IDX
-      REAL(KIND=8) :: SIGMA, COLLSIGMA, ALPHA, NCOLLMAX,FCORR,VR,VR2,rfp
+      INTEGER      :: NCOLL,NCOLLMAX_INT
+      REAL(KIND=8) :: SIGMA, COLLSIGMA, ALPHA, NCOLLMAX,FCORR,VR,VR2,rfp,SIGMA_R
       REAL(KIND=8) :: OMEGA, CREF, MRED, COLLPROB, PTCE
       REAL(KIND=8) :: TRDOF, PROT1, PROT2, PVIB1, PVIB2, EI, ETR, ECOLL, TOTDOF, EA, EROT, EVIB
       !REAL(KIND=8) :: B,C,EINT,ETOT,ETR,PHI,SITETA,VRX,VRY,VRZ
@@ -356,9 +358,8 @@ MODULE collisions
                   IF (ECOLL .LE. EA) CYCLE
                   PTCE = REACTIONS(JR)%C1 * (ECOLL-EA)**REACTIONS(JR)%C2 * (1.-EA/ECOLL)**REACTIONS(JR)%C3
                ELSE IF (REACTIONS(JR)%TYPE == LXCAT) THEN
-                  IDX = BINARY_SEARCH(ETR, REACTIONS(JR)%TABLE_ENERGY) ! to manage the external cases!
-                  PTCE = REACTIONS(JR)%TABLE_CS(IDX) + (ETR - REACTIONS(JR)%TABLE_ENERGY(IDX)) * &
-                         (REACTIONS(JR)%TABLE_CS(IDX+1)-REACTIONS(JR)%TABLE_CS(IDX))
+                  SIGMA_R = INTERP_CS(ETR, REACTIONS(JR)%TABLE_ENERGY, REACTIONS(JR)%TABLE_CS)
+                  PTCE = SIGMA_R / (SIGMA*(VR/CREF)**(1.-2.*OMEGA))
                ELSE
                   PTCE = 0
                END IF
@@ -366,6 +367,7 @@ MODULE collisions
                rfp = rf()
                IF (rfp .LT. PTCE) THEN
                   SKIP = .TRUE.
+                  TIMESTEP_REAC = TIMESTEP_REAC + 1
                   ! React
                   ECOLL = ECOLL - EA
 

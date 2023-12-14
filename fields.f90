@@ -1188,18 +1188,28 @@ MODULE fields
       REAL(KIND=8), DIMENSION(3), INTENT(INOUT) :: E
       INTEGER, INTENT(IN) :: JP
       REAL(KIND=8) :: RF_XMIN, RF_XMAX, RF_YMAX
-      REAL(KIND=8) :: RF_FREQ, NOVERL, COIL_CURRENT
+      REAL(KIND=8) :: RF_FREQ, NOVERL, COIL_CURRENT, EMAG, RP
 
       RF_XMIN = -0.08d0
       RF_XMAX = -0.055d0
       RF_YMAX = 0.015d0
 
       RF_FREQ = 13.56d6
-      NOVERL = 250.d0
-      COIL_CURRENT = 1.d0
+      NOVERL = 250.d0 ! Number of coil turns per meter
+      COIL_CURRENT = 10.d0
 
-      IF (particles(JP)%X > RF_XMIN .AND. particles(JP)%X < RF_XMAX .AND. particles(JP)%Y < RF_YMAX) THEN
-         E(3) = E(3) - MU0*PI*RF_FREQ*NOVERL*COIL_CURRENT * particles(JP)%Y * SIN(2*PI*RF_FREQ*tID*DT)
+      IF (DIMS == 2) THEN
+         IF (particles(JP)%X > RF_XMIN .AND. particles(JP)%X < RF_XMAX .AND. particles(JP)%Y < RF_YMAX) THEN
+            E(3) = E(3) - MU0*PI*RF_FREQ*NOVERL*COIL_CURRENT * particles(JP)%Y * SIN(2*PI*RF_FREQ*tID*DT)
+         END IF
+      ELSE IF (DIMS == 3) THEN
+         IF (particles(JP)%X > -0.015 .AND. particles(JP)%X < 0) THEN
+            RP = SQRT(particles(JP)%Y**2+particles(JP)%Z**2)
+            EMAG = MU0*PI*RF_FREQ*NOVERL*COIL_CURRENT*RP*SIN(2*PI*RF_FREQ*tID*DT)
+            E(2) = E(2) -particles(JP)%Z/RP * EMAG
+            E(3) = E(3) +particles(JP)%Y/RP * EMAG
+         END IF
+         
       END IF
 
    END SUBROUTINE APPLY_RF_E_FIELD

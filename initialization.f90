@@ -1493,6 +1493,8 @@ MODULE initialization
                NROWS = NROWS + 1
             END DO
             REWIND(in4)
+            IF (ALLOCATED(NEW_REACTION%TABLE_ENERGY)) DEALLOCATE(NEW_REACTION%TABLE_ENERGY)
+            IF (ALLOCATED(NEW_REACTION%TABLE_CS)) DEALLOCATE(NEW_REACTION%TABLE_CS)
             ALLOCATE(NEW_REACTION%TABLE_ENERGY(NROWS))
             ALLOCATE(NEW_REACTION%TABLE_CS(NROWS))
             DO
@@ -1509,13 +1511,15 @@ MODULE initialization
 
             CLOSE(in4)
 
+            NEW_REACTION%TABLE_ENERGY = NEW_REACTION%TABLE_ENERGY * QE ! Table is in [eV] but we need [J].
+
          END IF
 
 
          IF (ReasonEOF < 0) EXIT ! End of file reached
          
          IF (ALLOCATED(REACTIONS)) THEN
-            ALLOCATE(TEMP_REACTIONS(N_REACTIONS+1)) ! Append the mixture to the list
+            ALLOCATE(TEMP_REACTIONS(N_REACTIONS+1)) ! Append the reaction to the list
             TEMP_REACTIONS(1:N_REACTIONS) = REACTIONS(1:N_REACTIONS)
             CALL MOVE_ALLOC(TEMP_REACTIONS, REACTIONS)
          ELSE
@@ -1548,7 +1552,7 @@ MODULE initialization
                WRITE(*,*) 'Reaction ', index, ' is from tabulated data in LxCat format.'
                WRITE(*,*) 'Activation energy: ', REACTIONS(index)%EA
                WRITE(*,*) 'Here are the energies (eV): ', REACTIONS(index)%TABLE_ENERGY
-               WRITE(*,*) 'And here are the cross sections (1/m^2): ', REACTIONS(index)%TABLE_CS
+               WRITE(*,*) 'And here are the cross sections (m^2): ', REACTIONS(index)%TABLE_CS
             ELSE
                WRITE(*,*) 'Reaction ', index, ' is not defined!'
             END IF
@@ -1846,7 +1850,7 @@ MODULE initialization
                         ZP = V1(3) + (V2(3)-V1(3))*P + (V3(3)-V1(3))*Q + (V4(3)-V1(3))*R
                      END IF
 
-                     !IF (XP > 0.6 .OR. XP  < 0.4 .OR. YP > 0.6 .OR. YP < 0.4) CYCLE
+                     IF (XP > 0 .OR. XP  < -0.015) CYCLE
 
                      ! Assign velocity and energy following a Boltzmann distribution
                      M = SPECIES(S_ID)%MOLECULAR_MASS
@@ -2434,7 +2438,7 @@ MODULE initialization
       INTEGER, PARAMETER :: in5 = 5557
       INTEGER            :: ios
       INTEGER            :: ReasonEOF
-      INTEGER            :: N_STR, SP_ID, I, STAT
+      INTEGER            :: N_STR, SP_ID, STAT
       CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
 
       ! Open input file for reading
@@ -2468,17 +2472,6 @@ MODULE initialization
 
             READ(in5, IOSTAT=ReasonEOF) MCC_BG_CELL_NRHO(SP_ID, :)
             IF (ReasonEOF < 0) EXIT ! End of file reached
-
-
-            !IF (line(2:11) == 'nrho_mean_') THEN
-            !   SP_ID = SPECIES_NAME_TO_ID(line(12:30))
-            !   WRITE(*,*) 'Line found!: ', line(2:30)
-            !   IF (SP_ID == -1) CALL ERROR_ABORT('Error! Species in MCC background vtk file not found.')
-
-            !   READ(in5, IOSTAT=ReasonEOF) MCC_BG_CELL_NRHO(SP_ID, :)
-            !   IF (ReasonEOF < 0) EXIT ! End of file reached
-            !   WRITE(*,*) MCC_BG_CELL_NRHO(SP_ID, :)
-            !END IF
          END DO ! Loop for reading input file
       ELSE
          DO
@@ -2488,6 +2481,7 @@ MODULE initialization
                SP_ID = SPECIES_NAME_TO_ID(STRARRAY(1)(11:))
                IF (SP_ID == -1) CALL ERROR_ABORT('Error! Species in MCC background vtk file not found.')
 
+               WRITE(*,*) 'Found data for species ', SP_ID
                READ(in5, IOSTAT=ReasonEOF) MCC_BG_CELL_NRHO(SP_ID, :)
                IF (ReasonEOF < 0) EXIT ! End of file reached
             END IF

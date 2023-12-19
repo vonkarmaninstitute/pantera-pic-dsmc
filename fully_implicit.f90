@@ -2959,4 +2959,124 @@ MODULE fully_implicit
    END SUBROUTINE DEPOSIT_CHARGE
 
 
+   SUBROUTINE SET_WALL_POTENTIAL ! Call this before deposit_charge!
+
+      IMPLICIT NONE
+      INTEGER :: V1, V2, V3, V4, I, J, EDGE_PG
+      REAL(KIND=8) :: POTENTIAL
+
+
+
+      IF (GRID_TYPE == UNSTRUCTURED) THEN
+
+         IF (DIMS == 2) THEN
+
+            DO I = 1, NCELLS
+               V1 = U2D_GRID%CELL_NODES(1,I)
+               V2 = U2D_GRID%CELL_NODES(2,I)
+               V3 = U2D_GRID%CELL_NODES(3,I)
+               DO J = 1, 3
+                  EDGE_PG = U2D_GRID%CELL_EDGES_PG(J, I)
+                  IF (EDGE_PG .NE. -1) THEN
+                     IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC &
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == RF_VOLTAGE_BC &
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC) THEN
+                        
+                        IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC) THEN
+                           POTENTIAL = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                        ELSE IF (GRID_BC(EDGE_PG)%FIELD_BC == RF_VOLTAGE_BC) THEN
+                           POTENTIAL = GRID_BC(EDGE_PG)%WALL_POTENTIAL &
+                                     + 0.5*GRID_BC(EDGE_PG)%WALL_RF_POTENTIAL*SIN(2*PI*GRID_BC(EDGE_PG)%RF_FREQUENCY*tID*DT)
+                        ELSE IF (GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC) THEN
+                           POTENTIAL = GRID_BC(EDGE_PG)%WALL_POTENTIAL &
+                                     + 0.5*GRID_BC(EDGE_PG)%WALL_RF_POTENTIAL*SIN(2*PI*GRID_BC(EDGE_PG)%RF_FREQUENCY*tID*DT)
+                        END IF
+
+                        IF (J==1) THEN
+                           DIRICHLET(V1-1) = POTENTIAL
+                           DIRICHLET(V2-1) = POTENTIAL
+                           IS_DIRICHLET(V1-1) = .TRUE.; IS_DIRICHLET(V2-1) = .TRUE.
+                        ELSE IF (J==2) THEN
+                           DIRICHLET(V2-1) = POTENTIAL
+                           DIRICHLET(V3-1) = POTENTIAL
+                           IS_DIRICHLET(V2-1) = .TRUE.; IS_DIRICHLET(V3-1) = .TRUE.
+                        ELSE
+                           DIRICHLET(V3-1) = POTENTIAL
+                           DIRICHLET(V1-1) = POTENTIAL
+                           IS_DIRICHLET(V3-1) = .TRUE.; IS_DIRICHLET(V1-1) = .TRUE.
+                        END IF
+                     END IF
+                  END IF
+               END DO
+            END DO
+
+         ELSE IF (DIMS == 3) THEN
+
+            DO I = 1, NCELLS
+               V1 = U3D_GRID%CELL_NODES(1,I)
+               V2 = U3D_GRID%CELL_NODES(2,I)
+               V3 = U3D_GRID%CELL_NODES(3,I)
+               V4 = U3D_GRID%CELL_NODES(4,I)
+
+               DO J = 1, 4
+                  EDGE_PG = U3D_GRID%CELL_FACES_PG(J, I)
+                  IF (EDGE_PG .NE. -1) THEN
+                     IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC &
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == RF_VOLTAGE_BC &
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC) THEN
+
+                        IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC) THEN
+                           POTENTIAL = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                        ELSE IF (GRID_BC(EDGE_PG)%FIELD_BC == RF_VOLTAGE_BC) THEN
+                           POTENTIAL = GRID_BC(EDGE_PG)%WALL_POTENTIAL &
+                                       + 0.5*GRID_BC(EDGE_PG)%WALL_RF_POTENTIAL*SIN(2*PI*GRID_BC(EDGE_PG)%RF_FREQUENCY*tID*DT)
+                        ELSE IF (GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC) THEN
+                           POTENTIAL = GRID_BC(EDGE_PG)%WALL_POTENTIAL &
+                                       + 0.5*GRID_BC(EDGE_PG)%WALL_RF_POTENTIAL*SIN(2*PI*GRID_BC(EDGE_PG)%RF_FREQUENCY*tID*DT)
+                        END IF
+
+                        IF (J==1) THEN
+                           DIRICHLET(V1-1) = POTENTIAL
+                           DIRICHLET(V3-1) = POTENTIAL
+                           DIRICHLET(V2-1) = POTENTIAL
+                           IS_DIRICHLET(V1-1) = .TRUE.
+                           IS_DIRICHLET(V3-1) = .TRUE.
+                           IS_DIRICHLET(V2-1) = .TRUE.
+                        ELSE IF (J==2) THEN
+                           DIRICHLET(V1-1) = POTENTIAL
+                           DIRICHLET(V2-1) = POTENTIAL
+                           DIRICHLET(V4-1) = POTENTIAL
+                           IS_DIRICHLET(V1-1) = .TRUE.
+                           IS_DIRICHLET(V2-1) = .TRUE.
+                           IS_DIRICHLET(V4-1) = .TRUE.
+                        ELSE IF (J == 3) THEN
+                           DIRICHLET(V2-1) = POTENTIAL
+                           DIRICHLET(V3-1) = POTENTIAL
+                           DIRICHLET(V4-1) = POTENTIAL
+                           IS_DIRICHLET(V2-1) = .TRUE.
+                           IS_DIRICHLET(V3-1) = .TRUE.
+                           IS_DIRICHLET(V4-1) = .TRUE.
+                        ELSE
+                           DIRICHLET(V1-1) = POTENTIAL
+                           DIRICHLET(V4-1) = POTENTIAL
+                           DIRICHLET(V3-1) = POTENTIAL
+                           IS_DIRICHLET(V1-1) = .TRUE.
+                           IS_DIRICHLET(V4-1) = .TRUE.
+                           IS_DIRICHLET(V3-1) = .TRUE.
+                        END IF
+                     END IF
+                  END IF
+               END DO
+            END DO
+
+         END IF
+
+      END IF
+
+
+
+
+   END SUBROUTINE SET_WALL_POTENTIAL
+
+
 END MODULE fully_implicit

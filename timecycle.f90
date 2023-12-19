@@ -32,6 +32,7 @@ MODULE timecycle
 
       IF (PIC_TYPE .NE. NONE) THEN
 
+         CALL SET_WALL_POTENTIAL
          CALL DEPOSIT_CHARGE(particles)
          CALL SETUP_POISSON
          CALL SOLVE_POISSON
@@ -128,7 +129,7 @@ MODULE timecycle
          ! ########### Advect particles and update field ############################################
 
          IF (PIC_TYPE == EXPLICIT) THEN
-
+            CALL SET_WALL_POTENTIAL
             CALL DEPOSIT_CHARGE(particles)
 
             CALL TIMER_START(2)
@@ -143,7 +144,7 @@ MODULE timecycle
          ELSE IF (PIC_TYPE == EXPLICITLIMITED) THEN   
            
             CALL ASSEMBLE_POISSON
-
+            CALL SET_WALL_POTENTIAL
             CALL DEPOSIT_CHARGE(particles)
 
             CALL TIMER_START(2)
@@ -173,6 +174,7 @@ MODULE timecycle
          ELSE IF (PIC_TYPE == FULLYIMPLICIT) THEN
 
             CALL TIMER_START(2)
+            CALL SET_WALL_POTENTIAL
             CALL SOLVE_POISSON_FULLY_IMPLICIT
             CALL COMPUTE_E_FIELD
             CALL TIMER_STOP(2)

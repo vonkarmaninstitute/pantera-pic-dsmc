@@ -1029,6 +1029,17 @@ MODULE initialization
          !       END IF
          !    END DO
          ! END DO
+      ELSE IF (STRARRAY(2) == 'rf_voltage') THEN
+         GRID_BC(IPG)%FIELD_BC = RF_VOLTAGE_BC
+         READ(STRARRAY(3), '(ES14.0)') GRID_BC(IPG)%WALL_RF_POTENTIAL
+         READ(STRARRAY(4), '(ES14.0)') GRID_BC(IPG)%WALL_POTENTIAL
+         READ(STRARRAY(5), '(ES14.0)') GRID_BC(IPG)%RF_FREQUENCY
+      ELSE IF (STRARRAY(2) == 'decoupled_rf_voltage') THEN
+         GRID_BC(IPG)%FIELD_BC = DECOUPLED_RF_VOLTAGE_BC
+         READ(STRARRAY(3), '(ES14.0)') GRID_BC(IPG)%WALL_RF_POTENTIAL
+         READ(STRARRAY(4), '(ES14.0)') GRID_BC(IPG)%WALL_POTENTIAL
+         READ(STRARRAY(5), '(ES14.0)') GRID_BC(IPG)%RF_FREQUENCY
+         READ(STRARRAY(6), '(ES14.0)') GRID_BC(IPG)%CAPACITANCE
       ELSE
          CALL ERROR_ABORT('Error in boundary condition definition.')
       END IF

@@ -17,11 +17,11 @@
 Dimensions:
     2
 Axisymmetric:
-    .TRUE.
+    .FALSE.
 Number_of_cells:
     1    1    1
 Domain_limits:
-    -1.0    1.0    0.0    1.0    -3.141592654    3.141592654
+    0.0    1.0    0.0    1.0    -0.5    0.5
 Domain_periodicity:
     .FALSE.   .FALSE.   .FALSE.
 Domain_specular:
@@ -32,9 +32,9 @@ Boundary_temperature:
     300.0
     
 PIC_type:
-    none
-!Mesh_file_SU2:
-!    'testmesh.su2'
+    explicit
+Mesh_file_SU2:
+    'testbox1.su2'
 Bool_dump_moments:
     .FALSE.
 Bool_dump_fluxes:
@@ -53,7 +53,7 @@ Fnum:  ! Ratio of real-to-simulated particles
 Timestep:
     1.0e-9
 Number_of_timesteps:
-    1
+    1000
 Stats_every:
     1
 
@@ -117,8 +117,8 @@ Thermal_bath_Ttr:
 
 
 ! ========= Reactions ==============================
-Reactions_file:
-    ar.react
+!Reactions_file:
+!    ar.react
 
 !Wall_reactions_file:
 !    ar.wall
@@ -170,8 +170,17 @@ Reactions_file:
 !    Emitter    Argon    1.0e15    0.0    0.0    0.0    300.0    300.0    300.0
 
     
-Solenoid_field:
-    -0.135     0.09    -0.065    0.15    32    25    15.0
+!Solenoid_field:
+!    -0.135     0.09    -0.065    0.15    32    25    15.0
+    
+Boundary_condition:
+    Ground    dirichlet    0.0
+
+Boundary_condition:
+    Driven    rf_voltage    1000.0    250.0    13.56e6
+
+Boundary_condition:
+    Sides    neumann    0.0
     
 ! ========= MPI parallelization =====================
 ! == Style for MPI domain partition can be:
@@ -184,7 +193,7 @@ Solenoid_field:
 ! We expect the number of processes to be N_BLOCKS_X*N_BLOCKS_Y
 
 Partition_style:
-    1
+    stripsx
 
 Partition_num_blocks:
     1  96

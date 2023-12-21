@@ -1185,11 +1185,11 @@ MODULE fields
 
 
 
-   SUBROUTINE APPLY_RF_E_FIELD(JP, E)
+   SUBROUTINE APPLY_RF_EB_FIELD(JP, E, B)
 
       IMPLICIT NONE
 
-      REAL(KIND=8), DIMENSION(3), INTENT(INOUT) :: E
+      REAL(KIND=8), DIMENSION(3), INTENT(INOUT) :: E, B
       INTEGER, INTENT(IN) :: JP
       REAL(KIND=8) :: RF_XMIN, RF_XMAX, RF_YMAX
       REAL(KIND=8) :: RF_FREQ, NOVERL, COIL_CURRENT, EMAG, RP
@@ -1205,6 +1205,7 @@ MODULE fields
       IF (DIMS == 2) THEN
          IF (particles(JP)%X > RF_XMIN .AND. particles(JP)%X < RF_XMAX .AND. particles(JP)%Y < RF_YMAX) THEN
             E(3) = E(3) - MU0*PI*RF_FREQ*NOVERL*COIL_CURRENT * particles(JP)%Y * SIN(2*PI*RF_FREQ*tID*DT)
+            B(1) = B(1) + MU0*NOVERL*COIL_CURRENT * COS(2*PI*RF_FREQ*tID*DT)
          END IF
       ELSE IF (DIMS == 3) THEN
          IF (particles(JP)%X > -0.015 .AND. particles(JP)%X < 0) THEN
@@ -1212,6 +1213,8 @@ MODULE fields
             EMAG = MU0*PI*RF_FREQ*NOVERL*COIL_CURRENT*RP*SIN(2*PI*RF_FREQ*tID*DT)
             E(2) = E(2) -particles(JP)%Z/RP * EMAG
             E(3) = E(3) +particles(JP)%Y/RP * EMAG
+
+            B(1) = B(1) + MU0*NOVERL*COIL_CURRENT * COS(2*PI*RF_FREQ*tID*DT)
          END IF
          
       END IF

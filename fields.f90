@@ -1210,7 +1210,7 @@ MODULE fields
             EMAG = MU0*PI*RF_FREQ*NOVERL*COIL_CURRENT * particles(JP)%Y * SIN(2*PI*RF_FREQ*tID*DT)
             E(3) = E(3) - EMAG
 
-            FIELD_POWER = FIELD_POWER + PARTICLE_CHARGE*(particles(JP)%VZ*EMAG)
+            FIELD_POWER = FIELD_POWER + FNUM * PARTICLE_CHARGE * (particles(JP)%VZ*EMAG)
 
             B(1) = B(1) + MU0*NOVERL*COIL_CURRENT * COS(2*PI*RF_FREQ*tID*DT)
          END IF
@@ -1221,7 +1221,7 @@ MODULE fields
             E(2) = E(2) -particles(JP)%Z/RP * EMAG
             E(3) = E(3) +particles(JP)%Y/RP * EMAG
 
-            FIELD_POWER = FIELD_POWER + PARTICLE_CHARGE * &
+            FIELD_POWER = FIELD_POWER + FNUM * PARTICLE_CHARGE * &
             (-particles(JP)%Z/RP * EMAG * particles(JP)%VY &
             + particles(JP)%Y/RP * EMAG * particles(JP)%VZ)
 

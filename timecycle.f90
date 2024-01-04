@@ -88,7 +88,7 @@ MODULE timecycle
 
             
 
-            WRITE(stringTMP, '(A13,I8,A4,I8,A9,ES14.3,A17,F10.1,A27,F10.1,A28,I10,A25,I10,A24,I10,A23,F10.3,A4)') &
+            WRITE(stringTMP, '(A13,I8,A4,I8,A9,ES14.3,A17,F10.1,A27,F10.1,A28,I10,A25,I10,A24,I10,A23,ES14.3,A4)') &
                            '   Timestep: ', tID, ' of ', NT, &
                            ' - time: ', CURRENT_TIME, ' [s] - CPU time: ', CURRENT_CPU_TIME, &
                            ' [s] - est. time required: ', EST_TIME, &

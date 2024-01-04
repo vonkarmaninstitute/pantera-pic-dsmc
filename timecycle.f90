@@ -88,14 +88,14 @@ MODULE timecycle
 
             
 
-            WRITE(stringTMP, '(A13,I8,A4,I8,A9,ES14.3,A17,F10.1,A27,F10.1,A28,I10,A25,I10,A24,I10)') &
+            WRITE(stringTMP, '(A13,I8,A4,I8,A9,ES14.3,A17,F10.1,A27,F10.1,A28,I10,A25,I10,A24,I10,A23,F10.3,A4)') &
                            '   Timestep: ', tID, ' of ', NT, &
                            ' - time: ', CURRENT_TIME, ' [s] - CPU time: ', CURRENT_CPU_TIME, &
                            ' [s] - est. time required: ', EST_TIME, &
                            ' [h] - number of particles: ', NP_TOT, &
                            ' - number of collisions: ', NCOLL_TOT, &
                            ' - number of reactions: ', NREAC_TOT, &
-                           ' - rf power deposited: ', FIELD_POWER_TOT, '[W]'
+                           ' - rf power deposited: ', FIELD_POWER_TOT, ' [W]'
 
             CALL ONLYMASTERPRINT1(PROC_ID, TRIM(stringTMP))
 

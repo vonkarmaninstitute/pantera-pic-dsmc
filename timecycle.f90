@@ -20,6 +20,7 @@ MODULE timecycle
       IMPLICIT NONE
    
       INTEGER :: NP_TOT, NCOLL_TOT, NREAC_TOT
+      REAL(KIND=8) :: FIELD_POWER_TOT
       REAL(KIND=8) :: CURRENT_TIME, CURRENT_CPU_TIME, EST_TIME
 
       CHARACTER(len=512) :: stringTMP
@@ -83,6 +84,8 @@ MODULE timecycle
             CALL MPI_REDUCE(NP_PROC, NP_TOT, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
             CALL MPI_REDUCE(TIMESTEP_COLL, NCOLL_TOT, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
             CALL MPI_REDUCE(TIMESTEP_REAC, NREAC_TOT, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+            CALL MPI_REDUCE(FIELD_POWER, FIELD_POWER_TOT, 1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+
             
 
             WRITE(stringTMP, '(A13,I8,A4,I8,A9,ES14.3,A17,F10.1,A27,F10.1,A28,I10,A25,I10,A24,I10)') &
@@ -91,7 +94,8 @@ MODULE timecycle
                            ' [s] - est. time required: ', EST_TIME, &
                            ' [h] - number of particles: ', NP_TOT, &
                            ' - number of collisions: ', NCOLL_TOT, &
-                           ' - number of reactions: ', NREAC_TOT
+                           ' - number of reactions: ', NREAC_TOT, &
+                           ' - rf power deposited: ', FIELD_POWER_TOT, '[W]'
 
             CALL ONLYMASTERPRINT1(PROC_ID, TRIM(stringTMP))
 
@@ -943,6 +947,8 @@ MODULE timecycle
       LOCAL_BOUNDARY_COLL_COUNT = 0
       ALLOCATE(LOCAL_WALL_COLL_COUNT(N_WALLS*N_SPECIES))
       LOCAL_WALL_COLL_COUNT = 0
+
+      FIELD_POWER = 0
 
       DO IP = 1, NP_PROC
          REMOVE_PART(IP) = .FALSE.

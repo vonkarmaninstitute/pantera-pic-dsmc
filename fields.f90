@@ -1193,6 +1193,7 @@ MODULE fields
       INTEGER, INTENT(IN) :: JP
       REAL(KIND=8) :: RF_XMIN, RF_XMAX, RF_YMAX
       REAL(KIND=8) :: RF_FREQ, NOVERL, COIL_CURRENT, EMAG, RP
+      REAL(KIND=8) :: PARTICLE_CHARGE
 
       RF_XMIN = -0.08d0
       RF_XMAX = -0.055d0
@@ -1202,9 +1203,15 @@ MODULE fields
       NOVERL = 250.d0 ! Number of coil turns per meter
       COIL_CURRENT = 10.d0
 
+      PARTICLE_CHARGE = QE*SPECIES(particles(JP)%S_ID)%CHARGE
+
       IF (DIMS == 2) THEN
          IF (particles(JP)%X > RF_XMIN .AND. particles(JP)%X < RF_XMAX .AND. particles(JP)%Y < RF_YMAX) THEN
-            E(3) = E(3) - MU0*PI*RF_FREQ*NOVERL*COIL_CURRENT * particles(JP)%Y * SIN(2*PI*RF_FREQ*tID*DT)
+            EMAG = MU0*PI*RF_FREQ*NOVERL*COIL_CURRENT * particles(JP)%Y * SIN(2*PI*RF_FREQ*tID*DT)
+            E(3) = E(3) - EMAG
+
+            FIELD_POWER = FIELD_POWER + PARTICLE_CHARGE*(particles(JP)%VZ*EMAG)
+
             B(1) = B(1) + MU0*NOVERL*COIL_CURRENT * COS(2*PI*RF_FREQ*tID*DT)
          END IF
       ELSE IF (DIMS == 3) THEN
@@ -1213,6 +1220,10 @@ MODULE fields
             EMAG = MU0*PI*RF_FREQ*NOVERL*COIL_CURRENT*RP*SIN(2*PI*RF_FREQ*tID*DT)
             E(2) = E(2) -particles(JP)%Z/RP * EMAG
             E(3) = E(3) +particles(JP)%Y/RP * EMAG
+
+            FIELD_POWER = FIELD_POWER + PARTICLE_CHARGE * &
+            (-particles(JP)%Z/RP * EMAG * particles(JP)%VY &
+            + particles(JP)%Y/RP * EMAG * particles(JP)%VZ)
 
             B(1) = B(1) + MU0*NOVERL*COIL_CURRENT * COS(2*PI*RF_FREQ*tID*DT)
          END IF

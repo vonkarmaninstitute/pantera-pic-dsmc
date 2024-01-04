@@ -519,6 +519,8 @@ TYPE(UNSTRUCTURED_3D_GRID_DATA_STRUCTURE) :: U3D_GRID
    REAL(KIND=8), DIMENSION(5) :: TIMERS_START_TIME = 0.d0
    REAL(KIND=8), DIMENSION(5) :: TIMERS_ELAPSED = 0.d0
 
+   REAL(KIND=8) :: FIELD_POWER
+
 CONTAINS  ! @@@@@@@@@@@@@@@@@@@@@ SUBROUTINES @@@@@@@@@@@@@@@@@@@@@@@@
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

@@ -2986,10 +2986,10 @@ MODULE fully_implicit
                            POTENTIAL = GRID_BC(EDGE_PG)%WALL_POTENTIAL
                         ELSE IF (GRID_BC(EDGE_PG)%FIELD_BC == RF_VOLTAGE_BC) THEN
                            POTENTIAL = GRID_BC(EDGE_PG)%WALL_POTENTIAL &
-                                     + 0.5*GRID_BC(EDGE_PG)%WALL_RF_POTENTIAL*SIN(2*PI*GRID_BC(EDGE_PG)%RF_FREQUENCY*tID*DT)
+                                     + 0.5*GRID_BC(EDGE_PG)%WALL_RF_POTENTIAL*COS(2*PI*GRID_BC(EDGE_PG)%RF_FREQUENCY*tID*DT)
                         ELSE IF (GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC) THEN
                            POTENTIAL = GRID_BC(EDGE_PG)%WALL_POTENTIAL &
-                                     + 0.5*GRID_BC(EDGE_PG)%WALL_RF_POTENTIAL*SIN(2*PI*GRID_BC(EDGE_PG)%RF_FREQUENCY*tID*DT)
+                                     + 0.5*GRID_BC(EDGE_PG)%WALL_RF_POTENTIAL*COS(2*PI*GRID_BC(EDGE_PG)%RF_FREQUENCY*tID*DT)
                         END IF
 
                         IF (J==1) THEN
@@ -3029,10 +3029,10 @@ MODULE fully_implicit
                            POTENTIAL = GRID_BC(EDGE_PG)%WALL_POTENTIAL
                         ELSE IF (GRID_BC(EDGE_PG)%FIELD_BC == RF_VOLTAGE_BC) THEN
                            POTENTIAL = GRID_BC(EDGE_PG)%WALL_POTENTIAL &
-                                       + 0.5*GRID_BC(EDGE_PG)%WALL_RF_POTENTIAL*SIN(2*PI*GRID_BC(EDGE_PG)%RF_FREQUENCY*tID*DT)
+                                       + 0.5*GRID_BC(EDGE_PG)%WALL_RF_POTENTIAL*COS(2*PI*GRID_BC(EDGE_PG)%RF_FREQUENCY*tID*DT)
                         ELSE IF (GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC) THEN
                            POTENTIAL = GRID_BC(EDGE_PG)%WALL_POTENTIAL &
-                                       + 0.5*GRID_BC(EDGE_PG)%WALL_RF_POTENTIAL*SIN(2*PI*GRID_BC(EDGE_PG)%RF_FREQUENCY*tID*DT)
+                                       + 0.5*GRID_BC(EDGE_PG)%WALL_RF_POTENTIAL*COS(2*PI*GRID_BC(EDGE_PG)%RF_FREQUENCY*tID*DT)
                         END IF
 
                         IF (J==1) THEN

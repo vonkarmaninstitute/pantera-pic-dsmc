@@ -288,8 +288,12 @@ TYPE(UNSTRUCTURED_3D_GRID_DATA_STRUCTURE) :: U3D_GRID
    !!!!!!!!! Collisions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-   CHARACTER(LEN=64) :: COLLISION_TYPE
-   LOGICAL           :: BOOL_MCC = .FALSE., BOOL_DSMC = .FALSE., BOOL_BGK = .FALSE.
+   !LOGICAL           :: BOOL_MCC = .FALSE., BOOL_DSMC = .FALSE., BOOL_BGK = .FALSE.
+   ENUM, BIND(C)
+   ENUMERATOR NO_COLL, DSMC, BGK, MCC, MCC_VAHEDI, DSMC_VAHEDI
+   END ENUM
+   INTEGER(KIND(DSMC)) :: COLLISION_TYPE = NONE
+
    REAL(KIND=8)      :: MCC_BG_DENS, MCC_BG_TTRA
    INTEGER           :: MCC_BG_MIX
    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: MCC_BG_CELL_NRHO

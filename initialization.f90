@@ -28,7 +28,8 @@ MODULE initialization
 
       CHARACTER*512      :: MIXTURE_DEFINITION, VSS_PARAMS_FILENAME, LINESOURCE_DEFINITION, WALL_DEFINITION, MCC_BG_FILENAME
       CHARACTER*512      :: BC_DEFINITION, SOLENOID_DEFINITION
-      CHARACTER*64       :: MIX_BOUNDINJECT_NAME, DSMC_COLL_MIX_NAME, MCC_BG_MIX_NAME, PIC_TYPE_STRING, PARTITION_STYLE_STRING
+      CHARACTER*64       :: MIX_BOUNDINJECT_NAME, DSMC_COLL_MIX_NAME, MCC_BG_MIX_NAME, PIC_TYPE_STRING, PARTITION_STYLE_STRING, &
+      COLLISION_TYPE_STRING
 
       ! Open input file for reading
       OPEN(UNIT=in1,FILE='input', STATUS='old',IOSTAT=ios)
@@ -203,7 +204,24 @@ MODULE initialization
          END IF
 
          ! ~~~~~~~~~~~~~  Collision type  ~~~~~~~~~~~~~~~~~
-         IF (line=='Collision_type:')          READ(in1,*) COLLISION_TYPE
+         IF (line=='Collision_type:') THEN
+            READ(in1,*) COLLISION_TYPE_STRING
+            IF (COLLISION_TYPE_STRING == "NONE") THEN
+               COLLISION_TYPE = NO_COLL
+            ELSE IF (COLLISION_TYPE_STRING == "DSMC") THEN
+               COLLISION_TYPE = DSMC
+            ELSE IF (COLLISION_TYPE_STRING == "MCC") THEN
+               COLLISION_TYPE = MCC
+            ELSE IF (COLLISION_TYPE_STRING == "VAHEDI_MCC") THEN
+               COLLISION_TYPE = MCC_VAHEDI
+            ELSE IF (COLLISION_TYPE_STRING == "VAHEDI_DSMC") THEN
+               COLLISION_TYPE = DSMC_VAHEDI
+            ELSE IF (COLLISION_TYPE_STRING == "BGK") THEN
+               COLLISION_TYPE = BGK
+            ELSE
+               CALL ERROR_ABORT('Collision type is not specified correctly in input script.')
+            END IF
+         END IF
          IF (line=='MCC_background_dens:')     READ(in1,*) MCC_BG_DENS
          IF (line=='MCC_background_Ttra:')     READ(in1,*) MCC_BG_TTRA
          IF (line=='MCC_background_mixture:') THEN
@@ -371,9 +389,9 @@ MODULE initialization
          ! ~~~~ Collisions ~~~~
          WRITE(*,*) '  =========== Collisions ============================'
          string = 'Collision type:'
-         WRITE(*,'(A5,A50,A64)') '     ', string, COLLISION_TYPE 
+         WRITE(*,'(A5,A50,I8)') '     ', string, COLLISION_TYPE
 
-         IF (COLLISION_TYPE == 'MCC') THEN  ! Only print this if MCC collisions are ON
+         IF (COLLISION_TYPE == MCC) THEN  ! Only print this if MCC collisions are ON
 
             string = 'Background number density [1/m^3]:'
             WRITE(*,'(A5,A50,ES14.3)') '     ', string, MCC_BG_DENS
@@ -1518,6 +1536,7 @@ MODULE initialization
                READ(in4,'(A)', IOSTAT=ReasonEOFCS) LINECS
                IF (ReasonEOFCS < 0) CALL ERROR_ABORT('Attention, reactions cross section file format error! ABORTING.')
                READ(LINECS, *) NEW_REACTION%TABLE_ENERGY(I), NEW_REACTION%TABLE_CS(I)
+               IF (NEW_REACTION%TABLE_CS(I) > SIGMAMAX) SIGMAMAX = NEW_REACTION%TABLE_CS(I)
             END DO
 
             CLOSE(in4)
@@ -1526,6 +1545,7 @@ MODULE initialization
 
          END IF
 
+         NEW_REACTION%EA = NEW_REACTION%EA * QE
 
          IF (ReasonEOF < 0) EXIT ! End of file reached
          
@@ -2356,43 +2376,6 @@ MODULE initialization
 
    END SUBROUTINE INITINJECTION
 
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   ! SUBROUTINE INITCOLLISIONS -> Initializes variables for the collisions !!!
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   
-   SUBROUTINE INITCOLLISIONS
-
-      IMPLICIT NONE
-
-      ! Set logicals
-      IF (COLLISION_TYPE == "NONE") THEN
-         BOOL_DSMC = .FALSE.
-         BOOL_MCC  = .FALSE.
-         BOOL_BGK  = .FALSE.
-
-      ELSE IF (COLLISION_TYPE == "DSMC") THEN
-         BOOL_DSMC = .TRUE.
-         BOOL_MCC  = .FALSE.
-         BOOL_BGK  = .FALSE.
-
-      ELSE IF (COLLISION_TYPE == "MCC") THEN
-         BOOL_DSMC = .FALSE.
-         BOOL_MCC  = .TRUE.
-         BOOL_BGK  = .FALSE.
-
-      ELSE IF (COLLISION_TYPE == "BGK") THEN
-         BOOL_DSMC = .FALSE.
-         BOOL_MCC  = .FALSE.
-         BOOL_BGK  = .TRUE.
-
-      ELSE ! ERROR!
-         CALL ONLYMASTERPRINT1(PROC_ID, '$$$ ATTENTION! Collision type in input file not recognized! ABORTING!')
-         STOP
-
-      END IF
-
-   END SUBROUTINE INITCOLLISIONS
-
 
    SUBROUTINE INITREACTIONS
    ! Here we precompute the TCE coefficients, with the input collision parameters
@@ -2405,7 +2388,7 @@ MODULE initialization
 
 
       DO JR = 1, N_REACTIONS
-         IF (.NOT. REACTIONS(JR)%IS_CEX) THEN
+         IF (REACTIONS(JR)%TYPE == TCE .AND. .NOT. REACTIONS(JR)%IS_CEX) THEN
             R1_SP_ID = REACTIONS(JR)%R1_SP_ID
             R2_SP_ID = REACTIONS(JR)%R2_SP_ID
 

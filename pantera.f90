@@ -33,7 +33,6 @@ PROGRAM PANTERA
    
    CALL INITVARIOUS        ! Initialize some additional variables
    CALL INITINJECTION      ! Initialize variables for injection
-   CALL INITCOLLISIONS     ! Initialize variables for collisions
    CALL INITREACTIONS      ! Initialize variables for reactions
    CALL INITFIELDS         ! Initialize electromagnetic fields
    CALL COMPUTE_B_FIELD_FROM_SOLENOIDS

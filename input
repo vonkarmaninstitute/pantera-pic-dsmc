@@ -23,7 +23,7 @@ Number_of_cells:
 Domain_limits:
     0.0    1.0    0.0    1.0    -0.5    0.5
 Domain_periodicity:
-    .FALSE.   .FALSE.   .FALSE.
+    .TRUE.   .TRUE.   .TRUE.
 Domain_specular:
     .FALSE.    .FALSE.    .FALSE.    .FALSE.
 Domain_diffuse:
@@ -32,42 +32,39 @@ Boundary_temperature:
     300.0
     
 PIC_type:
-    explicit
-Mesh_file_SU2:
-    'testbox1.su2'
+    none
+!Mesh_file_SU2:
+!    'testbox1.su2'
 Bool_dump_moments:
     .FALSE.
 Bool_dump_fluxes:
     .FALSE.
     
-Flowfield_output:
+All_output_path:
     './dumps/'
-Particle_dump_output:
-    './dumps/'
-Fluxes_dump_output:
-    './dumps/'
+
 ! ========= Numerical parameters ====================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0e9
+    1.0e18
 Timestep:
-    1.0e-9
+    1.0e-11
 Number_of_timesteps:
-    1000
+    10000
 Stats_every:
     1
 
 RNG_seed:
-    65645
+    65644
 Dump_part_every:
     1000000
 
 Binary_output:
     .TRUE.
 Dump_grid_start:
-    0
+    10000000
 Dump_grid_avgevery:
-    1
+    100
 Dump_grid_numavgs:
     1
 Dump_part_start:
@@ -75,12 +72,18 @@ Dump_part_start:
 
 
 Perform_checks:
-    .FALSE.
+    .TRUE.
 
 ! ========= Multispecies ==============================
 
 Species_file:
     ar.species
+
+Def_mixture:
+    Neutrals Ar 1.0
+
+Def_mixture:
+    Excited Ar* 1.0
 
 Def_mixture:
     Ions Ar+ 1.0
@@ -91,10 +94,10 @@ Def_mixture:
 ! ========= Collisions ==============================
 
 Collision_type: ! [MCC / DSMC / BGK / NONE]
-    NONE
+    VAHEDI_DSMC
 
 !MCC_background_dens:
-!  1.0e20
+!  1.0e24
 !MCC_background_Ttra:
 !  300.0
 !MCC_background_mixture:
@@ -117,8 +120,8 @@ Thermal_bath_Ttr:
 
 
 ! ========= Reactions ==============================
-!Reactions_file:
-!    ar.react
+Reactions_file:
+    ar.react
 
 !Wall_reactions_file:
 !    ar.wall
@@ -127,60 +130,19 @@ Thermal_bath_Ttr:
 ! ========= Initial particle seed ===================
 
 
-!Initial_particles:
-!    Ions   1.0e11    0.0    0.0    0.0    300.0    300.0    300.0    0.    0.
+Initial_particles:
+    Neutrals   1.0e24    0.0    0.0    0.0    300.0    300.0    300.0    0.    0.
 
-!Initial_particles:
-!    Electrons   1.0e11    0.0    0.0    0.0    11600.0    11600.0    11600.0    0.    0.
+Initial_particles:
+    Excited   1.0e22    0.0    0.0    0.0    300.0    300.0    300.0    0.    0.
 
+Initial_particles:
+    Ions   1.0e23    0.0    0.0    0.0    300.0    300.0    300.0    0.    0.
 
-    
-!Boundary_condition:
-!    Grid    dirichlet    0.0
-
-!Boundary_condition:
-!    Axis    neumann    0.0
-
-!Boundary_condition:
-!    Dielectric    neumann    0.0
-
-!Boundary_condition:
-!    Bound    dirichlet    0.0
-
-!Boundary_condition:
-!    Grid    vacuum
-
-!Boundary_condition:
-!    OuterWall    vacuum
-
-!Boundary_condition:
-!    PFGWall    vacuum
+Initial_particles:
+    Electrons   1.0e23    0.0    0.0    0.0    116050.0    116050.0    116050.0    0.    0.
 
 
-!Boundary_condition:
-!    OuterWall    dirichlet    0.0
-
-!Boundary_condition:
-!    PFGWall    dirichlet    0.0
-
-!Boundary_condition:
-!    Wall    dirichlet   0.0
-
-!Boundary_emit:
-!    Emitter    Argon    1.0e15    0.0    0.0    0.0    300.0    300.0    300.0
-
-    
-!Solenoid_field:
-!    -0.135     0.09    -0.065    0.15    32    25    15.0
-    
-Boundary_condition:
-    Ground    dirichlet    0.0
-
-Boundary_condition:
-    Driven    rf_voltage    1000.0    250.0    13.56e6
-
-Boundary_condition:
-    Sides    neumann    0.0
     
 ! ========= MPI parallelization =====================
 ! == Style for MPI domain partition can be:

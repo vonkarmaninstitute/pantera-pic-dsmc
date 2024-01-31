@@ -1065,7 +1065,8 @@ CONTAINS
                                           100*TIMERS_ELAPSED(4)/TOTAL_ELAPSED, '%.'
          WRITE(*,'(A20,F6.1,A6,F4.1,A2)') 'MPI particle comm.: ',  TIMERS_ELAPSED(5),   ' s  = ', &
                                           100*TIMERS_ELAPSED(5)/TOTAL_ELAPSED, '%.'
-
+         WRITE(*,'(A20,F6.1,A6,F4.1,A2)') 'Collisions:         ',  TIMERS_ELAPSED(6),   ' s  = ', &
+                                          100*TIMERS_ELAPSED(6)/TOTAL_ELAPSED, '%.'
          WRITE(*,*) '=========================================='
       END IF
 

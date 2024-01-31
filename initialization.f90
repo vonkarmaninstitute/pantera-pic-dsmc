@@ -1532,11 +1532,13 @@ MODULE initialization
                   
                IF (LINECS(1:5) == '-----') EXIT
             END DO
+            NEW_REACTION%MAX_SIGMA = 0
             DO I = 1, NROWS
                READ(in4,'(A)', IOSTAT=ReasonEOFCS) LINECS
                IF (ReasonEOFCS < 0) CALL ERROR_ABORT('Attention, reactions cross section file format error! ABORTING.')
                READ(LINECS, *) NEW_REACTION%TABLE_ENERGY(I), NEW_REACTION%TABLE_CS(I)
-               IF (NEW_REACTION%TABLE_CS(I) > SIGMAMAX) SIGMAMAX = NEW_REACTION%TABLE_CS(I)
+               IF (NEW_REACTION%TABLE_CS(I) > SIGMAMAX) SIGMAMAX = NEW_REACTION%TABLE_CS(I) ! Global maximum gross section
+               IF (NEW_REACTION%TABLE_CS(I) > NEW_REACTION%MAX_SIGMA) NEW_REACTION%MAX_SIGMA = NEW_REACTION%TABLE_CS(I) ! Reaction maximum cross section
             END DO
 
             CLOSE(in4)

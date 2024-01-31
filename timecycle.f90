@@ -204,20 +204,19 @@ MODULE timecycle
 
          ! ########### Perform collisions ##########################################
 
+         CALL TIMER_START(6)
          IF (COLLISION_TYPE == MCC)  CALL MCC_COLLISIONS
          IF (COLLISION_TYPE == MCC_VAHEDI)  CALL MCC_COLLISIONS_VAHEDI
 
          !CALL REMOVE_PARTICLES_OF_SPECIES(1)
 
          IF (COLLISION_TYPE == DSMC .OR. COLLISION_TYPE == DSMC_VAHEDI) THEN
-            IF (GRID_TYPE == UNSTRUCTURED) THEN
-               CALL DSMC_COLLISIONS_UNSTRUCTURED
-            ELSE
-               CALL DSMC_COLLISIONS
-            END IF
+            CALL DSMC_COLLISIONS
          END IF
 
          IF (COLLISION_TYPE == BGK) CALL BGK_COLLISIONS
+
+         CALL TIMER_STOP(6)
 
          IF (BOOL_THERMAL_BATH) CALL THERMAL_BATH
 

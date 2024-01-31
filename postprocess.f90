@@ -1041,6 +1041,8 @@ MODULE postprocess
       REAL(KIND=8)                       :: CFNUM
 
       CHARACTER*256                      :: file_name
+      CHARACTER*1024                     :: HEADER_STRING
+      LOGICAL                            :: FILE_EXISTS
 
       ALLOCATE(TOT_NUM(N_SPECIES))
       ALLOCATE(TOT_EE_PART(N_SPECIES))
@@ -1127,7 +1129,34 @@ MODULE postprocess
          ! WRITE(*,*) ' '
 
          WRITE(file_name,'(A, A)') TRIM(ADJUSTL(CHECKS_SAVE_PATH)), 'conservation_checks'
+
+         INQUIRE(FILE=file_name, EXIST=FILE_EXISTS)
+
          OPEN(54331, FILE=file_name, POSITION='append', STATUS='unknown', ACTION='write')
+         IF (.NOT. FILE_EXISTS) THEN
+            HEADER_STRING = ''
+            HEADER_STRING = TRIM(HEADER_STRING) // 'time'
+            DO JS = 1, N_SPECIES
+               HEADER_STRING = TRIM(HEADER_STRING) // ' npart_' // TRIM(SPECIES(JS)%NAME)
+            END DO
+            DO JS = 1, N_SPECIES
+               HEADER_STRING = TRIM(HEADER_STRING) // ' xmom_' // TRIM(SPECIES(JS)%NAME) // ' ' &
+                                             // 'ymom_' // TRIM(SPECIES(JS)%NAME) // ' ' &
+                                             // 'zmom_' // TRIM(SPECIES(JS)%NAME)
+            END DO
+            HEADER_STRING = TRIM(HEADER_STRING) // ' totxmom totymom totzmom'
+            DO JS = 1, N_SPECIES
+               HEADER_STRING = TRIM(HEADER_STRING) // ' ek_' // TRIM(SPECIES(JS)%NAME)
+            END DO
+            HEADER_STRING = TRIM(HEADER_STRING) // ' totei'
+            DO JS = 1, N_SPECIES
+               HEADER_STRING = TRIM(HEADER_STRING) // ' eepart_' // TRIM(SPECIES(JS)%NAME)
+            END DO
+            HEADER_STRING = TRIM(HEADER_STRING) // ' toteefield tote fieldpower'
+
+            WRITE(54331,*) TRIM(HEADER_STRING)
+         END IF
+
          WRITE(54331,*) CURRENT_TIME, TOT_NUM, TOT_MOMENTUM, SUM(TOT_MOMENTUM, DIM=2), &
          TOT_KE_PART, TOT_IE, TOT_EE_PART,TOT_EE_FIELD, &
          SUM(TOT_KE_PART) + TOT_IE + TOT_EE_FIELD, &

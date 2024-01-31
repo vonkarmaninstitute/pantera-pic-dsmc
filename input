@@ -48,9 +48,9 @@ All_output_path:
 Fnum:  ! Ratio of real-to-simulated particles
     1.0e18
 Timestep:
-    1.0e-11
+    1.0e-12
 Number_of_timesteps:
-    10000
+    1000
 Stats_every:
     1
 

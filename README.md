@@ -4,23 +4,23 @@
 PANTERA (*PArticle Numerical Tool for non-Equilibrium Reacting Aerodynamics*) is an open-source software for the simulation of nonequilibrium gas and plasma flows based on the Direct Simulation Monte Carlo and Particle-in-Cell methods, written in modern Fortran and parallelized for distributed memory machines.
 
 Main developers:
-Pietro Parodi - pietro.parodi@vki.ac.be - VKI / KU Leuven
-Stefano Boccelli - stefano.boccelli@polimi.it   - Politecnico di Milano / VKI / uOttawa
-Federico Bariselli - federico.bariselli@vki.ac.be - Politecnico di Milano / VKI
+* Pietro Parodi - pietro.parodi@vki.ac.be - *VKI / KU Leuven*
+* Stefano Boccelli - stefano.boccelli@polimi.it   - *Politecnico di Milano / VKI / uOttawa / NASA Goddard*
+* Federico Bariselli - federico.bariselli@vki.ac.be - *Politecnico di Milano / VKI*
 
-Original DSMC code by Aldo Frezzotti - Politecnico di Milano. Main development is done at [the von Karman Institute for Fluid Dynamics](https://www.vki.ac.be/) See "history" section for a complete list of contributors.
+Original DSMC code by Aldo Frezzotti - Politecnico di Milano. Main development is done at [the von Karman Institute for Fluid Dynamics](https://www.vki.ac.be/) under an FWO (Research Foundation - Flanders) PhD fellowship. See "history" section for a complete list of contributors.
 
 ## Applications and main features
 
 PANTERA is extremely flexible in the possible applications. It has been applied to a variety of problems ranging from flow in micro-electromechanical devices to rarefied hypersonics to laboratory plasmas and plasmas for space propulsion. The main features are the following:
 
 * Simulation of multiple species
-* 1D, 2D, 3D, and 2D axisymmetric domains, always 3V (3 velocity components).
+* 1D, 2D, 3D, and 2D axisymmetric domains, always 3V (3 velocity components)
 * Structured regular and unstructured grids (read in the [SU2](https://su2code.github.io/docs/Mesh-File/) format)
-* DSMC Collisions using the pair-wise VSS coefficients and optionally binary reactions using the TCE model from modified Arrhenius rates and Borgnakke-Larsen internal energy exchange.
-* DSMC or MCC collisions and reactions from tabulated cross sections in the [LXCat](https://us.lxcat.net/home/) txt format.
-* Explicit as well as energy-conserving (semi-implicit and fully-implicit) electrostatic PIC schemes.
-* Possibility to restart a simulation from a saved state (particle dump).
+* DSMC Collisions using the pair-wise VSS coefficients and optionally binary reactions using the TCE model from modified Arrhenius rates and Borgnakke-Larsen internal energy exchange
+* DSMC or MCC collisions and reactions from tabulated cross sections in the [LXCat](https://us.lxcat.net/home/) txt format
+* Explicit as well as energy-conserving (semi-implicit and fully-implicit) electrostatic PIC schemes
+* Possibility to restart a simulation from a saved state (particle dump)
 * Many models including Maxwell and CLL surface scattering, dielectric solids, surface charging, surface reactions, externally applied electric and magnetic fields, ...
 
 ## Compiling, running and debugging
@@ -33,7 +33,7 @@ This will read the Makefile and create the "pantera.exe" executable. You can the
 Installing PANTERA requires you first install the [PETSc](https://petsc.org/release/) library, and correctly set the `PETSC_DIR` and `PETSC_ARCH` environment variables.
 If it doesn't run, make sure that:
 * you have a compiler installed (gcc)
-* you have a version of MPI installed, such as [OpenMPI](https://www.open-mpi.org/) (in Debian/Ubuntu, packages "openmpi-common" and "libopenmpi-dev").
+* you have a version of MPI installed, such as [OpenMPI](https://www.open-mpi.org/) (in Debian/Ubuntu, packages `openmpi-common` and `libopenmpi-dev`).
 
 ### Running
 
@@ -77,7 +77,7 @@ You are very welcome to contribute to Pantera! Please try to keep the programmin
 
 Remember to write real numbers with a decimal, or at least a dot, as "2.", not just "2". Fortran is not Matlab and you will introduce a bug. Also mind divisions when integers are involved. You may get a zero where you naively expected a real number. Convert integers to reals for divisions. Remember that Fortran has inverse ordering of multidimensional arrays with respect to C/C++. This means that the first index identifies contiguous regions in memory/cache. Consequently, it is massively faster if the first index is the fastest to advance in a multi-dimensional loop.
 
-BUT MOST OF ALL, FOLLOW THE KISS PHILOSOPHY: Keep It Simple Stupid.
+BUT MOST IMPORTANTLY, FOLLOW THE KISS PHILOSOPHY: Keep It Simple, Stupid.
 
 Keep in mind our aim:
 * We want Pantera to grow in power and allow to run complex and compute intensive simulations
@@ -91,4 +91,4 @@ Pantera grew out from a DSMC code initially written by prof. Aldo Frezzotti, in 
 Stefano Boccelli partially rewrote it to introduce hybrid PIC/DSMC capabilities.
 Pietro Parodi developed and used the code during his Research Master and PhD work at VKI, introducing multi-species treatment, collision/reaction models, unstructured grids, various PIC solvers and more.
 
-Logo credits: S. Boccelli
+ASCII logo credits: S. Boccelli

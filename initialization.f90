@@ -1548,6 +1548,7 @@ MODULE initialization
          END IF
 
          NEW_REACTION%EA = NEW_REACTION%EA * QE
+         NEW_REACTION%COUNTS = 0
 
          IF (ReasonEOF < 0) EXIT ! End of file reached
          

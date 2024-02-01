@@ -555,6 +555,8 @@ MODULE collisions
 
       DO JR = 1, N_REACTIONS
 
+         REACTIONS(JR)%COUNTS = 0
+
          SP_ID1 = REACTIONS(JR)%R1_SP_ID
          SP_ID2 = REACTIONS(JR)%R2_SP_ID
 
@@ -688,6 +690,7 @@ MODULE collisions
             IF (rf() < P_REACT) THEN ! Collision happens
 
                TIMESTEP_COLL = TIMESTEP_COLL + 1
+               REACTIONS(JR)%COUNTS = REACTIONS(JR)%COUNTS + 1
                HAS_REACTED(IND1) = .TRUE.
                HAS_REACTED(IND2) = .TRUE.
 
@@ -715,32 +718,32 @@ MODULE collisions
 
 
                IF (.NOT. REACTIONS(JR)%IS_CEX) THEN
-                  totdof = 3
-                  ! TOTDOF = 3. + SPECIES(P2_SP_ID)%ROTDOF + SPECIES(P2_SP_ID)%VIBDOF + &
-                  !       SPECIES(P1_SP_ID)%ROTDOF
+                  
+                  TOTDOF = 3. + SPECIES(P2_SP_ID)%ROTDOF + SPECIES(P2_SP_ID)%VIBDOF + &
+                         SPECIES(P1_SP_ID)%ROTDOF
                   IF (REACTIONS(JR)%N_PROD == 3) THEN
                      P3_SP_ID = REACTIONS(JR)%P3_SP_ID
-                  !    TOTDOF = TOTDOF + 3. + SPECIES(P3_SP_ID)%ROTDOF + SPECIES(P3_SP_ID)%VIBDOF
-                   END IF
+                     TOTDOF = TOTDOF + 3. + SPECIES(P3_SP_ID)%ROTDOF + SPECIES(P3_SP_ID)%VIBDOF
+                  END IF
 
-                  ! EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P1_SP_ID)%VIBDOF)
-                  ! particles(JP1)%EVIB = EI
-                  ! ECOLL = ECOLL - EI
+                  EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P1_SP_ID)%VIBDOF)
+                  particles(JP1)%EVIB = EI
+                  ECOLL = ECOLL - EI
 
-                  ! TOTDOF = TOTDOF - SPECIES(P1_SP_ID)%ROTDOF
-                  ! EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P1_SP_ID)%ROTDOF)
-                  ! particles(JP1)%EROT = EI
-                  ! ECOLL = ECOLL - EI
+                  TOTDOF = TOTDOF - SPECIES(P1_SP_ID)%ROTDOF
+                  EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P1_SP_ID)%ROTDOF)
+                  particles(JP1)%EROT = EI
+                  ECOLL = ECOLL - EI
 
-                  ! TOTDOF = TOTDOF - SPECIES(P2_SP_ID)%VIBDOF
-                  ! EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P2_SP_ID)%VIBDOF)
-                  ! particles(JP2)%EVIB = EI
-                  ! ECOLL = ECOLL - EI
+                  TOTDOF = TOTDOF - SPECIES(P2_SP_ID)%VIBDOF
+                  EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P2_SP_ID)%VIBDOF)
+                  particles(JP2)%EVIB = EI
+                  ECOLL = ECOLL - EI
 
-                  ! TOTDOF = TOTDOF - SPECIES(P2_SP_ID)%ROTDOF
-                  ! EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P2_SP_ID)%ROTDOF)
-                  ! particles(JP2)%EROT = EI
-                  ! ECOLL = ECOLL - EI
+                  TOTDOF = TOTDOF - SPECIES(P2_SP_ID)%ROTDOF
+                  EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P2_SP_ID)%ROTDOF)
+                  particles(JP2)%EROT = EI
+                  ECOLL = ECOLL - EI
 
                   M1 = SPECIES(P1_SP_ID)%MOLECULAR_MASS
                   IF (REACTIONS(JR)%N_PROD == 2) THEN
@@ -749,8 +752,8 @@ MODULE collisions
                      M2 = SPECIES(P2_SP_ID)%MOLECULAR_MASS + SPECIES(P3_SP_ID)%MOLECULAR_MASS
                   END IF
                   TOTDOF = TOTDOF - 3.
-                  !EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, 3)
-                  EI = ECOLL
+                  EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, 3)
+                  !EI = ECOLL
                   !IF (TIMESTEP_COLL < 10) WRITE(*,*) 'Colliding particles ', JP1, JP2, ' with mass ', M1, ' and ', M2
                   !IF (TIMESTEP_COLL < 10) WRITE(*,*) 'Pre collision velocities  ', C1, ' and ', C2
 

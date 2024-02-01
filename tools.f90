@@ -1177,6 +1177,12 @@ CONTAINS
 
    END FUNCTION BINARY_SEARCH
 
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE INTERP_CS -> Interpolates a tabulated cross-section given an energy  !
+   ! There are a few variations. Here:                                               !
+   ! * We interpolate linearly                                                       !
+   ! * For energy values out of the table we set the cross section to zero           !
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    FUNCTION INTERP_CS(VALUE_EN, TABLE_EN, TABLE_CS) RESULT(VALUE_CS)
 
@@ -1193,13 +1199,18 @@ CONTAINS
 
       INDEX = -1
       IF (VALUE_EN .LT. TABLE_EN(L)) THEN
-         VALUE_CS = TABLE_CS(L)
+         ! Lower than lower energy value
+         !VALUE_CS = TABLE_CS(L)
+         VALUE_CS = 0
          RETURN
       ELSE IF (VALUE_EN .GT. TABLE_EN(R)) THEN
-         VALUE_CS = TABLE_CS(R)
+         ! Higher than highest energy value
+         !VALUE_CS = TABLE_CS(R)
+         VALUE_CS = 0
          RETURN
       ELSE IF (R == L+1) THEN
-         VALUE_CS = TABLE_CS(L)
+         ! Only two values in the table
+         VALUE_CS = TABLE_CS(L) + (TABLE_CS(R)-TABLE_CS(L))*(VALUE_EN-TABLE_EN(L))/(TABLE_EN(R)-TABLE_EN(L))
          RETURN
       ELSE
          DO
@@ -1215,7 +1226,10 @@ CONTAINS
                R = INDEX
             END IF
          END DO
-         VALUE_CS = TABLE_CS(INDEX)
+         ! The value we are looking for is between INDEX and INDEX+1.
+         L = INDEX
+         R = INDEX+1
+         VALUE_CS = TABLE_CS(L) + (TABLE_CS(R)-TABLE_CS(L))*(VALUE_EN-TABLE_EN(L))/(TABLE_EN(R)-TABLE_EN(L))
          RETURN
       END IF
 

@@ -208,7 +208,6 @@ MODULE timecycle
          IF (COLLISION_TYPE == MCC)  CALL MCC_COLLISIONS
          IF (COLLISION_TYPE == MCC_VAHEDI)  CALL MCC_COLLISIONS_VAHEDI
 
-         !CALL REMOVE_PARTICLES_OF_SPECIES(1)
 
          IF (COLLISION_TYPE == DSMC .OR. COLLISION_TYPE == DSMC_VAHEDI) THEN
             CALL DSMC_COLLISIONS
@@ -252,6 +251,8 @@ MODULE timecycle
 
          ! ########### Perform the conservation checks ###################################
          IF (PERFORM_CHECKS .AND. MOD(tID, CHECKS_EVERY) .EQ. 0) CALL CHECKS
+
+         CALL REMOVE_PARTICLES_OF_SPECIES(1)
 
          !IF (PERFORM_CHECKS .AND. MOD(tID, CHECKS_EVERY) .EQ. 0) THEN
          !   CALL ONLYMASTERPRINT1(PROC_ID, '---> Checking if particles are in the correct cells.')
@@ -515,8 +516,6 @@ MODULE timecycle
                         ZP = V1(3) + (V2(3)-V1(3))*P + (V3(3)-V1(3))*Q + (V4(3)-V1(3))*R
                      END IF
 
-                     IF (XP > 0 .OR. XP  < -0.015) CYCLE
-
                      ! Assign velocity and energy following a Boltzmann distribution
                      M = SPECIES(S_ID)%MOLECULAR_MASS
                      CALL MAXWELL(VOLUME_INJECT_TASKS(ITASK)%UX, &
@@ -537,12 +536,11 @@ MODULE timecycle
                
             ELSE ! Structured grid
                ! Compute number of particles of this species per process to be created.
-               !IF (AXI) THEN
-               !   DOMAIN_VOLUME = 0.5*(XMAX-XMIN)*(YMAX**2-YMIN**2)*(ZMAX-ZMIN)
-               !ELSE
-               !   DOMAIN_VOLUME = (XMAX-XMIN)*(YMAX-YMIN)*(ZMAX-ZMIN)
-               !END IF
-               DOMAIN_VOLUME = 1.d-4
+               IF (AXI) THEN
+                  DOMAIN_VOLUME = 0.5*(XMAX-XMIN)*(YMAX**2-YMIN**2)*(ZMAX-ZMIN)
+               ELSE
+                  DOMAIN_VOLUME = (XMAX-XMIN)*(YMAX-YMIN)*(ZMAX-ZMIN)
+               END IF
 
                NP_INIT = RANDINT(DT*VOLUME_INJECT_TASKS(ITASK)%NRHODOT/(FNUM*SPECIES(S_ID)%SPWT)*DOMAIN_VOLUME* &
                            MIXTURES(VOLUME_INJECT_TASKS(ITASK)%MIX_ID)%COMPONENTS(i)%MOLFRAC/N_MPI_THREADS)
@@ -550,20 +548,15 @@ MODULE timecycle
                DO IP = 1, NP_INIT
 
                   ! Create particle position randomly in the domain
-                  !XP = XMIN + (XMAX-XMIN)*rf()
+                  XP = XMIN + (XMAX-XMIN)*rf()
 
-                  !IF (AXI .AND. (.NOT. BOOL_RADIAL_WEIGHTING)) THEN
-                  !   YP = SQRT(YMIN*YMIN + rf()*(YMAX*YMAX - YMIN*YMIN))
-                  !   ZP = 0
-                  !ELSE
-                  !   YP = YMIN + (YMAX-YMIN)*rf()
-                  !   ZP = ZMIN + (ZMAX-ZMIN)*rf()
-                  !END IF
-
-                  XP = -0.005 + 0.01*rf()
-                  YP = -0.005 + 0.01*rf()
-                  ZP = rf() - 0.5
-                  IF ((XP*XP+YP*YP) > 2.5d-5) CYCLE
+                  IF (AXI .AND. (.NOT. BOOL_RADIAL_WEIGHTING)) THEN
+                     YP = SQRT(YMIN*YMIN + rf()*(YMAX*YMAX - YMIN*YMIN))
+                     ZP = 0
+                  ELSE
+                     YP = YMIN + (YMAX-YMIN)*rf()
+                     ZP = ZMIN + (ZMAX-ZMIN)*rf()
+                  END IF
 
 
                

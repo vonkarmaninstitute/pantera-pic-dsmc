@@ -1545,13 +1545,24 @@ MODULE collisions
       TIMESTEP_COLL = 0
       TIMESTEP_REAC = 0
 
-      NULL_COLL_FREQ = MCC_BG_DENS*1e-11
-      P_NULL = 1 - EXP(-DT*NULL_COLL_FREQ)
+      DO JR = 1, N_REACTIONS
+         REACTIONS(JR)%COUNTS = 0
+      END DO
+
+      NULL_COLL_FREQ = MCC_BG_DENS*1e-12
+      !P_NULL = 1 - EXP(-DT*NULL_COLL_FREQ)
+      P_NULL = DT*NULL_COLL_FREQ
+      IF (P_NULL > 1) THEN
+         WRITE(*,*) 'Caution! P_NULL is greater than 1! P_NULL = ', P_NULL, 'Setting it to 1 and adjusting the collision frequency.'
+         P_NULL = 1.
+         NULL_COLL_FREQ = 1./DT
+      END IF
 
       NP_PROC_INITIAL = NP_PROC
       DO JP1 = 1, NP_PROC_INITIAL
          HAS_REACTED = .FALSE.
          IF (rf() > P_NULL) CYCLE
+         TIMESTEP_COLL = TIMESTEP_COLL + 1
 
          SP_ID1 = particles(JP1)%S_ID
 
@@ -1613,6 +1624,7 @@ MODULE collisions
 
                ! Try the reaction
                IF (R_SELECT < P_CUMULATED) THEN ! Collision happens
+                  REACTIONS(JR)%COUNTS = REACTIONS(JR)%COUNTS + 1
 
                   ! Actually create the second collision partner
                   CALL INTERNAL_ENERGY(SPECIES(SP_ID2)%ROTDOF, MCC_BG_TTRA, EROT)
@@ -1624,7 +1636,7 @@ MODULE collisions
                   CALL ADD_PARTICLE_ARRAY(NEWparticle, NP_PROC, particles)
                   JP2 = NP_PROC
 
-                  TIMESTEP_COLL = TIMESTEP_COLL + 1
+
                   TIMESTEP_REAC = TIMESTEP_REAC + 1
 
                   ! Rimuovere commento per avere avviso
@@ -1727,14 +1739,12 @@ MODULE collisions
 
                   ! If this pair had a chemical reaction, exit and don't test any other reaction.
                   HAS_REACTED = .TRUE.
+                  EXIT
                END IF
-
-               IF (HAS_REACTED) EXIT
-
             END DO
-
             IF (HAS_REACTED) EXIT
          END DO
+
       END DO
 
    END SUBROUTINE MCC_COLLISIONS_VAHEDI

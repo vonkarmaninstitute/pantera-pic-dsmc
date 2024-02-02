@@ -94,14 +94,14 @@ Def_mixture:
 ! ========= Collisions ==============================
 
 Collision_type: ! [MCC / DSMC / BGK / NONE]
-    VAHEDI_DSMC
+    VAHEDI_MCC
 
-!MCC_background_dens:
-!  1.0e24
-!MCC_background_Ttra:
-!  300.0
-!MCC_background_mixture:
-!  Neutrals
+MCC_background_dens:
+  1.0e24
+MCC_background_Ttra:
+  300.0
+MCC_background_mixture:
+  Neutrals
 
 !BGK_sigma:
 !   1.0e-19
@@ -130,8 +130,8 @@ Reactions_file:
 ! ========= Initial particle seed ===================
 
 
-Initial_particles:
-    Neutrals   1.0e24    0.0    0.0    0.0    300.0    300.0    300.0    0.    0.
+!Initial_particles:
+!    Neutrals   1.0e24    0.0    0.0    0.0    300.0    300.0    300.0    0.    0.
 
 Initial_particles:
     Excited   1.0e22    0.0    0.0    0.0    300.0    300.0    300.0    0.    0.
@@ -142,7 +142,8 @@ Initial_particles:
 Initial_particles:
     Electrons   1.0e23    0.0    0.0    0.0    116050.0    116050.0    116050.0    0.    0.
 
-
+!Volume_inject:
+!    Neutrals    1.0e36    0.0    0.0    0.0    300.0    300.0    300.0    0.    0.
     
 ! ========= MPI parallelization =====================
 ! == Style for MPI domain partition can be:

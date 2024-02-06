@@ -400,12 +400,12 @@ MODULE fully_implicit
       CALL COMPUTE_E_FIELD
 
       !  Advect the particles using the guessed new potential
-      ALLOCATE(part_adv, SOURCE = particles)
+      IF (ALLOCATED(particles)) ALLOCATE(part_adv, SOURCE = particles)
       CALL TIMER_START(3)
       CALL ADVECT_CN_B(part_adv, .FALSE., .FALSE., Jmat)
       CALL TIMER_STOP(3)
       CALL DEPOSIT_CHARGE(part_adv)
-      DEALLOCATE(part_adv)
+      IF (ALLOCATED(part_adv)) DEALLOCATE(part_adv)
 
       ! Compute the new potential from the charge distribution
       !CALL SOLVE_POISSON
@@ -506,14 +506,14 @@ MODULE fully_implicit
 
       !CALL MatView(jac,PETSC_VIEWER_STDOUT_WORLD,ierr)
       !  Advect the particles using the guessed new potential
-      ALLOCATE(part_adv, SOURCE = particles)
+      IF (ALLOCATED(particles)) ALLOCATE(part_adv, SOURCE = particles)
       CALL TIMER_START(3)
       CALL ADVECT_CN_B(part_adv, .FALSE., .TRUE., jac)
       CALL TIMER_STOP(3)
       IF (JACOBIAN_TYPE == 4) CALL COMPUTE_MASS_MATRICES(part_adv)
       IF (JACOBIAN_TYPE == 6) CALL COMPUTE_DENSITY_TEMPERATURE(part_adv)
       IF (JACOBIAN_TYPE == 7) CALL COMPUTE_DENSITY_TEMPERATURE(part_adv)
-      DEALLOCATE(part_adv)
+      IF (ALLOCATED(part_adv)) DEALLOCATE(part_adv)
 
 
       CALL MatGetOwnershipRange( jac, Istart, Iend, ierr)

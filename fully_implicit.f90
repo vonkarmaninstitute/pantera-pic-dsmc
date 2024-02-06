@@ -2553,12 +2553,14 @@ MODULE fully_implicit
 
 
 
-   SUBROUTINE APPLY_RF_EB_FIELD(JP, E, B)
+   SUBROUTINE APPLY_RF_EB_FIELD(part_adv, JP, E, B)
 
       IMPLICIT NONE
 
       REAL(KIND=8), DIMENSION(3), INTENT(INOUT) :: E, B
       INTEGER, INTENT(IN) :: JP
+      TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE, INTENT(IN) :: part_adv
+
       REAL(KIND=8) :: RF_XMIN, RF_XMAX, RF_YMAX
       REAL(KIND=8) :: RF_FREQ, NOVERL, COIL_CURRENT, EMAG, RP
       REAL(KIND=8) :: PARTICLE_CHARGE
@@ -2569,29 +2571,29 @@ MODULE fully_implicit
 
       RF_FREQ = 13.56d6
       NOVERL = 250.d0 ! Number of coil turns per meter
-      COIL_CURRENT = 10.d0
+      COIL_CURRENT = 1.d0
 
-      PARTICLE_CHARGE = QE*SPECIES(particles(JP)%S_ID)%CHARGE
+      PARTICLE_CHARGE = QE*SPECIES(part_adv(JP)%S_ID)%CHARGE
 
       IF (DIMS == 2) THEN
-         IF (particles(JP)%X > RF_XMIN .AND. particles(JP)%X < RF_XMAX .AND. particles(JP)%Y < RF_YMAX) THEN
-            EMAG = MU0*PI*RF_FREQ*NOVERL*COIL_CURRENT * particles(JP)%Y * COS(2*PI*RF_FREQ*tID*DT)
+         IF (part_adv(JP)%X > RF_XMIN .AND. part_adv(JP)%X < RF_XMAX .AND. part_adv(JP)%Y < RF_YMAX) THEN
+            EMAG = MU0*PI*RF_FREQ*NOVERL*COIL_CURRENT * part_adv(JP)%Y * COS(2*PI*RF_FREQ*tID*DT)
             E(3) = E(3) - EMAG
 
-            FIELD_POWER = FIELD_POWER + FNUM * PARTICLE_CHARGE * (particles(JP)%VZ*EMAG)
+            FIELD_POWER = FIELD_POWER + FNUM * PARTICLE_CHARGE * (part_adv(JP)%VZ*EMAG)
 
             B(1) = B(1) + MU0*NOVERL*COIL_CURRENT * SIN(2*PI*RF_FREQ*tID*DT)
          END IF
       ELSE IF (DIMS == 3) THEN
-         IF (particles(JP)%X > -0.015 .AND. particles(JP)%X < 0) THEN
-            RP = SQRT(particles(JP)%Y**2+particles(JP)%Z**2)
+         IF (part_adv(JP)%X > -0.015 .AND. part_adv(JP)%X < 0) THEN
+            RP = SQRT(part_adv(JP)%Y**2+part_adv(JP)%Z**2)
             EMAG = MU0*PI*RF_FREQ*NOVERL*COIL_CURRENT*RP*COS(2*PI*RF_FREQ*tID*DT)
-            E(2) = E(2) -particles(JP)%Z/RP * EMAG
-            E(3) = E(3) +particles(JP)%Y/RP * EMAG
+            E(2) = E(2) -part_adv(JP)%Z/RP * EMAG
+            E(3) = E(3) +part_adv(JP)%Y/RP * EMAG
 
             FIELD_POWER = FIELD_POWER + FNUM * PARTICLE_CHARGE * &
-            (-particles(JP)%Z/RP * EMAG * particles(JP)%VY &
-            + particles(JP)%Y/RP * EMAG * particles(JP)%VZ)
+            (-part_adv(JP)%Z/RP * EMAG * part_adv(JP)%VY &
+            + part_adv(JP)%Y/RP * EMAG * part_adv(JP)%VZ)
 
             B(1) = B(1) + MU0*NOVERL*COIL_CURRENT * SIN(2*PI*RF_FREQ*tID*DT)
          END IF
@@ -3258,6 +3260,8 @@ MODULE fully_implicit
       ALLOCATE(LOCAL_WALL_COLL_COUNT(N_WALLS*N_SPECIES))
       LOCAL_WALL_COLL_COUNT = 0
 
+      FIELD_POWER = 0
+
       DO IP = 1, NP_PROC
          NCROSSINGS = 0
          REMOVE_PART(IP) = .FALSE.
@@ -3333,9 +3337,8 @@ MODULE fully_implicit
                E = EBAR_FIELD(:, 1, IC) ! CALL APPLY_E_FIELD(IP, E)
                
                B = 0
-               IF (N_SOLENOIDS > 0) CALL APPLY_B_FIELD(IP, B)
                B = B + EXTERNAL_B_FIELD
-               CALL APPLY_RF_EB_FIELD(IP, E, B)
+               CALL APPLY_RF_EB_FIELD(part_adv, IP, E, B)
 
             ELSE
                E = 0

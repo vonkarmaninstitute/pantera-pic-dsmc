@@ -967,7 +967,7 @@ MODULE timecycle
             B = 0
             IF (N_SOLENOIDS > 0) CALL APPLY_B_FIELD(IP, B)
             B = B + EXTERNAL_B_FIELD
-            CALL APPLY_RF_EB_FIELD(IP, E, B)
+            CALL APPLY_RF_EB_FIELD(particles, IP, E, B)
             
 
 

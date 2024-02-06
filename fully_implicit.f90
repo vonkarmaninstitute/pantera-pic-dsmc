@@ -3191,7 +3191,7 @@ MODULE fully_implicit
       REAL(KIND=8) :: EDGE_X1, EDGE_Y1, EDGE_X2, EDGE_Y2
       INTEGER, DIMENSION(:), ALLOCATABLE :: LOCAL_BOUNDARY_COLL_COUNT, LOCAL_WALL_COLL_COUNT
       REAL(KIND=8) :: WEIGHT_RATIO
-      TYPE(PARTICLE_DATA_STRUCTURE) :: NEWparticle
+      TYPE(PARTICLE_DATA_STRUCTURE) :: NEWparticle, particleNOW
       INTEGER, DIMENSION(3) :: NEXTVERT
       INTEGER, DIMENSION(8) :: EDGEINDEX
       REAL(KIND=8), DIMENSION(8) :: COLLTIMES
@@ -3617,6 +3617,11 @@ MODULE fully_implicit
                      ! The particle is at the boundary of the domain
                      IF (FACE_PG .NE. -1) THEN
 
+                        IF (GRID_BC(FACE_PG)%DUMP_FLUXES .AND. (tID .GE. DUMP_BOUND_START)) THEN
+                           particleNOW = particles(IP)
+                           CALL ADD_PARTICLE_ARRAY(particleNOW, NP_DUMP_PROC, part_dump)
+                        END IF
+
                         CHARGE = SPECIES(part_adv(IP)%S_ID)%CHARGE
                         IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. ABS(CHARGE) .GE. 1.d-6 .AND. FINAL) THEN
                            K = QE/(EPS0*EPS_SCALING**2)
@@ -3895,6 +3900,14 @@ MODULE fully_implicit
       !CALL VecDestroy(dydeyvals,ierr)
       !CALL VecDestroy(vals,ierr)
       !CALL VecDestroy(cols,ierr)
+
+      IF ((tID .GT. DUMP_BOUND_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
+         IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_EVERY) .EQ. 0) THEN
+            CALL DUMP_BOUNDARY_PARTICLES_FILE(tID)
+            IF (ALLOCATED(part_dump)) DEALLOCATE(part_dump)
+            NP_DUMP_PROC = 0
+         END IF
+      END IF
 
 
    END SUBROUTINE ADVECT_CN_B

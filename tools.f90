@@ -984,6 +984,15 @@ CONTAINS
 
    END FUNCTION CROSS
 
+   FUNCTION DOT(A, B)
+      REAL(KIND=8) :: DOT
+      REAL(KIND=8), DIMENSION(3), INTENT(IN) :: A, B
+   
+      DOT = A(1)*B(1) + A(2)*B(2) + A(3)*B(3)
+      
+   END FUNCTION DOT
+
+
 
    FUNCTION RANDINT(X)
       REAL(KIND=8), INTENT(IN) :: X

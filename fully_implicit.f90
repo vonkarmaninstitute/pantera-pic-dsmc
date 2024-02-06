@@ -2552,6 +2552,55 @@ MODULE fully_implicit
    END SUBROUTINE APPLY_B_FIELD
 
 
+
+   SUBROUTINE APPLY_RF_EB_FIELD(JP, E, B)
+
+      IMPLICIT NONE
+
+      REAL(KIND=8), DIMENSION(3), INTENT(INOUT) :: E, B
+      INTEGER, INTENT(IN) :: JP
+      REAL(KIND=8) :: RF_XMIN, RF_XMAX, RF_YMAX
+      REAL(KIND=8) :: RF_FREQ, NOVERL, COIL_CURRENT, EMAG, RP
+      REAL(KIND=8) :: PARTICLE_CHARGE
+
+      RF_XMIN = -0.08d0
+      RF_XMAX = -0.055d0
+      RF_YMAX = 0.015d0
+
+      RF_FREQ = 13.56d6
+      NOVERL = 250.d0 ! Number of coil turns per meter
+      COIL_CURRENT = 10.d0
+
+      PARTICLE_CHARGE = QE*SPECIES(particles(JP)%S_ID)%CHARGE
+
+      IF (DIMS == 2) THEN
+         IF (particles(JP)%X > RF_XMIN .AND. particles(JP)%X < RF_XMAX .AND. particles(JP)%Y < RF_YMAX) THEN
+            EMAG = MU0*PI*RF_FREQ*NOVERL*COIL_CURRENT * particles(JP)%Y * COS(2*PI*RF_FREQ*tID*DT)
+            E(3) = E(3) - EMAG
+
+            FIELD_POWER = FIELD_POWER + FNUM * PARTICLE_CHARGE * (particles(JP)%VZ*EMAG)
+
+            B(1) = B(1) + MU0*NOVERL*COIL_CURRENT * SIN(2*PI*RF_FREQ*tID*DT)
+         END IF
+      ELSE IF (DIMS == 3) THEN
+         IF (particles(JP)%X > -0.015 .AND. particles(JP)%X < 0) THEN
+            RP = SQRT(particles(JP)%Y**2+particles(JP)%Z**2)
+            EMAG = MU0*PI*RF_FREQ*NOVERL*COIL_CURRENT*RP*COS(2*PI*RF_FREQ*tID*DT)
+            E(2) = E(2) -particles(JP)%Z/RP * EMAG
+            E(3) = E(3) +particles(JP)%Y/RP * EMAG
+
+            FIELD_POWER = FIELD_POWER + FNUM * PARTICLE_CHARGE * &
+            (-particles(JP)%Z/RP * EMAG * particles(JP)%VY &
+            + particles(JP)%Y/RP * EMAG * particles(JP)%VZ)
+
+            B(1) = B(1) + MU0*NOVERL*COIL_CURRENT * SIN(2*PI*RF_FREQ*tID*DT)
+         END IF
+         
+      END IF
+
+   END SUBROUTINE APPLY_RF_EB_FIELD
+
+
    SUBROUTINE WALL_REACT(part_adv, IP, REMOVE)
       
       IMPLICIT NONE
@@ -3077,6 +3126,804 @@ MODULE fully_implicit
 
 
    END SUBROUTINE SET_WALL_POTENTIAL
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! SUBROUTINE ADVECT_CN_B -> Advects particles in the domain using a Crank-Nicholson scheme for fully implicit !
+   ! with magnetic field                                                                                         !
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+   SUBROUTINE ADVECT_CN_B(part_adv, FINAL, COMPUTE_JACOBIAN, jac)
+
+      ! This subroutine advects the particles belonging to the processor.
+      ! Particles are advected for a timestep DT. A temporary variable DTRIM is
+      ! used: if a collision with a wall happens, the wall_collision subroutine 
+      ! is called, the free flight time before collision is computed, and then 
+      ! advection is performed for the remaining time. ! TO BE IMPLEMENTED!
+      !
+      ! After the advection, periodic BCs are applied, so that the periodic 
+      ! coordinates stay into the domain boundaries.
+      !
+      ! Finally, if particles are out of the domain (and it happens only if 
+      ! the periodicity wasn't active for some direction), remove them. 
+
+      IMPLICIT NONE
+
+      Mat jac
+      Mat dxde, dxdexmat, dxdeymat, dydexmat, dydeymat
+      !PetscInt row
+      PetscInt ncols
+      PetscInt cols(2000)
+      PetscScalar dxdexvals(2000), dxdeyvals(2000), dydexvals(2000), dydeyvals(2000), vals(2000)
+      PetscInt first_row, last_row
+
+      !PetscViewer  viewer
+
+      LOGICAL, INTENT(IN) :: FINAL, COMPUTE_JACOBIAN
+      TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE, INTENT(INOUT) :: part_adv
+
+      INTEGER      :: IP, IC, I, J, OLD_IC, JJ, SIZE
+      INTEGER      :: BOUNDCOLL, FACE_PG, NEIGHBOR
+      REAL(KIND=8) :: DTCOLL, TOTDTCOLL, rfp
+      REAL(KIND=8) :: COEFA, COEFB, COEFC, DELTA, ALPHA, BETA, GAMMA, DTADV
+      !REAL(KIND=8), DIMENSION(2) :: TEST
+      REAL(KIND=8), DIMENSION(4) :: NORMX, NORMY, XW, YW, ZW, BOUNDPOS
+      ! REAL(KIND=8) :: XCOLL, YCOLL, ZCOLL
+      LOGICAL, DIMENSION(:), ALLOCATABLE :: REMOVE_PART
+      REAL(KIND=8), DIMENSION(3) :: E, B
+      REAL(KIND=8) ::V_PERP, VDUMMY, EROT, EVIB, VDOTN, WALL_TEMP
+      INTEGER :: S_ID
+      LOGICAL :: HASCOLLIDED
+      REAL(KIND=8) :: EDGE_X1, EDGE_Y1, EDGE_X2, EDGE_Y2
+      INTEGER, DIMENSION(:), ALLOCATABLE :: LOCAL_BOUNDARY_COLL_COUNT, LOCAL_WALL_COLL_COUNT
+      REAL(KIND=8) :: WEIGHT_RATIO
+      TYPE(PARTICLE_DATA_STRUCTURE) :: NEWparticle
+      INTEGER, DIMENSION(3) :: NEXTVERT
+      INTEGER, DIMENSION(8) :: EDGEINDEX
+      REAL(KIND=8), DIMENSION(8) :: COLLTIMES
+      INTEGER, DIMENSION(2000) :: EBARIDX
+      REAL(KIND=8), DIMENSION(2000) :: DVXDEX, DVYDEX, DVXDEY, DVYDEY, DXDEX, DYDEX, DXDEY, DYDEY, DTDEX, DTDEY, &
+      DTDEXPREC, DTDEYPREC, DALPHADEX, DALPHADEY, DBETADEX, DBETADEY, DGAMMADEX, DGAMMADEY
+      REAL(KIND=8) :: NEWVX, NEWVY
+      INTEGER :: LOC, NUMSTEPS, MAXNUMSTEPS
+      REAL(KIND=8) :: VALXX, VALXY, VALYX, VALYY
+      REAL(KIND=8) :: DPSI1DX, DPSI1DY, DPSI2DX, DPSI2DY, DPSI3DX, DPSI3DY, DPSJ1DX, DPSJ1DY, DPSJ2DX, DPSJ2DY, DPSJ3DX, DPSJ3DY
+      INTEGER :: V1I, V2I, V3I, V1J, V2J, V3J
+      REAL(KIND=8) :: X_TEMP, Y_TEMP, Z_TEMP, VX_TEMP, VY_TEMP, VZ_TEMP
+      REAL(KIND=8), DIMENSION(3) :: FACE_NORMAL, FACE_TANG1, FACE_TANG2
+      REAL(KIND=8) :: V_TANG1, V_TANG2
+      REAL(KIND=8), DIMENSION(3) :: TANG1, TANG2
+      REAL(KIND=8) :: VDOTTANG1, VRM, RN, R1, R2, THETA1, THETA2, DOT_NORM, VTANGENT
+      INTEGER :: NI, NJ, VNI, VNJ
+      REAL(KIND=8), DIMENSION(3) :: DIRB, VOLD, AMOVER, VMOVER
+      REAL(KIND=8) :: QOM, NORMB, A, MAG
+
+      INTEGER :: NCROSSINGS
+
+      INTEGER :: NCOLSXX, NCOLSXY, NCOLSYX, NCOLSYY
+      INTEGER, DIMENSION(:), ALLOCATABLE :: COLSXX, COLSXY, COLSYX, COLSYY
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: DXDEXV, DXDEYV, DYDEXV, DYDEYV
+
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: DXDEBAR, DVDEBAR
+
+      LOGICAL :: FLUIDBOUNDARY
+      INTEGER :: NEIGHBORPG
+      REAL(KIND=8) :: CHARGE, K, PSIP, RHO_Q
+      INTEGER :: VP
+
+      !REAL(KIND=8) :: CHECKVALUE
+
+      ! IF (tID == 4 .AND. FINAL) THEN
+      !    OPEN(66332, FILE='crossings', POSITION='append', STATUS='unknown', ACTION='write')
+      ! END IF
+
+      IF (JACOBIAN_TYPE .NE. 3) CALL ERROR_ABORT('Jacobian type not supported.')
+
+      SIZE = NCELLS
+
+      MAXNUMSTEPS = 0
+
+
+      !E = [0.d0, 0.d0, 0.d0]
+      !B = [0.d0, 0.d0, 0.d0]
+
+      NEXTVERT = [2,3,1]
+      EDGEINDEX = [1,1,2,2,3,3,4,4]
+
+      NORMX = [ 1., -1., 0., 0. ]
+      NORMY = [ 0., 0., 1., -1. ]
+
+      XW = [ XMIN, XMAX, XMIN, XMAX ]
+      YW = [ YMAX, YMIN, YMIN, YMAX ]
+      ZW = [ 0., 0., 0., 0. ]
+
+      BOUNDPOS = [ XMIN, XMAX, YMIN, YMAX ]
+
+      ALLOCATE(REMOVE_PART(NP_PROC))
+      
+      ALLOCATE(LOCAL_BOUNDARY_COLL_COUNT(4*N_SPECIES))
+      LOCAL_BOUNDARY_COLL_COUNT = 0
+      ALLOCATE(LOCAL_WALL_COLL_COUNT(N_WALLS*N_SPECIES))
+      LOCAL_WALL_COLL_COUNT = 0
+
+      DO IP = 1, NP_PROC
+         NCROSSINGS = 0
+         REMOVE_PART(IP) = .FALSE.
+         IC = part_adv(IP)%IC
+
+
+
+         ! ! Update velocity
+
+         ! V_NEW(1) = part_adv(IP)%VX
+         ! V_NEW(2) = part_adv(IP)%VY
+         ! V_NEW(3) = part_adv(IP)%VZ
+
+         ! IF (PIC_TYPE .NE. NONE) THEN
+         !    !PHIBAR_FIELD = 0.d0
+         !    !EBAR_FIELD = 0.d0
+         !    CALL APPLY_E_FIELD(IP, E)
+         !    !CALL APPLY_RF_E_FIELD(IP, E)
+            
+
+
+         !    V_OLD(1) = part_adv(IP)%VX
+         !    V_OLD(2) = part_adv(IP)%VY
+         !    V_OLD(3) = part_adv(IP)%VZ
+
+         !    CALL UPDATE_VELOCITY_BORIS(part_adv(IP)%DTRIM, V_OLD, V_NEW, &
+         !    SPECIES(part_adv(IP)%S_ID)%CHARGE, SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS, &
+         !    E, B)
+
+         !    ! Assign v^n to the particle, for simplicity
+         !    !part_adv(IP)%VX = 0.5*(V_OLD(1) + V_NEW(1))
+         !    !part_adv(IP)%VY = 0.5*(V_OLD(2) + V_NEW(2))
+         !    !part_adv(IP)%VZ = 0.5*(V_OLD(3) + V_NEW(3))
+         !    part_adv(IP)%VX = V_NEW(1)
+         !    part_adv(IP)%VY = V_NEW(2)
+         !    part_adv(IP)%VZ = V_NEW(3)
+         ! END IF
+
+
+
+         ! ! Forced electric field
+         ! E = [3000.d0, 0.d0, 0.d0]
+            
+
+
+         ! V_OLD(1) = part_adv(IP)%VX
+         ! V_OLD(2) = part_adv(IP)%VY
+         ! V_OLD(3) = part_adv(IP)%VZ
+
+         ! CALL UPDATE_VELOCITY_BORIS(DT, V_OLD, V_NEW, &
+         ! SPECIES(part_adv(IP)%S_ID)%CHARGE, SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS, &
+         ! E, B)
+
+         ! ! Assign v^n to the particle, for simplicity
+         ! !part_adv(IP)%VX = 0.5*(V_OLD(1) + V_NEW(1))
+         ! !part_adv(IP)%VY = 0.5*(V_OLD(2) + V_NEW(2))
+         ! !part_adv(IP)%VZ = 0.5*(V_OLD(3) + V_NEW(3))
+         ! part_adv(IP)%VX = V_NEW(1)
+         ! part_adv(IP)%VY = V_NEW(2)
+         ! part_adv(IP)%VZ = V_NEW(3)
+
+         ! ! End forced electric field.
+
+
+
+         HASCOLLIDED = .FALSE.
+         TOTDTCOLL = 0.
+         DO WHILE (part_adv(IP)%DTRIM .GT. 0.) ! Repeat the procedure until step is done
+
+            DTCOLL = part_adv(IP)%DTRIM ! Looking for collisions within the remaining time
+            ! ______ ADVECTION ______
+            IF (PIC_TYPE .NE. NONE) THEN
+               E = EBAR_FIELD(:, 1, IC) ! CALL APPLY_E_FIELD(IP, E)
+               
+               B = 0
+               IF (N_SOLENOIDS > 0) CALL APPLY_B_FIELD(IP, B)
+               B = B + EXTERNAL_B_FIELD
+               CALL APPLY_RF_EB_FIELD(IP, E, B)
+
+            ELSE
+               E = 0
+               B = 0
+            END IF
+            !WRITE(*,*) 'Field on particle ', IP, ' on proc ', PROC_ID, ' in cell ', IC, ' is ', E
+
+            IF (GRID_TYPE == UNSTRUCTURED) THEN
+               !WRITE(*,*) 'Moving particle ', IP, ' for ', DTCOLL, ' s. Position: ', part_adv(IP)%X, part_adv(IP)%Y,&
+               !' velocity: ', part_adv(IP)%VX, part_adv(IP)%VY
+               ! For unstructured, we only need to check the boundaries of the cell.
+
+               ! The new C-N procedure with uniform E field.
+               IF (DIMS == 2) THEN
+                  CALL ERROR_ABORT('Not implemented!')
+                  COLLTIMES = -1.d0
+                  DO I = 1, 3
+                     J = NEXTVERT(I)
+                     EDGE_X1 = U2D_GRID%NODE_COORDS(1, U2D_GRID%CELL_NODES(I,IC))
+                     EDGE_Y1 = U2D_GRID%NODE_COORDS(2, U2D_GRID%CELL_NODES(I,IC))
+                     EDGE_X2 = U2D_GRID%NODE_COORDS(1, U2D_GRID%CELL_NODES(J,IC))
+                     EDGE_Y2 = U2D_GRID%NODE_COORDS(2, U2D_GRID%CELL_NODES(J,IC))
+                     !IF (EDGE_X2 == EDGE_X1) THEN
+                     !   COEFB = 0; COEFA = 1; COEFC = - EDGE_X1
+                     !ELSE IF (EDGE_Y2 == EDGE_Y1) THEN
+                     !   COEFA = 0; COEFB = 1; COEFC = - EDGE_Y1
+                     !ELSE
+                     !   COEFA = (EDGE_Y2-EDGE_Y1)
+                     !   COEFB = (EDGE_X1-EDGE_X2)
+                     !   COEFC = (EDGE_X2 - EDGE_X1) * EDGE_Y1 - (EDGE_Y2 - EDGE_Y1) * EDGE_X1
+                     !   !COEFA = 1
+                     !   !COEFB = (EDGE_X1-EDGE_X2)/(EDGE_Y2-EDGE_Y1)
+                     !   !COEFC = - COEFB * EDGE_Y1 - EDGE_X1
+                     !END IF
+
+                     COEFA = (EDGE_Y2-EDGE_Y1)
+                     COEFB = (EDGE_X1-EDGE_X2)
+                     !COEFC = (EDGE_X2 - EDGE_X1) * EDGE_Y1 - (EDGE_Y2 - EDGE_Y1) * EDGE_X1
+                     COEFC = EDGE_Y1*EDGE_X2 - EDGE_X1*EDGE_Y2
+
+                     IF (PIC_TYPE .NE. NONE) THEN
+                        ALPHA = 0.5*SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS* &
+                              (COEFA*E(1) + COEFB*E(2))
+                     ELSE
+                        ALPHA = 0.d0
+                     END IF
+
+                     BETA = COEFA*part_adv(IP)%VX + COEFB*part_adv(IP)%VY
+                     GAMMA = COEFA*part_adv(IP)%X + COEFB*part_adv(IP)%Y + COEFC
+
+                     IF (ALPHA == 0.d0) THEN
+                        COLLTIMES(2*(I-1) + 1) = - GAMMA/BETA
+                     ELSE
+                        DELTA = BETA*BETA - 4.0*ALPHA*GAMMA
+                        IF (DELTA >= 0.d0) THEN
+                           COLLTIMES(2*(I-1) + 1) = 0.5*(-BETA - SQRT(DELTA))/ALPHA
+                           COLLTIMES(2*I) =         0.5*(-BETA + SQRT(DELTA))/ALPHA
+                        END IF
+                     END IF
+                  END DO
+
+                  ! Find which collision happens first.
+                  DTCOLL = part_adv(IP)%DTRIM
+                  BOUNDCOLL = -1
+                  DO I = 1, 6
+                     IF (COLLTIMES(I) > 0 .AND. COLLTIMES(I) < DTCOLL) THEN
+
+
+                        X_TEMP = part_adv(IP)%X
+                        Y_TEMP = part_adv(IP)%Y
+                        Z_TEMP = part_adv(IP)%Z
+
+                        VX_TEMP = part_adv(IP)%VX
+                        VY_TEMP = part_adv(IP)%VY
+                        VZ_TEMP = part_adv(IP)%VZ
+
+                        CALL MOVE_PARTICLE_CN(part_adv, IP, E, COLLTIMES(I))
+                        J = EDGEINDEX(I)
+
+
+                        ! ! A small check that we actually found an intersection.
+
+                        ! JJ = NEXTVERT(J)
+                        ! EDGE_X1 = U2D_GRID%NODE_COORDS(1, U2D_GRID%CELL_NODES(J,IC))
+                        ! EDGE_Y1 = U2D_GRID%NODE_COORDS(2, U2D_GRID%CELL_NODES(J,IC))
+                        ! EDGE_X2 = U2D_GRID%NODE_COORDS(1, U2D_GRID%CELL_NODES(JJ,IC))
+                        ! EDGE_Y2 = U2D_GRID%NODE_COORDS(2, U2D_GRID%CELL_NODES(JJ,IC))
+
+                        ! COEFA = (EDGE_Y2-EDGE_Y1)
+                        ! COEFB = (EDGE_X1-EDGE_X2)
+                        ! COEFC = (EDGE_X2 - EDGE_X1) * EDGE_Y1 - (EDGE_Y2 - EDGE_Y1) * EDGE_X1
+                        ! WRITE(*,*) (COEFA*part_adv(IP)%X + COEFB*part_adv(IP)%Y + COEFC)/(ABS(COEFA)+ABS(COEFB)+ABS(COEFC))
+                        ! ! End of the small check.
+                        
+                        IF ((part_adv(IP)%VX*U2D_GRID%EDGE_NORMAL(1,J,IC) + part_adv(IP)%VY*U2D_GRID%EDGE_NORMAL(2,J,IC)) > 0) THEN
+                           ! Velocity pre-rotation points outwards.
+                           DTCOLL = COLLTIMES(I)
+                           BOUNDCOLL = J
+                           IF (AXI) THEN
+                              CALL AXI_ROTATE_VELOCITY(part_adv, IP)
+                              IF ((part_adv(IP)%VX*U2D_GRID%EDGE_NORMAL(1,J,IC) &
+                                 + part_adv(IP)%VY*U2D_GRID%EDGE_NORMAL(2,J,IC)) < 0) THEN
+                                 ! After rotation the velocity points back into the cell.
+                                 ! We should move without applying the boundary conditions, and start again from there.
+                                 BOUNDCOLL = 0
+                                 !WRITE(*,*) 'This happened to particle with id ', part_adv(IP)%ID, ' and V dot N was ', &
+                                 !(part_adv(IP)%VX*U2D_GRID%EDGE_NORMAL(1,J,IC) + part_adv(IP)%VY*U2D_GRID%EDGE_NORMAL(2,J,IC))
+                                 ! We should move without applying the boundary conditions, and start again from there.
+                              END IF
+                           END IF
+                        ELSE
+                           IF (AXI) THEN
+                              CALL AXI_ROTATE_VELOCITY(part_adv, IP)
+                              IF ((part_adv(IP)%VX*U2D_GRID%EDGE_NORMAL(1,J,IC) &
+                                 + part_adv(IP)%VY*U2D_GRID%EDGE_NORMAL(2,J,IC)) > 0) THEN
+                                 ! After rotation the velocity points out of the cell.
+                                 DTCOLL = COLLTIMES(I)
+                                 BOUNDCOLL = J
+                                 !WRITE(*,*) 'The opposite happened to particle with id ', part_adv(IP)%ID, ' and V dot N was ', &
+                                 !(part_adv(IP)%VX*U2D_GRID%EDGE_NORMAL(1,J,IC) + part_adv(IP)%VY*U2D_GRID%EDGE_NORMAL(2,J,IC))
+                                 ! We should move without applying the boundary conditions, and start again from there.
+                              END IF
+                           END IF
+                        END IF
+
+                        part_adv(IP)%X = X_TEMP
+                        part_adv(IP)%Y = Y_TEMP
+                        part_adv(IP)%Z = Z_TEMP
+
+                        part_adv(IP)%VX = VX_TEMP
+                        part_adv(IP)%VY = VY_TEMP
+                        part_adv(IP)%VZ = VZ_TEMP
+
+                     END IF
+                  END DO
+               ELSE IF (DIMS == 3) THEN
+                  QOM = SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS
+                  NORMB = NORM2(B)
+                  DIRB = B/NORMB
+                  A = 0.5*QOM*part_adv(IP)%DTRIM
+                  MAG = (A*A*NORMB*NORMB)/(1 + A*A*NORMB*NORMB)
+                  VOLD = [part_adv(IP)%VX, part_adv(IP)%VY, part_adv(IP)%VZ]
+
+                  COLLTIMES = -1.d0
+                  DO I = 1, 4
+                     IF (PIC_TYPE .NE. NONE) THEN
+                        AMOVER = (1-MAG)*QOM*(E+CROSS(VOLD,B)) + MAG*QOM*DOT(E,DIRB)*DIRB
+                        ALPHA = 0.5*(U3D_GRID%CELL_FACES_COEFFS(1,I,IC)*AMOVER(1) &
+                                   + U3D_GRID%CELL_FACES_COEFFS(2,I,IC)*AMOVER(2) &
+                                   + U3D_GRID%CELL_FACES_COEFFS(3,I,IC)*AMOVER(3))
+                     ELSE
+                        ALPHA = 0.d0
+                     END IF
+
+                     VMOVER = (1-MAG)*VOLD + MAG*(CROSS(E,B)/(NORMB*NORMB) + DOT(VOLD,DIRB)*DIRB)
+                     BETA = U3D_GRID%CELL_FACES_COEFFS(1,I,IC)*VMOVER(1) &
+                          + U3D_GRID%CELL_FACES_COEFFS(2,I,IC)*VMOVER(2) &
+                          + U3D_GRID%CELL_FACES_COEFFS(3,I,IC)*VMOVER(3)
+
+                     GAMMA = U3D_GRID%CELL_FACES_COEFFS(1,I,IC)*part_adv(IP)%X &
+                           + U3D_GRID%CELL_FACES_COEFFS(2,I,IC)*part_adv(IP)%Y &
+                           + U3D_GRID%CELL_FACES_COEFFS(3,I,IC)*part_adv(IP)%Z &
+                           + U3D_GRID%CELL_FACES_COEFFS(4,I,IC)
+
+                     IF (ALPHA == 0.d0) THEN
+                        COLLTIMES(2*(I-1) + 1) = - GAMMA/BETA
+                     ELSE
+                        DELTA = BETA*BETA - 4.0*ALPHA*GAMMA
+                        IF (DELTA >= 0.d0) THEN
+                           COLLTIMES(2*(I-1) + 1) = 0.5*(-BETA - SQRT(DELTA))/ALPHA
+                           COLLTIMES(2*I) =         0.5*(-BETA + SQRT(DELTA))/ALPHA
+                        END IF
+                     END IF
+                  END DO
+
+                  ! Find which collision happens first.
+                  DTCOLL = part_adv(IP)%DTRIM
+                  BOUNDCOLL = -1
+                  DO I = 1, 8
+                     IF (COLLTIMES(I) > 0 .AND. COLLTIMES(I) <= DTCOLL) THEN
+
+
+                        X_TEMP = part_adv(IP)%X
+                        Y_TEMP = part_adv(IP)%Y
+                        Z_TEMP = part_adv(IP)%Z
+
+                        VX_TEMP = part_adv(IP)%VX
+                        VY_TEMP = part_adv(IP)%VY
+                        VZ_TEMP = part_adv(IP)%VZ
+
+                        CALL MOVE_PARTICLE_CN_B(part_adv, IP, E, B, COLLTIMES(I))
+                        J = EDGEINDEX(I)
+
+                        ! ! A small check that we actually found an intersection.
+                        ! CHECKVALUE = U3D_GRID%CELL_FACES_COEFFS(1,J,IC)*part_adv(IP)%X &
+                        ! + U3D_GRID%CELL_FACES_COEFFS(2,J,IC)*part_adv(IP)%Y &
+                        ! + U3D_GRID%CELL_FACES_COEFFS(3,J,IC)*part_adv(IP)%Z &
+                        ! + U3D_GRID%CELL_FACES_COEFFS(4,J,IC)
+                        ! IF (ABS(CHECKVALUE) > 1.0d-12) WRITE(*,*) 'Checkvalue too large! = ', CHECKVALUE
+                        ! ! End of the small check.
+                        
+                        IF ((part_adv(IP)%VX*U3D_GRID%FACE_NORMAL(1,J,IC) &
+                           + part_adv(IP)%VY*U3D_GRID%FACE_NORMAL(2,J,IC) &
+                           + part_adv(IP)%VZ*U3D_GRID%FACE_NORMAL(3,J,IC)) > 0) THEN
+                           DTCOLL = COLLTIMES(I)
+                           BOUNDCOLL = J
+                        END IF
+
+                        part_adv(IP)%X = X_TEMP
+                        part_adv(IP)%Y = Y_TEMP
+                        part_adv(IP)%Z = Z_TEMP
+
+                        part_adv(IP)%VX = VX_TEMP
+                        part_adv(IP)%VY = VY_TEMP
+                        part_adv(IP)%VZ = VZ_TEMP
+
+                     END IF
+                  END DO
+               END IF
+
+
+
+               ! Do the advection
+               IF (BOUNDCOLL > 0) THEN
+                  CALL MOVE_PARTICLE_CN_B(part_adv, IP, E, B, DTCOLL)
+                  IF (AXI .AND. DIMS == 2) CALL AXI_ROTATE_VELOCITY(part_adv, IP)
+                  part_adv(IP)%DTRIM = part_adv(IP)%DTRIM - DTCOLL
+
+                  FLUIDBOUNDARY = .FALSE.
+                  IF (DIMS == 2) THEN
+                     NEIGHBOR = U2D_GRID%CELL_NEIGHBORS(BOUNDCOLL, IC)
+                     IF (NEIGHBOR == -1) THEN
+                        FLUIDBOUNDARY = .TRUE.
+                     ELSE
+                        NEIGHBORPG = U2D_GRID%CELL_PG(NEIGHBOR)
+                        IF (NEIGHBORPG .NE. -1) THEN
+                           IF (GRID_BC(NEIGHBORPG)%VOLUME_BC == SOLID) FLUIDBOUNDARY = .TRUE.
+                        END IF
+                     END IF
+
+                     FACE_PG = U2D_GRID%CELL_EDGES_PG(BOUNDCOLL, IC)
+                     FACE_NORMAL = U2D_GRID%EDGE_NORMAL(:,BOUNDCOLL,IC)
+                     FACE_TANG1 = [-FACE_NORMAL(2), FACE_NORMAL(1), 0.d0]
+                     FACE_TANG2 = [0.d0, 0.d0, 1.d0]
+                  ELSE
+                     NEIGHBOR = U3D_GRID%CELL_NEIGHBORS(BOUNDCOLL, IC)
+                     IF (NEIGHBOR == -1) THEN
+                        FLUIDBOUNDARY = .TRUE.
+                     ELSE
+                        NEIGHBORPG = U3D_GRID%CELL_PG(NEIGHBOR)
+                        IF (NEIGHBORPG .NE. -1) THEN
+                           IF (GRID_BC(NEIGHBORPG)%VOLUME_BC == SOLID) FLUIDBOUNDARY = .TRUE.
+                        END IF
+                     END IF
+                     
+                     FACE_PG = U3D_GRID%CELL_FACES_PG(BOUNDCOLL, IC)
+                     FACE_NORMAL = U3D_GRID%FACE_NORMAL(:,BOUNDCOLL,IC)
+                     FACE_TANG1 = U3D_GRID%FACE_TANG1(:,BOUNDCOLL,IC)
+                     FACE_TANG2 = U3D_GRID%FACE_TANG2(:,BOUNDCOLL,IC)
+                  END IF
+
+                  ! Move to new cell
+                  IF (FLUIDBOUNDARY) THEN
+                     ! The particle is at the boundary of the domain
+                     IF (FACE_PG .NE. -1) THEN
+
+                        CHARGE = SPECIES(part_adv(IP)%S_ID)%CHARGE
+                        IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. ABS(CHARGE) .GE. 1.d-6 .AND. FINAL) THEN
+                           K = QE/(EPS0*EPS_SCALING**2)
+                           IF (DIMS == 2) THEN
+                              RHO_Q = K*CHARGE*FNUM/(ZMAX-ZMIN)
+                              DO I = 1, 3
+                                 VP = U2D_GRID%CELL_NODES(I,IC)
+                                 PSIP = U2D_GRID%BASIS_COEFFS(1,I,IC)*part_adv(IP)%X &
+                                      + U2D_GRID%BASIS_COEFFS(2,I,IC)*part_adv(IP)%Y &
+                                      + U2D_GRID%BASIS_COEFFS(3,I,IC)
+                                 SURFACE_CHARGE(VP) = SURFACE_CHARGE(VP) + RHO_Q*PSIP
+                              END DO
+                           ELSE IF (DIMS == 3) THEN
+                              RHO_Q = K*CHARGE*FNUM
+                              DO I = 1, 4
+                                 VP = U3D_GRID%CELL_NODES(I,IC)
+                                 PSIP = U3D_GRID%BASIS_COEFFS(1,I,IC)*part_adv(IP)%X &
+                                      + U3D_GRID%BASIS_COEFFS(2,I,IC)*part_adv(IP)%Y &
+                                      + U3D_GRID%BASIS_COEFFS(3,I,IC)*part_adv(IP)%Z &
+                                      + U3D_GRID%BASIS_COEFFS(4,I,IC)
+                                 SURFACE_CHARGE(VP) = SURFACE_CHARGE(VP) + RHO_Q*PSIP
+                              END DO
+                           END IF
+                        END IF
+
+                        ! Apply particle boundary condition
+                        IF (GRID_BC(FACE_PG)%PARTICLE_BC == SPECULAR) THEN
+                           IF (GRID_BC(FACE_PG)%REACT) THEN
+                              CALL WALL_REACT(part_adv, IP, REMOVE_PART(IP))
+                           END IF
+                           
+                           VDOTN = part_adv(IP)%VX*FACE_NORMAL(1) &
+                                 + part_adv(IP)%VY*FACE_NORMAL(2) &
+                                 + part_adv(IP)%VZ*FACE_NORMAL(3)
+                           part_adv(IP)%VX = part_adv(IP)%VX - 2.*VDOTN*FACE_NORMAL(1)
+                           part_adv(IP)%VY = part_adv(IP)%VY - 2.*VDOTN*FACE_NORMAL(2)
+                           part_adv(IP)%VZ = part_adv(IP)%VZ - 2.*VDOTN*FACE_NORMAL(3)
+                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == DIFFUSE) THEN
+                           IF (GRID_BC(FACE_PG)%REACT) THEN
+                              CALL WALL_REACT(part_adv, IP, REMOVE_PART(IP))
+                           END IF
+
+                           S_ID = part_adv(IP)%S_ID
+                           WALL_TEMP = GRID_BC(FACE_PG)%WALL_TEMP
+                           CALL MAXWELL(0.d0, 0.d0, 0.d0, &
+                           WALL_TEMP, WALL_TEMP, WALL_TEMP, &
+                           VDUMMY, V_TANG1, V_TANG2, SPECIES(S_ID)%MOLECULAR_MASS)
+
+                           CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, WALL_TEMP, EROT)
+                           CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, WALL_TEMP, EVIB)
+                                          
+                           V_PERP = FLX(0.d0, WALL_TEMP, SPECIES(S_ID)%MOLECULAR_MASS)
+
+
+                           part_adv(IP)%VX = - V_PERP*FACE_NORMAL(1) &
+                                             - V_TANG1*FACE_TANG1(1) &
+                                             - V_TANG2*FACE_TANG2(1)
+                           part_adv(IP)%VY = - V_PERP*FACE_NORMAL(2) &
+                                             - V_TANG1*FACE_TANG1(2) &
+                                             - V_TANG2*FACE_TANG2(2)
+                           part_adv(IP)%VZ = - V_PERP*FACE_NORMAL(3) &
+                                             - V_TANG1*FACE_TANG1(3) &
+                                             - V_TANG2*FACE_TANG2(3)
+                           
+                           part_adv(IP)%EROT = EROT
+                           part_adv(IP)%EVIB = EVIB
+
+                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == CLL) THEN
+                           IF (GRID_BC(FACE_PG)%REACT) THEN
+                              CALL WALL_REACT(part_adv, IP, REMOVE_PART(IP))
+                           END IF
+
+                           VDOTN = part_adv(IP)%VX*FACE_NORMAL(1) &
+                                 + part_adv(IP)%VY*FACE_NORMAL(2) &
+                                 + part_adv(IP)%VZ*FACE_NORMAL(3)
+
+                           TANG1(1) = part_adv(IP)%VX - VDOTN*FACE_NORMAL(1)
+                           TANG1(2) = part_adv(IP)%VY - VDOTN*FACE_NORMAL(2)
+                           TANG1(3) = part_adv(IP)%VZ - VDOTN*FACE_NORMAL(3)
+
+                           TANG1 = TANG1/NORM2(TANG1)
+
+                           TANG2 = CROSS(FACE_NORMAL, TANG1)
+
+                           VDOTTANG1 = part_adv(IP)%VX*TANG1(1) &
+                                     + part_adv(IP)%VY*TANG1(2) &
+                                     + part_adv(IP)%VZ*TANG1(3)
+
+                           S_ID = part_adv(IP)%S_ID
+                           WALL_TEMP = GRID_BC(FACE_PG)%WALL_TEMP
+
+                           VRM = SQRT(2.*KB*WALL_TEMP/SPECIES(S_ID)%MOLECULAR_MASS)
+
+                           ! Normal velocity for the CLL model
+                           RN = rf()
+                           DO WHILE (RN < 1.0D-13)
+                              RN = rf()
+                           END DO
+                           R1 = SQRT(-GRID_BC(FACE_PG)%ACC_N*LOG(RN))
+                           THETA1 = 2.*PI*rf()
+                           DOT_NORM = VDOTN/VRM * SQRT(1 - GRID_BC(FACE_PG)%ACC_N)
+                           V_PERP = VRM * SQRT(R1*R1 + DOT_NORM*DOT_NORM + 2.*R1*DOT_NORM*COS(THETA1))
+
+                           ! Tangential velocity for the CLL model
+                           RN = rf()
+                           DO WHILE (RN < 1.0D-13)
+                              RN = rf()
+                           END DO         
+                           R2 = SQRT(-GRID_BC(FACE_PG)%ACC_T*LOG(RN))
+                           THETA2 = 2.*PI*rf()
+                           VTANGENT = VDOTTANG1/VRM * SQRT(1 - GRID_BC(FACE_PG)%ACC_T)
+                           V_TANG1 = VRM * (VTANGENT + R2 * COS(THETA2))
+                           V_TANG2 = VRM * R2 * SIN(THETA2)
+
+                           CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, WALL_TEMP, EROT)
+                           CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, WALL_TEMP, EVIB)
+
+                           part_adv(IP)%VX = V_PERP*FACE_NORMAL(1) &
+                                           + V_TANG1*TANG1(1) &
+                                           + V_TANG2*TANG2(1)
+                           part_adv(IP)%VY = V_PERP*FACE_NORMAL(2) &
+                                           + V_TANG1*TANG1(2) &
+                                           + V_TANG2*TANG2(2)
+                           part_adv(IP)%VZ = V_PERP*FACE_NORMAL(3) &
+                                           + V_TANG1*TANG1(3) &
+                                           + V_TANG2*TANG2(3)
+                           
+                           part_adv(IP)%EROT = EROT
+                           part_adv(IP)%EVIB = EVIB
+
+                        ELSE
+                           REMOVE_PART(IP) = .TRUE.
+                           part_adv(IP)%DTRIM = 0.d0
+                        END IF
+                     ELSE
+                        REMOVE_PART(IP) = .TRUE.
+                        part_adv(IP)%DTRIM = 0.d0
+                     END IF
+                  ELSE
+                     ! The particle is crossing to another cell
+                     part_adv(IP)%IC = NEIGHBOR
+                     IC = NEIGHBOR
+                     NCROSSINGS = NCROSSINGS + 1
+                     !WRITE(*,*) 'moved particle to cell: ', IC
+                  END IF
+               ELSE IF (BOUNDCOLL == 0) THEN
+                  CALL MOVE_PARTICLE_CN_B(part_adv, IP, E, B, DTCOLL)
+                  IF (AXI .AND. DIMS == 2) CALL AXI_ROTATE_VELOCITY(part_adv, IP)
+                  part_adv(IP)%DTRIM = part_adv(IP)%DTRIM - DTCOLL
+               ELSE
+                  ! The particle stays within the current cell. End of the motion.
+                  CALL MOVE_PARTICLE_CN_B(part_adv, IP, E, B, part_adv(IP)%DTRIM)
+                  IF (AXI .AND. DIMS == 2) CALL AXI_ROTATE_VELOCITY(part_adv, IP)
+                  part_adv(IP)%DTRIM = 0.d0
+               END IF
+            
+            ELSE
+               CALL ERROR_ABORT('Error! C-N mover only implemented for unstructured grids.')
+            END IF
+            
+            ! IF (tID == 4 .AND. FINAL) THEN
+            !    WRITE(66332,*) NCROSSINGS, NUMSTEPS
+            ! END IF
+
+         END DO ! WHILE (DTRIM .GT. 0.)
+
+            ! _______ APPLY Z PERIODIC BCs ________
+
+            ! Z we should be able to do this a posteriori (remember it could be more than one depth length out!)
+         IF (BOOL_Z_PERIODIC) THEN
+         
+            DO WHILE (part_adv(IP)%Z .GT. ZMAX)
+               part_adv(IP)%Z = ZMIN + (part_adv(IP)%Z - ZMAX)
+            END DO
+            DO WHILE (part_adv(IP)%Z .LT. ZMIN) 
+               part_adv(IP)%Z = ZMAX + (part_adv(IP)%Z - ZMIN)
+            END DO
+      
+         END IF 
+
+         part_adv(IP)%DTRIM = DT ! For the next timestep.
+
+
+         ! IF (COMPUTE_JACOBIAN) THEN
+
+         !    DXDEBAR = DXDEBAR * SPECIES(part_adv(IP)%S_ID)%CHARGE*QE
+         !    COUNTER = 0
+         !    DO I = 1, U2D_GRID%NUM_CELLS
+         !       IF (DXDEBAR(I) .NE. 0.d0) COUNTER = COUNTER + 1
+         !    END DO
+         !    IF (ALLOCATED(COLINDICES)) DEALLOCATE(COLINDICES)
+         !    IF (ALLOCATED(DXDEBAR_NZ)) DEALLOCATE(DXDEBAR_NZ)
+         !    ALLOCATE(COLINDICES(COUNTER))
+         !    ALLOCATE(DXDEBAR_NZ(COUNTER))
+         !    J = 1
+         !    DO I = 1, U2D_GRID%NUM_CELLS
+         !       IF (DXDEBAR(I) .NE. 0.d0) THEN
+         !          COLINDICES(J) = I - 1
+         !          DXDEBAR_NZ(J) = DXDEBAR(I)
+         !          J = J + 1
+         !       END IF
+         !    END DO
+         !    IF (COUNTER > 0) THEN
+         !       CALL MatSetValues(dxde,1,IC-1,COUNTER,COLINDICES,DXDEBAR_NZ,ADD_VALUES,ierr)
+         !    END IF
+         !    ! Tutto qui. Il resto fuori dal loop particelle.
+         ! END IF
+
+      END DO ! End loop: DO IP = 1,NP_PROC
+
+      !WRITE(*,*) 'Max number of steps on proc ', PROC_ID, ' = ', MAXNUMSTEPS
+
+      ! ==============
+      ! ========= Now remove part_adv that are out of the domain and reorder the array. 
+      ! ========= Do this in the end of the advection step, since reordering the array 
+      ! ========= mixes the part_adv.
+      ! ==============
+      IF (FINAL) THEN
+         IP = NP_PROC
+         DO WHILE (IP .GE. 1)
+
+            ! Is particle IP out of the domain? Then remove it!
+            IF (REMOVE_PART(IP)) THEN
+               CALL REMOVE_PARTICLE_ARRAY(IP, part_adv, NP_PROC)
+            ELSE IF (GRID_TYPE .NE. UNSTRUCTURED) THEN
+               CALL CELL_FROM_POSITION(part_adv(IP)%X, part_adv(IP)%Y, IC)
+               OLD_IC = part_adv(IP)%IC
+               part_adv(IP)%IC = IC
+               ! If cell-based particle weight has changed,
+               IF (BOOL_RADIAL_WEIGHTING .AND. (IC .NE. OLD_IC)) THEN
+                  WEIGHT_RATIO = CELL_FNUM(OLD_IC)/CELL_FNUM(IC)
+                  ! If the weight has increased, the particle may be removed
+                  IF (WEIGHT_RATIO .LT. 1.d0) THEN
+                     rfp = rf()
+                     IF (WEIGHT_RATIO .LT. rfp) CALL REMOVE_PARTICLE_ARRAY(IP, part_adv, NP_PROC)
+                  ELSE IF (WEIGHT_RATIO .GT. 1.d0) THEN
+                  ! If the weight has decreased, more part_adv may be added
+                     rfp = rf()
+                     DO WHILE ((WEIGHT_RATIO - 1.) .GT. rfp)
+                        CALL INIT_PARTICLE(part_adv(IP)%X, part_adv(IP)%Y, part_adv(IP)%Z, &
+                        part_adv(IP)%VX, part_adv(IP)%VY,part_adv(IP)%VZ, &
+                        part_adv(IP)%EROT,part_adv(IP)%EVIB,part_adv(IP)%S_ID,IC,DT,NEWparticle)
+                        CALL ADD_PARTICLE_ARRAY(NEWparticle, NP_PROC, part_adv)
+                        WEIGHT_RATIO = WEIGHT_RATIO - 1.
+                     END DO
+                  END IF
+               END IF
+            END IF
+
+            IP = IP - 1
+
+         END DO
+      END IF
+      DEALLOCATE(REMOVE_PART)
+
+
+      IF (FINAL) THEN
+         ! Tally surface collisions from all processes
+         CALL MPI_REDUCE(LOCAL_BOUNDARY_COLL_COUNT, BOUNDARY_COLL_COUNT, 4*N_SPECIES, MPI_INTEGER, MPI_SUM, 0, &
+         MPI_COMM_WORLD, ierr)
+
+         CALL MPI_REDUCE(LOCAL_WALL_COLL_COUNT, WALL_COLL_COUNT, N_WALLS*N_SPECIES, MPI_INTEGER, MPI_SUM, 0, &
+         MPI_COMM_WORLD, ierr)
+      END IF
+
+      DEALLOCATE(LOCAL_BOUNDARY_COLL_COUNT)
+      DEALLOCATE(LOCAL_WALL_COLL_COUNT)
+
+      ! IF (tID == 4 .AND. FINAL) THEN
+      !    CLOSE(66332)
+      ! END IF
+      
+      !CALL VecDestroy(dxdexvals,ierr)
+      !CALL VecDestroy(dxdeyvals,ierr)
+      !CALL VecDestroy(dydexvals,ierr)
+      !CALL VecDestroy(dydeyvals,ierr)
+      !CALL VecDestroy(vals,ierr)
+      !CALL VecDestroy(cols,ierr)
+
+
+   END SUBROUTINE ADVECT_CN_B
+
+
+
+
+   SUBROUTINE MOVE_PARTICLE_CN_B(part_adv, IP, E, B, TIME)
+
+      ! Moves particle with index IP for time TIME.
+      ! For now simply rectilinear movement, will have to include Lorentz's force
+
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN)      :: IP
+      REAL(KIND=8), DIMENSION(3), INTENT(IN) :: E, B
+      REAL(KIND=8), INTENT(IN) :: TIME
+      REAL(KIND=8), DIMENSION(3) :: DIRB, VOLD, AMOVER, VMOVER
+      REAL(KIND=8) :: QOM, NORMB, A, MAG
+      TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE, INTENT(INOUT) :: part_adv
+
+
+
+      QOM = SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS
+      NORMB = NORM2(B)
+      DIRB = B/NORMB
+      A = 0.5*QOM*part_adv(IP)%DTRIM
+      MAG = (A*A*NORMB*NORMB)/(1 + A*A*NORMB*NORMB)
+      VOLD = [part_adv(IP)%VX, part_adv(IP)%VY, part_adv(IP)%VZ]
+
+      AMOVER = (1-MAG)*QOM*(E+CROSS(VOLD,B)) + MAG*QOM*DOT(E,DIRB)*DIRB
+      VMOVER = (1-MAG)*VOLD + MAG*(CROSS(E,B)/(NORMB*NORMB) + DOT(VOLD,DIRB)*DIRB)
+
+      
+      part_adv(IP)%X = part_adv(IP)%X + VMOVER(1)*TIME + 0.5*AMOVER(1)*TIME*TIME
+      part_adv(IP)%Y = part_adv(IP)%Y + VMOVER(2)*TIME + 0.5*AMOVER(2)*TIME*TIME
+      part_adv(IP)%Z = part_adv(IP)%Z + VMOVER(3)*TIME + 0.5*AMOVER(3)*TIME*TIME
+
+      part_adv(IP)%VX = VMOVER(1) + AMOVER(1) * TIME
+      part_adv(IP)%VY = VMOVER(2) + AMOVER(2) * TIME
+      part_adv(IP)%VZ = VMOVER(3) + AMOVER(3) * TIME
+
+   END SUBROUTINE MOVE_PARTICLE_CN_B
+
 
 
 END MODULE fully_implicit

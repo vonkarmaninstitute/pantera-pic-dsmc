@@ -402,7 +402,7 @@ MODULE fully_implicit
       !  Advect the particles using the guessed new potential
       ALLOCATE(part_adv, SOURCE = particles)
       CALL TIMER_START(3)
-      CALL ADVECT_CN(part_adv, .FALSE., .FALSE., Jmat)
+      CALL ADVECT_CN_B(part_adv, .FALSE., .FALSE., Jmat)
       CALL TIMER_STOP(3)
       CALL DEPOSIT_CHARGE(part_adv)
       DEALLOCATE(part_adv)
@@ -508,7 +508,7 @@ MODULE fully_implicit
       !  Advect the particles using the guessed new potential
       ALLOCATE(part_adv, SOURCE = particles)
       CALL TIMER_START(3)
-      CALL ADVECT_CN(part_adv, .FALSE., .TRUE., jac)
+      CALL ADVECT_CN_B(part_adv, .FALSE., .TRUE., jac)
       CALL TIMER_STOP(3)
       IF (JACOBIAN_TYPE == 4) CALL COMPUTE_MASS_MATRICES(part_adv)
       IF (JACOBIAN_TYPE == 6) CALL COMPUTE_DENSITY_TEMPERATURE(part_adv)
@@ -886,7 +886,7 @@ MODULE fully_implicit
       !  Advect the particles using the guessed new potential
       ALLOCATE(part_adv, SOURCE = particles)
       CALL TIMER_START(3)
-      CALL ADVECT_CN(part_adv, .FALSE., .TRUE., Jmat)
+      CALL ADVECT_CN_B(part_adv, .FALSE., .TRUE., Jmat)
       CALL TIMER_STOP(3)
       CALL DEPOSIT_CHARGE(part_adv)
       IF (JACOBIAN_TYPE == 4) CALL COMPUTE_MASS_MATRICES(part_adv)
@@ -3900,7 +3900,7 @@ MODULE fully_implicit
       INTEGER, INTENT(IN)      :: IP
       REAL(KIND=8), DIMENSION(3), INTENT(IN) :: E, B
       REAL(KIND=8), INTENT(IN) :: TIME
-      REAL(KIND=8), DIMENSION(3) :: DIRB, VOLD, AMOVER, VMOVER
+      REAL(KIND=8), DIMENSION(3) :: DIRB, VOLD, VNEW, VHALF, AMOVER, VMOVER
       REAL(KIND=8) :: QOM, NORMB, A, MAG
       TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE, INTENT(INOUT) :: part_adv
 
@@ -3916,14 +3916,18 @@ MODULE fully_implicit
       AMOVER = (1-MAG)*QOM*(E+CROSS(VOLD,B)) + MAG*QOM*DOT(E,DIRB)*DIRB
       VMOVER = (1-MAG)*VOLD + MAG*(CROSS(E,B)/(NORMB*NORMB) + DOT(VOLD,DIRB)*DIRB)
 
+      VHALF = VMOVER + 0.5*AMOVER*TIME
       
-      part_adv(IP)%X = part_adv(IP)%X + VMOVER(1)*TIME + 0.5*AMOVER(1)*TIME*TIME
-      part_adv(IP)%Y = part_adv(IP)%Y + VMOVER(2)*TIME + 0.5*AMOVER(2)*TIME*TIME
-      part_adv(IP)%Z = part_adv(IP)%Z + VMOVER(3)*TIME + 0.5*AMOVER(3)*TIME*TIME
+      part_adv(IP)%X = part_adv(IP)%X + VHALF(1)*TIME
+      part_adv(IP)%Y = part_adv(IP)%Y + VHALF(2)*TIME
+      part_adv(IP)%Z = part_adv(IP)%Z + VHALF(3)*TIME
 
-      part_adv(IP)%VX = VMOVER(1) + AMOVER(1) * TIME
-      part_adv(IP)%VY = VMOVER(2) + AMOVER(2) * TIME
-      part_adv(IP)%VZ = VMOVER(3) + AMOVER(3) * TIME
+      
+      VNEW = VOLD + QOM*(E + CROSS(VHALF,B)) * TIME
+
+      part_adv(IP)%VX = VNEW(1)
+      part_adv(IP)%VY = VNEW(2)
+      part_adv(IP)%VZ = VNEW(3)
 
    END SUBROUTINE MOVE_PARTICLE_CN_B
 

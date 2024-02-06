@@ -184,7 +184,7 @@ MODULE timecycle
             CALL TIMER_STOP(2)
             
             CALL TIMER_START(3)
-            CALL ADVECT_CN(particles, .TRUE., .FALSE., Jmat)
+            CALL ADVECT_CN_B(particles, .TRUE., .FALSE., Jmat)
             CALL TIMER_STOP(3)
 
          ELSE

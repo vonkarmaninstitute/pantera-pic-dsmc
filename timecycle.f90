@@ -204,6 +204,7 @@ MODULE timecycle
 
          ! ########### Perform collisions ##########################################
 
+         CALL MPI_BARRIER(MPI_COMM_WORLD, ierr)
          CALL TIMER_START(6)
          IF (COLLISION_TYPE == MCC)  CALL MCC_COLLISIONS
          IF (COLLISION_TYPE == MCC_VAHEDI)  CALL MCC_COLLISIONS_VAHEDI
@@ -215,6 +216,7 @@ MODULE timecycle
 
          IF (COLLISION_TYPE == BGK) CALL BGK_COLLISIONS
 
+         CALL MPI_BARRIER(MPI_COMM_WORLD, ierr)
          CALL TIMER_STOP(6)
 
          IF (BOOL_THERMAL_BATH) CALL THERMAL_BATH

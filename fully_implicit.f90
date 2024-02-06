@@ -3476,24 +3476,36 @@ MODULE fully_implicit
                   END DO
                ELSE IF (DIMS == 3) THEN
                   QOM = SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS
-                  NORMB = NORM2(B)
-                  DIRB = B/NORMB
                   A = 0.5*QOM*part_adv(IP)%DTRIM
-                  MAG = (A*A*NORMB*NORMB)/(1 + A*A*NORMB*NORMB)
+                  NORMB = NORM2(B)
+                  IF (NORMB == 0) THEN
+                     DIRB = [1,0,0]
+                     MAG = 0
+                  ELSE
+                     DIRB = B/NORMB
+                     MAG = (A*A*NORMB*NORMB)/(1 + A*A*NORMB*NORMB)
+                  END IF
                   VOLD = [part_adv(IP)%VX, part_adv(IP)%VY, part_adv(IP)%VZ]
 
                   COLLTIMES = -1.d0
                   DO I = 1, 4
                      IF (PIC_TYPE .NE. NONE) THEN
-                        AMOVER = (1-MAG)*QOM*(E+CROSS(VOLD,B)) + MAG*QOM*DOT(E,DIRB)*DIRB
+                        IF (NORMB == 0) THEN
+                           AMOVER = QOM*E
+                        ELSE
+                           AMOVER = (1-MAG)*QOM*(E+CROSS(VOLD,B)) + MAG*QOM*DOT(E,DIRB)*DIRB
+                        END IF
                         ALPHA = 0.5*(U3D_GRID%CELL_FACES_COEFFS(1,I,IC)*AMOVER(1) &
                                    + U3D_GRID%CELL_FACES_COEFFS(2,I,IC)*AMOVER(2) &
                                    + U3D_GRID%CELL_FACES_COEFFS(3,I,IC)*AMOVER(3))
                      ELSE
                         ALPHA = 0.d0
                      END IF
-
-                     VMOVER = (1-MAG)*VOLD + MAG*(CROSS(E,B)/(NORMB*NORMB) + DOT(VOLD,DIRB)*DIRB)
+                     IF (NORMB == 0) THEN
+                        VMOVER = VOLD
+                     ELSE
+                        VMOVER = (1-MAG)*VOLD + MAG*(CROSS(E,B)/(NORMB*NORMB) + DOT(VOLD,DIRB)*DIRB)
+                     END IF
                      BETA = U3D_GRID%CELL_FACES_COEFFS(1,I,IC)*VMOVER(1) &
                           + U3D_GRID%CELL_FACES_COEFFS(2,I,IC)*VMOVER(2) &
                           + U3D_GRID%CELL_FACES_COEFFS(3,I,IC)*VMOVER(3)
@@ -3907,14 +3919,24 @@ MODULE fully_implicit
 
 
       QOM = SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS
-      NORMB = NORM2(B)
-      DIRB = B/NORMB
       A = 0.5*QOM*part_adv(IP)%DTRIM
-      MAG = (A*A*NORMB*NORMB)/(1 + A*A*NORMB*NORMB)
+      NORMB = NORM2(B)
+      IF (NORMB == 0) THEN
+         DIRB = [1,0,0]
+         MAG = 0
+      ELSE
+         DIRB = B/NORMB
+         MAG = (A*A*NORMB*NORMB)/(1 + A*A*NORMB*NORMB)
+      END IF
       VOLD = [part_adv(IP)%VX, part_adv(IP)%VY, part_adv(IP)%VZ]
 
-      AMOVER = (1-MAG)*QOM*(E+CROSS(VOLD,B)) + MAG*QOM*DOT(E,DIRB)*DIRB
-      VMOVER = (1-MAG)*VOLD + MAG*(CROSS(E,B)/(NORMB*NORMB) + DOT(VOLD,DIRB)*DIRB)
+      IF (NORMB == 0) THEN
+         AMOVER = QOM*E
+         VMOVER = VOLD
+      ELSE
+         AMOVER = (1-MAG)*QOM*(E+CROSS(VOLD,B)) + MAG*QOM*DOT(E,DIRB)*DIRB
+         VMOVER = (1-MAG)*VOLD + MAG*(CROSS(E,B)/(NORMB*NORMB) + DOT(VOLD,DIRB)*DIRB)
+      END IF
 
       VHALF = VMOVER + 0.5*AMOVER*TIME
       

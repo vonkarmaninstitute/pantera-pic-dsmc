@@ -566,6 +566,7 @@ CONTAINS
                WRITE(*,*) 'Particle position [x, y, z]=[ ', XP, ', ', YP, ', ', ZP, ']'
                WRITE(*,*) 'Particle species: ', SPECIES(particles(IP)%S_ID)%NAME
                REMOVE_PART(IP) = .TRUE.
+               CYCLE
             END IF
 
             I = INT((XP-XMIN)/DX) + 1

@@ -446,10 +446,14 @@ CONTAINS
       INTEGER, DIMENSION(:,:,:,:), ALLOCATABLE :: TETRAINGRID
       LOGICAL :: INSIDE, INSIDE_DOMAIN
       !REAL(KIND=8) :: MINABSPSI
+      LOGICAL, DIMENSION(:), ALLOCATABLE :: REMOVE_PART
 
       N_PARTITIONS_X = 100
       N_PARTITIONS_Y = 100
       N_PARTITIONS_Z = 100
+
+      ALLOCATE(REMOVE_PART(NP_PROC))
+      REMOVE_PART = .FALSE.
 
       ! First we assign the unstructured cells to the cells of a cartesian grid, which is easily indexable.
       IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
@@ -558,9 +562,10 @@ CONTAINS
             ZP = particles(IP)%Z
             
             IF (XP < XMIN .OR. XP > XMAX .OR. YP < YMIN .OR. YP > YMAX .OR.ZP < ZMIN .OR. ZP > ZMAX) THEN
-               WRITE(*,*) 'Error during restart! Particle found ouside the domain.'
+               WRITE(*,*) 'Error during restart! Particle found ouside the bounds.'
                WRITE(*,*) 'Particle position [x, y, z]=[ ', XP, ', ', YP, ', ', ZP, ']'
                WRITE(*,*) 'Particle species: ', SPECIES(particles(IP)%S_ID)%NAME
+               REMOVE_PART(IP) = .TRUE.
             END IF
 
             I = INT((XP-XMIN)/DX) + 1
@@ -591,12 +596,28 @@ CONTAINS
                WRITE(*,*) 'Error during restart! Particle found ouside the domain.'
                WRITE(*,*) 'Particle position [x, y, z]=[ ', XP, ', ', YP, ', ', ZP, ']'
                WRITE(*,*) 'Particle species: ', SPECIES(particles(IP)%S_ID)%NAME
+               REMOVE_PART(IP) = .TRUE.
             END IF
          END DO
 
       ELSE
          CALL ERROR_ABORT('Not implemented!')
       END IF
+
+
+
+
+      IP = NP_PROC
+      DO WHILE (IP .GE. 1)
+         ! Is particle IP out of the domain? Then remove it!
+         IF (REMOVE_PART(IP)) THEN
+            CALL REMOVE_PARTICLE_ARRAY(IP, particles, NP_PROC)
+         END IF
+         IP = IP - 1
+      END DO
+
+      DEALLOCATE(REMOVE_PART)
+
 
    END SUBROUTINE REASSIGN_PARTICLES_TO_CELLS_3D
 
@@ -617,6 +638,7 @@ CONTAINS
 
       N_PARTITIONS_X = 100
       N_PARTITIONS_Y = 100
+
       ALLOCATE(REMOVE_PART(NP_PROC))
       REMOVE_PART = .FALSE.
 
@@ -738,6 +760,8 @@ CONTAINS
       ELSE
          CALL ERROR_ABORT('Not implemented!')
       END IF
+
+      DEALLOCATE(REMOVE_PART)
 
    END SUBROUTINE REASSIGN_PARTICLES_TO_CELLS_2D
 

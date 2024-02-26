@@ -254,7 +254,8 @@ MODULE timecycle
          ! ########### Perform the conservation checks ###################################
          IF (PERFORM_CHECKS .AND. MOD(tID, CHECKS_EVERY) .EQ. 0) CALL CHECKS
 
-         CALL REMOVE_PARTICLES_OF_SPECIES(1)
+         IF (REMOVE_MIX .NE. -1) CALL REMOVE_PARTICLES_IN_MIXTURE(REMOVE_MIX)
+
 
          !IF (PERFORM_CHECKS .AND. MOD(tID, CHECKS_EVERY) .EQ. 0) THEN
          !   CALL ONLYMASTERPRINT1(PROC_ID, '---> Checking if particles are in the correct cells.')
@@ -1944,6 +1945,20 @@ MODULE timecycle
       END DO
 
    END SUBROUTINE REMOVE_PARTICLES_OF_SPECIES
+
+
+   SUBROUTINE REMOVE_PARTICLES_IN_MIXTURE(MIX_ID)
+
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN) :: MIX_ID
+      INTEGER :: I
+
+      DO I = 1, MIXTURES(MIX_ID)%N_COMPONENTS
+         CALL REMOVE_PARTICLES_OF_SPECIES(MIXTURES(MIX_ID)%COMPONENTS(I)%ID)
+      END DO
+
+   END SUBROUTINE REMOVE_PARTICLES_IN_MIXTURE
 
 
 END MODULE timecycle

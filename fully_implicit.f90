@@ -3225,6 +3225,8 @@ MODULE fully_implicit
       REAL(KIND=8) :: CHARGE, K, PSIP, RHO_Q
       INTEGER :: VP
 
+      REAL(KIND=8) :: SIGNED_DIST
+
       !REAL(KIND=8) :: CHECKVALUE
 
       ! IF (tID == 4 .AND. FINAL) THEN
@@ -3389,15 +3391,16 @@ MODULE fully_implicit
                      BETA = COEFA*part_adv(IP)%VX + COEFB*part_adv(IP)%VY
                      GAMMA = COEFA*part_adv(IP)%X + COEFB*part_adv(IP)%Y + COEFC
 
-                     IF (ALPHA == 0.d0) THEN
-                        COLLTIMES(2*(I-1) + 1) = - GAMMA/BETA
-                     ELSE
-                        DELTA = BETA*BETA - 4.0*ALPHA*GAMMA
-                        IF (DELTA >= 0.d0) THEN
-                           COLLTIMES(2*(I-1) + 1) = 0.5*(-BETA - SQRT(DELTA))/ALPHA
-                           COLLTIMES(2*I) =         0.5*(-BETA + SQRT(DELTA))/ALPHA
-                        END IF
-                     END IF
+                     COLLTIMES(2*(I-1) + 1:2*I) = SOLVE_QUADRATIC(ALPHA, BETA, GAMMA)
+                     ! IF (ALPHA == 0.d0) THEN
+                     !    COLLTIMES(2*(I-1) + 1) = - GAMMA/BETA
+                     ! ELSE
+                     !    DELTA = BETA*BETA - 4.0*ALPHA*GAMMA
+                     !    IF (DELTA >= 0.d0) THEN
+                     !       COLLTIMES(2*(I-1) + 1) = 0.5*(-BETA - SQRT(DELTA))/ALPHA
+                     !       COLLTIMES(2*I) =         0.5*(-BETA + SQRT(DELTA))/ALPHA
+                     !    END IF
+                     ! END IF
                   END DO
 
                   ! Find which collision happens first.
@@ -3515,15 +3518,16 @@ MODULE fully_implicit
                            + U3D_GRID%CELL_FACES_COEFFS(3,I,IC)*part_adv(IP)%Z &
                            + U3D_GRID%CELL_FACES_COEFFS(4,I,IC)
 
-                     IF (ALPHA == 0.d0) THEN
-                        COLLTIMES(2*(I-1) + 1) = - GAMMA/BETA
-                     ELSE
-                        DELTA = BETA*BETA - 4.0*ALPHA*GAMMA
-                        IF (DELTA >= 0.d0) THEN
-                           COLLTIMES(2*(I-1) + 1) = 0.5*(-BETA - SQRT(DELTA))/ALPHA
-                           COLLTIMES(2*I) =         0.5*(-BETA + SQRT(DELTA))/ALPHA
-                        END IF
-                     END IF
+                     COLLTIMES(2*(I-1) + 1:2*I) = SOLVE_QUADRATIC(ALPHA, BETA, GAMMA)
+                     ! IF (ALPHA == 0.d0) THEN
+                     !    COLLTIMES(2*(I-1) + 1) = - GAMMA/BETA
+                     ! ELSE
+                     !    DELTA = BETA*BETA - 4.0*ALPHA*GAMMA
+                     !    IF (DELTA >= 0.d0) THEN
+                     !       COLLTIMES(2*(I-1) + 1) = 0.5*(-BETA - SQRT(DELTA))/ALPHA
+                     !       COLLTIMES(2*I) =         0.5*(-BETA + SQRT(DELTA))/ALPHA
+                     !    END IF
+                     ! END IF
                   END DO
 
                   ! Find which collision happens first.
@@ -3541,7 +3545,7 @@ MODULE fully_implicit
                         VY_TEMP = part_adv(IP)%VY
                         VZ_TEMP = part_adv(IP)%VZ
 
-                        CALL MOVE_PARTICLE_CN_B(part_adv, IP, E, B, COLLTIMES(I))
+                        CALL MOVE_PARTICLE_CN_B(part_adv, IP, E, B, MAG, COLLTIMES(I))
                         J = EDGEINDEX(I)
 
                         ! ! A small check that we actually found an intersection.
@@ -3575,7 +3579,7 @@ MODULE fully_implicit
 
                ! Do the advection
                IF (BOUNDCOLL > 0) THEN
-                  CALL MOVE_PARTICLE_CN_B(part_adv, IP, E, B, DTCOLL)
+                  CALL MOVE_PARTICLE_CN_B(part_adv, IP, E, B, MAG, DTCOLL)
                   IF (AXI .AND. DIMS == 2) CALL AXI_ROTATE_VELOCITY(part_adv, IP)
                   part_adv(IP)%DTRIM = part_adv(IP)%DTRIM - DTCOLL
 
@@ -3768,14 +3772,24 @@ MODULE fully_implicit
                      !WRITE(*,*) 'moved particle to cell: ', IC
                   END IF
                ELSE IF (BOUNDCOLL == 0) THEN
-                  CALL MOVE_PARTICLE_CN_B(part_adv, IP, E, B, DTCOLL)
+                  CALL MOVE_PARTICLE_CN_B(part_adv, IP, E, B, MAG, DTCOLL)
                   IF (AXI .AND. DIMS == 2) CALL AXI_ROTATE_VELOCITY(part_adv, IP)
                   part_adv(IP)%DTRIM = part_adv(IP)%DTRIM - DTCOLL
                ELSE
                   ! The particle stays within the current cell. End of the motion.
-                  CALL MOVE_PARTICLE_CN_B(part_adv, IP, E, B, part_adv(IP)%DTRIM)
+                  CALL MOVE_PARTICLE_CN_B(part_adv, IP, E, B, MAG, part_adv(IP)%DTRIM)
                   IF (AXI .AND. DIMS == 2) CALL AXI_ROTATE_VELOCITY(part_adv, IP)
                   part_adv(IP)%DTRIM = 0.d0
+                  
+                  DO I = 1,4
+                     ! Little check that we actually stay within the same cell.
+                     SIGNED_DIST = U3D_GRID%CELL_FACES_COEFFS(1,I,IC)*part_adv(IP)%X &
+                                 + U3D_GRID%CELL_FACES_COEFFS(2,I,IC)*part_adv(IP)%Y &
+                                 + U3D_GRID%CELL_FACES_COEFFS(3,I,IC)*part_adv(IP)%Z &
+                                 + U3D_GRID%CELL_FACES_COEFFS(4,I,IC)
+                     IF (SIGNED_DIST > 1e-12) WRITE(*,*) 'Caution. Particle out! SIGNED_DIST = ', SIGNED_DIST
+                  END DO
+
                END IF
             
             ELSE
@@ -3915,7 +3929,7 @@ MODULE fully_implicit
 
 
 
-   SUBROUTINE MOVE_PARTICLE_CN_B(part_adv, IP, E, B, TIME)
+   SUBROUTINE MOVE_PARTICLE_CN_B(part_adv, IP, E, B, MAG, TIME)
 
       ! Moves particle with index IP for time TIME.
       ! For now simply rectilinear movement, will have to include Lorentz's force
@@ -3924,22 +3938,19 @@ MODULE fully_implicit
 
       INTEGER, INTENT(IN)      :: IP
       REAL(KIND=8), DIMENSION(3), INTENT(IN) :: E, B
-      REAL(KIND=8), INTENT(IN) :: TIME
+      REAL(KIND=8), INTENT(IN) :: TIME, MAG
       REAL(KIND=8), DIMENSION(3) :: DIRB, VOLD, VNEW, VHALF, AMOVER, VMOVER
-      REAL(KIND=8) :: QOM, NORMB, A, MAG
+      REAL(KIND=8) :: QOM, NORMB, A
       TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE, INTENT(INOUT) :: part_adv
 
 
 
       QOM = SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS
-      A = 0.5*QOM*part_adv(IP)%DTRIM
       NORMB = NORM2(B)
       IF (NORMB == 0) THEN
          DIRB = [1,0,0]
-         MAG = 0
       ELSE
          DIRB = B/NORMB
-         MAG = (A*A*NORMB*NORMB)/(1 + A*A*NORMB*NORMB)
       END IF
       VOLD = [part_adv(IP)%VX, part_adv(IP)%VY, part_adv(IP)%VZ]
 
@@ -3958,7 +3969,8 @@ MODULE fully_implicit
       part_adv(IP)%Z = part_adv(IP)%Z + VHALF(3)*TIME
 
       
-      VNEW = VOLD + QOM*(E + CROSS(VHALF,B)) * TIME
+      !VNEW = VOLD + QOM*(E + CROSS(VHALF,B)) * TIME
+      VNEW = 2.*VHALF - VOLD
 
       part_adv(IP)%VX = VNEW(1)
       part_adv(IP)%VY = VNEW(2)

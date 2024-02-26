@@ -329,6 +329,7 @@ TYPE(UNSTRUCTURED_3D_GRID_DATA_STRUCTURE) :: U3D_GRID
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: nfs_XMIN, nfs_XMAX, nfs_YMIN, nfs_YMAX
    REAL(KIND=8) :: KAPPA_XMIN, KAPPA_XMAX, KAPPA_YMIN, KAPPA_YMAX
    REAL(KIND=8) :: S_NORM_XMIN, S_NORM_XMAX, S_NORM_YMIN, S_NORM_YMAX
+   INTEGER           :: REMOVE_MIX = -1
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Particles injection from line source !!!!!!!!!!!!!!!

@@ -29,7 +29,7 @@ MODULE initialization
       CHARACTER*512      :: MIXTURE_DEFINITION, VSS_PARAMS_FILENAME, LINESOURCE_DEFINITION, WALL_DEFINITION, MCC_BG_FILENAME
       CHARACTER*512      :: BC_DEFINITION, SOLENOID_DEFINITION
       CHARACTER*64       :: MIX_BOUNDINJECT_NAME, DSMC_COLL_MIX_NAME, MCC_BG_MIX_NAME, PIC_TYPE_STRING, PARTITION_STYLE_STRING, &
-      COLLISION_TYPE_STRING
+      COLLISION_TYPE_STRING, REMOVE_MIX_NAME
 
       ! Open input file for reading
       OPEN(UNIT=in1,FILE='input', STATUS='old',IOSTAT=ios)
@@ -264,6 +264,11 @@ MODULE initialization
             CALL DEF_VOLUME_INJECT(BC_DEFINITION)
          END IF
 
+         ! ~~~~~~~~~~~~~  Particle deletion  ~~~~~~~~~~~~~~~~~
+         IF (line=='Remove_particles_in_mixture:') THEN
+            READ(in1,*) REMOVE_MIX_NAME
+            REMOVE_MIX = MIXTURE_NAME_TO_ID(REMOVE_MIX_NAME)
+         END IF
 
          ! ~~~~~~~~~~~~~  Thermal bath  ~~~~~~~~~~~~~~~~~
          IF (line=='Thermal_bath_bool:')  READ(in1,*) BOOL_THERMAL_BATH

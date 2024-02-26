@@ -441,9 +441,9 @@ CONTAINS
       REAL(KIND=8) :: DX, DY, DZ, CELLXMIN, CELLXMAX, CELLYMIN, CELLYMAX, CELLZMIN, CELLZMAX
       REAL(KIND=8) :: X1, X2, X3, X4, Y1, Y2, Y3, Y4, Z1, Z2, Z3, Z4, XP, YP, ZP, PSIP
       INTEGER :: I, J, K, IC, IMIN, IMAX, JMIN, JMAX, KMIN, KMAX, V1, V2, V3, V4
-      INTEGER :: N_PARTITIONS_X, N_PARTITIONS_Y, N_PARTITIONS_Z, IP, VP, CELL
-      INTEGER, DIMENSION(:,:,:), ALLOCATABLE :: NINGRIDCELL
-      INTEGER, DIMENSION(:,:,:,:), ALLOCATABLE :: TETRAINGRID
+      INTEGER :: N_PARTITIONS_X, N_PARTITIONS_Y, N_PARTITIONS_Z, IP, VP, CELL, IDX
+      INTEGER, DIMENSION(:,:,:), ALLOCATABLE :: NINGRIDCELL, IOFTETRA
+      INTEGER, DIMENSION(:), ALLOCATABLE :: INDTETRA
       LOGICAL :: INSIDE, INSIDE_DOMAIN
       !REAL(KIND=8) :: MINABSPSI
       LOGICAL, DIMENSION(:), ALLOCATABLE :: REMOVE_PART
@@ -508,7 +508,22 @@ CONTAINS
 
          END DO
 
-         ALLOCATE(TETRAINGRID(MAXVAL(NINGRIDCELL), N_PARTITIONS_Z, N_PARTITIONS_Y, N_PARTITIONS_X))
+         ALLOCATE(IOFTETRA(N_PARTITIONS_Z, N_PARTITIONS_Y, N_PARTITIONS_X))
+         IOFTETRA = -1
+
+         IDX = 1
+         DO I = 1, N_PARTITIONS_X
+            DO J = 1, N_PARTITIONS_Y
+               DO K = 1, N_PARTITIONS_Z
+                  IF (NINGRIDCELL(K,J,I) .NE. 0) THEN
+                     IOFTETRA(K,J,I) = IDX
+                     IDX = IDX + NINGRIDCELL(K,J,I)
+                  END IF
+               END DO
+            END DO
+         END DO
+
+         ALLOCATE(INDTETRA(SUM(NINGRIDCELL)))
          NINGRIDCELL = 0
 
          DO IC = 1, NCELLS
@@ -548,8 +563,8 @@ CONTAINS
             DO I = IMIN, IMAX
                DO J = JMIN, JMAX
                   DO K = KMIN, KMAX
+                     INDTETRA(IOFTETRA(K,J,I) + NINGRIDCELL(K,J,I)) = IC
                      NINGRIDCELL(K,J,I) = NINGRIDCELL(K,J,I) + 1
-                     TETRAINGRID(NINGRIDCELL(K,J,I), K, J, I) = IC
                   END DO
                END DO
             END DO
@@ -574,9 +589,9 @@ CONTAINS
             K = INT((ZP-ZMIN)/DZ) + 1
 
             INSIDE_DOMAIN = .FALSE.
-            DO CELL = 1, NINGRIDCELL(K,J,I)
+            DO CELL = IOFTETRA(K,J,I), IOFTETRA(K,J,I)+NINGRIDCELL(K,J,I)-1
                !MINABSPSI = 1.d100
-               IC = TETRAINGRID(CELL, K, J, I)
+               IC = INDTETRA(CELL)
                ! Check if particle IP (XP, YP) is in unstructured cell IC.
                INSIDE = .TRUE.
                DO VP = 1, 4
@@ -1327,5 +1342,33 @@ CONTAINS
       END DO
    END SUBROUTINE CHECK
 
+
+   FUNCTION SOLVE_QUADRATIC(A, B, C)
+
+      IMPLICIT NONE
+
+      REAL(KIND=8), INTENT(IN) :: A, B, C
+      REAL(KIND=8), DIMENSION(2) :: SOLVE_QUADRATIC
+      REAL(KIND=8) :: DELTA, R
+
+      DELTA = B*B-4.0*A*C
+
+      IF (DELTA < 0) THEN
+         SOLVE_QUADRATIC(1) = -1
+         SOLVE_QUADRATIC(2) = -1
+      ELSE IF (DELTA == 0) THEN
+         SOLVE_QUADRATIC(1) = B/A
+         SOLVE_QUADRATIC(2) = SOLVE_QUADRATIC(1)
+      ELSE IF (DELTA > 0) THEN
+         IF (A == 0) THEN
+            SOLVE_QUADRATIC(1) = 0.5*C/B
+            SOLVE_QUADRATIC(2) = SOLVE_QUADRATIC(1)
+         ELSE
+            R = -B - SIGN(SQRT(DELTA), B)
+            SOLVE_QUADRATIC(1) = 2.0*C/R
+            SOLVE_QUADRATIC(2) = 0.5*R/A
+         END IF
+      END IF
+   END FUNCTION SOLVE_QUADRATIC
 
 END MODULE tools

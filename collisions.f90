@@ -1550,8 +1550,8 @@ MODULE collisions
       END DO
 
       NULL_COLL_FREQ = MCC_BG_DENS*1e-12
-      !P_NULL = 1 - EXP(-DT*NULL_COLL_FREQ)
-      P_NULL = DT*NULL_COLL_FREQ
+      P_NULL = 1 - EXP(-DT*NULL_COLL_FREQ)
+      !P_NULL = DT*NULL_COLL_FREQ
       IF (P_NULL > 1) THEN
          WRITE(*,*) 'Caution! P_NULL is greater than 1! P_NULL = ', P_NULL, 'Setting it to 1 and adjusting the collision frequency.'
          P_NULL = 1.
@@ -1617,7 +1617,8 @@ MODULE collisions
 
                IF (REACTIONS(JR)%TYPE == LXCAT) THEN
                   SIGMA_R = INTERP_CS(ETR, REACTIONS(JR)%TABLE_ENERGY, REACTIONS(JR)%TABLE_CS)
-                  P_CUMULATED = P_CUMULATED + BG_NRHO*SIGMA_R*VR / NULL_COLL_FREQ
+                  !P_CUMULATED = P_CUMULATED + BG_NRHO*SIGMA_R*VR / NULL_COLL_FREQ
+                  P_CUMULATED = P_CUMULATED + (1. -EXP(-BG_NRHO*SIGMA_R*VR*DT)) / P_NULL
                ELSE
                   CYCLE
                END IF

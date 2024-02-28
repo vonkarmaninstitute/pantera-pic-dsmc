@@ -2562,7 +2562,7 @@ MODULE fully_implicit
       TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE, INTENT(IN) :: part_adv
 
       REAL(KIND=8) :: RF_XMIN, RF_XMAX, RF_YMAX
-      REAL(KIND=8) :: RF_FREQ, NOVERL, COIL_CURRENT, EMAG, RP
+      REAL(KIND=8) :: RF_FREQ, NOVERL, EMAG, RP
       REAL(KIND=8) :: PARTICLE_CHARGE
 
       RF_XMIN = -0.08d0
@@ -2571,7 +2571,6 @@ MODULE fully_implicit
 
       RF_FREQ = 13.56d6
       NOVERL = 250.d0 ! Number of coil turns per meter
-      COIL_CURRENT = 1.d0
 
       PARTICLE_CHARGE = QE*SPECIES(part_adv(JP)%S_ID)%CHARGE
 
@@ -3787,7 +3786,10 @@ MODULE fully_implicit
                                  + U3D_GRID%CELL_FACES_COEFFS(2,I,IC)*part_adv(IP)%Y &
                                  + U3D_GRID%CELL_FACES_COEFFS(3,I,IC)*part_adv(IP)%Z &
                                  + U3D_GRID%CELL_FACES_COEFFS(4,I,IC)
-                     IF (SIGNED_DIST > 1e-12) WRITE(*,*) 'Caution. Particle out! SIGNED_DIST = ', SIGNED_DIST
+                     IF (SIGNED_DIST > 1e-12) THEN
+                        WRITE(*,*) 'Caution. Particle out! SIGNED_DIST = ', SIGNED_DIST
+                        REMOVE_PART(IP) = .TRUE.
+                     END IF
                   END DO
 
                END IF

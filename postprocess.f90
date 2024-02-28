@@ -1158,7 +1158,7 @@ MODULE postprocess
             DO JS = 1, N_SPECIES
                HEADER_STRING = TRIM(HEADER_STRING) // ' eepart_' // TRIM(SPECIES(JS)%NAME)
             END DO
-            HEADER_STRING = TRIM(HEADER_STRING) // ' toteefield tote fieldpower'
+            HEADER_STRING = TRIM(HEADER_STRING) // ' toteefield tote fieldpower coilcurrent'
             DO JS = 1, N_REACTIONS
                HEADER_STRING = TRIM(HEADER_STRING) // ' nreact_' // ITOA(JS)
             END DO
@@ -1169,7 +1169,7 @@ MODULE postprocess
          WRITE(54331,*) CURRENT_TIME, TOT_NUM, TOT_MOMENTUM, SUM(TOT_MOMENTUM, DIM=2), &
          TOT_KE_PART, TOT_IE, TOT_EE_PART,TOT_EE_FIELD, &
          SUM(TOT_KE_PART) + TOT_IE + TOT_EE_FIELD, &
-         FIELD_POWER_TOT, TOT_REACT_COUNTS !TOT_FE, TOT_EE
+         FIELD_POWER_TOT, COIL_CURRENT, TOT_REACT_COUNTS !TOT_FE, TOT_EE
          CLOSE(54331)
 
       ELSE

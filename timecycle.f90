@@ -73,6 +73,12 @@ MODULE timecycle
       CALL CPU_TIME(START_CPU_TIME)
       DO WHILE (tID .LE. NT)
 
+
+         CALL MPI_REDUCE(FIELD_POWER, FIELD_POWER_TOT, 1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         CALL MPI_BCAST(FIELD_POWER_TOT, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+         FIELD_POWER_AVG = AVERAGING_ALPHA*FIELD_POWER_TOT + (1-AVERAGING_ALPHA)*FIELD_POWER_AVG
+         COIL_CURRENT = COIL_CURRENT*SQRT(FIELD_POWER_TARGET/FIELD_POWER_AVG)
+
          ! ########### Print simulation info #######################################
 
          CURRENT_TIME = tID*DT
@@ -95,7 +101,8 @@ MODULE timecycle
                            ' [h] - number of particles: ', NP_TOT, &
                            ' - number of collisions: ', NCOLL_TOT, &
                            ' - number of reactions: ', NREAC_TOT, &
-                           ' - rf power deposited: ', FIELD_POWER_TOT, ' [W]'
+                           ' - rf power deposited: ', FIELD_POWER_TOT, ' [W]', &
+                           ' - coil current: ', COIL_CURRENT, ' [A]'
 
             CALL ONLYMASTERPRINT1(PROC_ID, TRIM(stringTMP))
 

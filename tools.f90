@@ -1371,4 +1371,50 @@ CONTAINS
       END IF
    END FUNCTION SOLVE_QUADRATIC
 
+
+
+   FUNCTION DQDCRT(A, B, C)
+
+      IMPLICIT NONE
+
+      REAL(KIND=8), INTENT(IN) :: A, B, C     !! COEFFICIENTS
+      REAL(KIND=8), DIMENSION(2) :: DQDCRT   !! REAL COMPONENTS OF ROOTS
+
+      REAL(KIND=8) :: D, R, W
+
+      IF (A == 0) THEN
+         !IT IS REALLY A LINEAR EQUATION:
+         IF (B == 0) THEN  !DEGENERATE CASE, JUST RETURN ZEROS
+            DQDCRT = 0
+         ELSE
+         !THERE IS ONLY ONE ROOT (REAL), SO JUST DUPLICATE IT:
+            DQDCRT = -C/B
+         END IF
+      ELSE
+         IF (C == 0) THEN
+            DQDCRT(1) = 0
+            DQDCRT(2) = -B/A
+         ELSE
+            D = B*B - 4.0*A*C
+               IF (D < 0) THEN
+               !COMPLEX ROOTS
+                  DQDCRT = -1
+               ELSE
+               !DISTINCT REAL ROOTS
+               R = SQRT(D)
+               IF (B /= 0) THEN
+                  W = -(B + SIGN(R, B))
+                  DQDCRT(1) = 2.0*C/W
+                  DQDCRT(2) = 0.5*W/A
+               ELSE
+                  DQDCRT(1) = ABS(0.5*R/A)
+                  DQDCRT(2) = -DQDCRT(1)
+               END IF
+            END IF
+         END IF
+      END IF
+
+   END FUNCTION DQDCRT
+
+
 END MODULE tools

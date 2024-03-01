@@ -29,6 +29,9 @@ MODULE timecycle
       NP_TOT = 0
       CALL INIT_POSTPROCESS
 
+      ALLOCATE(FIELD_POWER_AVG(FIELD_POWER_NUMAVG))
+      FIELD_POWER_AVG = FIELD_POWER_TARGET
+
       ! ########### Compute poisson ##########################################
 
       IF (PIC_TYPE .NE. NONE) THEN
@@ -76,8 +79,11 @@ MODULE timecycle
 
          CALL MPI_REDUCE(FIELD_POWER, FIELD_POWER_TOT, 1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
          CALL MPI_BCAST(FIELD_POWER_TOT, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-         FIELD_POWER_AVG = AVERAGING_ALPHA*FIELD_POWER_TOT + (1-AVERAGING_ALPHA)*FIELD_POWER_AVG
-         COIL_CURRENT = COIL_CURRENT*SQRT(FIELD_POWER_TARGET/FIELD_POWER_AVG)
+         FIELD_POWER_AVG(MOD(tID, FIELD_POWER_NUMAVG) + 1) = FIELD_POWER_TOT
+         IF (MOD(tID, FIELD_POWER_NUMAVG) .EQ. 0) THEN
+            WRITE(*,*) 'Adjusting coil current.'
+            COIL_CURRENT = COIL_CURRENT*SQRT(FIELD_POWER_TARGET/(SUM(FIELD_POWER_AVG)/DBLE(FIELD_POWER_NUMAVG)))
+         END IF
 
          ! ########### Print simulation info #######################################
 
@@ -94,7 +100,7 @@ MODULE timecycle
 
             
 
-            WRITE(stringTMP, '(A13,I8,A4,I8,A9,ES14.3,A17,F10.1,A27,F10.1,A28,I10,A25,I10,A24,I10,A23,ES14.3,A4)') &
+            WRITE(stringTMP, '(A13,I8,A4,I8,A9,ES14.3,A17,F10.1,A27,F10.1,A28,I10,A25,I10,A24,I10,A23,ES14.3,A4,A17,ES14.3,A4)') &
                            '   Timestep: ', tID, ' of ', NT, &
                            ' - time: ', CURRENT_TIME, ' [s] - CPU time: ', CURRENT_CPU_TIME, &
                            ' [s] - est. time required: ', EST_TIME, &

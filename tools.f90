@@ -261,6 +261,9 @@ CONTAINS
       IF (BOOL_BINARY_OUTPUT) THEN
          OPEN(10, FILE=filename, ACCESS='SEQUENTIAL', FORM='UNFORMATTED', STATUS='NEW', CONVERT='BIG_ENDIAN', RECL=80)
          DO IP = 1, NP_PROC
+            IF (PARTDUMP_FRACSAMPLE < 1) THEN
+               IF (rf() > PARTDUMP_FRACSAMPLE) CYCLE
+            END IF
             WRITE(10) particles(IP)%X, particles(IP)%Y, particles(IP)%Z, &
             particles(IP)%VX, particles(IP)%VY, particles(IP)%VZ, particles(IP)%EROT, particles(IP)%EVIB, &
             particles(IP)%S_ID, particles(IP)%IC, particles(IP)%DTRIM
@@ -270,6 +273,9 @@ CONTAINS
          OPEN(10, FILE=filename )
          !WRITE(10,*) '% X | Y | Z | VX | VY | VZ | EROT | EVIB | S_ID | IC | DTRIM'
          DO IP = 1, NP_PROC
+            IF (PARTDUMP_FRACSAMPLE < 1) THEN
+               IF (rf() > PARTDUMP_FRACSAMPLE) CYCLE
+            END IF
             WRITE(10,*) particles(IP)%X, particles(IP)%Y, particles(IP)%Z, &
             particles(IP)%VX, particles(IP)%VY, particles(IP)%VZ, particles(IP)%EROT, particles(IP)%EVIB, &
             particles(IP)%S_ID, particles(IP)%IC, particles(IP)%DTRIM

@@ -174,6 +174,7 @@ MODULE initialization
          IF (line=='Binary_output:')           READ(in1,*) BOOL_BINARY_OUTPUT
          IF (line=='Dump_part_every:')         READ(in1,*) DUMP_EVERY
          IF (line=='Dump_part_start:')         READ(in1,*) DUMP_START
+         IF (line=='Dump_part_fracsample:')    READ(in1,*) PARTDUMP_FRACSAMPLE
          IF (line=='Dump_bound_every:')        READ(in1,*) DUMP_BOUND_EVERY
          IF (line=='Dump_bound_start:')        READ(in1,*) DUMP_BOUND_START
          IF (line=='Dump_grid_avgevery:')      READ(in1,*) DUMP_GRID_AVG_EVERY

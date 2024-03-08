@@ -29,26 +29,36 @@ MODULE collisions
       ! IOF => index (for IND) of first particle in a cell (an offset in IND)
       
       INTEGER, DIMENSION(:,:), ALLOCATABLE :: NPC, IOF
-      INTEGER, DIMENSION(:), ALLOCATABLE :: IND
-      INTEGER                            :: JP, JS, JC, IDX
+      INTEGER, DIMENSION(:), ALLOCATABLE :: NPCALL, IOFALL
+      INTEGER, DIMENSION(:), ALLOCATABLE :: IND, INDALL
+      INTEGER                            :: JP, JS, JC, IDX, IDXALL
       INTEGER                            :: NCOLLREAL
 
       ALLOCATE(NPC(N_SPECIES,NCELLS))
       ALLOCATE(IOF(N_SPECIES,NCELLS))
 
+      ALLOCATE(NPCALL(NCELLS))
+      ALLOCATE(IOFALL(NCELLS))
       ! Count the number of particles in each cell of each species, to allocate arrays later
       NPC = 0
+      NPCALL = 0
       DO JP = 1, NP_PROC
          JC = particles(JP)%IC
          JS = particles(JP)%S_ID
          NPC(JS,JC) = NPC(JS,JC) + 1
+         NPCALL(JC) = NPCALL(JC) + 1
       END DO
 
       ! Fill the array of offsets (IOF). IOF(IS,IC) is the the index in IND of the first
       ! particle in cell IC of species IS
       IOF = -1
+      IOFALL = -1
       IDX = 1
       DO JC = 1, NCELLS
+         IF (NPCALL(JC) .NE. 0) THEN
+            IOFALL(JC) = IDXALL
+            IDXALL = IDXALL + NPCALL(JC)
+         END IF
          DO JS = 1, N_SPECIES
             IF (NPC(JS,JC) .NE. 0) THEN
                IOF(JS,JC) = IDX
@@ -60,13 +70,18 @@ MODULE collisions
       ! Allocate and fill the array of indices (IND). IND(IP) is the particle index (for the "particles" array)
       ! but ordered by cells, with offsets given by IND(IC) and stride length NPC(IC)
       ALLOCATE(IND(NP_PROC))
+      ALLOCATE(INDALL(NP_PROC))
    
       NPC = 0
+      NPCALL = 0
       DO JP = 1, NP_PROC
          JC = particles(JP)%IC
          JS = particles(JP)%S_ID
          IND(IOF(JS,JC) + NPC(JS,JC)) = JP
          NPC(JS,JC) = NPC(JS,JC) + 1
+
+         INDALL(IOFALL(JC) + NPCALL(JC)) = JP
+         NPCALL(JC) = NPCALL(JC) + 1
       END DO
 
       ! Verify: ! DBDBDBDBDBDDBDBDBDBDBDBDDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBD
@@ -84,7 +99,7 @@ MODULE collisions
             ! For cells where there is at least two particles, call the collision procedure.
             IF (COLLISION_TYPE == DSMC) THEN
                ! DSMC temporarily broken because now arrays are per-species.
-               !CALL VSS_COLLIS(JC, NPC, IOF, IND, NCOLLREAL)
+               CALL VSS_COLLIS(JC, NPCALL, IOFALL, INDALL, NCOLLREAL)
             ELSE IF (COLLISION_TYPE == DSMC_VAHEDI) THEN
                CALL VAHEDI_COLLIS(JC, NPC, IOF, IND, NCOLLREAL)
             END IF
@@ -97,6 +112,10 @@ MODULE collisions
       DEALLOCATE(NPC)
       DEALLOCATE(IOF)
       DEALLOCATE(IND)
+
+      DEALLOCATE(NPCALL)
+      DEALLOCATE(IOFALL)
+      DEALLOCATE(INDALL)
    
    END SUBROUTINE DSMC_COLLISIONS
 

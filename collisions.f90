@@ -54,6 +54,7 @@ MODULE collisions
       IOF = -1
       IOFALL = -1
       IDX = 1
+      IDXALL = 1
       DO JC = 1, NCELLS
          IF (NPCALL(JC) .NE. 0) THEN
             IOFALL(JC) = IDXALL

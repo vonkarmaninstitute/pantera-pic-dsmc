@@ -826,10 +826,18 @@ CONTAINS
             !WRITE(*,*) 'Writing trajectory file for particle with ID ', particles(IP)%ID
             WRITE(filename, "(A,A,I0.15)") TRIM(ADJUSTL(TRAJDUMP_SAVE_PATH)), "trajectory_", particles(IP)%ID ! Compose filename
             ! Open file for writing
-            OPEN(1610, FILE=filename, POSITION='APPEND')
-            WRITE(1610,*) TIMESTEP, particles(IP)%S_ID, particles(IP)%X, particles(IP)%Y, particles(IP)%Z, &
-            particles(IP)%VX, particles(IP)%VY, particles(IP)%VZ
-            CLOSE(1610)
+            IF (BOOL_BINARY_OUTPUT) THEN
+               OPEN(1610, FILE=filename, ACCESS='SEQUENTIAL', POSITION='APPEND', FORM='UNFORMATTED', &
+               STATUS='UNKNOWN', CONVERT='BIG_ENDIAN', RECL=56)
+               WRITE(1610) TIMESTEP, particles(IP)%S_ID, particles(IP)%X, particles(IP)%Y, particles(IP)%Z, &
+               particles(IP)%VX, particles(IP)%VY, particles(IP)%VZ
+               CLOSE(1610)
+            ELSE
+               OPEN(1610, FILE=filename, POSITION='APPEND')
+               WRITE(1610,*) TIMESTEP, particles(IP)%S_ID, particles(IP)%X, particles(IP)%Y, particles(IP)%Z, &
+               particles(IP)%VX, particles(IP)%VY, particles(IP)%VZ
+               CLOSE(1610)
+            END IF   
          END IF
       END DO
 

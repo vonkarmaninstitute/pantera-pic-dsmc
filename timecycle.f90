@@ -19,7 +19,7 @@ MODULE timecycle
 
       IMPLICIT NONE
    
-      INTEGER :: NP_TOT, NCOLL_TOT, NREAC_TOT
+      INTEGER :: NP_TOT, NCOLL_TOT, NREAC_TOT, IP
       REAL(KIND=8) :: FIELD_POWER_TOT
       REAL(KIND=8) :: CURRENT_TIME, CURRENT_CPU_TIME, EST_TIME
 
@@ -83,6 +83,16 @@ MODULE timecycle
          IF (MOD(tID, FIELD_POWER_NUMAVG) .EQ. 0) THEN
             WRITE(*,*) 'Adjusting coil current.'
             COIL_CURRENT = COIL_CURRENT*SQRT(FIELD_POWER_TARGET/(SUM(FIELD_POWER_AVG)/DBLE(FIELD_POWER_NUMAVG)))
+         END IF
+
+
+
+         IF (tID == 40001) THEN
+            DO IP = 1, NP_PROC
+               IF (rf() < 1.d-4) THEN
+                  particles(IP)%DUMP_TRAJ = .TRUE.
+               END IF
+            END DO
          END IF
 
          ! ########### Print simulation info #######################################

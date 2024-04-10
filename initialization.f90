@@ -1479,6 +1479,14 @@ MODULE initialization
             NEW_REACTION%N_PROD = 3
             NEW_REACTION%P3_SP_ID = REACTION_SPECIES_NAME_TO_ID(STRARRAY(9))
          END IF
+
+         IF (N_STR .GE. 11) THEN
+            IF (STRARRAY(10) .NE. '+') THEN
+               CALL ERROR_ABORT('Attention, format is not respected in reactions file.')
+            END IF
+            NEW_REACTION%N_PROD = 4
+            NEW_REACTION%P4_SP_ID = REACTION_SPECIES_NAME_TO_ID(STRARRAY(11))
+         END IF
       
          IF (STRARRAY(4) == '-CEX->') THEN
             NEW_REACTION%IS_CEX = .TRUE.

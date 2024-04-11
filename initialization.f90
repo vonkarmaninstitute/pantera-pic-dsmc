@@ -1461,6 +1461,7 @@ MODULE initialization
 
          IF (N_STR == 0) CYCLE ! This is an empty line
          IF (STRARRAY(2) .NE. '+' .OR. (STRARRAY(4) .NE. '-->' .AND. STRARRAY(4) .NE. '-CEX->') .OR. STRARRAY(6) .NE. '+') THEN
+            WRITE(*,*) 'Line in reactions file:', DEFINITION
             CALL ERROR_ABORT('Attention, format is not respected in reactions file.')
          END IF
 
@@ -1474,6 +1475,7 @@ MODULE initialization
 
          IF (N_STR .GE. 9) THEN
             IF (STRARRAY(8) .NE. '+') THEN
+               WRITE(*,*) 'Line in reactions file:', DEFINITION
                CALL ERROR_ABORT('Attention, format is not respected in reactions file.')
             END IF
             NEW_REACTION%N_PROD = 3
@@ -1482,6 +1484,7 @@ MODULE initialization
 
          IF (N_STR .GE. 11) THEN
             IF (STRARRAY(10) .NE. '+') THEN
+               WRITE(*,*) 'Line in reactions file:', DEFINITION
                CALL ERROR_ABORT('Attention, format is not respected in reactions file.')
             END IF
             NEW_REACTION%N_PROD = 4

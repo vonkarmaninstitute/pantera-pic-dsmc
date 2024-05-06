@@ -886,6 +886,17 @@ MODULE collisions
    END FUNCTION COLL_INTERNAL_ENERGY
 
 
+   REAL(KIND=8) FUNCTION COLL_INTERNAL_ENERGY_EQUAL(ECOLL, TRDOF, INTDOF)
+
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN) :: INTDOF
+      REAL(KIND=8), INTENT(IN)  :: ECOLL, TRDOF
+
+      COLL_INTERNAL_ENERGY_EQUAL = 0.5*ECOLL
+
+   END FUNCTION COLL_INTERNAL_ENERGY_EQUAL
+
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE HS_SCATTER -> Computes velocities after a hard-sphere   !
    ! i.e. isotropic collision                                           !

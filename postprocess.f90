@@ -1041,7 +1041,7 @@ MODULE postprocess
       REAL(KIND=8)                       :: CFNUM
 
       CHARACTER*256                      :: file_name
-      CHARACTER*1024                     :: HEADER_STRING
+      CHARACTER*2048                     :: HEADER_STRING
       LOGICAL                            :: FILE_EXISTS
 
       ALLOCATE(TOT_NUM(N_SPECIES))

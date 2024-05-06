@@ -87,13 +87,13 @@ MODULE timecycle
 
 
 
-         IF (tID == 40001) THEN
-            DO IP = 1, NP_PROC
-               IF (rf() < 1.d-4) THEN
-                  particles(IP)%DUMP_TRAJ = .TRUE.
-               END IF
-            END DO
-         END IF
+         ! IF (tID == 40001) THEN
+         !    DO IP = 1, NP_PROC
+         !       IF (rf() < 1.d-4) THEN
+         !          particles(IP)%DUMP_TRAJ = .TRUE.
+         !       END IF
+         !    END DO
+         ! END IF
 
          ! ########### Print simulation info #######################################
 

@@ -17,6 +17,12 @@ MODULE screen
       IF (P_ID .EQ. 0) THEN ! Only master prints
          WRITE(*,*)
          WRITE(*,*)
+         WRITE(*,*)  'PANTERA PIC-DSMC  Copyright (C) 2024  Pietro Parodi, Stefano Boccelli, Federico Bariselli'
+         WRITE(*,*)  'This program comes with ABSOLUTELY NO WARRANTY.                                          '
+         WRITE(*,*)  'This is free software, and you are welcome to redistribute it                            '
+         WRITE(*,*)  'under certain conditions. See https://www.gnu.org/licenses/ for details.                 '
+         WRITE(*,*)
+         WRITE(*,*)
          WRITE(*,*)  '                                                            ___.,.   .~-.,    '
          WRITE(*,*)  '                                              .___    .,//.~      `\/     \   '
          WRITE(*,*)  '                                             / `\ \.,/             /       |  '

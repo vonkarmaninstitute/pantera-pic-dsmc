@@ -33,8 +33,8 @@ Boundary_temperature:
     
 PIC_type:
     none
-!Mesh_file_SU2:
-!    'testbox1.su2'
+Mesh_file_SU2:
+    'testbox1.su2'
 Bool_dump_moments:
     .FALSE.
 Bool_dump_fluxes:
@@ -50,7 +50,7 @@ Fnum:  ! Ratio of real-to-simulated particles
 Timestep:
     1.0e-12
 Number_of_timesteps:
-    1000
+    10
 Stats_every:
     1
 

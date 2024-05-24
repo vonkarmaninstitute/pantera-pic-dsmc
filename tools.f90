@@ -1119,58 +1119,60 @@ CONTAINS
 
       ALLOCATE(ALL_TIMERS_ELAPSED(6*N_MPI_THREADS))
       CALL MPI_GATHER(TIMERS_ELAPSED, 6, MPI_DOUBLE_PRECISION, & 
-      GLOBAL_TIMERS_ELAPSED, 6, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+      ALL_TIMERS_ELAPSED, 6, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
       GLOBAL_TIMERS_ELAPSED = RESHAPE(ALL_TIMERS_ELAPSED, [6, N_MPI_THREADS])
 
       IF (PROC_ID == 0) THEN
          TIMERS_MAX_AMONG_PROC = MAXVAL(GLOBAL_TIMERS_ELAPSED, DIM = 2)
          TIMERS_MIN_AMONG_PROC = MINVAL(GLOBAL_TIMERS_ELAPSED, DIM = 2)
-         TIMERS_AVG_AMONG_PROC = MINVAL(GLOBAL_TIMERS_ELAPSED, DIM = 2)
+         TIMERS_AVG_AMONG_PROC = SUM(GLOBAL_TIMERS_ELAPSED, DIM = 2)/DBLE(N_MPI_THREADS)
          TOTAL_ELAPSED = SUM(TIMERS_MAX_AMONG_PROC)
 
-         WRITE(*,*) '=========================================='
-         WRITE(*,*) '==========     TIMING INFO     ==========='
-         WRITE(*,*) '=========================================='
-         WRITE(*,*) 'Section             |    MAX    |    MIN    |    AVG    |     MAX/TOT'
+         WRITE(*,*) '==================================================================='
+         WRITE(*,*) '=======================     TIMING INFO     ======================='
+         WRITE(*,*) '==================================================================='
+         WRITE(*,*) 'Section             |    MAX    |    MIN    |    AVG    |  MAX/TOT'
 
-         WRITE(*,'(A21,F9.2,A3,F9.2,A3,F9.2,A3,F4.1,A2)') ' Initialization:     ',  &
+         WRITE(*,'(A21,F9.2,A3,F9.2,A3,F9.2,A3,F9.2,A2)') ' Initialization:     ',  &
          TIMERS_MAX_AMONG_PROC(1),   ' s ', &
          TIMERS_MIN_AMONG_PROC(1),   ' s ', &
          TIMERS_AVG_AMONG_PROC(1),   ' s ', &
          100*TIMERS_MAX_AMONG_PROC(1)/TOTAL_ELAPSED, '%.'
 
-         WRITE(*,'(A21,F9.2,A3,F9.2,A3,F9.2,A3,F4.1,A2)') ' Field solution:     ',  &
+         WRITE(*,'(A21,F9.2,A3,F9.2,A3,F9.2,A3,F9.2,A2)') ' Field solution:     ',  &
          TIMERS_MAX_AMONG_PROC(2),   ' s ', &
          TIMERS_MIN_AMONG_PROC(2),   ' s ', &
          TIMERS_AVG_AMONG_PROC(2),   ' s ', &
          100*TIMERS_MAX_AMONG_PROC(2)/TOTAL_ELAPSED, '%.'
 
-         WRITE(*,'(A21,F9.2,A3,F9.2,A3,F9.2,A3,F4.1,A2)') ' Particle movement:  ',  &
+         WRITE(*,'(A21,F9.2,A3,F9.2,A3,F9.2,A3,F9.2,A2)') ' Particle movement:  ',  &
          TIMERS_MAX_AMONG_PROC(3),   ' s ', &
          TIMERS_MIN_AMONG_PROC(3),   ' s ', &
          TIMERS_AVG_AMONG_PROC(3),   ' s ', &
          100*TIMERS_MAX_AMONG_PROC(3)/TOTAL_ELAPSED, '%.'
 
-         WRITE(*,'(A21,F9.2,A3,F9.2,A3,F9.2,A3,F4.1,A2)') ' File output:        ',  &
+         WRITE(*,'(A21,F9.2,A3,F9.2,A3,F9.2,A3,F9.2,A2)') ' File output:        ',  &
          TIMERS_MAX_AMONG_PROC(4),   ' s ', &
          TIMERS_MIN_AMONG_PROC(4),   ' s ', &
          TIMERS_AVG_AMONG_PROC(4),   ' s ', &
          100*TIMERS_MAX_AMONG_PROC(4)/TOTAL_ELAPSED, '%.'
 
-         WRITE(*,'(A21,F9.2,A3,F9.2,A3,F9.2,A3,F4.1,A2)') ' MPI particle comm.: ',  &
+         WRITE(*,'(A21,F9.2,A3,F9.2,A3,F9.2,A3,F9.2,A2)') ' MPI particle comm.: ',  &
          TIMERS_MAX_AMONG_PROC(5),   ' s ', &
          TIMERS_MIN_AMONG_PROC(5),   ' s ', &
          TIMERS_AVG_AMONG_PROC(5),   ' s ', &
          100*TIMERS_MAX_AMONG_PROC(5)/TOTAL_ELAPSED, '%.'
 
-         WRITE(*,'(A21,F9.2,A3,F9.2,A3,F9.2,A3,F4.1,A2)') ' Collisions:         ',  &
+         WRITE(*,'(A21,F9.2,A3,F9.2,A3,F9.2,A3,F9.2,A2)') ' Collisions:         ',  &
          TIMERS_MAX_AMONG_PROC(6),   ' s ', &
          TIMERS_MIN_AMONG_PROC(6),   ' s ', &
          TIMERS_AVG_AMONG_PROC(6),   ' s ', &
          100*TIMERS_MAX_AMONG_PROC(6)/TOTAL_ELAPSED, '%.'
 
-         WRITE(*,*) '=========================================='
+         WRITE(*,*) '===================================================================='
       END IF
+
+      DEALLOCATE(ALL_TIMERS_ELAPSED)
 
    END SUBROUTINE TIMER_SUMMARY
 

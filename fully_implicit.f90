@@ -2678,7 +2678,9 @@ MODULE fully_implicit
       IMPLICIT NONE
 
       ! Solve the linear system  (Amat*PHI_FIELD = bvec)
+      CALL TIMER_START(1)
       CALL KSPSolve(ksp,bvec,xvec,ierr)
+      CALL TIMER_STOP(1)
 
       CALL KSPGetConvergedReason(ksp,reason,ierr)
       IF (PROC_ID == 0) WRITE(*,*) 'KSPConvergedReason = ', reason

@@ -1901,8 +1901,6 @@ MODULE initialization
                         ZP = V1(3) + (V2(3)-V1(3))*P + (V3(3)-V1(3))*Q + (V4(3)-V1(3))*R
                      END IF
 
-                     IF (XP > 0 .OR. XP  < -0.015) CYCLE
-
                      ! Assign velocity and energy following a Boltzmann distribution
                      M = SPECIES(S_ID)%MOLECULAR_MASS
                      CALL MAXWELL(INITIAL_PARTICLES_TASKS(ITASK)%UX, &

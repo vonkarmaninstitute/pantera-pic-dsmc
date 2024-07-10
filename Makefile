@@ -12,8 +12,10 @@ OPTF = -O3 -fimplicit-none
 #-march=native -Wall -Wextra -fimplicit-none -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow -mcmodel=medium # Aggressive optimization options 
 
 # Objects: list of all objects *.o
-OBJS = mpi_common.o  global.o  screen.o  tools.o  initialization.o  timecycle.o  grid_and_partition.o  particle.o  collisions.o  postprocess.o  fields.o  mt19937.o  fully_implicit.o
+OBJS = $(BUILDDIR)mpi_common.o  $(BUILDDIR)global.o  $(BUILDDIR)screen.o  $(BUILDDIR)tools.o  $(BUILDDIR)initialization.o  $(BUILDDIR)timecycle.o  $(BUILDDIR)grid_and_partition.o  $(BUILDDIR)particle.o  $(BUILDDIR)collisions.o  $(BUILDDIR)postprocess.o  $(BUILDDIR)fields.o  $(BUILDDIR)mt19937.o  $(BUILDDIR)fully_implicit.o
 
+SRCDIR = src/
+BUILDDIR = build/
 
 #  The following variable must either be a path to petsc.pc or just "petsc" if petsc.pc
 #  has been installed to a system location or can be found in PKG_CONFIG_PATH.
@@ -47,58 +49,62 @@ debug: OPTF += -Wall -Wextra -fbacktrace -fcheck=all -ffpe-trap=invalid,zero,ove
 debug: pantera.exe
 
 # Executable generation by the linker
-pantera.exe: pantera.o $(OBJS) 
-	$(LNK) $(OPTF) pantera.o $(OBJS) \
+pantera.exe: createbuilddir
+pantera.exe: $(BUILDDIR)pantera.o $(OBJS) 
+	$(LNK) $(OPTF) $(BUILDDIR)pantera.o $(OBJS) \
 	            -o pantera.exe -L/usr/lib $(LDFLAGS) $(LDLIBS) -I$(PETSC_DIR)/include
 
 # Objects generation
-pantera.o: pantera.f90  $(OBJS) 
-	$(CMP) $(OPTF) pantera.f90
+$(BUILDDIR)pantera.o: $(SRCDIR)pantera.f90  $(OBJS) createbuilddir
+	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)pantera.f90
 
-global.o: global.f90  mpi_common.o  particle.o
-	$(CMP) $(OPTF) global.f90
+$(BUILDDIR)global.o: $(SRCDIR)global.f90  $(BUILDDIR)mpi_common.o  $(BUILDDIR)particle.o  createbuilddir
+	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)global.f90
 
-fully_implicit.o: fully_implicit.f90  global.o  screen.o  tools.o
-	$(CMP) $(OPTF) fully_implicit.f90
+$(BUILDDIR)fully_implicit.o: $(SRCDIR)fully_implicit.f90  $(BUILDDIR)global.o  $(BUILDDIR)screen.o  $(BUILDDIR)tools.o  createbuilddir
+	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)fully_implicit.f90
 
-timecycle.o: timecycle.f90  global.o  particle.o  screen.o  collisions.o  postprocess.o  fields.o  fully_implicit.o
-	$(CMP) $(OPTF) timecycle.f90
+$(BUILDDIR)timecycle.o: $(SRCDIR)timecycle.f90  $(BUILDDIR)global.o  $(BUILDDIR)particle.o  $(BUILDDIR)screen.o  $(BUILDDIR)collisions.o  $(BUILDDIR)postprocess.o  $(BUILDDIR)fields.o  $(BUILDDIR)fully_implicit.o  createbuilddir
+	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)timecycle.f90
 
-initialization.o: initialization.f90  global.o  tools.o  grid_and_partition.o
-	$(CMP) $(OPTF) initialization.f90
+$(BUILDDIR)initialization.o: $(SRCDIR)initialization.f90  $(BUILDDIR)global.o  $(BUILDDIR)tools.o  $(BUILDDIR)grid_and_partition.o  createbuilddir
+	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)initialization.f90
 
-tools.o: tools.f90  mpi_common.o  global.o  mt19937.o
-	$(CMP) $(OPTF) tools.f90
+$(BUILDDIR)tools.o: $(SRCDIR)tools.f90  $(BUILDDIR)mpi_common.o  $(BUILDDIR)global.o  $(BUILDDIR)mt19937.o  createbuilddir
+	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)tools.f90
 
-grid_and_partition.o: grid_and_partition.f90  mpi_common.o  global.o  tools.o
-	$(CMP) $(OPTF) grid_and_partition.f90
+$(BUILDDIR)grid_and_partition.o: $(SRCDIR)grid_and_partition.f90  $(BUILDDIR)mpi_common.o  $(BUILDDIR)global.o  $(BUILDDIR)tools.o  createbuilddir
+	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)grid_and_partition.f90
 
-screen.o: screen.f90
-	$(CMP) $(OPTF) screen.f90
+$(BUILDDIR)screen.o: $(SRCDIR)screen.f90  createbuilddir
+	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)screen.f90
 
-mpi_common.o: mpi_common.f90
-	$(CMP) $(OPTF) mpi_common.f90
+$(BUILDDIR)mpi_common.o: $(SRCDIR)mpi_common.f90  createbuilddir
+	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)mpi_common.f90
 
-particle.o: particle.f90
-	$(CMP) $(OPTF) particle.f90
+$(BUILDDIR)particle.o: $(SRCDIR)particle.f90  createbuilddir
+	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)particle.f90
 
-collisions.o: collisions.f90
-	$(CMP) $(OPTF) collisions.f90
+$(BUILDDIR)collisions.o: $(SRCDIR)collisions.f90  createbuilddir
+	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)collisions.f90
 	
-postprocess.o: postprocess.f90  fields.o
-	$(CMP) $(OPTF) postprocess.f90
+$(BUILDDIR)postprocess.o: $(SRCDIR)postprocess.f90  $(BUILDDIR)fields.o  createbuilddir
+	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)postprocess.f90
 
-fields.o: fields.f90  fully_implicit.o
-	$(CMP) $(OPTF) fields.f90
+$(BUILDDIR)fields.o: $(SRCDIR)fields.f90  $(BUILDDIR)fully_implicit.o  createbuilddir
+	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)fields.f90
 	
-mt19937.o: mt19937.f90
-	$(CMP) $(OPTF) mt19937.f90
+$(BUILDDIR)mt19937.o: $(SRCDIR)mt19937.f90  createbuilddir
+	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)mt19937.f90
 
 	
 # Cleaning command
+createbuilddir:
+	mkdir  build
+
 clean: 
 	@echo cleaning objects, modules and executables 
-	rm  -f  *.o  *.mod  *.exe  *~
+	rm  -rf  $(BUILDDIR)  *.exe
 
 cleanoutput:
 	@echo cleaning output and dump files

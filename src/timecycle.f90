@@ -8,7 +8,8 @@ MODULE timecycle
    USE postprocess
    USE fields
    USE fully_implicit
-
+   USE washboard
+   
    CONTAINS
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1366,6 +1367,52 @@ MODULE timecycle
                            !WRITE(66341,*) VXPRE, ', ', VYPRE, ', ', VZPRE, ', ', &
                            !particles(IP)%VX, ', ', particles(IP)%VY, ', ', particles(IP)%VZ
                            !CLOSE(66341)
+                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == WASHBOARD) THEN
+                           IF (GRID_BC(FACE_PG)%REACT) THEN
+                              CALL WALL_REACT(particles, IP, REMOVE_PART(IP))
+                           END IF
+
+                           !VXPRE = particles(IP)%VX
+                           !VYPRE = particles(IP)%VY
+                           !VZPRE = particles(IP)%VZ
+
+                           VDOTN = particles(IP)%VX*FACE_NORMAL(1) &
+                                 + particles(IP)%VY*FACE_NORMAL(2) &
+                                 + particles(IP)%VZ*FACE_NORMAL(3)
+
+                           TANG1(1) = particles(IP)%VX - VDOTN*FACE_NORMAL(1)
+                           TANG1(2) = particles(IP)%VY - VDOTN*FACE_NORMAL(2)
+                           TANG1(3) = particles(IP)%VZ - VDOTN*FACE_NORMAL(3)
+
+                           TANG1 = TANG1/NORM2(TANG1)
+
+                           TANG2 = CROSS(FACE_NORMAL, TANG1)
+
+                           VDOTTANG1 = particles(IP)%VX*TANG1(1) &
+                                     + particles(IP)%VY*TANG1(2) &
+                                     + particles(IP)%VZ*TANG1(3)
+
+
+                           CALL WB_SCATTER(FACE_PG, SPECIES(particles(IP)%S_ID)%MOLECULAR_MASS, &
+                           VDOTTANG1, VDOTN, V_TANG1, V_TANG2, V_PERP)
+                           S_ID = particles(IP)%S_ID
+                           WALL_TEMP = GRID_BC(FACE_PG)%WALL_TEMP
+
+                           CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, WALL_TEMP, EROT)
+                           CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, WALL_TEMP, EVIB)
+
+                           particles(IP)%VX = V_PERP*FACE_NORMAL(1) &
+                                            + V_TANG1*TANG1(1) &
+                                            + V_TANG2*TANG2(1)
+                           particles(IP)%VY = V_PERP*FACE_NORMAL(2) &
+                                            + V_TANG1*TANG1(2) &
+                                            + V_TANG2*TANG2(2)
+                           particles(IP)%VZ = V_PERP*FACE_NORMAL(3) &
+                                            + V_TANG1*TANG1(3) &
+                                            + V_TANG2*TANG2(3)
+                           
+                           particles(IP)%EROT = EROT
+                           particles(IP)%EVIB = EVIB
 
                         ELSE
                            REMOVE_PART(IP) = .TRUE.

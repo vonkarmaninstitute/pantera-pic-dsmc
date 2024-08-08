@@ -15,6 +15,7 @@ MODULE global
    REAL(KIND=8) :: MU0  = 1.25663706212d-6               ! https://physics.nist.gov/cgi-bin/cuu/Value?mu0
    REAL(KIND=8) :: KB   = 1.380649d-23                   ! https://physics.nist.gov/cgi-bin/cuu/Value?k
    REAL(KIND=8) :: QE   = 1.602176634d-19                ! https://physics.nist.gov/cgi-bin/cuu/Value?e
+   REAL(KIND=8) :: NA   = 6.02214076e23                  ! https://physics.nist.gov/cgi-bin/cuu/Value?na
 
    REAL(KIND=8) :: EPS_SCALING = 1.d0
    
@@ -134,7 +135,7 @@ TYPE(UNSTRUCTURED_3D_GRID_DATA_STRUCTURE) :: U3D_GRID
    INTEGER         :: N_GRID_BC = 0
 
    ENUM, BIND(C)
-      ENUMERATOR VACUUM, SPECULAR, DIFFUSE, CLL, REACT, AXIS, PERIODIC_MASTER, PERIODIC_SLAVE, EMIT
+      ENUMERATOR VACUUM, SPECULAR, DIFFUSE, CLL, REACT, AXIS, PERIODIC_MASTER, PERIODIC_SLAVE, EMIT, WB_BC
    END ENUM
 
    ENUM, BIND(C)
@@ -168,6 +169,14 @@ TYPE(UNSTRUCTURED_3D_GRID_DATA_STRUCTURE) :: U3D_GRID
 
       LOGICAL :: REACT = .FALSE.
       LOGICAL :: DUMP_FLUXES = .FALSE.
+
+      ! Washboard model
+      REAL(KIND=8) :: A
+      REAL(KIND=8) :: B
+      REAL(KIND=8) :: W
+      REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:,:) :: MAX_P_DN
+      REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:,:) :: MAX_P_UP
+      REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:,:) :: P_COLL_UP
 
    END TYPE BOUNDARY_CONDITION_DATA_STRUCTURE
 

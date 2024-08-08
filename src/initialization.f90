@@ -1024,6 +1024,15 @@ MODULE initialization
          READ(STRARRAY(5), '(ES14.0)') GRID_BC(IPG)%ACC_T
       ELSE IF (STRARRAY(2) == 'react') THEN
          GRID_BC(IPG)%REACT = .TRUE.
+      ELSE IF (STRARRAY(2) == 'washboard') THEN
+         GRID_BC(IPG)%PARTICLE_BC = WB_BC
+         READ(STRARRAY(3), '(ES14.0)') GRID_BC(IPG)%A
+         READ(STRARRAY(4), '(ES14.0)') GRID_BC(IPG)%B
+         READ(STRARRAY(5), '(ES14.0)') GRID_BC(IPG)%W
+         READ(STRARRAY(6), '(ES14.0)') GRID_BC(IPG)%WALL_TEMP
+         READ(STRARRAY(7), '(ES14.0)') GRID_BC(IPG)%ACC_N
+         GRID_BC(IPG)%ACC_T = 0
+         CALL READ_WASHBOARD_TABLES(IPG)
       ELSE IF (STRARRAY(2) == 'axis') THEN
          GRID_BC(IPG)%PARTICLE_BC = AXIS
          ! Needs more info
@@ -1072,6 +1081,85 @@ MODULE initialization
    END SUBROUTINE DEF_BOUNDARY_CONDITION
 
 
+   SUBROUTINE READ_WASHBOARD_TABLES(IPG)
+
+      IMPLICIT NONE
+      
+      INTEGER :: IPG ! Physical group index
+      INTEGER, PARAMETER :: file_unit = 938
+      INTEGER :: I, J, K, IDX
+      INTEGER :: STATUS
+
+      real, dimension(45, 1600) :: matrix, matrix_neg, matrix_pup
+
+      ALLOCATE(GRID_BC(IPG)%MAX_P_DN(45,40,40))
+      ALLOCATE(GRID_BC(IPG)%MAX_P_UP(45,40,40))
+      ALLOCATE(GRID_BC(IPG)%P_COLL_UP(45,40,40))
+
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      !!!!!!!   Max_P   !!!!!!!!!!!!!!!!
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  
+      ! Open the file
+      open(unit=file_unit, file='Max_P.csv', status='old', action='read', &
+           form='formatted', iostat=status)
+      if (status /= 0) then
+         WRITE(*,*) 'Error opening file Max_P.csv'
+         stop
+      endif
+      ! Read data from the file into the array
+      do i = 1, 45
+         read(file_unit, *) (matrix(i, j), j = 1, 1600)
+      end do
+      ! Close the file
+      close(unit=file_unit)
+  
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      !!!!!!!   Max_P_neg  !!!!!!!!!!!!!
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      ! Open the file
+      open(unit=file_unit, file='Max_neg_P.csv', status='old', action='read', &
+           form='formatted', iostat=status)
+      if (status /= 0) then
+         WRITE(*,*) 'Error opening file neg Max_neg_P.csv'
+         stop
+      endif
+      ! Read data from the file into the array
+      do i = 1, 45
+          read(file_unit, *) (matrix_neg(i, j), j = 1, 1600)
+      end do
+      close(unit=file_unit)
+  
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      !!!!!!!   P_up_col   !!!!!!!!!!!!!
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      ! Open the file
+      open(unit=file_unit, file='Pup_write.csv', status='old', action='read', &
+           form='formatted', iostat=status)
+      if (status /= 0) then
+         WRITE(*,*) 'Error opening file neg Pup_write.csv'
+         stop
+      endif
+      ! Read data from the file into the array
+      do i = 1, 45
+         read(file_unit, *) (matrix_pup(i, j), j = 1, 1600)
+      end do
+      close(unit=file_unit)
+  
+      ! Reshape the matrix
+      do i = 1, 45
+         idx = 1
+         do j = 1, 40
+            do k = 1, 40
+               GRID_BC(IPG)%MAX_P_DN(i, j, k) = matrix(i, idx)
+               GRID_BC(IPG)%MAX_P_UP(i, j, k) = matrix_neg(i, idx)
+               GRID_BC(IPG)%P_COLL_UP(i, j, k) = matrix_pup(i, idx)
+               idx = idx + 1
+            end do
+         end do
+      end do
+
+   END SUBROUTINE READ_WASHBOARD_TABLES
 
 
    SUBROUTINE DEF_DOMAIN_TYPE(DEFINITION)

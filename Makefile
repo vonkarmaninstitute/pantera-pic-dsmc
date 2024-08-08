@@ -12,7 +12,7 @@ OPTF = -O3 -fimplicit-none
 #-march=native -Wall -Wextra -fimplicit-none -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow -mcmodel=medium # Aggressive optimization options 
 
 # Objects: list of all objects *.o
-OBJS = $(BUILDDIR)mpi_common.o  $(BUILDDIR)global.o  $(BUILDDIR)screen.o  $(BUILDDIR)tools.o  $(BUILDDIR)initialization.o  $(BUILDDIR)timecycle.o  $(BUILDDIR)grid_and_partition.o  $(BUILDDIR)particle.o  $(BUILDDIR)collisions.o  $(BUILDDIR)postprocess.o  $(BUILDDIR)fields.o  $(BUILDDIR)mt19937.o  $(BUILDDIR)fully_implicit.o
+OBJS = $(BUILDDIR)mpi_common.o  $(BUILDDIR)global.o  $(BUILDDIR)screen.o  $(BUILDDIR)tools.o  $(BUILDDIR)initialization.o  $(BUILDDIR)timecycle.o  $(BUILDDIR)grid_and_partition.o  $(BUILDDIR)particle.o  $(BUILDDIR)collisions.o  $(BUILDDIR)postprocess.o  $(BUILDDIR)fields.o  $(BUILDDIR)mt19937.o  $(BUILDDIR)fully_implicit.o  $(BUILDDIR)washboard.o
 
 SRCDIR = src/
 BUILDDIR = build/
@@ -64,7 +64,7 @@ $(BUILDDIR)global.o: $(SRCDIR)global.f90  $(BUILDDIR)mpi_common.o  $(BUILDDIR)pa
 $(BUILDDIR)fully_implicit.o: $(SRCDIR)fully_implicit.f90  $(BUILDDIR)global.o  $(BUILDDIR)screen.o  $(BUILDDIR)tools.o  createbuilddir
 	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)fully_implicit.f90
 
-$(BUILDDIR)timecycle.o: $(SRCDIR)timecycle.f90  $(BUILDDIR)global.o  $(BUILDDIR)particle.o  $(BUILDDIR)screen.o  $(BUILDDIR)collisions.o  $(BUILDDIR)postprocess.o  $(BUILDDIR)fields.o  $(BUILDDIR)fully_implicit.o  createbuilddir
+$(BUILDDIR)timecycle.o: $(SRCDIR)timecycle.f90  $(BUILDDIR)global.o  $(BUILDDIR)particle.o  $(BUILDDIR)screen.o  $(BUILDDIR)collisions.o  $(BUILDDIR)postprocess.o  $(BUILDDIR)fields.o  $(BUILDDIR)fully_implicit.o  $(BUILDDIR)washboard.o  createbuilddir
 	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)timecycle.f90
 
 $(BUILDDIR)initialization.o: $(SRCDIR)initialization.f90  $(BUILDDIR)global.o  $(BUILDDIR)tools.o  $(BUILDDIR)grid_and_partition.o  createbuilddir
@@ -94,17 +94,20 @@ $(BUILDDIR)postprocess.o: $(SRCDIR)postprocess.f90  $(BUILDDIR)fields.o  createb
 $(BUILDDIR)fields.o: $(SRCDIR)fields.f90  $(BUILDDIR)fully_implicit.o  createbuilddir
 	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)fields.f90
 	
+$(BUILDDIR)washboard.o: $(SRCDIR)washboard.f90  $(BUILDDIR)tools.o  $(BUILDDIR)global.o  createbuilddir
+	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)washboard.f90
+
 $(BUILDDIR)mt19937.o: $(SRCDIR)mt19937.f90  createbuilddir
 	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)mt19937.f90
 
 	
 # Cleaning command
-createbuilddir:
+createbuilddir:  clean
 	mkdir  build
 
 clean: 
 	@echo cleaning objects, modules and executables 
-	rm  -rf  $(BUILDDIR)  *.exe
+	rm -rf build *.exe
 
 cleanoutput:
 	@echo cleaning output and dump files

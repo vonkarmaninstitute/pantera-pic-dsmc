@@ -9,7 +9,7 @@ MODULE timecycle
    USE fields
    USE fully_implicit
    USE washboard
-   
+
    CONTAINS
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1367,14 +1367,14 @@ MODULE timecycle
                            !WRITE(66341,*) VXPRE, ', ', VYPRE, ', ', VZPRE, ', ', &
                            !particles(IP)%VX, ', ', particles(IP)%VY, ', ', particles(IP)%VZ
                            !CLOSE(66341)
-                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == WASHBOARD) THEN
+                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == WB_BC) THEN
                            IF (GRID_BC(FACE_PG)%REACT) THEN
                               CALL WALL_REACT(particles, IP, REMOVE_PART(IP))
                            END IF
 
-                           !VXPRE = particles(IP)%VX
-                           !VYPRE = particles(IP)%VY
-                           !VZPRE = particles(IP)%VZ
+                           VXPRE = particles(IP)%VX
+                           VYPRE = particles(IP)%VY
+                           VZPRE = particles(IP)%VZ
 
                            VDOTN = particles(IP)%VX*FACE_NORMAL(1) &
                                  + particles(IP)%VY*FACE_NORMAL(2) &
@@ -1393,8 +1393,10 @@ MODULE timecycle
                                      + particles(IP)%VZ*TANG1(3)
 
 
+                           V_TANG1 = VDOTTANG1
+                           V_PERP = VDOTN
                            CALL WB_SCATTER(FACE_PG, SPECIES(particles(IP)%S_ID)%MOLECULAR_MASS, &
-                           VDOTTANG1, VDOTN, V_TANG1, V_TANG2, V_PERP)
+                           V_TANG1, V_TANG2, V_PERP)
                            S_ID = particles(IP)%S_ID
                            WALL_TEMP = GRID_BC(FACE_PG)%WALL_TEMP
 
@@ -1414,6 +1416,10 @@ MODULE timecycle
                            particles(IP)%EROT = EROT
                            particles(IP)%EVIB = EVIB
 
+                           OPEN(66341, FILE='clldump', POSITION='append', STATUS='unknown', ACTION='write')
+                           WRITE(66341,*) VXPRE, ', ', VYPRE, ', ', VZPRE, ', ', &
+                           particles(IP)%VX, ', ', particles(IP)%VY, ', ', particles(IP)%VZ
+                           CLOSE(66341)
                         ELSE
                            REMOVE_PART(IP) = .TRUE.
                            particles(IP)%DTRIM = 0.d0

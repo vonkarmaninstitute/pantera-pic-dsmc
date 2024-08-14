@@ -2453,15 +2453,22 @@ MODULE initialization
             S_ID = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%COMPONENTS(IS)%ID
             M = SPECIES(S_ID)%MOLECULAR_MASS
             FRAC = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%COMPONENTS(IS)%MOLFRAC
-            BETA = 1./SQRT(2.*KB/M*EMIT_TASKS(ITASK)%TTRA) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
+            IF (EMIT_TASKS(ITASK)%TTRA == 0) THEN
+               BETA = 0
+            ELSE
+               BETA = 1./SQRT(2.*KB/M*EMIT_TASKS(ITASK)%TTRA) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
+            END IF
 
             U_NORM = EMIT_TASKS(ITASK)%UX*NORMX + EMIT_TASKS(ITASK)%UY*NORMY + EMIT_TASKS(ITASK)%UZ*NORMZ ! Molecular speed ratio normal to boundary
             EMIT_TASKS(ITASK)%U_NORM = U_NORM
             S_NORM = U_NORM*BETA
 
-            FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-S_NORM**2) &
-                           + SQRT(PI)*S_NORM*(1.+ERF1(S_NORM)))      ! Tot number flux emitted
-
+            IF (EMIT_TASKS(ITASK)%TTRA == 0) THEN
+               FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC*U_NORM      ! Tot number flux emitted
+            ELSE
+               FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-S_NORM**2) &
+                              + SQRT(PI)*S_NORM*(1.+ERF1(S_NORM)))      ! Tot number flux emitted
+            END IF
 
 
             NtotINJECT = FLUXLINESOURCE*AREA*DT/FNUM         ! Tot num of particles to be injected

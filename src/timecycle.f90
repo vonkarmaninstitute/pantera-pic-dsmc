@@ -348,7 +348,12 @@ MODULE timecycle
                NFS = NFS + 1
             END IF
 
-            BETA = 1./SQRT(2.*KB/M*EMIT_TASK%TTRA)
+            IF (EMIT_TASK%TTRA == 0) THEN
+               BETA = 0
+            ELSE
+               BETA = 1./SQRT(2.*KB/M*EMIT_TASK%TTRA)
+            END IF
+
             IF (COLOCATED_ELECTRONS) BETA_E = 1./SQRT(2.*KB/SPECIES(ELECTRON_S_ID)%MOLECULAR_MASS*COLOCATED_ELECTRONS_TTRA)
 
             DO IP = 1, NFS ! Loop on particles to be injected
@@ -360,7 +365,11 @@ MODULE timecycle
                CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, EMIT_TASK%TROT, EROT)
                CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, EMIT_TASK%TVIB, EVIB)
 
-               V_NORM = FLX(EMIT_TASK%U_NORM*BETA, EMIT_TASK%TTRA, M)
+               IF (EMIT_TASK%TTRA == 0) THEN
+                  V_NORM = 0
+               ELSE
+                  V_NORM = FLX(EMIT_TASK%U_NORM*BETA, EMIT_TASK%TTRA, M)
+               END IF
 
                VX = EMIT_TASK%UX &
                   - V_NORM*FACE_NORMAL(1) &
@@ -952,7 +961,7 @@ MODULE timecycle
       REAL(KIND=8) :: CHARGE, K, PSIP, RHO_Q
       INTEGER :: VP
 
-      !REAL(KIND=8) :: VXPRE, VYPRE, VZPRE
+      REAL(KIND=8) :: VXPRE, VYPRE, VZPRE
 
 
       E = [0.d0, 0.d0, 0.d0]
@@ -976,6 +985,9 @@ MODULE timecycle
       LOCAL_WALL_COLL_COUNT = 0
 
       FIELD_POWER = 0
+
+      OPEN(66341, FILE='washboarddump', POSITION='append', STATUS='unknown', ACTION='write')
+
 
       DO IP = 1, NP_PROC
          REMOVE_PART(IP) = .FALSE.
@@ -1416,10 +1428,9 @@ MODULE timecycle
                            particles(IP)%EROT = EROT
                            particles(IP)%EVIB = EVIB
 
-                           OPEN(66341, FILE='clldump', POSITION='append', STATUS='unknown', ACTION='write')
                            WRITE(66341,*) VXPRE, ', ', VYPRE, ', ', VZPRE, ', ', &
                            particles(IP)%VX, ', ', particles(IP)%VY, ', ', particles(IP)%VZ
-                           CLOSE(66341)
+                           
                         ELSE
                            REMOVE_PART(IP) = .TRUE.
                            particles(IP)%DTRIM = 0.d0
@@ -1867,6 +1878,7 @@ MODULE timecycle
          !particles(IP)%VY = V_NEW(2)
          !particles(IP)%VZ = V_NEW(3)
 
+
       END DO ! End loop: DO IP = 1,NP_PROC
 
       ! ==============
@@ -1933,7 +1945,7 @@ MODULE timecycle
          END IF
       END IF
 
-
+      CLOSE(66341)
 
    END SUBROUTINE ADVECT
 

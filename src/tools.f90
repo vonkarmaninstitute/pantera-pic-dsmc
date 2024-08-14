@@ -24,7 +24,6 @@ CONTAINS
 
    END FUNCTION rf
 
-
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   ! FUNCTION rf -> Pseudo-random number generator (RNG) !!!!!!!!!!!!!!!!
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -130,27 +129,31 @@ CONTAINS
       TT(3) = TZ
 
       DO I = 1,3
+         IF (TT(I) == 0.d0) THEN
+            VEL(I) = 0
+         ELSE
 
-         ! Step 1.
-         R = rf()
+            ! Step 1.
+            R = rf()
+               
+            TETA = PI2*R
+
+            ! Step 2.
             
-         TETA = PI2*R
+            BETA = 1./SQRT(2.*KB/M*TT(I))
 
-         ! Step 2.
-         
-         BETA = 1./SQRT(2.*KB/M*TT(I))
-
-         ! R goes from 0 to 1 included. Remove the extremes
-         ! or the log() will explode
-         R1 = rf()
+            ! R goes from 0 to 1 included. Remove the extremes
+            ! or the log() will explode
+            R1 = rf()
             DO WHILE (R1 < 1.0D-13)
                R1 = rf()
             END DO
 
-         RO = SQRT(-LOG(R1))/BETA ! The random number here shouldn't be correlated to the one for teta!!
+            RO = SQRT(-LOG(R1))/BETA ! The random number here shouldn't be correlated to the one for teta!!
 
-         VEL(I) = RO*SIN(TETA)
+            VEL(I) = RO*SIN(TETA)
 
+         END IF
       END DO
 
       ! Step 3.

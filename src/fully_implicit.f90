@@ -2644,6 +2644,545 @@ MODULE fully_implicit
    END SUBROUTINE WALL_REACT
 
 
+   SUBROUTINE FormJacobianBoltz(snes,x,jac,prec,dummy,ierr_l)
+   
+      IMPLICIT NONE
+
+      SNES snes
+      Vec x
+      Mat  jac, prec
+      PetscErrorCode ierr_l
+      PetscBool      flg
+      INTEGER dummy(*)
+      INTEGER I, IC
+
+      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, EPS_REL
+      REAL(KIND=8) :: B11, B12, B13, B22, B23, B21, B33, B31, B32
+      INTEGER :: V1, V2, V3
+      INTEGER :: P, Q, VP, VQ
+      REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD, FACTOR, AREA
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) 'FormJacobian Called'
+      END IF
+
+
+      !ALL MatSetFromOptions(jac,ierr)
+      !ALL MatSetUp(jac,ierr)
+!
+      !ALL MatZeroEntries(jac,ierr)
+
+      !CALL MatAssemblyBegin(jac,MAT_FLUSH_ASSEMBLY,ierr)
+      !CALL MatAssemblyEnd(jac,MAT_FLUSH_ASSEMBLY,ierr)
+
+      CALL VecScatterCreateToAll(x,ctx,x_seq,ierr)
+      CALL VecScatterBegin(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
+      CALL VecScatterEnd(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
+      CALL VecScatterDestroy(ctx, ierr)
+
+      ! CALL VecGetArrayReadF90(X_SEQ,PHI_FIELD,ierr)
+      CALL VecGetArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
+      IF (ALLOCATED(PHI_FIELD_NEW)) DEALLOCATE(PHI_FIELD_NEW)
+      ALLOCATE(PHI_FIELD_NEW, SOURCE = PHI_FIELD_TEMP)
+      CALL VecRestoreArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
+      CALL VecDestroy(x_seq,ierr)
+
+      CALL MatGetOwnershipRange( jac, Istart, Iend, ierr)
+
+      ! Accumulate Jacobian. All this is in principle not needed since we already have Amat.
+
+      IF (DIMS == 2) THEN
+         DO I = 1, NCELLS
+            AREA = CELL_AREAS(I)
+
+            IF (U2D_GRID%CELL_PG(I) == -1) THEN
+               EPS_REL = 1.d0
+            ELSE
+               EPS_REL = GRID_BC(U2D_GRID%CELL_PG(I))%EPS_REL
+            END IF
+            
+            ! We need to ADD to a sparse matrix entry.
+            DO P = 1, 3
+               VP = U2D_GRID%CELL_NODES(P,I)
+               IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(VP-1)) THEN
+                     DO Q = 1, 3
+                        VQ = U2D_GRID%CELL_NODES(Q,I)
+                        KPQ = AREA*(U2D_GRID%BASIS_COEFFS(1,P,I)*U2D_GRID%BASIS_COEFFS(1,Q,I) &
+                                    + U2D_GRID%BASIS_COEFFS(2,P,I)*U2D_GRID%BASIS_COEFFS(2,Q,I))*EPS_REL
+
+                        IF (AXI) THEN
+                           V1 = U2D_GRID%CELL_NODES(1,I)
+                           V2 = U2D_GRID%CELL_NODES(2,I)
+                           V3 = U2D_GRID%CELL_NODES(3,I)
+                           Y1 = U2D_GRID%NODE_COORDS(2, V1)
+                           Y2 = U2D_GRID%NODE_COORDS(2, V2)
+                           Y3 = U2D_GRID%NODE_COORDS(2, V3)
+
+                           KPQ = KPQ*(Y1+Y2+Y3)/3.
+                        END IF
+                        CALL MatSetValues(jac,one,VP-1,one,VQ-1,KPQ,ADD_VALUES,ierr)
+
+                        ! FLUID ELECTRONS
+                        VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*AREA&
+                        *EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+
+                        !!!!! TEST FOR SINH(U) POTENTIAL
+                        ! VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*AREA&
+                        ! *COSH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
+                        !!!!!
+                        IF (BOOL_KAPPA_DISTRIBUTION) THEN 
+                           VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*(2.*KAPPA_C-1.)/(2.*KAPPA_C-3.)*AREA&
+                           *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_C-3./2.)))**(-KAPPA_C-1./2.)
+                        END IF
+
+                        IF (P == Q) THEN
+                           VALUETOADD = VALUETOADD/6.
+                           IF (AXI) THEN
+                              ! We do cyclic permutation using MOD 
+                              V1 = U2D_GRID%CELL_NODES(1 + MOD(P-1,3),I) ! Start from P node in cell I
+                              V2 = U2D_GRID%CELL_NODES(1 + MOD(P,3),I)
+                              V3 = U2D_GRID%CELL_NODES(1 + MOD(P+1,3),I)
+                              Y1 = U2D_GRID%NODE_COORDS(2, V1)
+                              Y2 = U2D_GRID%NODE_COORDS(2, V2)
+                              Y3 = U2D_GRID%NODE_COORDS(2, V3)
+
+                              VALUETOADD = VALUETOADD*(3*Y1+Y2+Y3)/5.
+                           END IF
+                        ELSE
+                           VALUETOADD = VALUETOADD/12.
+                           IF (AXI) THEN
+                              ! We have to choose first P and Q node, then choose the last one using MOD
+                              V1 = VP
+                              V2 = VQ
+                              V3 = U2D_GRID%CELL_NODES(1 + MOD(Q,3),I)
+                              IF (V3 == V1 .OR. V3 == V1) V3 = U2D_GRID%CELL_NODES(1 + MOD(Q+1,3),I)
+                              Y1 = U2D_GRID%NODE_COORDS(2, V1)
+                              Y2 = U2D_GRID%NODE_COORDS(2, V2)
+                              Y3 = U2D_GRID%NODE_COORDS(2, V3)
+
+                              VALUETOADD = VALUETOADD*(2*Y1+2*Y2+Y3)/5.
+                           END IF
+                        END IF
+                        IF (GRID_BC(U2D_GRID%CELL_PG(I))%VOLUME_BC == FLUID) THEN
+                           CALL MatSetValues(jac,one,VP-1,one,VQ-1,VALUETOADD*BOLTZ_SOLID_NODES(VQ),ADD_VALUES,ierr)
+                        END IF
+                     END DO
+                  END IF
+               END IF
+            END DO
+         END DO
+      ELSE IF (DIMS == 3) THEN
+         DO I = 1, NCELLS
+            VOLUME = CELL_VOLUMES(I)
+
+            IF (U3D_GRID%CELL_PG(I) == -1) THEN
+               EPS_REL = 1.d0
+            ELSE
+               EPS_REL = GRID_BC(U3D_GRID%CELL_PG(I))%EPS_REL
+            END IF
+            
+            ! We need to ADD to a sparse matrix entry.
+            DO P = 1, 4
+               VP = U3D_GRID%CELL_NODES(P,I)
+               IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(VP-1)) THEN
+                     DO Q = 1, 4
+                        VQ = U3D_GRID%CELL_NODES(Q,I)
+                        KPQ = VOLUME*(U3D_GRID%BASIS_COEFFS(1,P,I)*U3D_GRID%BASIS_COEFFS(1,Q,I) &
+                                    + U3D_GRID%BASIS_COEFFS(2,P,I)*U3D_GRID%BASIS_COEFFS(2,Q,I) &
+                                    + U3D_GRID%BASIS_COEFFS(3,P,I)*U3D_GRID%BASIS_COEFFS(3,Q,I))*EPS_REL
+                        CALL MatSetValues(jac,one,VP-1,one,VQ-1,KPQ,ADD_VALUES,ierr)
+
+                        ! FLUID ELECTRONS
+                        VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*VOLUME&
+                        *EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+
+                        !!!!! TEST FOR SINH(U) POTENTIAL !!!!!
+                        ! VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*VOLUME&
+                        ! *COSH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
+                        !!!!!
+
+                        IF (BOOL_KAPPA_DISTRIBUTION) THEN 
+                           VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*(2.*KAPPA_C-1.)/(2.*KAPPA_C-3.)*VOLUME&
+                           *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_C-3./2.)))**(-KAPPA_C-1./2.)
+                        END IF
+
+                        IF (P == Q) THEN
+                           VALUETOADD = VALUETOADD/10.
+                        ELSE
+                           VALUETOADD = VALUETOADD/20.
+                        END IF
+                        IF (GRID_BC(U3D_GRID%CELL_PG(I))%VOLUME_BC == FLUID) THEN
+                           CALL MatSetValues(jac,one,VP-1,one,VQ-1,VALUETOADD*BOLTZ_SOLID_NODES(VQ),ADD_VALUES,ierr)
+                        END IF
+                     END DO
+                  END IF
+               END IF
+            END DO
+         END DO
+      END IF
+
+      CALL MatAssemblyBegin(jac,MAT_FLUSH_ASSEMBLY,ierr)
+      CALL MatAssemblyEnd(jac,MAT_FLUSH_ASSEMBLY,ierr)
+
+      DO I = Istart, Iend-1
+         IF (IS_DIRICHLET(I)) CALL MatSetValues(jac,one,I,one,I,1.d0,INSERT_VALUES,ierr)
+      END DO
+
+      CALL MatAssemblyBegin(jac,MAT_FINAL_ASSEMBLY,ierr)
+      CALL MatAssemblyEnd(jac,MAT_FINAL_ASSEMBLY,ierr)
+
+      flg  = PETSC_FALSE
+      CALL PetscOptionsHasName(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,"-snes_mf_operator",flg,ierr)
+      IF (flg) THEN  ! We want only the preconditioner to be filled. The Jacobian is computed from finite differencing.
+         CALL MatSetFromOptions(prec,ierr)
+         CALL MatSetUp(prec,ierr)
+         CALL MatAssemblyBegin(prec,MAT_FINAL_ASSEMBLY,ierr)
+         CALL MatAssemblyEnd(prec,MAT_FINAL_ASSEMBLY,ierr)
+      END IF
+
+
+   END SUBROUTINE FormJacobianBoltz
+
+
+   SUBROUTINE FormFunctionBoltz(snes,x,f,dummy,ierr_l)
+      IMPLICIT NONE
+
+      SNES snes
+      Vec x,f
+      PetscErrorCode ierr_l
+      INTEGER dummy(*)
+      PetscScalar, POINTER :: RESIDUAL(:)
+      CHARACTER(LEN=512)  :: filename
+
+      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA, EPS_REL
+      REAL(KIND=8) :: B11, B12, B13, B22, B23, B21, B33, B31, B32
+      INTEGER :: V1, V2, V3, I
+      INTEGER :: P, Q, VP, VQ
+      REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD, KE
+
+      TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: part_adv
+
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) 'FormFunction Called'
+      END IF
+      
+      CALL VecScatterCreateToAll(x,ctx,x_seq,ierr)
+      CALL VecScatterBegin(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
+      CALL VecScatterEnd(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
+      CALL VecScatterDestroy(ctx, ierr)
+      
+      CALL VecGetArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
+      IF (ALLOCATED(PHI_FIELD_NEW)) DEALLOCATE(PHI_FIELD_NEW)
+      ALLOCATE(PHI_FIELD_NEW, SOURCE = PHI_FIELD_TEMP)
+      CALL VecRestoreArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
+      CALL VecDestroy(x_seq,ierr)
+
+      ALLOCATE(RHS_NEW, SOURCE = RHS)
+      RHS_NEW = 0.d0
+
+      CALL VecGetOwnershipRange( f, Istart, Iend, ierr)
+
+      IF (DIMS == 2) THEN
+         DO I = 1, NCELLS
+            AREA = CELL_AREAS(I)
+
+            IF (U2D_GRID%CELL_PG(I) == -1) THEN
+               EPS_REL = 1.d0
+            ELSE
+               EPS_REL = GRID_BC(U2D_GRID%CELL_PG(I))%EPS_REL
+            END IF
+            
+            ! We need to ADD to a sparse matrix entry.
+            DO P = 1, 3
+               VP = U2D_GRID%CELL_NODES(P,I)
+               IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(VP-1)) THEN
+                     DO Q = 1, 3
+                        VQ = U2D_GRID%CELL_NODES(Q,I)
+                        KPQ = AREA*(U2D_GRID%BASIS_COEFFS(1,P,I)*U2D_GRID%BASIS_COEFFS(1,Q,I) &
+                                    + U2D_GRID%BASIS_COEFFS(2,P,I)*U2D_GRID%BASIS_COEFFS(2,Q,I))*EPS_REL
+
+                        IF (AXI) THEN
+                           V1 = U2D_GRID%CELL_NODES(1,I)
+                           V2 = U2D_GRID%CELL_NODES(2,I)
+                           V3 = U2D_GRID%CELL_NODES(3,I)
+                           Y1 = U2D_GRID%NODE_COORDS(2, V1)
+                           Y2 = U2D_GRID%NODE_COORDS(2, V2)
+                           Y3 = U2D_GRID%NODE_COORDS(2, V3)
+
+                           KPQ = KPQ*(Y1+Y2+Y3)/3.
+                        END IF
+                        RHS_NEW(VP-1) = RHS_NEW(VP-1) + KPQ*PHI_FIELD_NEW(VQ)
+
+                        ! ---- FLUID ELECTRONS -----
+                        
+                        VALUETOADD = QE*BOLTZ_N0/(EPS0)*AREA*EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+
+                        !!!!! TEST FOR SINH(U) POTENTIAL
+                        ! VALUETOADD = QE*BOLTZ_N0/(EPS0)*AREA*SINH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
+                        !!!!!
+                        IF (BOOL_KAPPA_DISTRIBUTION) THEN 
+                           VALUETOADD = QE*BOLTZ_N0/(EPS0)*AREA&
+                           *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_C-3./2.)))**(-KAPPA_C+1./2.)
+                        END IF
+
+                        IF (P == Q) THEN
+                           VALUETOADD = VALUETOADD/6.
+                           IF (AXI) THEN
+                              ! We do cyclic permutation using MOD 
+                              V1 = U2D_GRID%CELL_NODES(1 + MOD(P-1,3),I) ! Start from P node in cell I
+                              V2 = U2D_GRID%CELL_NODES(1 + MOD(P,3),I)
+                              V3 = U2D_GRID%CELL_NODES(1 + MOD(P+1,3),I)
+                              Y1 = U2D_GRID%NODE_COORDS(2, V1)
+                              Y2 = U2D_GRID%NODE_COORDS(2, V2)
+                              Y3 = U2D_GRID%NODE_COORDS(2, V3)
+
+                              VALUETOADD = VALUETOADD*(3*Y1+Y2+Y3)/5.
+                           END IF
+                        ELSE
+                           VALUETOADD = VALUETOADD/12.
+                           IF (AXI) THEN
+                              ! We have to choose first P and Q node, then choose the last one using MOD
+                              V1 = VP
+                              V2 = VQ
+                              V3 = U2D_GRID%CELL_NODES(1 + MOD(Q,3),I)
+                              IF (V3 == V1 .OR. V3 == V1) V3 = U2D_GRID%CELL_NODES(1 + MOD(Q+1,3),I)
+                              Y1 = U2D_GRID%NODE_COORDS(2, V1)
+                              Y2 = U2D_GRID%NODE_COORDS(2, V2)
+                              Y3 = U2D_GRID%NODE_COORDS(2, V3)
+
+                              VALUETOADD = VALUETOADD*(2*Y1+2*Y2+Y3)/5.
+                           END IF
+                        END IF
+                        IF (GRID_BC(U2D_GRID%CELL_PG(I))%VOLUME_BC == FLUID) THEN
+                           RHS_NEW(VP-1) = RHS_NEW(VP-1) + VALUETOADD*BOLTZ_SOLID_NODES(VQ)
+                        END IF
+                     END DO
+                  END IF
+               END IF
+            END DO
+         END DO
+      ELSE IF (DIMS == 3) THEN
+         DO I = 1, NCELLS
+            VOLUME = CELL_VOLUMES(I)
+
+            IF (U3D_GRID%CELL_PG(I) == -1) THEN
+               EPS_REL = 1.d0
+            ELSE
+               EPS_REL = GRID_BC(U3D_GRID%CELL_PG(I))%EPS_REL
+            END IF
+            
+            DO P = 1, 4
+               VP = U3D_GRID%CELL_NODES(P,I)
+               IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
+                  DO Q = 1, 4
+                     VQ = U3D_GRID%CELL_NODES(Q,I)
+                     KPQ = VOLUME*(U3D_GRID%BASIS_COEFFS(1,P,I)*U3D_GRID%BASIS_COEFFS(1,Q,I) &
+                                 + U3D_GRID%BASIS_COEFFS(2,P,I)*U3D_GRID%BASIS_COEFFS(2,Q,I) &
+                                 + U3D_GRID%BASIS_COEFFS(3,P,I)*U3D_GRID%BASIS_COEFFS(3,Q,I))*EPS_REL
+                     RHS_NEW(VP-1) = RHS_NEW(VP-1) + KPQ*PHI_FIELD_NEW(VQ)
+
+                     ! FLUID ELECTRONS
+                     VALUETOADD = QE*BOLTZ_N0/(EPS0)*VOLUME*EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+
+                     !!!!! TEST FOR SINH(U) POTENTIAL
+                     ! VALUETOADD = QE*BOLTZ_N0/(EPS0)*VOLUME*SINH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
+                     !!!!!
+
+                     IF (BOOL_KAPPA_DISTRIBUTION) THEN 
+                        VALUETOADD = QE*BOLTZ_N0/(EPS0)*VOLUME&
+                        *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_C-3./2.)))**(-KAPPA_C+1./2.)
+                     END IF
+
+                     IF (P == Q) THEN
+                        VALUETOADD = VALUETOADD/10.
+                     ELSE
+                        VALUETOADD = VALUETOADD/20.
+                     END IF
+                     IF (GRID_BC(U3D_GRID%CELL_PG(I))%VOLUME_BC == FLUID) THEN
+                        RHS_NEW(VP-1) = RHS_NEW(VP-1) + VALUETOADD*BOLTZ_SOLID_NODES(VQ)
+                     END IF
+                  END DO
+               END IF
+            END DO
+         END DO 
+      END IF
+
+      DO I = 1, NNODES
+         IF (IS_DIRICHLET(I-1)) THEN
+            ! RHS_NEW(I-1) = DIRICHLET(I-1)
+            RHS_NEW(I-1) = PHI_FIELD_NEW(I)
+         ELSE IF (IS_NEUMANN(I-1)) THEN
+            RHS_NEW(I-1) = RHS_NEW(I-1) + NEUMANN(I-1)
+         END IF
+      END DO
+
+      ! Compute the residual
+      CALL VecGetOwnershipRange(f,Istart,Iend,ierr)
+      CALL VecGetArrayF90(f,RESIDUAL,ierr_l)
+      RESIDUAL = RHS_NEW(Istart:Iend-1) - RHS(Istart:Iend-1)
+      CALL VecRestoreArrayF90(f,RESIDUAL,ierr_l)
+
+
+      CALL VecNorm(f,NORM_2,norm,ierr)
+      CALL SNESGetIterationNumber(snes,its,ierr)
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '||RESIDUAL|| = ', norm
+         WRITE(filename, "(A,A)") TRIM(ADJUSTL(RESIDUAL_SAVE_PATH)), "residuals" ! Compose filename   
+         OPEN(66331, FILE=filename, POSITION='append', STATUS='unknown', ACTION='write')
+         WRITE(66331,*) tID, norm
+         CLOSE(66331)
+      END IF
+
+      DEALLOCATE(RHS_NEW)
+   END SUBROUTINE FormFunctionBoltz
+
+
+
+   SUBROUTINE SOLVE_BOLTZMANN
+      IMPLICIT NONE
+
+      PetscScalar, POINTER :: solvec_l(:)
+
+      ! Create SNES environment
+      CALL SNESDestroy(snes,ierr)
+      CALL SNESCreate(PETSC_COMM_WORLD,snes,ierr)
+
+
+      ! Initialize Jacobian Matrix
+      CALL MatDestroy(Jmat,ierr)
+      CALL MatCreate(PETSC_COMM_WORLD,Jmat,ierr)
+      CALL MatSetSizes(Jmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
+      CALL MatSetType(Jmat, MATMPIAIJ, ierr)
+      CALL MatMPIAIJSetPreallocation(Jmat,100,PETSC_NULL_INTEGER,100,PETSC_NULL_INTEGER, ierr)
+      CALL MatSetFromOptions( Jmat, ierr)
+
+      ! Jacobian evaluation routine
+      CALL PetscOptionsHasName(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,"-snes_mf_operator",matrix_free,ierr)
+      IF (.not. matrix_free) THEN
+         CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobianBoltz,0,ierr)
+      ENDIF
+      
+
+      ! Create rvec (for FormFunction) and solvec (for the solution)
+      CALL VecCreate(PETSC_COMM_WORLD,rvec,ierr)
+      CALL VecSetSizes(rvec,PETSC_DECIDE,NNODES,ierr)
+      CALL VecSetFromOptions(rvec, ierr)
+      CALL VecDuplicate(rvec, solvec, ierr)
+
+      ! Function evaluation routine
+      CALL SNESSetFunction(snes,rvec,FormFunctionBoltz,0,ierr)
+
+      !CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobianBoltz,0,ierr)
+      CALL SNESSetFromOptions(snes,ierr)
+
+
+      
+      CALL VecGetOwnershipRange(solvec,Istart,Iend,ierr)
+      CALL VecGetArrayF90(solvec,solvec_l,ierr)
+      solvec_l = PHI_FIELD(Istart+1:Iend)
+      CALL VecRestoreArrayF90(solvec,solvec_l,ierr)
+
+      
+      ! ------ SOLVE ------
+      CALL SNESSolve(snes,PETSC_NULL_VEC,solvec,ierr)
+      CALL SNESGetConvergedReason(snes,snesreason,ierr)
+      CALL SNESGetIterationNumber(snes,its,ierr)
+      IF (PROC_ID == 0) WRITE(*,*) 'SNESConvergedReason = ', snesreason, '  ||  SNESIterationNumber = ', its
+      
+      CALL VecScatterCreateToAll(solvec,ctx,solvec_seq,ierr)
+      CALL VecScatterBegin(ctx,solvec,solvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
+      CALL VecScatterEnd(ctx,solvec,solvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
+      CALL VecScatterDestroy(ctx, ierr)
+
+      CALL VecGetArrayReadF90(solvec_seq,PHI_FIELD_TEMP,ierr)
+      IF (ALLOCATED(PHI_FIELD)) DEALLOCATE(PHI_FIELD)
+      ALLOCATE(PHI_FIELD, SOURCE = PHI_FIELD_TEMP)
+      CALL VecRestoreArrayReadF90(solvec_seq,PHI_FIELD_TEMP,ierr)
+
+      IF (ALLOCATED(BOLTZ_NRHOE)) DEALLOCATE(BOLTZ_NRHOE)
+      ALLOCATE(BOLTZ_NRHOE, SOURCE = PHI_FIELD)
+      CALL GET_BOLTZMANN_DENSITY
+
+      ! Cleanup.
+      CALL VecDestroy(solvec, ierr)
+      CALL VecDestroy(solvec_seq,ierr)
+      CALL VecDestroy(rvec, ierr)
+
+   END SUBROUTINE SOLVE_BOLTZMANN
+
+   ! CALCULATE BOLTZMANN DENSITY
+   SUBROUTINE GET_BOLTZMANN_DENSITY
+
+      IMPLICIT NONE
+
+      BOLTZ_NRHOE = BOLTZ_N0 * exp(QE*(PHI_FIELD - BOLTZ_PHI0)/(KB*BOLTZ_TE))
+      IF (BOOL_KAPPA_DISTRIBUTION) THEN
+         BOLTZ_NRHOE = BOLTZ_N0*(1-QE*(PHI_FIELD - BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_C-3./2.)))**(-KAPPA_C+1./2.)
+      END IF
+      BOLTZ_NRHOE = BOLTZ_NRHOE*BOLTZ_SOLID_NODES
+
+   END SUBROUTINE GET_BOLTZMANN_DENSITY
+
+   SUBROUTINE SETUP_SOLID_NODES
+
+      IMPLICIT NONE
+
+      INTEGER :: IC, IP, V
+      INTEGER :: FACE_PG
+
+      ALLOCATE(BOLTZ_SOLID_NODES(NNODES))
+      BOLTZ_SOLID_NODES = 1.
+      
+      IF (DIMS == 2) THEN
+         !! Set the value of BOLTZ_SOLID_NODES to 0. for every node inside the solid
+         DO IC=1, NCELLS
+            IF (GRID_BC(U2D_GRID%CELL_PG(IC))%VOLUME_BC == SOLID) THEN
+               DO IP = 1, 3
+                  V = U2D_GRID%CELL_NODES(IP,IC)
+                  IF (IS_DIELECTRIC(V-1)) THEN
+                     IF (U2D_GRID%CELL_NEIGHBORS(IP, IC) == -1) THEN
+                        IF (IP == 1) THEN
+                           BOLTZ_SOLID_NODES(U2D_GRID%CELL_NODES(1,IC)) = 0.
+                           BOLTZ_SOLID_NODES(U2D_GRID%CELL_NODES(2,IC)) = 0.
+                        ELSE IF (IP == 2) THEN
+                           BOLTZ_SOLID_NODES(U2D_GRID%CELL_NODES(2,IC)) = 0.
+                           BOLTZ_SOLID_NODES(U2D_GRID%CELL_NODES(3,IC)) = 0.
+                        ELSE IF (IP == 3) THEN
+                           BOLTZ_SOLID_NODES(U2D_GRID%CELL_NODES(3,IC)) = 0.
+                           BOLTZ_SOLID_NODES(U2D_GRID%CELL_NODES(1,IC)) = 0.
+                        END IF
+                     ELSE
+                        CYCLE ! We keep 1. on bundary
+                     END IF
+                  ELSE
+                     BOLTZ_SOLID_NODES(V) = 0.
+                  END IF
+               END DO
+            END IF
+         END DO
+
+      ELSE IF (DIMS==3) THEN      
+         !! Set the value of BOLTZ_SOLID_NODES to 0. for every node inside the solid
+         DO IC=1, NCELLS
+            IF (GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC == SOLID) THEN
+               DO IP = 1, 4
+                  V = U3D_GRID%CELL_NODES(IP,IC)
+                  IF (IS_DIELECTRIC(V-1)) THEN
+                     CYCLE ! We keep 1. on bundary
+                  ELSE
+                     BOLTZ_SOLID_NODES(V) = 0.
+                  END IF
+               END DO
+            END IF
+         END DO
+      END IF
+   END SUBROUTINE SETUP_SOLID_NODES
+
+
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! SUBROUTINE SETUP_POISSON -> Solves the Poisson equation with the RHS RHS !
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

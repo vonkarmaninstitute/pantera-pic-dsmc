@@ -116,6 +116,11 @@ MODULE initialization
             CALL DEF_BOUNDARY_DUMP_FLUXES(BC_DEFINITION)
          END IF
 
+         IF (line=='Boundary_compute_force:') THEN
+            READ(in1,'(A)') BC_DEFINITION
+            CALL DEF_BOUNDARY_COMPUTE_FORCE(BC_DEFINITION)
+         END IF
+
          ! ~~~~~~~~~~~~~  Numerical settings  ~~~~~~~~~~~~~~~~~
          IF (line=='Fnum:')                    READ(in1,*) FNUM
          IF (line=='Bool_radial_weighting:')   READ(in1,*) BOOL_RADIAL_WEIGHTING
@@ -147,6 +152,9 @@ MODULE initialization
          IF (line=='Fluid_electrons_n0:')      READ(in1,*) BOLTZ_N0
          IF (line=='Fluid_electrons_phi0:')    READ(in1,*) BOLTZ_PHI0
          IF (line=='Fluid_electrons_Te:')      READ(in1,*) BOLTZ_TE
+
+         IF (line=='Bool_kappa_distribution:') READ(in1,*) BOOL_KAPPA_DISTRIBUTION
+         IF (line=='Kappa_constant:')           READ(in1,*) KAPPA_C
 
          IF (line=='Jacobian_type:')           READ(in1,*) JACOBIAN_TYPE
          IF (line=='Residual_and_jacobian_combined:') READ(in1,*) RESIDUAL_AND_JACOBIAN_COMBINED
@@ -1226,6 +1234,32 @@ MODULE initialization
    END SUBROUTINE DEF_BOUNDARY_DUMP_FLUXES
 
 
+   SUBROUTINE DEF_BOUNDARY_COMPUTE_FORCE(DEFINITION)
+
+      IMPLICIT NONE
+
+      CHARACTER(LEN=*), INTENT(IN) :: DEFINITION
+
+      INTEGER :: N_STR, I, IPG
+      CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
+
+
+      CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
+
+      IF (N_STR .NE. 1) CALL ERROR_ABORT('Error in boundary force definition.')
+
+      ! phys_group type parameters
+      IPG = -1
+      DO I = 1, N_GRID_BC
+         IF (GRID_BC(I)%PHYSICAL_GROUP_NAME == STRARRAY(1)) IPG = I
+      END DO
+      IF (IPG == -1) CALL ERROR_ABORT('Error in boundary condition definition. Group name not found.')
+
+      GRID_BC(IPG)%DUMP_DRAG_BC = .TRUE.
+
+
+   END SUBROUTINE DEF_BOUNDARY_COMPUTE_FORCE
+
 
 
    SUBROUTINE DEF_BOUNDARY_EMIT(DEFINITION)
@@ -2234,13 +2268,14 @@ MODULE initialization
       REAL(KIND=8) :: BETA, FLUXBOUND, NtotINJECT, Snow
       REAL(KIND=8) :: U_NORM, S_NORM, FLUXLINESOURCE, LINELENGTH, NORMX, NORMY, NORMZ, AREA
       REAL(KIND=8) :: PI2  
+      REAL(KIND=8) :: INTEG1, INTEG2
 
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: nfs_LINE
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TASK_NFS
       !INTEGER, DIMENSION(:), ALLOCATABLE :: EMIT_COUNT
  
       REAL(KIND=8)  :: M, FRAC
-      INTEGER :: N_COMP, IS, S_ID, ILINE, ITASK
+      INTEGER :: N_COMP, IS, S_ID, ILINE, ITASK, I
 
       REAL(KIND=8) :: X1, X2, Y1, Y2
     
@@ -2453,23 +2488,44 @@ MODULE initialization
             S_ID = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%COMPONENTS(IS)%ID
             M = SPECIES(S_ID)%MOLECULAR_MASS
             FRAC = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%COMPONENTS(IS)%MOLFRAC
-            IF (EMIT_TASKS(ITASK)%TTRA == 0) THEN
-               BETA = 0
+
+            
+            !!!!! KAPPA DISTRIBUTION !!!!!
+            IF (BOOL_KAPPA_DISTRIBUTION) THEN
+               BETA = 1./SQRT(2.*KB/M*EMIT_TASKS(ITASK)%TTRA*(KAPPA_C-3./2.))
+               U_NORM = EMIT_TASKS(ITASK)%UX*NORMX + EMIT_TASKS(ITASK)%UY*NORMY + EMIT_TASKS(ITASK)%UZ*NORMZ ! Molecular speed ratio normal to boundary
+               EMIT_TASKS(ITASK)%U_NORM = U_NORM
+               S_NORM = U_NORM*BETA
+
+               INTEG1 = PI/2.
+               INTEG2 = ATAN(S_NORM)
+               DO I = 2, INT(KAPPA_C)
+                  INTEG1 = (2.*I-3.)/(2.*(I-1.))*INTEG1
+                  INTEG2 = S_NORM/(2.*(I-1.)*(1.+(S_NORM)**2)**(I-1.)) + (2.*I-3.)/(2.*(I-1.))*INTEG2
+               END DO
+               
+               FLUXLINESOURCE = GAMMA(KAPPA_C)/GAMMA(KAPPA_C-1./2.)*EMIT_TASKS(ITASK)%NRHO*FRAC/(BETA*SQRT(PI)) * &
+               ( 1./(KAPPA_C-1.)/2.*(1+S_NORM**2)**(-KAPPA_C+1.) + S_NORM*(INTEG1 +INTEG2))      ! Tot number flux emitted
+
             ELSE
-               BETA = 1./SQRT(2.*KB/M*EMIT_TASKS(ITASK)%TTRA) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
+               IF (EMIT_TASKS(ITASK)%TTRA == 0) THEN
+                  BETA = 0
+               ELSE
+                  BETA = 1./SQRT(2.*KB/M*EMIT_TASKS(ITASK)%TTRA) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
+               END IF
+
+               U_NORM = EMIT_TASKS(ITASK)%UX*NORMX + EMIT_TASKS(ITASK)%UY*NORMY + EMIT_TASKS(ITASK)%UZ*NORMZ ! Molecular speed ratio normal to boundary
+               EMIT_TASKS(ITASK)%U_NORM = U_NORM
+               S_NORM = U_NORM*BETA
+
+               IF (EMIT_TASKS(ITASK)%TTRA == 0) THEN
+                  FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC*U_NORM      ! Tot number flux emitted
+               ELSE
+                  FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-S_NORM**2) &
+                                 + SQRT(PI)*S_NORM*(1.+ERF1(S_NORM)))      ! Tot number flux emitted
+               END IF
+
             END IF
-
-            U_NORM = EMIT_TASKS(ITASK)%UX*NORMX + EMIT_TASKS(ITASK)%UY*NORMY + EMIT_TASKS(ITASK)%UZ*NORMZ ! Molecular speed ratio normal to boundary
-            EMIT_TASKS(ITASK)%U_NORM = U_NORM
-            S_NORM = U_NORM*BETA
-
-            IF (EMIT_TASKS(ITASK)%TTRA == 0) THEN
-               FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC*U_NORM      ! Tot number flux emitted
-            ELSE
-               FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-S_NORM**2) &
-                              + SQRT(PI)*S_NORM*(1.+ERF1(S_NORM)))      ! Tot number flux emitted
-            END IF
-
 
             NtotINJECT = FLUXLINESOURCE*AREA*DT/FNUM         ! Tot num of particles to be injected
 

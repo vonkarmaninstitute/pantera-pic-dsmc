@@ -128,6 +128,8 @@ CONTAINS
       TT(2) = TY
       TT(3) = TZ
 
+
+
       DO I = 1,3
          IF (TT(I) == 0.d0) THEN
             VEL(I) = 0
@@ -166,6 +168,59 @@ CONTAINS
 
    END SUBROUTINE MAXWELL
 
+
+   SUBROUTINE KAPPA(UX, UY, UZ, TX, TY, TZ, VX, VY, VZ, M)
+
+      IMPLICIT NONE
+
+      REAL(KIND=8), INTENT(IN)    :: UX, UY, UZ, TX, TY, TZ
+      REAL(KIND=8), INTENT(IN)    :: M ! Molecular mass
+      REAL(KIND=8), INTENT(INOUT) :: VX, VY, VZ
+
+      INTEGER                     :: I
+      REAL(KIND=8)                :: PI2
+      REAL(KIND=8)                :: R, R1, RO, TETA, BETA
+      REAL(KIND=8), DIMENSION(3)  :: VEL, TT
+      REAL(KIND=8) :: DELTA
+
+      PI2  = 2.*PI
+
+      TT(1) = TX
+      TT(2) = TY
+      TT(3) = TZ
+
+
+      !!!!! KAPPA DISTRIBUTION !!!!!
+
+      DO I = 1,3
+         ! Step 1.
+         R = rf()
+             
+         TETA = PI2*R
+
+         ! Step 2.
+         ! R goes from 0 to 1 included. Remove the extremes
+         R1 = rf()
+            DO WHILE (R1 < 1.0D-13)
+               R1 = rf()
+            END DO
+
+         BETA = 1./SQRT(2.*KB*TT(I)/M*(KAPPA_C-3./2.))
+         DELTA = (1-GAMMA(KAPPA_C-1./2.)/GAMMA(KAPPA_C+1./2.)*(KAPPA_C-1./2.)*(1-R1))**(-1./(KAPPA_C-1./2.))
+
+         RO = SQRT(DELTA-1)/BETA
+         VEL(I) = RO*SIN(TETA)
+      END DO
+
+      ! Step 3.
+
+      VX = UX + VEL(1)
+      VY = UY + VEL(2)
+      VZ = UZ + VEL(3)
+
+      RETURN
+
+   END SUBROUTINE KAPPA
 
 
    SUBROUTINE INTERNAL_ENERGY(DOF, TEMP, EI)
@@ -329,6 +384,63 @@ CONTAINS
       END IF
 
    END SUBROUTINE DUMP_BOUNDARY_PARTICLES_FILE
+
+   SUBROUTINE DUMP_FORCE_FILE(TIMESTEP)
+
+      IMPLICIT NONE
+
+      REAL(KIND=8) :: CURRENT_TIME
+      INTEGER, INTENT(IN) :: TIMESTEP
+      CHARACTER(LEN=512)  :: filename
+
+      REAL(KIND=8), DIMENSION(3) :: DUMP_FORCE_DIRECT, DUMP_FORCE_INDIRECT
+
+      DUMP_FORCE_DIRECT = FORCE_DIRECT
+      DUMP_FORCE_INDIRECT = FORCE_INDIRECT
+
+      CURRENT_TIME = TIMESTEP*DT
+
+
+      IF (PROC_ID .EQ. 0) THEN
+         CALL MPI_REDUCE(MPI_IN_PLACE,  DUMP_FORCE_DIRECT, 3, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         CALL MPI_REDUCE(MPI_IN_PLACE,  DUMP_FORCE_INDIRECT, 3, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         
+         WRITE(filename, "(A,A,I0.5)") TRIM(ADJUSTL(FLOWFIELD_SAVE_PATH)), "dump_force" ! Compose filename
+         OPEN(54331, FILE=filename, POSITION='append', STATUS='unknown', ACTION='write')
+         WRITE(54331,*) CURRENT_TIME, DUMP_FORCE_DIRECT, DUMP_FORCE_INDIRECT
+         CLOSE(54331)
+
+      ELSE
+         CALL MPI_REDUCE(DUMP_FORCE_DIRECT,  DUMP_FORCE_DIRECT, 3, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         CALL MPI_REDUCE(DUMP_FORCE_INDIRECT,  DUMP_FORCE_INDIRECT, 3, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      END IF
+
+
+      ! ! Dump particles that hit a boundary to file
+      ! WRITE(filename, "(A,A,I0.5)") TRIM(ADJUSTL(PARTDUMP_SAVE_PATH)), "bound_proc_", PROC_ID ! Compose filename
+
+      ! ! Open file for writing
+      ! IF (BOOL_BINARY_OUTPUT) THEN
+      !    OPEN(28479, FILE=filename, ACCESS='SEQUENTIAL', POSITION='APPEND', FORM='UNFORMATTED', &
+      !    STATUS='UNKNOWN', CONVERT='BIG_ENDIAN', RECL=84)
+      !    DO IP = 1, NP_DUMP_PROC
+      !       WRITE(28479) TIMESTEP, part_dump(IP)%X, part_dump(IP)%Y, part_dump(IP)%Z, &
+      !       part_dump(IP)%VX, part_dump(IP)%VY, part_dump(IP)%VZ, part_dump(IP)%EROT, part_dump(IP)%EVIB, &
+      !       part_dump(IP)%S_ID, part_dump(IP)%IC, part_dump(IP)%DTRIM
+      !    END DO
+      !    CLOSE(28479)
+      ! ELSE
+      !    OPEN(28479, FILE=filename )
+      !    !WRITE(10,*) '% TIMESTEP | X | Y | Z | VX | VY | VZ | EROT | EVIB | S_ID | IPG | DTRIM'
+      !    DO IP = 1, NP_DUMP_PROC
+      !       WRITE(28479,*) TIMESTEP, part_dump(IP)%X, part_dump(IP)%Y, part_dump(IP)%Z, &
+      !       part_dump(IP)%VX, part_dump(IP)%VY, part_dump(IP)%VZ, part_dump(IP)%EROT, part_dump(IP)%EVIB, &
+      !       part_dump(IP)%S_ID, part_dump(IP)%IC, part_dump(IP)%DTRIM
+      !    END DO
+      !    CLOSE(28479)
+      ! END IF
+
+   END SUBROUTINE DUMP_FORCE_FILE
 
 
    SUBROUTINE READ_PARTICLES_FILE(TIMESTEP)
@@ -909,6 +1021,7 @@ CONTAINS
       REAL(KIND=8) :: y,fM,BETA, KAPPA, ACCA
 
       BETA = 1./SQRT(2.*KB/M*TINF)
+      IF (BOOL_KAPPA_DISTRIBUTION) BETA = 1./SQRT(2.*KB/M*TINF*(KAPPA_C-3./2.))
 
       ACCA = SQRT(SN**2+2.)                              ! Tmp variable
       KAPPA = 2./(SN+ACCA) * EXP(0.5 + 0.5*SN*(SN-ACCA)) ! variable
@@ -922,6 +1035,7 @@ CONTAINS
 
          R2 = rf()
          fM = KAPPA*(y+sn)*EXP(-y**2)
+         IF (BOOL_KAPPA_DISTRIBUTION) fM = KAPPA*(y+sn)*GAMMA(KAPPA_C)/GAMMA(KAPPA_C-1./2.)/(1+y**2)**KAPPA_C
 
          ! Step 3. 
 

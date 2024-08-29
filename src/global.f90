@@ -16,8 +16,11 @@ MODULE global
    REAL(KIND=8) :: KB   = 1.380649d-23                   ! https://physics.nist.gov/cgi-bin/cuu/Value?k
    REAL(KIND=8) :: QE   = 1.602176634d-19                ! https://physics.nist.gov/cgi-bin/cuu/Value?e
    REAL(KIND=8) :: NA   = 6.02214076e23                  ! https://physics.nist.gov/cgi-bin/cuu/Value?na
+   REAL(KIND=8) :: ME   = 9.1093837139d-31               ! https://physics.nist.gov/cgi-bin/cuu/Value?me
 
    REAL(KIND=8) :: EPS_SCALING = 1.d0
+
+   REAL(KIND=8) :: KAPPA_C = 4.d0
    
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! Particle variables and arrays !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -70,6 +73,8 @@ MODULE global
    LOGICAL :: BOOL_FLUID_ELECTRONS
    REAL(KIND=8) :: BOLTZ_N0, BOLTZ_PHI0, BOLTZ_TE
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: BOLTZ_NRHOE
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: BOLTZ_SOLID_NODES
+   LOGICAL :: BOOL_KAPPA_DISTRIBUTION
 
    ENUM, BIND(C)
       ENUMERATOR RECTILINEAR_UNIFORM, RECTILINEAR_NONUNIFORM, QUADTREE, UNSTRUCTURED
@@ -170,6 +175,8 @@ TYPE(UNSTRUCTURED_3D_GRID_DATA_STRUCTURE) :: U3D_GRID
       LOGICAL :: REACT = .FALSE.
       LOGICAL :: DUMP_FLUXES = .FALSE.
 
+      LOGICAL :: DUMP_FORCE_BC = .FALSE.
+
       ! Washboard model
       REAL(KIND=8) :: A
       REAL(KIND=8) :: B
@@ -251,6 +258,7 @@ TYPE(UNSTRUCTURED_3D_GRID_DATA_STRUCTURE) :: U3D_GRID
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: NEUMANN
    LOGICAL, DIMENSION(:), ALLOCATABLE :: IS_NEUMANN
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: SURFACE_CHARGE 
+   LOGICAL, DIMENSION(:), ALLOCATABLE :: IS_DIELECTRIC
 
 
    REAL(KIND=8), DIMENSION(3) :: EXTERNAL_B_FIELD = 0
@@ -536,6 +544,17 @@ TYPE(UNSTRUCTURED_3D_GRID_DATA_STRUCTURE) :: U3D_GRID
 
    REAL(KIND=8), DIMENSION(6) :: TIMERS_START_TIME = 0.d0
    REAL(KIND=8), DIMENSION(6) :: TIMERS_ELAPSED = 0.d0
+
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!! Drag force calculation !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   REAL(KIND=8), DIMENSION(3) :: FORCE_DIRECT = 0.d0
+   REAL(KIND=8), DIMENSION(3) :: FORCE_INDIRECT = 0.d0
+   LOGICAL                    :: BOOL_CALCULATE_FORCE = .FALSE.
+   INTEGER                    :: DUMP_FORCE_START = 0
+
+   TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: part_force_direct
+
 
    REAL(KIND=8) :: FIELD_POWER
    REAL(KIND=8) :: COIL_CURRENT = 1.5d0

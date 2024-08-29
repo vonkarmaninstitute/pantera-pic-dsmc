@@ -38,9 +38,24 @@ MODULE timecycle
       IF (PIC_TYPE .NE. NONE) THEN
 
          CALL SET_WALL_POTENTIAL
+
+         IF (BOOL_FLUID_ELECTRONS) THEN
+            
+            CALL SETUP_SOLID_NODES
+            
+            ALLOCATE(PHI_FIELD(NNODES))
+            PHI_FIELD=0
+            ALLOCATE(BOLTZ_NRHOE, SOURCE = PHI_FIELD)
+            CALL GET_BOLTZMANN_DENSITY
+         END IF
+
          CALL DEPOSIT_CHARGE(particles)
-         CALL SETUP_POISSON
-         CALL SOLVE_POISSON
+         IF (BOOL_FLUID_ELECTRONS) THEN
+            CALL SOLVE_BOLTZMANN
+         ELSE
+            CALL SETUP_POISSON
+            CALL SOLVE_POISSON
+         END IF
          PHIBAR_FIELD = PHI_FIELD
          CALL COMPUTE_E_FIELD
 
@@ -161,7 +176,11 @@ MODULE timecycle
             CALL DEPOSIT_CHARGE(particles)
 
             CALL TIMER_START(2)
-            CALL SOLVE_POISSON
+            IF (BOOL_FLUID_ELECTRONS) THEN
+               CALL SOLVE_BOLTZMANN
+            ELSE
+               CALL SOLVE_POISSON
+            END IF
             CALL COMPUTE_E_FIELD
             CALL TIMER_STOP(2)
 
@@ -352,7 +371,9 @@ MODULE timecycle
                BETA = 0
             ELSE
                BETA = 1./SQRT(2.*KB/M*EMIT_TASK%TTRA)
+               IF (BOOL_KAPPA_DISTRIBUTION)  BETA = 1./SQRT(2.*KB/M*EMIT_TASK%TTRA*(KAPPA_C-3./2.))
             END IF
+
 
             IF (COLOCATED_ELECTRONS) BETA_E = 1./SQRT(2.*KB/SPECIES(ELECTRON_S_ID)%MOLECULAR_MASS*COLOCATED_ELECTRONS_TTRA)
 
@@ -960,6 +981,9 @@ MODULE timecycle
       INTEGER :: NEIGHBORPG
       REAL(KIND=8) :: CHARGE, K, PSIP, RHO_Q
       INTEGER :: VP
+      REAL(KIND=8) :: Y1, Y2, AREA, E_MAG2
+      INTEGER :: V1, V2, V3, VV1, VV2, VV3
+      REAL(KIND=8) :: POT1, POT2, POT3
 
       REAL(KIND=8) :: VXPRE, VYPRE, VZPRE
 
@@ -1239,6 +1263,24 @@ MODULE timecycle
                            particleNOW = particles(IP)
                            CALL ADD_PARTICLE_ARRAY(particleNOW, NP_DUMP_PROC, part_dump)
                         END IF
+
+                        !!!!!!!!! DIRECT COLLISION WITH SOLID BODY !!!!!!!!!
+                        !!!! TODO: IMPLEMENT DRAG FORCES ON INDIVIDUAL PHYSICAL GROUPS
+                        IF (GRID_BC(FACE_PG)%DUMP_FORCE_BC .AND. (tID .GE. DUMP_FORCE_START)) THEN
+                           K = FNUM*SPECIES(particles(IP)%S_ID)%MOLECULAR_MASS                    
+                           IF (DIMS == 2) THEN
+                              IF (AXI) THEN
+                                 FORCE_DIRECT(1) = FORCE_DIRECT(1) + K*particles(IP)%VX/DT*2*PI/(ZMAX-ZMIN)
+                              ELSE
+                                 FORCE_DIRECT(1) = FORCE_DIRECT(1) + K*particles(IP)%VX/DT
+                                 FORCE_DIRECT(2) = FORCE_DIRECT(2) + K*particles(IP)%VY/DT
+                              END IF
+                           ELSE IF (DIMS ==3) THEN
+                              FORCE_DIRECT(1) = FORCE_DIRECT(1) + K*particles(IP)%VX/DT
+                              FORCE_DIRECT(2) = FORCE_DIRECT(2) + K*particles(IP)%VY/DT
+                              FORCE_DIRECT(3) = FORCE_DIRECT(3) + K*particles(IP)%VZ/DT
+                           END IF 
+                        END IF
                         
                         CHARGE = SPECIES(particles(IP)%S_ID)%CHARGE
                         IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. ABS(CHARGE) .GE. 1.d-6) THEN
@@ -1434,6 +1476,25 @@ MODULE timecycle
                         ELSE
                            REMOVE_PART(IP) = .TRUE.
                            particles(IP)%DTRIM = 0.d0
+                        END IF
+
+                        !!!!!!!!! DIRECT COLLISION WITH SOLID BODY !!!!!!!!!
+                        !!!! TODO: IMPLEMENT DRAG FORCES ON INDIVIDUAL PHYSICAL GROUPS
+                        IF (GRID_BC(FACE_PG)%DUMP_FORCE_BC .AND. (tID .GE. DUMP_FORCE_START)) THEN
+                           IF (REMOVE_PART(IP)) CYCLE ! IF PARTICLE IS ABSORBED, CYCLE
+                           K = FNUM*SPECIES(particles(IP)%S_ID)%MOLECULAR_MASS                           
+                           IF (DIMS == 2) THEN
+                              IF (AXI) THEN
+                                 FORCE_DIRECT(1) = FORCE_DIRECT(1) - K*particles(IP)%VX/DT*2*PI/(ZMAX-ZMIN)
+                              ELSE
+                                 FORCE_DIRECT(1) = FORCE_DIRECT(1) - K*particles(IP)%VX/DT
+                                 FORCE_DIRECT(2) = FORCE_DIRECT(2) - K*particles(IP)%VY/DT
+                              END IF
+                           ELSE IF (DIMS ==3) THEN
+                              FORCE_DIRECT(1) = FORCE_DIRECT(1) - K*particles(IP)%VX/DT
+                              FORCE_DIRECT(2) = FORCE_DIRECT(2) - K*particles(IP)%VY/DT
+                              FORCE_DIRECT(3) = FORCE_DIRECT(3) - K*particles(IP)%VZ/DT
+                           END IF
                         END IF
                      ELSE
                         REMOVE_PART(IP) = .TRUE.
@@ -1881,6 +1942,118 @@ MODULE timecycle
 
       END DO ! End loop: DO IP = 1,NP_PROC
 
+
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      !!!!!! FLUID ELECTRON CHARGE ASSIGMENT !!!!
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      IF (BOOL_FLUID_ELECTRONS) THEN
+         IF (DIMS==2) THEN
+            DO IC=1, NCELLS
+               IF (CELL_PROCS(IC)==PROC_ID) THEN
+                  DO IP=1, 3
+                     FACE_PG = U2D_GRID%CELL_EDGES_PG(IP, IC)
+                     IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. GRID_BC(U2D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
+                        ! VV1 = 1 + MOD(IP-1,3)
+                        ! VV2 = 1 + MOD(IP,3)
+                        IF (IP == 1) THEN
+                           VV1 = 1
+                           VV2 = 2
+                        ELSE IF (IP == 2) THEN
+                           VV1 = 2
+                           VV2 = 3
+                        ELSE IF (IP == 3) THEN
+                           VV1 = 3
+                           VV2 = 1
+                        END IF
+                        V1 = U2D_GRID%CELL_NODES(VV1,IC)
+                        V2 = U2D_GRID%CELL_NODES(VV2,IC)
+                        Y1 = U2D_GRID%NODE_COORDS(2, V1)
+                        Y2 = U2D_GRID%NODE_COORDS(2, V2)       
+                        AREA = U2D_GRID%CELL_EDGES_LEN(IP,IC)
+
+                        CHARGE = -QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*SQRT(KB*BOLTZ_TE/(2*PI*ME))*AREA*DT
+                        POT1 = EXP(QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                        POT2 = EXP(QE*(PHI_FIELD(V2)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+
+                        IF (BOOL_KAPPA_DISTRIBUTION) THEN
+                           CHARGE = CHARGE*SQRT(KAPPA_C-3./2.)&
+                           *GAMMA(KAPPA_C+1.)/GAMMA(KAPPA_C-1./2.)/(KAPPA_C*(KAPPA_C-1.))
+                           POT1 = (1-QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_C-3./2.)))**(-KAPPA_C+1.)
+                           POT2 = (1-QE*(PHI_FIELD(V2)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_C-3./2.)))**(-KAPPA_C+1.)
+                        END IF
+
+                        IF (AXI) THEN
+                           SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) +&
+                           CHARGE*(POT1*(3.*Y1+Y2) + POT2*(Y1+Y2))/12.
+                           SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) +&
+                           CHARGE*(POT1*(Y1+Y2) + POT2*(Y1+3.*Y2))/12.
+                        ELSE
+                           SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + CHARGE*(POT1/3. + POT2/6.)
+                           SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) + CHARGE*(POT2/3. + POT1/6.)
+                        END IF
+                     END IF
+                  END DO
+               END IF
+            END DO
+
+         ELSE IF (DIMS==3) THEN
+            DO IC=1, NCELLS
+               IF (CELL_PROCS(IC)==PROC_ID) THEN
+                  DO IP=1, 4
+                     FACE_PG = U3D_GRID%CELL_FACES_PG(IP, IC)
+                     IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
+                        IF (IP == 1) THEN
+                           VV1 = 1
+                           VV2 = 3
+                           VV3 = 2
+                        ELSE IF (IP == 2) THEN
+                           VV1 = 1
+                           VV2 = 2
+                           VV3 = 4
+                        ELSE IF (IP == 3) THEN
+                           VV1 = 2
+                           VV2 = 3
+                           VV3 = 4
+                        ELSE IF (IP == 4) THEN
+                           VV1 = 1
+                           VV2 = 4
+                           VV3 = 3
+                        END IF
+
+                        V1 = U3D_GRID%CELL_NODES(VV1,IC)
+                        V2 = U3D_GRID%CELL_NODES(VV2,IC)
+                        V3 = U3D_GRID%CELL_NODES(VV3,IC)    
+
+                        AREA = U3D_GRID%FACE_AREA(IP,IC)
+
+                        IF (BOOL_KAPPA_DISTRIBUTION) THEN
+                           CHARGE = -QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*SQRT(KB*BOLTZ_TE*(KAPPA_C-3./2.)/(2*PI*ME))&
+                           *AREA*DT*GAMMA(KAPPA_C+1.)/GAMMA(KAPPA_C-1./2.)/(KAPPA_C*(KAPPA_C-1.))
+                           POT1 = (1-QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_C-3./2.)))**(-KAPPA_C+1.)
+                           POT2 = (1-QE*(PHI_FIELD(V2)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_C-3./2.)))**(-KAPPA_C+1.)
+                           POT3 = (1-QE*(PHI_FIELD(V3)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_C-3./2.)))**(-KAPPA_C+1.)
+
+                           SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + CHARGE*(POT1/6. + POT2/12. + POT3/12.)
+                           SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) + CHARGE*(POT1/12. + POT2/6. + POT3/12.)
+                           SURFACE_CHARGE(V3) = SURFACE_CHARGE(V3) + CHARGE*(POT1/12. + POT2/12. + POT3/6.)           
+                        ELSE
+                           CHARGE = -QE/(EPS0*EPS_SCALING**2)*SQRT(KB*BOLTZ_TE/(2*PI*ME))*AREA*DT
+
+                           SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1)&
+                           + CHARGE*(BOLTZ_NRHOE(V1)/6. + BOLTZ_NRHOE(V2)/12. + BOLTZ_NRHOE(V3)/12.)
+                           SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2)&
+                           + CHARGE*(BOLTZ_NRHOE(V1)/12. + BOLTZ_NRHOE(V2)/6. + BOLTZ_NRHOE(V3)/12.)
+                           SURFACE_CHARGE(V3) = SURFACE_CHARGE(V3)&
+                           + CHARGE*(BOLTZ_NRHOE(V1)/12. + BOLTZ_NRHOE(V2)/12. + BOLTZ_NRHOE(V3)/6.)
+                        END IF
+                     END IF
+                  END DO
+               END IF
+            END DO
+         END IF
+      END IF
+      
+
       ! ==============
       ! ========= Now remove particles that are out of the domain and reorder the array. 
       ! ========= Do this in the end of the advection step, since reordering the array 
@@ -1944,6 +2117,94 @@ MODULE timecycle
             NP_DUMP_PROC = 0
          END IF
       END IF
+
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      !!!!!! INDIRECT FORCE CALC + SAVE DATA !!!!
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      IF ((tID .GT. DRAG_FORCE_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
+         IF (DIMS==2) THEN
+            DO IC=1, NCELLS
+               IF (CELL_PROCS(IC)==PROC_ID) THEN
+                  DO IP=1, 3
+                     ! NEIGHBOR = U2D_GRID%CELL_NEIGHBORS(IP, IC)
+                     ! IF (NEIGHBOR == -1) CYCLE
+                     ! NEIGHBORPG = U2D_GRID%CELL_PG(NEIGHBOR)
+                     FACE_PG =  U2D_GRID%CELL_EDGES_PG(IP, IC)
+                     IF (FACE_PG .NE. -1) THEN
+                        IF (GRID_BC(FACE_PG)%DUMP_DRAG_BC .AND. (GRID_BC(U2D_GRID%CELL_PG(IC))%VOLUME_BC == FLUID)) THEN
+                           AREA = U2D_GRID%CELL_EDGES_LEN(IP,IC)
+                           E_MAG2 = E_FIELD(1,1,IC)*E_FIELD(1,1,IC) + E_FIELD(2,1,IC)*E_FIELD(2,1,IC)
+                           IF (AXI) THEN
+                              IF (IP == 1) THEN
+                                 VV1 = 1
+                                 VV2 = 2
+                              ELSE IF (IP == 2) THEN
+                                 VV1 = 2
+                                 VV2 = 3
+                              ELSE IF (IP == 3) THEN
+                                 VV1 = 3
+                                 VV2 = 1
+                              END IF
+                              V1 = U2D_GRID%CELL_NODES(VV1,IC)
+                              V2 = U2D_GRID%CELL_NODES(VV2,IC)
+                              Y1 = U2D_GRID%NODE_COORDS(2, V1)
+                              Y2 = U2D_GRID%NODE_COORDS(2, V2)
+                              FORCE_INDIRECT(1) = FORCE_INDIRECT(1) + EPS0*AREA*2*PI*(Y1+Y2)*&
+                                                ( (E_FIELD(1,1,IC)*E_FIELD(1,1,IC) - 0.5*E_MAG2)*U2D_GRID%EDGE_NORMAL(1,IP,IC) &
+                                                +  E_FIELD(1,1,IC)*E_FIELD(2,1,IC)*U2D_GRID%EDGE_NORMAL(2,IP,IC))
+                           ELSE
+                              FORCE_INDIRECT(1) = FORCE_INDIRECT(1) + EPS0*AREA*(ZMAX-ZMIN)*&
+                                                ( (E_FIELD(1,1,IC)*E_FIELD(1,1,IC) - 0.5*E_MAG2)*U2D_GRID%EDGE_NORMAL(1,IP,IC) &
+                                                +  E_FIELD(1,1,IC)*E_FIELD(2,1,IC)*U2D_GRID%EDGE_NORMAL(2,IP,IC))
+                              
+                              FORCE_INDIRECT(2) = FORCE_INDIRECT(2) + EPS0*AREA*(ZMAX-ZMIN)*&
+                                                (  E_FIELD(2,1,IC)*E_FIELD(1,1,IC)*U2D_GRID%EDGE_NORMAL(1,IP,IC) &
+                                                + (E_FIELD(2,1,IC)*E_FIELD(2,1,IC) - 0.5*E_MAG2)*U2D_GRID%EDGE_NORMAL(2,IP,IC))
+                           END IF
+                        END IF
+                     END IF
+                  END DO
+               END IF
+            END DO
+         ELSE IF (DIMS==3) THEN
+            DO IC=1, NCELLS
+               IF (CELL_PROCS(IC)==PROC_ID) THEN
+                  DO IP=1, 4
+                     ! NEIGHBOR = U3D_GRID%CELL_NEIGHBORS(IP, IC)
+                     ! IF (NEIGHBOR == -1) CYCLE
+                     ! NEIGHBORPG = U3D_GRID%CELL_PG(NEIGHBOR)
+                     FACE_PG =  U3D_GRID%CELL_FACES_PG(IP, IC)
+                     IF (FACE_PG .NE. -1) THEN
+                        IF (GRID_BC(FACE_PG)%DUMP_DRAG_BC .AND. (GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC == FLUID)) THEN
+
+                           AREA = U3D_GRID%FACE_AREA(IP,IC)
+                           E_MAG2 = E_FIELD(1,1,IC)*E_FIELD(1,1,IC) + E_FIELD(2,1,IC)*E_FIELD(2,1,IC)&
+                           + E_FIELD(3,1,IC)*E_FIELD(3,1,IC)
+
+                           FORCE_INDIRECT(1) = FORCE_INDIRECT(1) + EPS0*AREA*&
+                           ( (E_FIELD(1,1,IC)*E_FIELD(1,1,IC) - 0.5*E_MAG2)*U3D_GRID%FACE_NORMAL(1,IP,IC) &
+                           +  E_FIELD(1,1,IC)*E_FIELD(2,1,IC)*U3D_GRID%FACE_NORMAL(2,IP,IC) &
+                           +  E_FIELD(1,1,IC)*E_FIELD(3,1,IC)*U3D_GRID%FACE_NORMAL(3,IP,IC))
+                           FORCE_INDIRECT(2) = FORCE_INDIRECT(2) + EPS0*AREA*&
+                           (  E_FIELD(2,1,IC)*E_FIELD(1,1,IC)*U3D_GRID%FACE_NORMAL(1,IP,IC) &
+                           + (E_FIELD(2,1,IC)*E_FIELD(2,1,IC) - 0.5*E_MAG2)*U3D_GRID%FACE_NORMAL(2,IP,IC) &
+                           +  E_FIELD(2,1,IC)*E_FIELD(3,1,IC)*U3D_GRID%FACE_NORMAL(3,IP,IC))
+                           FORCE_INDIRECT(3) = FORCE_INDIRECT(3) + EPS0*AREA*&
+                           (  E_FIELD(3,1,IC)*E_FIELD(1,1,IC)*U3D_GRID%FACE_NORMAL(1,IP,IC) &
+                           +  E_FIELD(3,1,IC)*E_FIELD(2,1,IC)*U3D_GRID%FACE_NORMAL(2,IP,IC) &
+                           + (E_FIELD(3,1,IC)*E_FIELD(3,1,IC) - 0.5*E_MAG2)*U3D_GRID%FACE_NORMAL(3,IP,IC))
+                        END IF
+                     END IF
+                  END DO
+               END IF
+            END DO
+         END IF
+
+         CALL DUMP_FORCE_FILE(tID)
+         FORCE_DIRECT = 0.d0
+         FORCE_INDIRECT = 0.d0
+      END IF
+
 
       CLOSE(66341)
 

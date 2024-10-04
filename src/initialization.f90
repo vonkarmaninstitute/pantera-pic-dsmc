@@ -1246,7 +1246,7 @@ MODULE initialization
 
       CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
 
-      IF (N_STR .NE. 1) CALL ERROR_ABORT('Error in boundary force definition.')
+      IF (N_STR .NE. 1) CALL ERROR_ABORT('Error in boundary definition for force calculation.')
 
       ! phys_group type parameters
       IPG = -1
@@ -1255,7 +1255,7 @@ MODULE initialization
       END DO
       IF (IPG == -1) CALL ERROR_ABORT('Error in boundary condition definition. Group name not found.')
 
-      GRID_BC(IPG)%DUMP_DRAG_BC = .TRUE.
+      GRID_BC(IPG)%DUMP_FORCE_BC = .TRUE.
 
 
    END SUBROUTINE DEF_BOUNDARY_COMPUTE_FORCE
@@ -2490,42 +2490,43 @@ MODULE initialization
             FRAC = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%COMPONENTS(IS)%MOLFRAC
 
             
-            !!!!! KAPPA DISTRIBUTION !!!!!
-            IF (BOOL_KAPPA_DISTRIBUTION) THEN
-               BETA = 1./SQRT(2.*KB/M*EMIT_TASKS(ITASK)%TTRA*(KAPPA_C-3./2.))
-               U_NORM = EMIT_TASKS(ITASK)%UX*NORMX + EMIT_TASKS(ITASK)%UY*NORMY + EMIT_TASKS(ITASK)%UZ*NORMZ ! Molecular speed ratio normal to boundary
-               EMIT_TASKS(ITASK)%U_NORM = U_NORM
-               S_NORM = U_NORM*BETA
 
-               INTEG1 = PI/2.
-               INTEG2 = ATAN(S_NORM)
-               DO I = 2, INT(KAPPA_C)
-                  INTEG1 = (2.*I-3.)/(2.*(I-1.))*INTEG1
-                  INTEG2 = S_NORM/(2.*(I-1.)*(1.+(S_NORM)**2)**(I-1.)) + (2.*I-3.)/(2.*(I-1.))*INTEG2
-               END DO
-               
-               FLUXLINESOURCE = GAMMA(KAPPA_C)/GAMMA(KAPPA_C-1./2.)*EMIT_TASKS(ITASK)%NRHO*FRAC/(BETA*SQRT(PI)) * &
-               ( 1./(KAPPA_C-1.)/2.*(1+S_NORM**2)**(-KAPPA_C+1.) + S_NORM*(INTEG1 +INTEG2))      ! Tot number flux emitted
-
+            IF (EMIT_TASKS(ITASK)%TTRA == 0) THEN
+               BETA = 0
             ELSE
-               IF (EMIT_TASKS(ITASK)%TTRA == 0) THEN
-                  BETA = 0
-               ELSE
-                  BETA = 1./SQRT(2.*KB/M*EMIT_TASKS(ITASK)%TTRA) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
-               END IF
-
-               U_NORM = EMIT_TASKS(ITASK)%UX*NORMX + EMIT_TASKS(ITASK)%UY*NORMY + EMIT_TASKS(ITASK)%UZ*NORMZ ! Molecular speed ratio normal to boundary
-               EMIT_TASKS(ITASK)%U_NORM = U_NORM
-               S_NORM = U_NORM*BETA
-
-               IF (EMIT_TASKS(ITASK)%TTRA == 0) THEN
-                  FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC*U_NORM      ! Tot number flux emitted
-               ELSE
-                  FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-S_NORM**2) &
-                                 + SQRT(PI)*S_NORM*(1.+ERF1(S_NORM)))      ! Tot number flux emitted
-               END IF
-
+               BETA = 1./SQRT(2.*KB/M*EMIT_TASKS(ITASK)%TTRA) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
             END IF
+
+            U_NORM = EMIT_TASKS(ITASK)%UX*NORMX + EMIT_TASKS(ITASK)%UY*NORMY + EMIT_TASKS(ITASK)%UZ*NORMZ ! Molecular speed ratio normal to boundary
+            EMIT_TASKS(ITASK)%U_NORM = U_NORM
+            S_NORM = U_NORM*BETA
+
+            IF (EMIT_TASKS(ITASK)%TTRA == 0) THEN
+               FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC*U_NORM      ! Tot number flux emitted
+            ELSE
+               FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-S_NORM**2) &
+                              + SQRT(PI)*S_NORM*(1.+ERF1(S_NORM)))      ! Tot number flux emitted
+            END IF
+
+            !!!!! KAPPA DISTRIBUTION !!!!! TODO: Obtain from Kappa distr func.
+            ! IF (BOOL_KAPPA_DISTRIBUTION) THEN
+            !    BETA = 1./SQRT(2.*KB/M*EMIT_TASKS(ITASK)%TTRA*(KAPPA_C-3./2.))
+            !    U_NORM = EMIT_TASKS(ITASK)%UX*NORMX + EMIT_TASKS(ITASK)%UY*NORMY + EMIT_TASKS(ITASK)%UZ*NORMZ ! Molecular speed ratio normal to boundary
+            !    EMIT_TASKS(ITASK)%U_NORM = U_NORM
+            !    S_NORM = U_NORM*BETA
+
+            !    INTEG1 = PI/2.
+            !    INTEG2 = ATAN(S_NORM)
+            !    DO I = 2, INT(KAPPA_C)
+            !       INTEG1 = (2.*I-3.)/(2.*(I-1.))*INTEG1
+            !       INTEG2 = S_NORM/(2.*(I-1.)*(1.+(S_NORM)**2)**(I-1.)) + (2.*I-3.)/(2.*(I-1.))*INTEG2
+            !    END DO
+               
+            !    FLUXLINESOURCE = GAMMA(KAPPA_C)/GAMMA(KAPPA_C-1./2.)*EMIT_TASKS(ITASK)%NRHO*FRAC/(BETA*SQRT(PI)) * &
+            !    ( 1./(KAPPA_C-1.)/2.*(1+S_NORM**2)**(-KAPPA_C+1.) + S_NORM*(INTEG1 +INTEG2))      ! Tot number flux emitted
+
+            ! END IF
+            
 
             NtotINJECT = FLUXLINESOURCE*AREA*DT/FNUM         ! Tot num of particles to be injected
 

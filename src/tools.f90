@@ -169,58 +169,59 @@ CONTAINS
    END SUBROUTINE MAXWELL
 
 
-   SUBROUTINE KAPPA(UX, UY, UZ, TX, TY, TZ, VX, VY, VZ, M)
+   !!!!! TODO: Implement Kappa distribution for particles
+   ! SUBROUTINE KAPPA(UX, UY, UZ, TX, TY, TZ, VX, VY, VZ, M)
 
-      IMPLICIT NONE
+   !    IMPLICIT NONE
 
-      REAL(KIND=8), INTENT(IN)    :: UX, UY, UZ, TX, TY, TZ
-      REAL(KIND=8), INTENT(IN)    :: M ! Molecular mass
-      REAL(KIND=8), INTENT(INOUT) :: VX, VY, VZ
+   !    REAL(KIND=8), INTENT(IN)    :: UX, UY, UZ, TX, TY, TZ
+   !    REAL(KIND=8), INTENT(IN)    :: M ! Molecular mass
+   !    REAL(KIND=8), INTENT(INOUT) :: VX, VY, VZ
 
-      INTEGER                     :: I
-      REAL(KIND=8)                :: PI2
-      REAL(KIND=8)                :: R, R1, RO, TETA, BETA
-      REAL(KIND=8), DIMENSION(3)  :: VEL, TT
-      REAL(KIND=8) :: DELTA
+   !    INTEGER                     :: I
+   !    REAL(KIND=8)                :: PI2
+   !    REAL(KIND=8)                :: R, R1, RO, TETA, BETA
+   !    REAL(KIND=8), DIMENSION(3)  :: VEL, TT
+   !    REAL(KIND=8) :: DELTA
 
-      PI2  = 2.*PI
+   !    PI2  = 2.*PI
 
-      TT(1) = TX
-      TT(2) = TY
-      TT(3) = TZ
+   !    TT(1) = TX
+   !    TT(2) = TY
+   !    TT(3) = TZ
 
 
-      !!!!! KAPPA DISTRIBUTION !!!!!
+   !    !!!!! KAPPA DISTRIBUTION !!!!!
 
-      DO I = 1,3
-         ! Step 1.
-         R = rf()
+   !    DO I = 1,3
+   !       ! Step 1.
+   !       R = rf()
              
-         TETA = PI2*R
+   !       TETA = PI2*R
 
-         ! Step 2.
-         ! R goes from 0 to 1 included. Remove the extremes
-         R1 = rf()
-            DO WHILE (R1 < 1.0D-13)
-               R1 = rf()
-            END DO
+   !       ! Step 2.
+   !       ! R goes from 0 to 1 included. Remove the extremes
+   !       R1 = rf()
+   !          DO WHILE (R1 < 1.0D-13)
+   !             R1 = rf()
+   !          END DO
 
-         BETA = 1./SQRT(2.*KB*TT(I)/M*(KAPPA_C-3./2.))
-         DELTA = (1-GAMMA(KAPPA_C-1./2.)/GAMMA(KAPPA_C+1./2.)*(KAPPA_C-1./2.)*(1-R1))**(-1./(KAPPA_C-1./2.))
+   !       BETA = 1./SQRT(2.*KB*TT(I)/M*(KAPPA_C-3./2.))
+   !       DELTA = (1-GAMMA(KAPPA_C-1./2.)/GAMMA(KAPPA_C+1./2.)*(KAPPA_C-1./2.)*(1-R1))**(-1./(KAPPA_C-1./2.))
 
-         RO = SQRT(DELTA-1)/BETA
-         VEL(I) = RO*SIN(TETA)
-      END DO
+   !       RO = SQRT(DELTA-1)/BETA
+   !       VEL(I) = RO*SIN(TETA)
+   !    END DO
 
-      ! Step 3.
+   !    ! Step 3.
 
-      VX = UX + VEL(1)
-      VY = UY + VEL(2)
-      VZ = UZ + VEL(3)
+   !    VX = UX + VEL(1)
+   !    VY = UY + VEL(2)
+   !    VZ = UZ + VEL(3)
 
-      RETURN
+   !    RETURN
 
-   END SUBROUTINE KAPPA
+   ! END SUBROUTINE KAPPA
 
 
    SUBROUTINE INTERNAL_ENERGY(DOF, TEMP, EI)
@@ -1021,7 +1022,7 @@ CONTAINS
       REAL(KIND=8) :: y,fM,BETA, KAPPA, ACCA
 
       BETA = 1./SQRT(2.*KB/M*TINF)
-      IF (BOOL_KAPPA_DISTRIBUTION) BETA = 1./SQRT(2.*KB/M*TINF*(KAPPA_C-3./2.))
+      ! IF (BOOL_KAPPA_DISTRIBUTION) BETA = 1./SQRT(2.*KB/M*TINF*(KAPPA_C-3./2.))
 
       ACCA = SQRT(SN**2+2.)                              ! Tmp variable
       KAPPA = 2./(SN+ACCA) * EXP(0.5 + 0.5*SN*(SN-ACCA)) ! variable
@@ -1035,7 +1036,7 @@ CONTAINS
 
          R2 = rf()
          fM = KAPPA*(y+sn)*EXP(-y**2)
-         IF (BOOL_KAPPA_DISTRIBUTION) fM = KAPPA*(y+sn)*GAMMA(KAPPA_C)/GAMMA(KAPPA_C-1./2.)/(1+y**2)**KAPPA_C
+         ! IF (BOOL_KAPPA_DISTRIBUTION) fM = KAPPA*(y+sn)*GAMMA(KAPPA_C)/GAMMA(KAPPA_C-1./2.)/(1+y**2)**KAPPA_C
 
          ! Step 3. 
 

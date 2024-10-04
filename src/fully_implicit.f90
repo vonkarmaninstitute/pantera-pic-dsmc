@@ -19,7 +19,7 @@ MODULE fully_implicit
    Vec bvec, xvec, x_seq, solvec_seq, xvec_seq, rvec, solvec
    VecScatter ctx
    KSP ksp, kspnk
-   PetscInt one, maxit, maxf
+   PetscInt one, maxit, maxf, its
    PetscInt Istart, Iend
    PetscReal val, norm, f0, stol, rtol, abstol
    PetscScalar, POINTER :: PHI_FIELD_TEMP(:)
@@ -33,6 +33,7 @@ MODULE fully_implicit
    PetscViewer viewer
    IS rowperm, colperm
    MatFactorInfo  info(MAT_FACTORINFO_SIZE)
+   PetscBool flg, matrix_free
 
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CELL_NE, CELL_TE
 

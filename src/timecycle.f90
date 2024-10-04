@@ -371,7 +371,7 @@ MODULE timecycle
                BETA = 0
             ELSE
                BETA = 1./SQRT(2.*KB/M*EMIT_TASK%TTRA)
-               IF (BOOL_KAPPA_DISTRIBUTION)  BETA = 1./SQRT(2.*KB/M*EMIT_TASK%TTRA*(KAPPA_C-3./2.))
+               ! IF (BOOL_KAPPA_DISTRIBUTION)  BETA = 1./SQRT(2.*KB/M*EMIT_TASK%TTRA*(KAPPA_C-3./2.))
             END IF
 
 
@@ -2121,7 +2121,7 @@ MODULE timecycle
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       !!!!!! INDIRECT FORCE CALC + SAVE DATA !!!!
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      IF ((tID .GT. DRAG_FORCE_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
+      IF ((tID .GT. DUMP_FORCE_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
          IF (DIMS==2) THEN
             DO IC=1, NCELLS
                IF (CELL_PROCS(IC)==PROC_ID) THEN
@@ -2131,7 +2131,7 @@ MODULE timecycle
                      ! NEIGHBORPG = U2D_GRID%CELL_PG(NEIGHBOR)
                      FACE_PG =  U2D_GRID%CELL_EDGES_PG(IP, IC)
                      IF (FACE_PG .NE. -1) THEN
-                        IF (GRID_BC(FACE_PG)%DUMP_DRAG_BC .AND. (GRID_BC(U2D_GRID%CELL_PG(IC))%VOLUME_BC == FLUID)) THEN
+                        IF (GRID_BC(FACE_PG)%DUMP_FORCE_BC .AND. (GRID_BC(U2D_GRID%CELL_PG(IC))%VOLUME_BC == FLUID)) THEN
                            AREA = U2D_GRID%CELL_EDGES_LEN(IP,IC)
                            E_MAG2 = E_FIELD(1,1,IC)*E_FIELD(1,1,IC) + E_FIELD(2,1,IC)*E_FIELD(2,1,IC)
                            IF (AXI) THEN
@@ -2175,7 +2175,7 @@ MODULE timecycle
                      ! NEIGHBORPG = U3D_GRID%CELL_PG(NEIGHBOR)
                      FACE_PG =  U3D_GRID%CELL_FACES_PG(IP, IC)
                      IF (FACE_PG .NE. -1) THEN
-                        IF (GRID_BC(FACE_PG)%DUMP_DRAG_BC .AND. (GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC == FLUID)) THEN
+                        IF (GRID_BC(FACE_PG)%DUMP_FORCE_BC .AND. (GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC == FLUID)) THEN
 
                            AREA = U3D_GRID%FACE_AREA(IP,IC)
                            E_MAG2 = E_FIELD(1,1,IC)*E_FIELD(1,1,IC) + E_FIELD(2,1,IC)*E_FIELD(2,1,IC)&

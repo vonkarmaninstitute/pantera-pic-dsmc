@@ -20,7 +20,6 @@ MODULE global
 
    REAL(KIND=8) :: EPS_SCALING = 1.d0
 
-   REAL(KIND=8) :: KAPPA_C = 4.d0
    
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! Particle variables and arrays !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -40,6 +39,19 @@ MODULE global
    CHARACTER*256 :: INJECT_FILENAME
    REAL(KIND=8) :: INJECT_PROBABILITY = 1
    LOGICAL :: BOOL_INJECT_FROM_FILE = .FALSE.
+
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   ! Fluid electrons !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+   LOGICAL :: BOOL_FLUID_ELECTRONS
+   REAL(KIND=8) :: BOLTZ_N0, BOLTZ_PHI0, BOLTZ_TE
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: BOLTZ_NRHOE
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: BOLTZ_SOLID_NODES
+
+   
+   LOGICAL :: BOOL_KAPPA_DISTRIBUTION
+   REAL(KIND=8) :: KAPPA_C = 4.d0
 
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -70,11 +82,7 @@ MODULE global
    INTEGER, DIMENSION(:), ALLOCATABLE :: CELL_PROCS
    INTEGER :: NCELLS, NNODES
    
-   LOGICAL :: BOOL_FLUID_ELECTRONS
-   REAL(KIND=8) :: BOLTZ_N0, BOLTZ_PHI0, BOLTZ_TE
-   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: BOLTZ_NRHOE
-   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: BOLTZ_SOLID_NODES
-   LOGICAL :: BOOL_KAPPA_DISTRIBUTION
+
 
    ENUM, BIND(C)
       ENUMERATOR RECTILINEAR_UNIFORM, RECTILINEAR_NONUNIFORM, QUADTREE, UNSTRUCTURED

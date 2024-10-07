@@ -2664,7 +2664,7 @@ MODULE fully_implicit
       REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD, FACTOR, AREA
 
       IF (PROC_ID == 0) THEN
-         WRITE(*,*) 'FormJacobian Called'
+         WRITE(*,*) 'FormJacobianBoltz Called'
       END IF
 
 
@@ -2858,7 +2858,6 @@ MODULE fully_implicit
       CHARACTER(LEN=512)  :: filename
 
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA, EPS_REL
-      REAL(KIND=8) :: B11, B12, B13, B22, B23, B21, B33, B31, B32
       INTEGER :: V1, V2, V3, I
       INTEGER :: P, Q, VP, VQ
       REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD, KE
@@ -2867,7 +2866,7 @@ MODULE fully_implicit
 
 
       IF (PROC_ID == 0) THEN
-         WRITE(*,*) 'FormFunction Called'
+         WRITE(*,*) 'FormFunctionBoltz Called'
       END IF
       
       CALL VecScatterCreateToAll(x,ctx,x_seq,ierr)
@@ -3044,31 +3043,14 @@ MODULE fully_implicit
 
 
    SUBROUTINE SOLVE_BOLTZMANN
-      IMPLICIT NONE
 
       PetscScalar, POINTER :: solvec_l(:)
+      PetscBool :: flg
 
       ! Create SNES environment
-      CALL SNESDestroy(snes,ierr)
       CALL SNESCreate(PETSC_COMM_WORLD,snes,ierr)
 
-
-      ! Initialize Jacobian Matrix
-      CALL MatDestroy(Jmat,ierr)
-      CALL MatCreate(PETSC_COMM_WORLD,Jmat,ierr)
-      CALL MatSetSizes(Jmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
-      CALL MatSetType(Jmat, MATMPIAIJ, ierr)
-      CALL MatMPIAIJSetPreallocation(Jmat,100,PETSC_NULL_INTEGER,100,PETSC_NULL_INTEGER, ierr)
-      CALL MatSetFromOptions( Jmat, ierr)
-
-      ! Jacobian evaluation routine
-      CALL PetscOptionsHasName(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,"-snes_mf_operator",matrix_free,ierr)
-      IF (.not. matrix_free) THEN
-         CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobianBoltz,0,ierr)
-      ENDIF
-      
-
-      ! Create rvec (for FormFunction) and solvec (for the solution)
+      ! Create rvec (for FormFunctionBoltz) and solvec (for the solution)
       CALL VecCreate(PETSC_COMM_WORLD,rvec,ierr)
       CALL VecSetSizes(rvec,PETSC_DECIDE,NNODES,ierr)
       CALL VecSetFromOptions(rvec, ierr)
@@ -3077,11 +3059,29 @@ MODULE fully_implicit
       ! Function evaluation routine
       CALL SNESSetFunction(snes,rvec,FormFunctionBoltz,0,ierr)
 
-      !CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobianBoltz,0,ierr)
+      ! Initialize Jacobian Matrix
+      CALL MatCreate(PETSC_COMM_WORLD,Jmat,ierr)
+      CALL MatSetSizes(Jmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
+      CALL MatSetType(Jmat, MATMPIAIJ, ierr)
+
+      CALL MatMPIAIJSetPreallocation(Jmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER, ierr)
+      CALL MatSetFromOptions(Jmat, ierr)
+
+      ! CALL MatCreate(PETSC_COMM_WORLD,Pmat,ierr)
+      ! CALL MatSetSizes(Pmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
+      ! CALL MatSetType(Pmat, MATMPIAIJ, ierr)
+
+      ! Jacobian evaluation routine
+      CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobianBoltz,0,ierr)
+      ! CALL PetscOptionsHasName(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,"-snes_mf_operator",flg,ierr)
+      ! IF (flg) THEN  ! We want only the preconditioner to be filled. The Jacobian is computed from finite differencing.
+      !    CALL SNESSetJacobian(snes,Jmat,Pmat,FormJacobian,0,ierr) ! The expensive but safe one. Jacobian computed independently.
+      ! ELSE
+      !    CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobian,0,ierr) ! The expensive but safe one. Jacobian computed independently.
+      ! END IF
+      
       CALL SNESSetFromOptions(snes,ierr)
 
-
-      
       CALL VecGetOwnershipRange(solvec,Istart,Iend,ierr)
       CALL VecGetArrayF90(solvec,solvec_l,ierr)
       solvec_l = PHI_FIELD(Istart+1:Iend)
@@ -3110,8 +3110,11 @@ MODULE fully_implicit
 
       ! Cleanup.
       CALL VecDestroy(solvec, ierr)
-      CALL VecDestroy(solvec_seq,ierr)
       CALL VecDestroy(rvec, ierr)
+      CALL VecDestroy(solvec_seq,ierr)
+      CALL SNESDestroy(snes, ierr)
+      CALL MatDestroy(Jmat,ierr)
+      ! CALL MatDestroy(Pmat,ierr)
 
    END SUBROUTINE SOLVE_BOLTZMANN
 
@@ -3119,6 +3122,9 @@ MODULE fully_implicit
    SUBROUTINE GET_BOLTZMANN_DENSITY
 
       IMPLICIT NONE
+
+      IF (ALLOCATED(BOLTZ_NRHOE)) DEALLOCATE(BOLTZ_NRHOE)
+      ALLOCATE(BOLTZ_NRHOE(NNODES))
 
       BOLTZ_NRHOE = BOLTZ_N0 * exp(QE*(PHI_FIELD - BOLTZ_PHI0)/(KB*BOLTZ_TE))
       IF (BOOL_KAPPA_DISTRIBUTION) THEN
@@ -3881,7 +3887,7 @@ MODULE fully_implicit
                
                B = 0
                B = B + EXTERNAL_B_FIELD
-               CALL APPLY_RF_EB_FIELD(part_adv, IP, E, B)
+               ! CALL APPLY_RF_EB_FIELD(part_adv, IP, E, B)
 
             ELSE
                E = 0

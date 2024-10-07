@@ -143,12 +143,14 @@ MODULE initialization
                PIC_TYPE = SEMIIMPLICIT
             ELSE IF (PIC_TYPE_STRING == "explicitlimited") THEN
                PIC_TYPE = EXPLICITLIMITED
+            ELSE IF (PIC_TYPE_STRING == "hybrid") THEN
+               PIC_TYPE = HYBRID
             ELSE
                CALL ERROR_ABORT('PIC type is not specified correctly in input script.')
             END IF
          END IF
          
-         IF (line=='Bool_fluid_electrons:')    READ(in1,*) BOOL_FLUID_ELECTRONS
+         ! Fluid electrons setting
          IF (line=='Fluid_electrons_n0:')      READ(in1,*) BOLTZ_N0
          IF (line=='Fluid_electrons_phi0:')    READ(in1,*) BOLTZ_PHI0
          IF (line=='Fluid_electrons_Te:')      READ(in1,*) BOLTZ_TE
@@ -2144,7 +2146,11 @@ MODULE initialization
             CALL ERROR_ABORT('ERROR! For axisymmetric simulations, YMIN cannot be reacting.')
          END IF
       END IF
-
+      ! ---------- Check if fluid electron parameters were set for HYBRID PIC_TYPE ------
+      IF (PIC_TYPE == HYBRID .AND. (BOLTZ_N0 == 0. .OR. BOLTZ_TE == 0.)) THEN
+         WRITE(*,*) BOLTZ_N0, BOLTZ_TE
+         CALL ERROR_ABORT('Hybrid PIC Type was chosen but proper parameter setting for fluid electrons is missing.')
+      END IF
 
    END SUBROUTINE INPUT_DATA_SANITY_CHECK
 
@@ -2488,9 +2494,6 @@ MODULE initialization
             S_ID = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%COMPONENTS(IS)%ID
             M = SPECIES(S_ID)%MOLECULAR_MASS
             FRAC = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%COMPONENTS(IS)%MOLFRAC
-
-            
-
             IF (EMIT_TASKS(ITASK)%TTRA == 0) THEN
                BETA = 0
             ELSE
@@ -2526,7 +2529,7 @@ MODULE initialization
             !    ( 1./(KAPPA_C-1.)/2.*(1+S_NORM**2)**(-KAPPA_C+1.) + S_NORM*(INTEG1 +INTEG2))      ! Tot number flux emitted
 
             ! END IF
-            
+
 
             NtotINJECT = FLUXLINESOURCE*AREA*DT/FNUM         ! Tot num of particles to be injected
 

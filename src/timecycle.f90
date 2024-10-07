@@ -39,18 +39,12 @@ MODULE timecycle
 
          CALL SET_WALL_POTENTIAL
 
-         IF (BOOL_FLUID_ELECTRONS) THEN
-            
-            CALL SETUP_SOLID_NODES
-            
+         CALL DEPOSIT_CHARGE(particles)
+         IF (PIC_TYPE == HYBRID) THEN
+            CALL SETUP_SOLID_NODES            
             ALLOCATE(PHI_FIELD(NNODES))
             PHI_FIELD=0
-            ALLOCATE(BOLTZ_NRHOE, SOURCE = PHI_FIELD)
             CALL GET_BOLTZMANN_DENSITY
-         END IF
-
-         CALL DEPOSIT_CHARGE(particles)
-         IF (BOOL_FLUID_ELECTRONS) THEN
             CALL SOLVE_BOLTZMANN
          ELSE
             CALL SETUP_POISSON
@@ -176,11 +170,7 @@ MODULE timecycle
             CALL DEPOSIT_CHARGE(particles)
 
             CALL TIMER_START(2)
-            IF (BOOL_FLUID_ELECTRONS) THEN
-               CALL SOLVE_BOLTZMANN
-            ELSE
-               CALL SOLVE_POISSON
-            END IF
+            CALL SOLVE_POISSON
             CALL COMPUTE_E_FIELD
             CALL TIMER_STOP(2)
 
@@ -230,6 +220,19 @@ MODULE timecycle
             CALL ADVECT_CN_B(particles, .TRUE., .FALSE., Jmat)
             CALL TIMER_STOP(3)
 
+         ELSE IF (PIC_TYPE == HYBRID) THEN
+
+               CALL SET_WALL_POTENTIAL
+               CALL DEPOSIT_CHARGE(particles)
+   
+               CALL TIMER_START(2)
+               CALL SOLVE_BOLTZMANN
+               CALL COMPUTE_E_FIELD
+               CALL TIMER_STOP(2)
+   
+               CALL TIMER_START(3)
+               CALL ADVECT
+               CALL TIMER_STOP(3)
          ELSE
 
             CALL TIMER_START(3)
@@ -373,7 +376,6 @@ MODULE timecycle
                BETA = 1./SQRT(2.*KB/M*EMIT_TASK%TTRA)
                ! IF (BOOL_KAPPA_DISTRIBUTION)  BETA = 1./SQRT(2.*KB/M*EMIT_TASK%TTRA*(KAPPA_C-3./2.))
             END IF
-
 
             IF (COLOCATED_ELECTRONS) BETA_E = 1./SQRT(2.*KB/SPECIES(ELECTRON_S_ID)%MOLECULAR_MASS*COLOCATED_ELECTRONS_TTRA)
 
@@ -1030,7 +1032,7 @@ MODULE timecycle
             B = 0
             IF (N_SOLENOIDS > 0) CALL APPLY_B_FIELD(IP, B)
             B = B + EXTERNAL_B_FIELD
-            CALL APPLY_RF_EB_FIELD(particles, IP, E, B)
+            ! CALL APPLY_RF_EB_FIELD(particles, IP, E, B)
             
 
 
@@ -1946,7 +1948,7 @@ MODULE timecycle
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       !!!!!! FLUID ELECTRON CHARGE ASSIGMENT !!!!
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      IF (BOOL_FLUID_ELECTRONS) THEN
+      IF (PIC_TYPE == HYBRID) THEN
          IF (DIMS==2) THEN
             DO IC=1, NCELLS
                IF (CELL_PROCS(IC)==PROC_ID) THEN

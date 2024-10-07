@@ -19,8 +19,7 @@ MODULE global
    REAL(KIND=8) :: ME   = 9.1093837139d-31               ! https://physics.nist.gov/cgi-bin/cuu/Value?me
 
    REAL(KIND=8) :: EPS_SCALING = 1.d0
-
-   
+      
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! Particle variables and arrays !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -44,8 +43,7 @@ MODULE global
    ! Fluid electrons !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-   LOGICAL :: BOOL_FLUID_ELECTRONS
-   REAL(KIND=8) :: BOLTZ_N0, BOLTZ_PHI0, BOLTZ_TE
+   REAL(KIND=8) :: BOLTZ_N0 = 0., BOLTZ_PHI0 = 0., BOLTZ_TE = 0.
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: BOLTZ_NRHOE
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: BOLTZ_SOLID_NODES
 
@@ -245,7 +243,7 @@ TYPE(UNSTRUCTURED_3D_GRID_DATA_STRUCTURE) :: U3D_GRID
 
 
    ENUM, BIND(C)
-      ENUMERATOR NONE, EXPLICIT, SEMIIMPLICIT, FULLYIMPLICIT, EXPLICITLIMITED
+      ENUMERATOR NONE, EXPLICIT, SEMIIMPLICIT, FULLYIMPLICIT, EXPLICITLIMITED, HYBRID
    END ENUM
    INTEGER(KIND(EXPLICIT)) :: PIC_TYPE = NONE
 

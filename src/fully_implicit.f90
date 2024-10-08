@@ -3341,7 +3341,7 @@ MODULE fully_implicit
                
                B = 0
                B = B + EXTERNAL_B_FIELD
-               CALL APPLY_RF_EB_FIELD(part_adv, IP, E, B)
+               !CALL APPLY_RF_EB_FIELD(part_adv, IP, E, B)
 
             ELSE
                E = 0

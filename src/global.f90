@@ -40,16 +40,17 @@ MODULE global
    LOGICAL :: BOOL_INJECT_FROM_FILE = .FALSE.
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   ! Fluid electrons !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!! Fluid electrons !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    REAL(KIND=8) :: BOLTZ_N0 = 0., BOLTZ_PHI0 = 0., BOLTZ_TE = 0.
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: BOLTZ_NRHOE
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: BOLTZ_SOLID_NODES
 
-   
-   LOGICAL :: BOOL_KAPPA_DISTRIBUTION
-   REAL(KIND=8) :: KAPPA_C = 4.d0
+   ! Option for Kappa distribution
+   LOGICAL :: BOOL_KAPPA_FLUID    = .FALSE.
+   REAL(KIND=8) :: KAPPA_FLUID_C  = 4.d0
+   REAL(KIND=8) :: KAPPA_FRACTION = 1.d0
 
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

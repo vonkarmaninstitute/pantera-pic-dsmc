@@ -155,8 +155,11 @@ MODULE initialization
          IF (line=='Fluid_electrons_phi0:')    READ(in1,*) BOLTZ_PHI0
          IF (line=='Fluid_electrons_Te:')      READ(in1,*) BOLTZ_TE
 
-         IF (line=='Bool_kappa_distribution:') READ(in1,*) BOOL_KAPPA_DISTRIBUTION
-         IF (line=='Kappa_constant:')           READ(in1,*) KAPPA_C
+         IF (line=='Bool_kappa_fluid:')        READ(in1,*) BOOL_KAPPA_FLUID
+         IF (line=='Kappa_constant_fluid:')    READ(in1,*) KAPPA_FLUID_C
+         IF (line=='Kappa_fraction')           READ(in1,*) KAPPA_FRACTION
+         IF (KAPPA_FRACTION < 0.0) CALL ERROR_ABORT('Fraction of Kappa fluid cannot be less than 0!')
+         IF (KAPPA_FRACTION == 0.0) BOOL_KAPPA_FLUID = .TRUE.
 
          IF (line=='Jacobian_type:')           READ(in1,*) JACOBIAN_TYPE
          IF (line=='Residual_and_jacobian_combined:') READ(in1,*) RESIDUAL_AND_JACOBIAN_COMBINED

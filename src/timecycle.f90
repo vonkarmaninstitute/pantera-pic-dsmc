@@ -44,7 +44,6 @@ MODULE timecycle
             CALL SETUP_SOLID_NODES            
             ALLOCATE(PHI_FIELD(NNODES))
             PHI_FIELD=0
-            CALL GET_BOLTZMANN_DENSITY
             CALL SOLVE_BOLTZMANN
          ELSE
             CALL SETUP_POISSON
@@ -222,17 +221,19 @@ MODULE timecycle
 
          ELSE IF (PIC_TYPE == HYBRID) THEN
 
-               CALL SET_WALL_POTENTIAL
-               CALL DEPOSIT_CHARGE(particles)
-   
-               CALL TIMER_START(2)
-               CALL SOLVE_BOLTZMANN
-               CALL COMPUTE_E_FIELD
-               CALL TIMER_STOP(2)
-   
-               CALL TIMER_START(3)
-               CALL ADVECT
-               CALL TIMER_STOP(3)
+            CALL SET_WALL_POTENTIAL
+            CALL DEPOSIT_CHARGE(particles)
+
+            CALL TIMER_START(2)
+            CALL SOLVE_BOLTZMANN
+            CALL COMPUTE_E_FIELD
+            CALL TIMER_STOP(2)
+
+            CALL TIMER_START(3)
+            CALL ADVECT
+            CALL FLUID_ELECTRONS_SURFACE_CHARGING
+            CALL TIMER_STOP(3)
+            
          ELSE
 
             CALL TIMER_START(3)
@@ -1945,115 +1946,6 @@ MODULE timecycle
       END DO ! End loop: DO IP = 1,NP_PROC
 
 
-      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      !!!!!! FLUID ELECTRON CHARGE ASSIGMENT !!!!
-      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      IF (PIC_TYPE == HYBRID) THEN
-         IF (DIMS==2) THEN
-            DO IC=1, NCELLS
-               IF (CELL_PROCS(IC)==PROC_ID) THEN
-                  DO IP=1, 3
-                     FACE_PG = U2D_GRID%CELL_EDGES_PG(IP, IC)
-                     IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. GRID_BC(U2D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
-                        ! VV1 = 1 + MOD(IP-1,3)
-                        ! VV2 = 1 + MOD(IP,3)
-                        IF (IP == 1) THEN
-                           VV1 = 1
-                           VV2 = 2
-                        ELSE IF (IP == 2) THEN
-                           VV1 = 2
-                           VV2 = 3
-                        ELSE IF (IP == 3) THEN
-                           VV1 = 3
-                           VV2 = 1
-                        END IF
-                        V1 = U2D_GRID%CELL_NODES(VV1,IC)
-                        V2 = U2D_GRID%CELL_NODES(VV2,IC)
-                        Y1 = U2D_GRID%NODE_COORDS(2, V1)
-                        Y2 = U2D_GRID%NODE_COORDS(2, V2)       
-                        AREA = U2D_GRID%CELL_EDGES_LEN(IP,IC)
-
-                        CHARGE = -QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*SQRT(KB*BOLTZ_TE/(2*PI*ME))*AREA*DT
-                        POT1 = EXP(QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
-                        POT2 = EXP(QE*(PHI_FIELD(V2)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
-
-                        IF (BOOL_KAPPA_DISTRIBUTION) THEN
-                           CHARGE = CHARGE*SQRT(KAPPA_C-3./2.)&
-                           *GAMMA(KAPPA_C+1.)/GAMMA(KAPPA_C-1./2.)/(KAPPA_C*(KAPPA_C-1.))
-                           POT1 = (1-QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_C-3./2.)))**(-KAPPA_C+1.)
-                           POT2 = (1-QE*(PHI_FIELD(V2)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_C-3./2.)))**(-KAPPA_C+1.)
-                        END IF
-
-                        IF (AXI) THEN
-                           SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) +&
-                           CHARGE*(POT1*(3.*Y1+Y2) + POT2*(Y1+Y2))/12.
-                           SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) +&
-                           CHARGE*(POT1*(Y1+Y2) + POT2*(Y1+3.*Y2))/12.
-                        ELSE
-                           SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + CHARGE*(POT1/3. + POT2/6.)
-                           SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) + CHARGE*(POT2/3. + POT1/6.)
-                        END IF
-                     END IF
-                  END DO
-               END IF
-            END DO
-
-         ELSE IF (DIMS==3) THEN
-            DO IC=1, NCELLS
-               IF (CELL_PROCS(IC)==PROC_ID) THEN
-                  DO IP=1, 4
-                     FACE_PG = U3D_GRID%CELL_FACES_PG(IP, IC)
-                     IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
-                        IF (IP == 1) THEN
-                           VV1 = 1
-                           VV2 = 3
-                           VV3 = 2
-                        ELSE IF (IP == 2) THEN
-                           VV1 = 1
-                           VV2 = 2
-                           VV3 = 4
-                        ELSE IF (IP == 3) THEN
-                           VV1 = 2
-                           VV2 = 3
-                           VV3 = 4
-                        ELSE IF (IP == 4) THEN
-                           VV1 = 1
-                           VV2 = 4
-                           VV3 = 3
-                        END IF
-
-                        V1 = U3D_GRID%CELL_NODES(VV1,IC)
-                        V2 = U3D_GRID%CELL_NODES(VV2,IC)
-                        V3 = U3D_GRID%CELL_NODES(VV3,IC)    
-
-                        AREA = U3D_GRID%FACE_AREA(IP,IC)
-
-                        IF (BOOL_KAPPA_DISTRIBUTION) THEN
-                           CHARGE = -QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*SQRT(KB*BOLTZ_TE*(KAPPA_C-3./2.)/(2*PI*ME))&
-                           *AREA*DT*GAMMA(KAPPA_C+1.)/GAMMA(KAPPA_C-1./2.)/(KAPPA_C*(KAPPA_C-1.))
-                           POT1 = (1-QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_C-3./2.)))**(-KAPPA_C+1.)
-                           POT2 = (1-QE*(PHI_FIELD(V2)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_C-3./2.)))**(-KAPPA_C+1.)
-                           POT3 = (1-QE*(PHI_FIELD(V3)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_C-3./2.)))**(-KAPPA_C+1.)
-
-                           SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + CHARGE*(POT1/6. + POT2/12. + POT3/12.)
-                           SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) + CHARGE*(POT1/12. + POT2/6. + POT3/12.)
-                           SURFACE_CHARGE(V3) = SURFACE_CHARGE(V3) + CHARGE*(POT1/12. + POT2/12. + POT3/6.)           
-                        ELSE
-                           CHARGE = -QE/(EPS0*EPS_SCALING**2)*SQRT(KB*BOLTZ_TE/(2*PI*ME))*AREA*DT
-
-                           SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1)&
-                           + CHARGE*(BOLTZ_NRHOE(V1)/6. + BOLTZ_NRHOE(V2)/12. + BOLTZ_NRHOE(V3)/12.)
-                           SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2)&
-                           + CHARGE*(BOLTZ_NRHOE(V1)/12. + BOLTZ_NRHOE(V2)/6. + BOLTZ_NRHOE(V3)/12.)
-                           SURFACE_CHARGE(V3) = SURFACE_CHARGE(V3)&
-                           + CHARGE*(BOLTZ_NRHOE(V1)/12. + BOLTZ_NRHOE(V2)/12. + BOLTZ_NRHOE(V3)/6.)
-                        END IF
-                     END IF
-                  END DO
-               END IF
-            END DO
-         END IF
-      END IF
       
 
       ! ==============

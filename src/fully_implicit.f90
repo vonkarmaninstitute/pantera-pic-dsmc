@@ -2645,209 +2645,92 @@ MODULE fully_implicit
    END SUBROUTINE WALL_REACT
 
 
-   SUBROUTINE FormJacobianBoltz(snes,x,jac,prec,dummy,ierr_l)
-   
-      IMPLICIT NONE
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!! SOLVE_BOLTZMAN: Solve Poisson's equation !!!!!!
+   !!!!!!!!  with FLUID ELECTRONS as NON-LINEAR TERM !!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   SUBROUTINE SOLVE_BOLTZMANN
 
-      SNES snes
-      Vec x
-      Mat  jac, prec
-      PetscErrorCode ierr_l
-      PetscBool      flg
-      INTEGER dummy(*)
-      INTEGER I, IC
+      LOGICAL :: SET_INITIAL
+      PetscScalar, POINTER :: solvec_l(:)
+      PetscBool :: flg
 
-      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, EPS_REL
-      REAL(KIND=8) :: B11, B12, B13, B22, B23, B21, B33, B31, B32
-      INTEGER :: V1, V2, V3
-      INTEGER :: P, Q, VP, VQ
-      REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD, FACTOR, AREA
+      ! Create SNES environment
+      CALL SNESCreate(PETSC_COMM_WORLD,snes,ierr)
 
-      IF (PROC_ID == 0) THEN
-         WRITE(*,*) 'FormJacobianBoltz Called'
+      ! Create rvec (for FormFunctionBoltz) and solvec (for the solution)
+      CALL VecCreate(PETSC_COMM_WORLD,rvec,ierr)
+      CALL VecSetSizes(rvec,PETSC_DECIDE,NNODES,ierr)
+      CALL VecSetFromOptions(rvec, ierr)
+      CALL VecDuplicate(rvec, solvec, ierr)
+
+      ! Function evaluation routine
+      CALL SNESSetFunction(snes,rvec,FormFunctionBoltz,0,ierr)
+
+      ! Initialize Jacobian Matrix
+      CALL MatCreate(PETSC_COMM_WORLD,Jmat,ierr)
+      CALL MatSetSizes(Jmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
+      CALL MatSetType(Jmat, MATMPIAIJ, ierr)
+
+      CALL MatMPIAIJSetPreallocation(Jmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER, ierr)
+      CALL MatSetFromOptions(Jmat, ierr)
+
+      ! CALL MatCreate(PETSC_COMM_WORLD,Pmat,ierr)
+      ! CALL MatSetSizes(Pmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
+      ! CALL MatSetType(Pmat, MATMPIAIJ, ierr)
+
+      ! Jacobian evaluation routine
+      CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobianBoltz,0,ierr)
+      ! CALL PetscOptionsHasName(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,"-snes_mf_operator",flg,ierr)
+      ! IF (flg) THEN  ! We want only the preconditioner to be filled. The Jacobian is computed from finite differencing.
+      !    CALL SNESSetJacobian(snes,Jmat,Pmat,FormJacobian,0,ierr) ! The expensive but safe one. Jacobian computed independently.
+      ! ELSE
+      !    CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobian,0,ierr) ! The expensive but safe one. Jacobian computed independently.
+      ! END IF
+      
+      CALL SNESSetFromOptions(snes,ierr)
+
+      IF (SET_INITIAL) THEN
+         CALL VecSet(solvec,0.d0,ierr)
+      ELSE
+         CALL VecGetOwnershipRange(solvec,Istart,Iend,ierr)
+         CALL VecGetArrayF90(solvec,solvec_l,ierr)
+         solvec_l = PHI_FIELD(Istart+1:Iend)
+         CALL VecRestoreArrayF90(solvec,solvec_l,ierr)
       END IF
 
-
-      !ALL MatSetFromOptions(jac,ierr)
-      !ALL MatSetUp(jac,ierr)
-!
-      !ALL MatZeroEntries(jac,ierr)
-
-      !CALL MatAssemblyBegin(jac,MAT_FLUSH_ASSEMBLY,ierr)
-      !CALL MatAssemblyEnd(jac,MAT_FLUSH_ASSEMBLY,ierr)
-
-      CALL VecScatterCreateToAll(x,ctx,x_seq,ierr)
-      CALL VecScatterBegin(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
-      CALL VecScatterEnd(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
+      
+      ! ------ SOLVE ------
+      CALL SNESSolve(snes,PETSC_NULL_VEC,solvec,ierr)
+      CALL SNESGetConvergedReason(snes,snesreason,ierr)
+      CALL SNESGetIterationNumber(snes,its,ierr)
+      IF (PROC_ID == 0) WRITE(*,*) 'SNESConvergedReason = ', snesreason, '  ||  SNESIterationNumber = ', its
+      
+      CALL VecScatterCreateToAll(solvec,ctx,solvec_seq,ierr)
+      CALL VecScatterBegin(ctx,solvec,solvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
+      CALL VecScatterEnd(ctx,solvec,solvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
       CALL VecScatterDestroy(ctx, ierr)
 
-      ! CALL VecGetArrayReadF90(X_SEQ,PHI_FIELD,ierr)
-      CALL VecGetArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
-      IF (ALLOCATED(PHI_FIELD_NEW)) DEALLOCATE(PHI_FIELD_NEW)
-      ALLOCATE(PHI_FIELD_NEW, SOURCE = PHI_FIELD_TEMP)
-      CALL VecRestoreArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
-      CALL VecDestroy(x_seq,ierr)
+      CALL VecGetArrayReadF90(solvec_seq,PHI_FIELD_TEMP,ierr)
+      IF (ALLOCATED(PHI_FIELD)) DEALLOCATE(PHI_FIELD)
+      ALLOCATE(PHI_FIELD, SOURCE = PHI_FIELD_TEMP)
+      CALL VecRestoreArrayReadF90(solvec_seq,PHI_FIELD_TEMP,ierr)
 
-      CALL MatGetOwnershipRange( jac, Istart, Iend, ierr)
+      CALL GET_BOLTZMANN_DENSITY
 
-      ! Accumulate Jacobian. All this is in principle not needed since we already have Amat.
+      ! Cleanup.
+      CALL VecDestroy(solvec, ierr)
+      CALL VecDestroy(rvec, ierr)
+      CALL VecDestroy(solvec_seq,ierr)
+      CALL SNESDestroy(snes, ierr)
+      CALL MatDestroy(Jmat,ierr)
+      ! CALL MatDestroy(Pmat,ierr)
 
-      IF (DIMS == 2) THEN
-         DO I = 1, NCELLS
-            AREA = CELL_AREAS(I)
-
-            IF (U2D_GRID%CELL_PG(I) == -1) THEN
-               EPS_REL = 1.d0
-            ELSE
-               EPS_REL = GRID_BC(U2D_GRID%CELL_PG(I))%EPS_REL
-            END IF
-            
-            ! We need to ADD to a sparse matrix entry.
-            DO P = 1, 3
-               VP = U2D_GRID%CELL_NODES(P,I)
-               IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
-                  IF (.NOT. IS_DIRICHLET(VP-1)) THEN
-                     DO Q = 1, 3
-                        VQ = U2D_GRID%CELL_NODES(Q,I)
-                        KPQ = AREA*(U2D_GRID%BASIS_COEFFS(1,P,I)*U2D_GRID%BASIS_COEFFS(1,Q,I) &
-                                    + U2D_GRID%BASIS_COEFFS(2,P,I)*U2D_GRID%BASIS_COEFFS(2,Q,I))*EPS_REL
-
-                        IF (AXI) THEN
-                           V1 = U2D_GRID%CELL_NODES(1,I)
-                           V2 = U2D_GRID%CELL_NODES(2,I)
-                           V3 = U2D_GRID%CELL_NODES(3,I)
-                           Y1 = U2D_GRID%NODE_COORDS(2, V1)
-                           Y2 = U2D_GRID%NODE_COORDS(2, V2)
-                           Y3 = U2D_GRID%NODE_COORDS(2, V3)
-
-                           KPQ = KPQ*(Y1+Y2+Y3)/3.
-                        END IF
-                        CALL MatSetValues(jac,one,VP-1,one,VQ-1,KPQ,ADD_VALUES,ierr)
-
-                        ! FLUID ELECTRONS
-                        VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*AREA&
-                        *EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
-
-                        !!!!! TEST FOR SINH(U) POTENTIAL
-                        ! VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*AREA&
-                        ! *COSH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
-                        !!!!!
-                        IF (BOOL_KAPPA_DISTRIBUTION) THEN 
-                           VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*(2.*KAPPA_C-1.)/(2.*KAPPA_C-3.)*AREA&
-                           *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_C-3./2.)))**(-KAPPA_C-1./2.)
-                        END IF
-
-                        IF (P == Q) THEN
-                           VALUETOADD = VALUETOADD/6.
-                           IF (AXI) THEN
-                              ! We do cyclic permutation using MOD 
-                              V1 = U2D_GRID%CELL_NODES(1 + MOD(P-1,3),I) ! Start from P node in cell I
-                              V2 = U2D_GRID%CELL_NODES(1 + MOD(P,3),I)
-                              V3 = U2D_GRID%CELL_NODES(1 + MOD(P+1,3),I)
-                              Y1 = U2D_GRID%NODE_COORDS(2, V1)
-                              Y2 = U2D_GRID%NODE_COORDS(2, V2)
-                              Y3 = U2D_GRID%NODE_COORDS(2, V3)
-
-                              VALUETOADD = VALUETOADD*(3*Y1+Y2+Y3)/5.
-                           END IF
-                        ELSE
-                           VALUETOADD = VALUETOADD/12.
-                           IF (AXI) THEN
-                              ! We have to choose first P and Q node, then choose the last one using MOD
-                              V1 = VP
-                              V2 = VQ
-                              V3 = U2D_GRID%CELL_NODES(1 + MOD(Q,3),I)
-                              IF (V3 == V1 .OR. V3 == V1) V3 = U2D_GRID%CELL_NODES(1 + MOD(Q+1,3),I)
-                              Y1 = U2D_GRID%NODE_COORDS(2, V1)
-                              Y2 = U2D_GRID%NODE_COORDS(2, V2)
-                              Y3 = U2D_GRID%NODE_COORDS(2, V3)
-
-                              VALUETOADD = VALUETOADD*(2*Y1+2*Y2+Y3)/5.
-                           END IF
-                        END IF
-                        IF (GRID_BC(U2D_GRID%CELL_PG(I))%VOLUME_BC == FLUID) THEN
-                           CALL MatSetValues(jac,one,VP-1,one,VQ-1,VALUETOADD*BOLTZ_SOLID_NODES(VQ),ADD_VALUES,ierr)
-                        END IF
-                     END DO
-                  END IF
-               END IF
-            END DO
-         END DO
-      ELSE IF (DIMS == 3) THEN
-         DO I = 1, NCELLS
-            VOLUME = CELL_VOLUMES(I)
-
-            IF (U3D_GRID%CELL_PG(I) == -1) THEN
-               EPS_REL = 1.d0
-            ELSE
-               EPS_REL = GRID_BC(U3D_GRID%CELL_PG(I))%EPS_REL
-            END IF
-            
-            ! We need to ADD to a sparse matrix entry.
-            DO P = 1, 4
-               VP = U3D_GRID%CELL_NODES(P,I)
-               IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
-                  IF (.NOT. IS_DIRICHLET(VP-1)) THEN
-                     DO Q = 1, 4
-                        VQ = U3D_GRID%CELL_NODES(Q,I)
-                        KPQ = VOLUME*(U3D_GRID%BASIS_COEFFS(1,P,I)*U3D_GRID%BASIS_COEFFS(1,Q,I) &
-                                    + U3D_GRID%BASIS_COEFFS(2,P,I)*U3D_GRID%BASIS_COEFFS(2,Q,I) &
-                                    + U3D_GRID%BASIS_COEFFS(3,P,I)*U3D_GRID%BASIS_COEFFS(3,Q,I))*EPS_REL
-                        CALL MatSetValues(jac,one,VP-1,one,VQ-1,KPQ,ADD_VALUES,ierr)
-
-                        ! FLUID ELECTRONS
-                        VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*VOLUME&
-                        *EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
-
-                        !!!!! TEST FOR SINH(U) POTENTIAL !!!!!
-                        ! VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*VOLUME&
-                        ! *COSH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
-                        !!!!!
-
-                        IF (BOOL_KAPPA_DISTRIBUTION) THEN 
-                           VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*(2.*KAPPA_C-1.)/(2.*KAPPA_C-3.)*VOLUME&
-                           *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_C-3./2.)))**(-KAPPA_C-1./2.)
-                        END IF
-
-                        IF (P == Q) THEN
-                           VALUETOADD = VALUETOADD/10.
-                        ELSE
-                           VALUETOADD = VALUETOADD/20.
-                        END IF
-                        IF (GRID_BC(U3D_GRID%CELL_PG(I))%VOLUME_BC == FLUID) THEN
-                           CALL MatSetValues(jac,one,VP-1,one,VQ-1,VALUETOADD*BOLTZ_SOLID_NODES(VQ),ADD_VALUES,ierr)
-                        END IF
-                     END DO
-                  END IF
-               END IF
-            END DO
-         END DO
-      END IF
-
-      CALL MatAssemblyBegin(jac,MAT_FLUSH_ASSEMBLY,ierr)
-      CALL MatAssemblyEnd(jac,MAT_FLUSH_ASSEMBLY,ierr)
-
-      DO I = Istart, Iend-1
-         IF (IS_DIRICHLET(I)) CALL MatSetValues(jac,one,I,one,I,1.d0,INSERT_VALUES,ierr)
-      END DO
-
-      CALL MatAssemblyBegin(jac,MAT_FINAL_ASSEMBLY,ierr)
-      CALL MatAssemblyEnd(jac,MAT_FINAL_ASSEMBLY,ierr)
-
-      flg  = PETSC_FALSE
-      CALL PetscOptionsHasName(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,"-snes_mf_operator",flg,ierr)
-      IF (flg) THEN  ! We want only the preconditioner to be filled. The Jacobian is computed from finite differencing.
-         CALL MatSetFromOptions(prec,ierr)
-         CALL MatSetUp(prec,ierr)
-         CALL MatAssemblyBegin(prec,MAT_FINAL_ASSEMBLY,ierr)
-         CALL MatAssemblyEnd(prec,MAT_FINAL_ASSEMBLY,ierr)
-      END IF
-
-
-   END SUBROUTINE FormJacobianBoltz
+   END SUBROUTINE SOLVE_BOLTZMANN
 
 
    SUBROUTINE FormFunctionBoltz(snes,x,f,dummy,ierr_l)
+
       IMPLICIT NONE
 
       SNES snes
@@ -2924,9 +2807,11 @@ MODULE fully_implicit
                         !!!!! TEST FOR SINH(U) POTENTIAL
                         ! VALUETOADD = QE*BOLTZ_N0/(EPS0)*AREA*SINH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
                         !!!!!
-                        IF (BOOL_KAPPA_DISTRIBUTION) THEN 
+                        IF (BOOL_KAPPA_FLUID) THEN 
                            VALUETOADD = QE*BOLTZ_N0/(EPS0)*AREA&
-                           *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_C-3./2.)))**(-KAPPA_C+1./2.)
+                           *(KAPPA_FRACTION*(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.))&
+                           )**(-KAPPA_FLUID_C+1./2.)&
+                           + (1-KAPPA_FRACTION)*EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE)))
                         END IF
 
                         IF (P == Q) THEN
@@ -2992,9 +2877,11 @@ MODULE fully_implicit
                      ! VALUETOADD = QE*BOLTZ_N0/(EPS0)*VOLUME*SINH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
                      !!!!!
 
-                     IF (BOOL_KAPPA_DISTRIBUTION) THEN 
+                     IF (BOOL_KAPPA_FLUID) THEN 
                         VALUETOADD = QE*BOLTZ_N0/(EPS0)*VOLUME&
-                        *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_C-3./2.)))**(-KAPPA_C+1./2.)
+                        *(KAPPA_FRACTION*(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
+                        **(-KAPPA_FLUID_C+1./2.)&
+                        + (1-KAPPA_FRACTION)*EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE)))
                      END IF
 
                      IF (P == Q) THEN
@@ -3040,83 +2927,333 @@ MODULE fully_implicit
       DEALLOCATE(RHS_NEW)
    END SUBROUTINE FormFunctionBoltz
 
+   SUBROUTINE FormJacobianBoltz(snes,x,jac,prec,dummy,ierr_l)
+   
+      IMPLICIT NONE
+
+      SNES snes
+      Vec x
+      Mat  jac, prec
+      PetscErrorCode ierr_l
+      PetscBool      flg
+      INTEGER dummy(*)
+      INTEGER I, IC
+
+      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, EPS_REL
+      INTEGER :: V1, V2, V3
+      INTEGER :: P, Q, VP, VQ
+      REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD, FACTOR, AREA
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) 'FormJacobianBoltz Called'
+      END IF
 
 
-   SUBROUTINE SOLVE_BOLTZMANN
+      !ALL MatSetFromOptions(jac,ierr)
+      !ALL MatSetUp(jac,ierr)
+!
+      !ALL MatZeroEntries(jac,ierr)
 
-      PetscScalar, POINTER :: solvec_l(:)
-      PetscBool :: flg
+      !CALL MatAssemblyBegin(jac,MAT_FLUSH_ASSEMBLY,ierr)
+      !CALL MatAssemblyEnd(jac,MAT_FLUSH_ASSEMBLY,ierr)
 
-      ! Create SNES environment
-      CALL SNESCreate(PETSC_COMM_WORLD,snes,ierr)
-
-      ! Create rvec (for FormFunctionBoltz) and solvec (for the solution)
-      CALL VecCreate(PETSC_COMM_WORLD,rvec,ierr)
-      CALL VecSetSizes(rvec,PETSC_DECIDE,NNODES,ierr)
-      CALL VecSetFromOptions(rvec, ierr)
-      CALL VecDuplicate(rvec, solvec, ierr)
-
-      ! Function evaluation routine
-      CALL SNESSetFunction(snes,rvec,FormFunctionBoltz,0,ierr)
-
-      ! Initialize Jacobian Matrix
-      CALL MatCreate(PETSC_COMM_WORLD,Jmat,ierr)
-      CALL MatSetSizes(Jmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
-      CALL MatSetType(Jmat, MATMPIAIJ, ierr)
-
-      CALL MatMPIAIJSetPreallocation(Jmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER, ierr)
-      CALL MatSetFromOptions(Jmat, ierr)
-
-      ! CALL MatCreate(PETSC_COMM_WORLD,Pmat,ierr)
-      ! CALL MatSetSizes(Pmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
-      ! CALL MatSetType(Pmat, MATMPIAIJ, ierr)
-
-      ! Jacobian evaluation routine
-      CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobianBoltz,0,ierr)
-      ! CALL PetscOptionsHasName(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,"-snes_mf_operator",flg,ierr)
-      ! IF (flg) THEN  ! We want only the preconditioner to be filled. The Jacobian is computed from finite differencing.
-      !    CALL SNESSetJacobian(snes,Jmat,Pmat,FormJacobian,0,ierr) ! The expensive but safe one. Jacobian computed independently.
-      ! ELSE
-      !    CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobian,0,ierr) ! The expensive but safe one. Jacobian computed independently.
-      ! END IF
-      
-      CALL SNESSetFromOptions(snes,ierr)
-
-      CALL VecGetOwnershipRange(solvec,Istart,Iend,ierr)
-      CALL VecGetArrayF90(solvec,solvec_l,ierr)
-      solvec_l = PHI_FIELD(Istart+1:Iend)
-      CALL VecRestoreArrayF90(solvec,solvec_l,ierr)
-
-      
-      ! ------ SOLVE ------
-      CALL SNESSolve(snes,PETSC_NULL_VEC,solvec,ierr)
-      CALL SNESGetConvergedReason(snes,snesreason,ierr)
-      CALL SNESGetIterationNumber(snes,its,ierr)
-      IF (PROC_ID == 0) WRITE(*,*) 'SNESConvergedReason = ', snesreason, '  ||  SNESIterationNumber = ', its
-      
-      CALL VecScatterCreateToAll(solvec,ctx,solvec_seq,ierr)
-      CALL VecScatterBegin(ctx,solvec,solvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
-      CALL VecScatterEnd(ctx,solvec,solvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
+      CALL VecScatterCreateToAll(x,ctx,x_seq,ierr)
+      CALL VecScatterBegin(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
+      CALL VecScatterEnd(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
       CALL VecScatterDestroy(ctx, ierr)
 
-      CALL VecGetArrayReadF90(solvec_seq,PHI_FIELD_TEMP,ierr)
-      IF (ALLOCATED(PHI_FIELD)) DEALLOCATE(PHI_FIELD)
-      ALLOCATE(PHI_FIELD, SOURCE = PHI_FIELD_TEMP)
-      CALL VecRestoreArrayReadF90(solvec_seq,PHI_FIELD_TEMP,ierr)
+      ! CALL VecGetArrayReadF90(X_SEQ,PHI_FIELD,ierr)
+      CALL VecGetArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
+      IF (ALLOCATED(PHI_FIELD_NEW)) DEALLOCATE(PHI_FIELD_NEW)
+      ALLOCATE(PHI_FIELD_NEW, SOURCE = PHI_FIELD_TEMP)
+      CALL VecRestoreArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
+      CALL VecDestroy(x_seq,ierr)
 
-      IF (ALLOCATED(BOLTZ_NRHOE)) DEALLOCATE(BOLTZ_NRHOE)
-      ALLOCATE(BOLTZ_NRHOE, SOURCE = PHI_FIELD)
-      CALL GET_BOLTZMANN_DENSITY
+      CALL MatGetOwnershipRange( jac, Istart, Iend, ierr)
 
-      ! Cleanup.
-      CALL VecDestroy(solvec, ierr)
-      CALL VecDestroy(rvec, ierr)
-      CALL VecDestroy(solvec_seq,ierr)
-      CALL SNESDestroy(snes, ierr)
-      CALL MatDestroy(Jmat,ierr)
-      ! CALL MatDestroy(Pmat,ierr)
+      ! Accumulate Jacobian. All this is in principle not needed since we already have Amat.
 
-   END SUBROUTINE SOLVE_BOLTZMANN
+      IF (DIMS == 2) THEN
+         DO I = 1, NCELLS
+            AREA = CELL_AREAS(I)
+
+            IF (U2D_GRID%CELL_PG(I) == -1) THEN
+               EPS_REL = 1.d0
+            ELSE
+               EPS_REL = GRID_BC(U2D_GRID%CELL_PG(I))%EPS_REL
+            END IF
+            
+            ! We need to ADD to a sparse matrix entry.
+            DO P = 1, 3
+               VP = U2D_GRID%CELL_NODES(P,I)
+               IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(VP-1)) THEN
+                     DO Q = 1, 3
+                        VQ = U2D_GRID%CELL_NODES(Q,I)
+                        KPQ = AREA*(U2D_GRID%BASIS_COEFFS(1,P,I)*U2D_GRID%BASIS_COEFFS(1,Q,I) &
+                                    + U2D_GRID%BASIS_COEFFS(2,P,I)*U2D_GRID%BASIS_COEFFS(2,Q,I))*EPS_REL
+
+                        IF (AXI) THEN
+                           V1 = U2D_GRID%CELL_NODES(1,I)
+                           V2 = U2D_GRID%CELL_NODES(2,I)
+                           V3 = U2D_GRID%CELL_NODES(3,I)
+                           Y1 = U2D_GRID%NODE_COORDS(2, V1)
+                           Y2 = U2D_GRID%NODE_COORDS(2, V2)
+                           Y3 = U2D_GRID%NODE_COORDS(2, V3)
+
+                           KPQ = KPQ*(Y1+Y2+Y3)/3.
+                        END IF
+                        CALL MatSetValues(jac,one,VP-1,one,VQ-1,KPQ,ADD_VALUES,ierr)
+
+                        ! FLUID ELECTRONS
+                        VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*AREA&
+                        *EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+
+                        !!!!! TEST FOR SINH(U) POTENTIAL
+                        ! VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*AREA&
+                        ! *COSH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
+                        !!!!!
+                        IF (BOOL_KAPPA_FLUID) THEN 
+                           VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*AREA&
+                           *(KAPPA_FRACTION*(2.*KAPPA_FLUID_C-1.)/(2.*KAPPA_FLUID_C-3.)&
+                           *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))**(-KAPPA_FLUID_C-1./2.)&
+                           +(1-KAPPA_FRACTION)*EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE)))
+                        END IF
+
+                        IF (P == Q) THEN
+                           VALUETOADD = VALUETOADD/6.
+                           IF (AXI) THEN
+                              ! We do cyclic permutation using MOD 
+                              V1 = U2D_GRID%CELL_NODES(1 + MOD(P-1,3),I) ! Start from P node in cell I
+                              V2 = U2D_GRID%CELL_NODES(1 + MOD(P,3),I)
+                              V3 = U2D_GRID%CELL_NODES(1 + MOD(P+1,3),I)
+                              Y1 = U2D_GRID%NODE_COORDS(2, V1)
+                              Y2 = U2D_GRID%NODE_COORDS(2, V2)
+                              Y3 = U2D_GRID%NODE_COORDS(2, V3)
+
+                              VALUETOADD = VALUETOADD*(3*Y1+Y2+Y3)/5.
+                           END IF
+                        ELSE
+                           VALUETOADD = VALUETOADD/12.
+                           IF (AXI) THEN
+                              ! We have to choose first P and Q node, then choose the last one using MOD
+                              V1 = VP
+                              V2 = VQ
+                              V3 = U2D_GRID%CELL_NODES(1 + MOD(Q,3),I)
+                              IF (V3 == V1 .OR. V3 == V1) V3 = U2D_GRID%CELL_NODES(1 + MOD(Q+1,3),I)
+                              Y1 = U2D_GRID%NODE_COORDS(2, V1)
+                              Y2 = U2D_GRID%NODE_COORDS(2, V2)
+                              Y3 = U2D_GRID%NODE_COORDS(2, V3)
+
+                              VALUETOADD = VALUETOADD*(2*Y1+2*Y2+Y3)/5.
+                           END IF
+                        END IF
+                        IF (GRID_BC(U2D_GRID%CELL_PG(I))%VOLUME_BC == FLUID) THEN
+                           CALL MatSetValues(jac,one,VP-1,one,VQ-1,VALUETOADD*BOLTZ_SOLID_NODES(VQ),ADD_VALUES,ierr)
+                        END IF
+                     END DO
+                  END IF
+               END IF
+            END DO
+         END DO
+      ELSE IF (DIMS == 3) THEN
+         DO I = 1, NCELLS
+            VOLUME = CELL_VOLUMES(I)
+
+            IF (U3D_GRID%CELL_PG(I) == -1) THEN
+               EPS_REL = 1.d0
+            ELSE
+               EPS_REL = GRID_BC(U3D_GRID%CELL_PG(I))%EPS_REL
+            END IF
+            
+            ! We need to ADD to a sparse matrix entry.
+            DO P = 1, 4
+               VP = U3D_GRID%CELL_NODES(P,I)
+               IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(VP-1)) THEN
+                     DO Q = 1, 4
+                        VQ = U3D_GRID%CELL_NODES(Q,I)
+                        KPQ = VOLUME*(U3D_GRID%BASIS_COEFFS(1,P,I)*U3D_GRID%BASIS_COEFFS(1,Q,I) &
+                                    + U3D_GRID%BASIS_COEFFS(2,P,I)*U3D_GRID%BASIS_COEFFS(2,Q,I) &
+                                    + U3D_GRID%BASIS_COEFFS(3,P,I)*U3D_GRID%BASIS_COEFFS(3,Q,I))*EPS_REL
+                        CALL MatSetValues(jac,one,VP-1,one,VQ-1,KPQ,ADD_VALUES,ierr)
+
+                        ! FLUID ELECTRONS
+                        VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*VOLUME&
+                        *EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+
+                        !!!!! TEST FOR SINH(U) POTENTIAL !!!!!
+                        ! VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*VOLUME&
+                        ! *COSH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
+                        !!!!!
+
+                        IF (BOOL_KAPPA_FLUID) THEN 
+                           VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*VOLUME&
+                           *(KAPPA_FRACTION*(2.*KAPPA_FLUID_C-1.)/(2.*KAPPA_FLUID_C-3.)&
+                           *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))**(-KAPPA_FLUID_C-1./2.)&
+                           +(1-KAPPA_FRACTION)*EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE)))
+                        END IF
+
+                        IF (P == Q) THEN
+                           VALUETOADD = VALUETOADD/10.
+                        ELSE
+                           VALUETOADD = VALUETOADD/20.
+                        END IF
+                        IF (GRID_BC(U3D_GRID%CELL_PG(I))%VOLUME_BC == FLUID) THEN
+                           CALL MatSetValues(jac,one,VP-1,one,VQ-1,VALUETOADD*BOLTZ_SOLID_NODES(VQ),ADD_VALUES,ierr)
+                        END IF
+                     END DO
+                  END IF
+               END IF
+            END DO
+         END DO
+      END IF
+
+      CALL MatAssemblyBegin(jac,MAT_FLUSH_ASSEMBLY,ierr)
+      CALL MatAssemblyEnd(jac,MAT_FLUSH_ASSEMBLY,ierr)
+
+      DO I = Istart, Iend-1
+         IF (IS_DIRICHLET(I)) CALL MatSetValues(jac,one,I,one,I,1.d0,INSERT_VALUES,ierr)
+      END DO
+
+      CALL MatAssemblyBegin(jac,MAT_FINAL_ASSEMBLY,ierr)
+      CALL MatAssemblyEnd(jac,MAT_FINAL_ASSEMBLY,ierr)
+
+      flg  = PETSC_FALSE
+      CALL PetscOptionsHasName(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,"-snes_mf_operator",flg,ierr)
+      IF (flg) THEN  ! We want only the preconditioner to be filled. The Jacobian is computed from finite differencing.
+         CALL MatSetFromOptions(prec,ierr)
+         CALL MatSetUp(prec,ierr)
+         CALL MatAssemblyBegin(prec,MAT_FINAL_ASSEMBLY,ierr)
+         CALL MatAssemblyEnd(prec,MAT_FINAL_ASSEMBLY,ierr)
+      END IF
+
+
+   END SUBROUTINE FormJacobianBoltz
+
+
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!! FLUID ELECTRON CHARGING on DIELECTRIC BC !!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   SUBROUTINE FLUID_ELECTRONS_SURFACE_CHARGING
+
+      IMPLICIT NONE
+
+      INTEGER :: IC, IP, FACE_PG
+      INTEGER :: V1, V2, V3, VV1, VV2, VV3
+      REAL(KIND=8) :: Y1, Y2, AREA, CHARGE, FACTOR
+      REAL(KIND=8) :: POT1, POT2, POT3
+
+      IF (DIMS==2) THEN
+         DO IC=1, NCELLS
+            IF (CELL_PROCS(IC)==PROC_ID) THEN
+               DO IP=1, 3
+                  FACE_PG = U2D_GRID%CELL_EDGES_PG(IP, IC)
+                  IF (FACE_PG == -1) CYCLE
+                  IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. GRID_BC(U2D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
+                     ! VV1 = 1 + MOD(IP-1,3)
+                     ! VV2 = 1 + MOD(IP,3)
+                     IF (IP == 1) THEN
+                        VV1 = 1
+                        VV2 = 2
+                     ELSE IF (IP == 2) THEN
+                        VV1 = 2
+                        VV2 = 3
+                     ELSE IF (IP == 3) THEN
+                        VV1 = 3
+                        VV2 = 1
+                     END IF
+                     V1 = U2D_GRID%CELL_NODES(VV1,IC)
+                     V2 = U2D_GRID%CELL_NODES(VV2,IC)
+                     Y1 = U2D_GRID%NODE_COORDS(2, V1)
+                     Y2 = U2D_GRID%NODE_COORDS(2, V2)       
+                     AREA = U2D_GRID%CELL_EDGES_LEN(IP,IC)
+
+                     CHARGE = -QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*SQRT(KB*BOLTZ_TE/(2*PI*ME))*AREA*DT
+                     POT1 = EXP(QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                     POT2 = EXP(QE*(PHI_FIELD(V2)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+
+                     IF (BOOL_KAPPA_FLUID) THEN
+                        FACTOR = SQRT(KAPPA_FLUID_C-3./2.)*GAMMA(KAPPA_FLUID_C+1.)&
+                        /GAMMA(KAPPA_FLUID_C-1./2.)/(KAPPA_FLUID_C*(KAPPA_FLUID_C-1.))
+                        POT1 = KAPPA_FRACTION*FACTOR*(1-QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
+                        **(-KAPPA_FLUID_C+1.) + (1-KAPPA_FRACTION)*POT1
+                        POT2 = KAPPA_FRACTION*FACTOR*(1-QE*(PHI_FIELD(V2)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
+                        **(-KAPPA_FLUID_C+1.) + (1-KAPPA_FRACTION)*POT2
+                     END IF
+
+                     IF (AXI) THEN
+                        SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) +&
+                        CHARGE*(POT1*(3.*Y1+Y2) + POT2*(Y1+Y2))/12.
+                        SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) +&
+                        CHARGE*(POT1*(Y1+Y2) + POT2*(Y1+3.*Y2))/12.
+                     ELSE
+                        SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + CHARGE*(POT1/3. + POT2/6.)
+                        SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) + CHARGE*(POT2/3. + POT1/6.)
+                     END IF
+                  END IF
+               END DO
+            END IF
+         END DO
+
+      ELSE IF (DIMS==3) THEN
+         DO IC=1, NCELLS
+            IF (CELL_PROCS(IC)==PROC_ID) THEN
+               DO IP=1, 4
+                  FACE_PG = U3D_GRID%CELL_FACES_PG(IP, IC)
+                  IF (FACE_PG == -1) CYCLE
+                  IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
+                     IF (IP == 1) THEN
+                        VV1 = 1
+                        VV2 = 3
+                        VV3 = 2
+                     ELSE IF (IP == 2) THEN
+                        VV1 = 1
+                        VV2 = 2
+                        VV3 = 4
+                     ELSE IF (IP == 3) THEN
+                        VV1 = 2
+                        VV2 = 3
+                        VV3 = 4
+                     ELSE IF (IP == 4) THEN
+                        VV1 = 1
+                        VV2 = 4
+                        VV3 = 3
+                     END IF
+
+                     V1 = U3D_GRID%CELL_NODES(VV1,IC)
+                     V2 = U3D_GRID%CELL_NODES(VV2,IC)
+                     V3 = U3D_GRID%CELL_NODES(VV3,IC)    
+
+                     AREA = U3D_GRID%FACE_AREA(IP,IC)
+
+
+                     CHARGE = -QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*SQRT(KB*BOLTZ_TE/(2*PI*ME))*AREA*DT
+                     POT1 = EXP(QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                     POT2 = EXP(QE*(PHI_FIELD(V2)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                     POT3 = EXP(QE*(PHI_FIELD(V3)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+
+                     IF (BOOL_KAPPA_FLUID) THEN
+                        FACTOR = SQRT(KAPPA_FLUID_C-3./2.)*GAMMA(KAPPA_FLUID_C+1.)&
+                        /GAMMA(KAPPA_FLUID_C-1./2.)/(KAPPA_FLUID_C*(KAPPA_FLUID_C-1.))
+                        POT1 = KAPPA_FRACTION*FACTOR*(1-QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
+                        **(-KAPPA_FLUID_C+1.) + (1-KAPPA_FRACTION)*POT1
+                        POT2 = KAPPA_FRACTION*FACTOR*(1-QE*(PHI_FIELD(V2)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
+                        **(-KAPPA_FLUID_C+1.) + (1-KAPPA_FRACTION)*POT2
+                        POT3 = KAPPA_FRACTION*FACTOR*(1-QE*(PHI_FIELD(V3)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
+                        **(-KAPPA_FLUID_C+1.) + (1-KAPPA_FRACTION)*POT3
+                     END IF
+
+                     SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + CHARGE*(POT1/6. + POT2/12. + POT3/12.)
+                     SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) + CHARGE*(POT1/12. + POT2/6. + POT3/12.)
+                     SURFACE_CHARGE(V3) = SURFACE_CHARGE(V3) + CHARGE*(POT1/12. + POT2/12. + POT3/6.)   
+                  END IF
+               END DO
+            END IF
+         END DO
+      END IF
+
+   END SUBROUTINE FLUID_ELECTRONS_SURFACE_CHARGING
 
    ! CALCULATE BOLTZMANN DENSITY
    SUBROUTINE GET_BOLTZMANN_DENSITY
@@ -3127,8 +3264,9 @@ MODULE fully_implicit
       ALLOCATE(BOLTZ_NRHOE(NNODES))
 
       BOLTZ_NRHOE = BOLTZ_N0 * exp(QE*(PHI_FIELD - BOLTZ_PHI0)/(KB*BOLTZ_TE))
-      IF (BOOL_KAPPA_DISTRIBUTION) THEN
-         BOLTZ_NRHOE = BOLTZ_N0*(1-QE*(PHI_FIELD - BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_C-3./2.)))**(-KAPPA_C+1./2.)
+      IF (BOOL_KAPPA_FLUID) THEN
+         BOLTZ_NRHOE = BOLTZ_N0*(KAPPA_FRACTION*(1-QE*(PHI_FIELD - BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
+         **(-KAPPA_FLUID_C+1./2.) + (1-KAPPA_FRACTION)*exp(QE*(PHI_FIELD - BOLTZ_PHI0)/(KB*BOLTZ_TE)))
       END IF
       BOLTZ_NRHOE = BOLTZ_NRHOE*BOLTZ_SOLID_NODES
 

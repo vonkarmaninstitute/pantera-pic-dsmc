@@ -658,7 +658,7 @@ MODULE postprocess
 
 
                   WRITE(54321) 'POINT_DATA '//ITOA( NNODES )//ACHAR(10)
-                  IF (BOOL_FLUID_ELECTRONS) THEN
+                  IF (PIC_TYPE == HYBRID) THEN
                      WRITE(54321) 'FIELD FieldData '//ITOA(7)//ACHAR(10)
                   ELSE
                      WRITE(54321) 'FIELD FieldData '//ITOA(6)//ACHAR(10)
@@ -682,8 +682,8 @@ MODULE postprocess
                   WRITE(54321) 'B_Z '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
                   WRITE(54321) B_FIELD(3,:,:), ACHAR(10)
 
-                  IF (BOOL_FLUID_ELECTRONS) THEN
-                     WRITE(54321) 'NRHO_E_BOLTZ '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
+                  IF (PIC_TYPE == HYBRID) THEN
+                     WRITE(54321) 'nrho_e_FLUID '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
                      WRITE(54321) BOLTZ_NRHOE, ACHAR(10)
                   END IF
                ELSE

@@ -38,9 +38,17 @@ MODULE timecycle
       IF (PIC_TYPE .NE. NONE) THEN
 
          CALL SET_WALL_POTENTIAL
+
          CALL DEPOSIT_CHARGE(particles)
-         CALL SETUP_POISSON
-         CALL SOLVE_POISSON
+         IF (PIC_TYPE == HYBRID) THEN
+            CALL SETUP_SOLID_NODES            
+            ALLOCATE(PHI_FIELD(NNODES))
+            PHI_FIELD=0
+            CALL SOLVE_BOLTZMANN
+         ELSE
+            CALL SETUP_POISSON
+            CALL SOLVE_POISSON
+         END IF
          PHIBAR_FIELD = PHI_FIELD
          CALL COMPUTE_E_FIELD
 
@@ -211,6 +219,21 @@ MODULE timecycle
             CALL ADVECT_CN_B(particles, .TRUE., .FALSE., Jmat)
             CALL TIMER_STOP(3)
 
+         ELSE IF (PIC_TYPE == HYBRID) THEN
+
+            CALL SET_WALL_POTENTIAL
+            CALL DEPOSIT_CHARGE(particles)
+
+            CALL TIMER_START(2)
+            CALL SOLVE_BOLTZMANN
+            CALL COMPUTE_E_FIELD
+            CALL TIMER_STOP(2)
+
+            CALL TIMER_START(3)
+            CALL ADVECT
+            CALL FLUID_ELECTRONS_SURFACE_CHARGING
+            CALL TIMER_STOP(3)
+            
          ELSE
 
             CALL TIMER_START(3)
@@ -352,6 +375,7 @@ MODULE timecycle
                BETA = 0
             ELSE
                BETA = 1./SQRT(2.*KB/M*EMIT_TASK%TTRA)
+               ! IF (BOOL_KAPPA_DISTRIBUTION)  BETA = 1./SQRT(2.*KB/M*EMIT_TASK%TTRA*(KAPPA_C-3./2.))
             END IF
 
             IF (COLOCATED_ELECTRONS) BETA_E = 1./SQRT(2.*KB/SPECIES(ELECTRON_S_ID)%MOLECULAR_MASS*COLOCATED_ELECTRONS_TTRA)
@@ -960,6 +984,9 @@ MODULE timecycle
       INTEGER :: NEIGHBORPG
       REAL(KIND=8) :: CHARGE, K, PSIP, RHO_Q
       INTEGER :: VP
+      REAL(KIND=8) :: Y1, Y2, AREA, E_MAG2
+      INTEGER :: V1, V2, V3, VV1, VV2, VV3
+      REAL(KIND=8) :: POT1, POT2, POT3
 
       REAL(KIND=8) :: VXPRE, VYPRE, VZPRE
 
@@ -1006,7 +1033,7 @@ MODULE timecycle
             B = 0
             IF (N_SOLENOIDS > 0) CALL APPLY_B_FIELD(IP, B)
             B = B + EXTERNAL_B_FIELD
-            !CALL APPLY_RF_EB_FIELD(particles, IP, E, B)
+            ! CALL APPLY_RF_EB_FIELD(particles, IP, E, B)
             
 
 
@@ -1239,6 +1266,24 @@ MODULE timecycle
                            particleNOW = particles(IP)
                            CALL ADD_PARTICLE_ARRAY(particleNOW, NP_DUMP_PROC, part_dump)
                         END IF
+
+                        !!!!!!!!! DIRECT COLLISION WITH SOLID BODY !!!!!!!!!
+                        !!!! TODO: IMPLEMENT DRAG FORCES ON INDIVIDUAL PHYSICAL GROUPS
+                        IF (GRID_BC(FACE_PG)%DUMP_FORCE_BC .AND. (tID .GE. DUMP_FORCE_START)) THEN
+                           K = FNUM*SPECIES(particles(IP)%S_ID)%MOLECULAR_MASS                    
+                           IF (DIMS == 2) THEN
+                              IF (AXI) THEN
+                                 FORCE_DIRECT(1) = FORCE_DIRECT(1) + K*particles(IP)%VX/DT*2*PI/(ZMAX-ZMIN)
+                              ELSE
+                                 FORCE_DIRECT(1) = FORCE_DIRECT(1) + K*particles(IP)%VX/DT
+                                 FORCE_DIRECT(2) = FORCE_DIRECT(2) + K*particles(IP)%VY/DT
+                              END IF
+                           ELSE IF (DIMS ==3) THEN
+                              FORCE_DIRECT(1) = FORCE_DIRECT(1) + K*particles(IP)%VX/DT
+                              FORCE_DIRECT(2) = FORCE_DIRECT(2) + K*particles(IP)%VY/DT
+                              FORCE_DIRECT(3) = FORCE_DIRECT(3) + K*particles(IP)%VZ/DT
+                           END IF 
+                        END IF
                         
                         CHARGE = SPECIES(particles(IP)%S_ID)%CHARGE
                         IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. ABS(CHARGE) .GE. 1.d-6) THEN
@@ -1434,6 +1479,25 @@ MODULE timecycle
                         ELSE
                            REMOVE_PART(IP) = .TRUE.
                            particles(IP)%DTRIM = 0.d0
+                        END IF
+
+                        !!!!!!!!! DIRECT COLLISION WITH SOLID BODY !!!!!!!!!
+                        !!!! TODO: IMPLEMENT DRAG FORCES ON INDIVIDUAL PHYSICAL GROUPS
+                        IF (GRID_BC(FACE_PG)%DUMP_FORCE_BC .AND. (tID .GE. DUMP_FORCE_START)) THEN
+                           IF (REMOVE_PART(IP)) CYCLE ! IF PARTICLE IS ABSORBED, CYCLE
+                           K = FNUM*SPECIES(particles(IP)%S_ID)%MOLECULAR_MASS                           
+                           IF (DIMS == 2) THEN
+                              IF (AXI) THEN
+                                 FORCE_DIRECT(1) = FORCE_DIRECT(1) - K*particles(IP)%VX/DT*2*PI/(ZMAX-ZMIN)
+                              ELSE
+                                 FORCE_DIRECT(1) = FORCE_DIRECT(1) - K*particles(IP)%VX/DT
+                                 FORCE_DIRECT(2) = FORCE_DIRECT(2) - K*particles(IP)%VY/DT
+                              END IF
+                           ELSE IF (DIMS ==3) THEN
+                              FORCE_DIRECT(1) = FORCE_DIRECT(1) - K*particles(IP)%VX/DT
+                              FORCE_DIRECT(2) = FORCE_DIRECT(2) - K*particles(IP)%VY/DT
+                              FORCE_DIRECT(3) = FORCE_DIRECT(3) - K*particles(IP)%VZ/DT
+                           END IF
                         END IF
                      ELSE
                         REMOVE_PART(IP) = .TRUE.
@@ -1881,6 +1945,9 @@ MODULE timecycle
 
       END DO ! End loop: DO IP = 1,NP_PROC
 
+
+      
+
       ! ==============
       ! ========= Now remove particles that are out of the domain and reorder the array. 
       ! ========= Do this in the end of the advection step, since reordering the array 
@@ -1945,7 +2012,95 @@ MODULE timecycle
          END IF
       END IF
 
-      !CLOSE(66341)
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      !!!!!! INDIRECT FORCE CALC + SAVE DATA !!!!
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      IF ((tID .GT. DUMP_FORCE_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
+         IF (DIMS==2) THEN
+            DO IC=1, NCELLS
+               IF (CELL_PROCS(IC)==PROC_ID) THEN
+                  DO IP=1, 3
+                     ! NEIGHBOR = U2D_GRID%CELL_NEIGHBORS(IP, IC)
+                     ! IF (NEIGHBOR == -1) CYCLE
+                     ! NEIGHBORPG = U2D_GRID%CELL_PG(NEIGHBOR)
+                     FACE_PG =  U2D_GRID%CELL_EDGES_PG(IP, IC)
+                     IF (FACE_PG .NE. -1) THEN
+                        IF (GRID_BC(FACE_PG)%DUMP_FORCE_BC .AND. (GRID_BC(U2D_GRID%CELL_PG(IC))%VOLUME_BC == FLUID)) THEN
+                           AREA = U2D_GRID%CELL_EDGES_LEN(IP,IC)
+                           E_MAG2 = E_FIELD(1,1,IC)*E_FIELD(1,1,IC) + E_FIELD(2,1,IC)*E_FIELD(2,1,IC)
+                           IF (AXI) THEN
+                              IF (IP == 1) THEN
+                                 VV1 = 1
+                                 VV2 = 2
+                              ELSE IF (IP == 2) THEN
+                                 VV1 = 2
+                                 VV2 = 3
+                              ELSE IF (IP == 3) THEN
+                                 VV1 = 3
+                                 VV2 = 1
+                              END IF
+                              V1 = U2D_GRID%CELL_NODES(VV1,IC)
+                              V2 = U2D_GRID%CELL_NODES(VV2,IC)
+                              Y1 = U2D_GRID%NODE_COORDS(2, V1)
+                              Y2 = U2D_GRID%NODE_COORDS(2, V2)
+                              FORCE_INDIRECT(1) = FORCE_INDIRECT(1) + EPS0*AREA*2*PI*(Y1+Y2)*&
+                                                ( (E_FIELD(1,1,IC)*E_FIELD(1,1,IC) - 0.5*E_MAG2)*U2D_GRID%EDGE_NORMAL(1,IP,IC) &
+                                                +  E_FIELD(1,1,IC)*E_FIELD(2,1,IC)*U2D_GRID%EDGE_NORMAL(2,IP,IC))
+                           ELSE
+                              FORCE_INDIRECT(1) = FORCE_INDIRECT(1) + EPS0*AREA*(ZMAX-ZMIN)*&
+                                                ( (E_FIELD(1,1,IC)*E_FIELD(1,1,IC) - 0.5*E_MAG2)*U2D_GRID%EDGE_NORMAL(1,IP,IC) &
+                                                +  E_FIELD(1,1,IC)*E_FIELD(2,1,IC)*U2D_GRID%EDGE_NORMAL(2,IP,IC))
+                              
+                              FORCE_INDIRECT(2) = FORCE_INDIRECT(2) + EPS0*AREA*(ZMAX-ZMIN)*&
+                                                (  E_FIELD(2,1,IC)*E_FIELD(1,1,IC)*U2D_GRID%EDGE_NORMAL(1,IP,IC) &
+                                                + (E_FIELD(2,1,IC)*E_FIELD(2,1,IC) - 0.5*E_MAG2)*U2D_GRID%EDGE_NORMAL(2,IP,IC))
+                           END IF
+                        END IF
+                     END IF
+                  END DO
+               END IF
+            END DO
+         ELSE IF (DIMS==3) THEN
+            DO IC=1, NCELLS
+               IF (CELL_PROCS(IC)==PROC_ID) THEN
+                  DO IP=1, 4
+                     ! NEIGHBOR = U3D_GRID%CELL_NEIGHBORS(IP, IC)
+                     ! IF (NEIGHBOR == -1) CYCLE
+                     ! NEIGHBORPG = U3D_GRID%CELL_PG(NEIGHBOR)
+                     FACE_PG =  U3D_GRID%CELL_FACES_PG(IP, IC)
+                     IF (FACE_PG .NE. -1) THEN
+                        IF (GRID_BC(FACE_PG)%DUMP_FORCE_BC .AND. (GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC == FLUID)) THEN
+
+                           AREA = U3D_GRID%FACE_AREA(IP,IC)
+                           E_MAG2 = E_FIELD(1,1,IC)*E_FIELD(1,1,IC) + E_FIELD(2,1,IC)*E_FIELD(2,1,IC)&
+                           + E_FIELD(3,1,IC)*E_FIELD(3,1,IC)
+
+                           FORCE_INDIRECT(1) = FORCE_INDIRECT(1) + EPS0*AREA*&
+                           ( (E_FIELD(1,1,IC)*E_FIELD(1,1,IC) - 0.5*E_MAG2)*U3D_GRID%FACE_NORMAL(1,IP,IC) &
+                           +  E_FIELD(1,1,IC)*E_FIELD(2,1,IC)*U3D_GRID%FACE_NORMAL(2,IP,IC) &
+                           +  E_FIELD(1,1,IC)*E_FIELD(3,1,IC)*U3D_GRID%FACE_NORMAL(3,IP,IC))
+                           FORCE_INDIRECT(2) = FORCE_INDIRECT(2) + EPS0*AREA*&
+                           (  E_FIELD(2,1,IC)*E_FIELD(1,1,IC)*U3D_GRID%FACE_NORMAL(1,IP,IC) &
+                           + (E_FIELD(2,1,IC)*E_FIELD(2,1,IC) - 0.5*E_MAG2)*U3D_GRID%FACE_NORMAL(2,IP,IC) &
+                           +  E_FIELD(2,1,IC)*E_FIELD(3,1,IC)*U3D_GRID%FACE_NORMAL(3,IP,IC))
+                           FORCE_INDIRECT(3) = FORCE_INDIRECT(3) + EPS0*AREA*&
+                           (  E_FIELD(3,1,IC)*E_FIELD(1,1,IC)*U3D_GRID%FACE_NORMAL(1,IP,IC) &
+                           +  E_FIELD(3,1,IC)*E_FIELD(2,1,IC)*U3D_GRID%FACE_NORMAL(2,IP,IC) &
+                           + (E_FIELD(3,1,IC)*E_FIELD(3,1,IC) - 0.5*E_MAG2)*U3D_GRID%FACE_NORMAL(3,IP,IC))
+                        END IF
+                     END IF
+                  END DO
+               END IF
+            END DO
+         END IF
+
+         CALL DUMP_FORCE_FILE(tID)
+         FORCE_DIRECT = 0.d0
+         FORCE_INDIRECT = 0.d0
+      END IF
+
+
+      CLOSE(66341)
 
    END SUBROUTINE ADVECT
 

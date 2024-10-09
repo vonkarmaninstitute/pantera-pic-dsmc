@@ -1013,7 +1013,7 @@ MODULE timecycle
 
       FIELD_POWER = 0
 
-      OPEN(66341, FILE='washboarddump', POSITION='append', STATUS='unknown', ACTION='write')
+      !OPEN(66341, FILE='washboarddump', POSITION='append', STATUS='unknown', ACTION='write')
 
 
       DO IP = 1, NP_PROC
@@ -1473,8 +1473,8 @@ MODULE timecycle
                            particles(IP)%EROT = EROT
                            particles(IP)%EVIB = EVIB
 
-                           WRITE(66341,*) VXPRE, ', ', VYPRE, ', ', VZPRE, ', ', &
-                           particles(IP)%VX, ', ', particles(IP)%VY, ', ', particles(IP)%VZ
+                           !WRITE(66341,*) VXPRE, ', ', VYPRE, ', ', VZPRE, ', ', &
+                           !particles(IP)%VX, ', ', particles(IP)%VY, ', ', particles(IP)%VZ
                            
                         ELSE
                            REMOVE_PART(IP) = .TRUE.

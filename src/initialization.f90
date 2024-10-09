@@ -157,7 +157,7 @@ MODULE initialization
 
          IF (line=='Bool_kappa_fluid:')        READ(in1,*) BOOL_KAPPA_FLUID
          IF (line=='Kappa_constant_fluid:')    READ(in1,*) KAPPA_FLUID_C
-         IF (line=='Kappa_fraction')           READ(in1,*) KAPPA_FRACTION
+         IF (line=='Kappa_fraction:')          READ(in1,*) KAPPA_FRACTION
          IF (KAPPA_FRACTION < 0.0) CALL ERROR_ABORT('Fraction of Kappa fluid cannot be less than 0!')
          IF (KAPPA_FRACTION == 0.0) BOOL_KAPPA_FLUID = .TRUE.
 

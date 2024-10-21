@@ -157,9 +157,6 @@ MODULE initialization
 
          IF (line=='Bool_kappa_fluid:')        READ(in1,*) BOOL_KAPPA_FLUID
          IF (line=='Kappa_constant_fluid:')    READ(in1,*) KAPPA_FLUID_C
-         IF (line=='Kappa_fraction:')          READ(in1,*) KAPPA_FRACTION
-         IF (KAPPA_FRACTION < 0.0) CALL ERROR_ABORT('Fraction of Kappa fluid cannot be less than 0!')
-         IF (KAPPA_FRACTION == 0.0) BOOL_KAPPA_FLUID = .TRUE.
 
          IF (line=='Jacobian_type:')           READ(in1,*) JACOBIAN_TYPE
          IF (line=='Residual_and_jacobian_combined:') READ(in1,*) RESIDUAL_AND_JACOBIAN_COMBINED
@@ -197,6 +194,8 @@ MODULE initialization
          IF (line=='Bool_dump_fluxes:')        READ(in1,*) BOOL_DUMP_FLUXES
          IF (line=='Dump_traj_start:')         READ(in1,*) TRAJECTORY_DUMP_START
          IF (line=='Dump_traj_number:')        READ(in1,*) TRAJECTORY_DUMP_NUMBER
+         IF (line=='Dump_force_start:')        READ(in1,*) DUMP_FORCE_START
+         IF (line=='Dump_force_every:')        READ(in1,*) DUMP_FORCE_EVERY
 
          IF (line=='Inject_from_file:') THEN
             BOOL_INJECT_FROM_FILE = .TRUE.
@@ -1061,6 +1060,10 @@ MODULE initialization
          READ(STRARRAY(3), '(ES14.0)') GRID_BC(IPG)%WALL_EFIELD
       ELSE IF (STRARRAY(2) == 'dielectric') THEN
          GRID_BC(IPG)%FIELD_BC = DIELECTRIC_BC
+         IF (STRARRAY(3) == 'conductive') THEN 
+            GRID_BC(IPG)%CONDUCTIVE_BC = .TRUE.
+            READ(STRARRAY(4), '(ES14.0)') GRID_BC(IPG)%CONDUCTIVE_BC_RESISTANCE
+         END IF
       !!! BCs for both particles and field
       ELSE IF (STRARRAY(2) == 'periodic_master') THEN
          GRID_BC(IPG)%PARTICLE_BC = PERIODIC_MASTER
@@ -2229,6 +2232,8 @@ MODULE initialization
          EBAR_FIELD = 0.d0
          ALLOCATE(SURFACE_CHARGE(NNODES))
          SURFACE_CHARGE = 0.d0
+         ALLOCATE(CONDUCTIVE_DELTA_CHARGE(NNODES))
+         CONDUCTIVE_DELTA_CHARGE = 0.d0
       ELSE
          NPX = NX + 1
          IF (DIMS == 2) THEN

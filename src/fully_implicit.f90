@@ -2692,6 +2692,9 @@ MODULE fully_implicit
 
       IF (SET_INITIAL) THEN
          CALL VecSet(solvec,0.d0,ierr)
+      ELSE IF (.NOT. ALLOCATED(PHI_FIELD)) THEN
+         ALLOCATE(PHI_FIELD(NNODES))
+         PHI_FIELD=0
       ELSE
          CALL VecGetOwnershipRange(solvec,Istart,Iend,ierr)
          CALL VecGetArrayF90(solvec,solvec_l,ierr)
@@ -2809,9 +2812,8 @@ MODULE fully_implicit
                         !!!!!
                         IF (BOOL_KAPPA_FLUID) THEN 
                            VALUETOADD = QE*BOLTZ_N0/(EPS0)*AREA&
-                           *(KAPPA_FRACTION*(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.))&
-                           )**(-KAPPA_FLUID_C+1./2.)&
-                           + (1-KAPPA_FRACTION)*EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE)))
+                           *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.))&
+                           )**(-KAPPA_FLUID_C+1./2.)
                         END IF
 
                         IF (P == Q) THEN
@@ -2843,7 +2845,7 @@ MODULE fully_implicit
                            END IF
                         END IF
                         IF (GRID_BC(U2D_GRID%CELL_PG(I))%VOLUME_BC == FLUID) THEN
-                           RHS_NEW(VP-1) = RHS_NEW(VP-1) + VALUETOADD*BOLTZ_SOLID_NODES(VQ)
+                           RHS_NEW(VP-1) = RHS_NEW(VP-1) + VALUETOADD
                         END IF
                      END DO
                   END IF
@@ -2879,9 +2881,8 @@ MODULE fully_implicit
 
                      IF (BOOL_KAPPA_FLUID) THEN 
                         VALUETOADD = QE*BOLTZ_N0/(EPS0)*VOLUME&
-                        *(KAPPA_FRACTION*(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
-                        **(-KAPPA_FLUID_C+1./2.)&
-                        + (1-KAPPA_FRACTION)*EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE)))
+                        *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
+                        **(-KAPPA_FLUID_C+1./2.)
                      END IF
 
                      IF (P == Q) THEN
@@ -2890,7 +2891,7 @@ MODULE fully_implicit
                         VALUETOADD = VALUETOADD/20.
                      END IF
                      IF (GRID_BC(U3D_GRID%CELL_PG(I))%VOLUME_BC == FLUID) THEN
-                        RHS_NEW(VP-1) = RHS_NEW(VP-1) + VALUETOADD*BOLTZ_SOLID_NODES(VQ)
+                        RHS_NEW(VP-1) = RHS_NEW(VP-1) + VALUETOADD
                      END IF
                   END DO
                END IF
@@ -3015,9 +3016,8 @@ MODULE fully_implicit
                         !!!!!
                         IF (BOOL_KAPPA_FLUID) THEN 
                            VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*AREA&
-                           *(KAPPA_FRACTION*(2.*KAPPA_FLUID_C-1.)/(2.*KAPPA_FLUID_C-3.)&
-                           *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))**(-KAPPA_FLUID_C-1./2.)&
-                           +(1-KAPPA_FRACTION)*EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE)))
+                           *(2.*KAPPA_FLUID_C-1.)/(2.*KAPPA_FLUID_C-3.)&
+                           *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))**(-KAPPA_FLUID_C-1./2.)
                         END IF
 
                         IF (P == Q) THEN
@@ -3049,7 +3049,7 @@ MODULE fully_implicit
                            END IF
                         END IF
                         IF (GRID_BC(U2D_GRID%CELL_PG(I))%VOLUME_BC == FLUID) THEN
-                           CALL MatSetValues(jac,one,VP-1,one,VQ-1,VALUETOADD*BOLTZ_SOLID_NODES(VQ),ADD_VALUES,ierr)
+                           CALL MatSetValues(jac,one,VP-1,one,VQ-1,VALUETOADD,ADD_VALUES,ierr)
                         END IF
                      END DO
                   END IF
@@ -3089,9 +3089,8 @@ MODULE fully_implicit
 
                         IF (BOOL_KAPPA_FLUID) THEN 
                            VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*VOLUME&
-                           *(KAPPA_FRACTION*(2.*KAPPA_FLUID_C-1.)/(2.*KAPPA_FLUID_C-3.)&
-                           *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))**(-KAPPA_FLUID_C-1./2.)&
-                           +(1-KAPPA_FRACTION)*EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE)))
+                           *(2.*KAPPA_FLUID_C-1.)/(2.*KAPPA_FLUID_C-3.)&
+                           *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))**(-KAPPA_FLUID_C-1./2.)
                         END IF
 
                         IF (P == Q) THEN
@@ -3100,7 +3099,7 @@ MODULE fully_implicit
                            VALUETOADD = VALUETOADD/20.
                         END IF
                         IF (GRID_BC(U3D_GRID%CELL_PG(I))%VOLUME_BC == FLUID) THEN
-                           CALL MatSetValues(jac,one,VP-1,one,VQ-1,VALUETOADD*BOLTZ_SOLID_NODES(VQ),ADD_VALUES,ierr)
+                           CALL MatSetValues(jac,one,VP-1,one,VQ-1,VALUETOADD,ADD_VALUES,ierr)
                         END IF
                      END DO
                   END IF
@@ -3176,10 +3175,10 @@ MODULE fully_implicit
                      IF (BOOL_KAPPA_FLUID) THEN
                         FACTOR = SQRT(KAPPA_FLUID_C-3./2.)*GAMMA(KAPPA_FLUID_C+1.)&
                         /GAMMA(KAPPA_FLUID_C-1./2.)/(KAPPA_FLUID_C*(KAPPA_FLUID_C-1.))
-                        POT1 = KAPPA_FRACTION*FACTOR*(1-QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
-                        **(-KAPPA_FLUID_C+1.) + (1-KAPPA_FRACTION)*POT1
-                        POT2 = KAPPA_FRACTION*FACTOR*(1-QE*(PHI_FIELD(V2)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
-                        **(-KAPPA_FLUID_C+1.) + (1-KAPPA_FRACTION)*POT2
+                        POT1 = FACTOR*(1-QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
+                        **(-KAPPA_FLUID_C+1.)
+                        POT2 = FACTOR*(1-QE*(PHI_FIELD(V2)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
+                        **(-KAPPA_FLUID_C+1.)
                      END IF
 
                      IF (AXI) THEN
@@ -3236,12 +3235,12 @@ MODULE fully_implicit
                      IF (BOOL_KAPPA_FLUID) THEN
                         FACTOR = SQRT(KAPPA_FLUID_C-3./2.)*GAMMA(KAPPA_FLUID_C+1.)&
                         /GAMMA(KAPPA_FLUID_C-1./2.)/(KAPPA_FLUID_C*(KAPPA_FLUID_C-1.))
-                        POT1 = KAPPA_FRACTION*FACTOR*(1-QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
-                        **(-KAPPA_FLUID_C+1.) + (1-KAPPA_FRACTION)*POT1
-                        POT2 = KAPPA_FRACTION*FACTOR*(1-QE*(PHI_FIELD(V2)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
-                        **(-KAPPA_FLUID_C+1.) + (1-KAPPA_FRACTION)*POT2
-                        POT3 = KAPPA_FRACTION*FACTOR*(1-QE*(PHI_FIELD(V3)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
-                        **(-KAPPA_FLUID_C+1.) + (1-KAPPA_FRACTION)*POT3
+                        POT1 = FACTOR*(1-QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
+                        **(-KAPPA_FLUID_C+1.)
+                        POT2 = FACTOR*(1-QE*(PHI_FIELD(V2)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
+                        **(-KAPPA_FLUID_C+1.)
+                        POT3 = FACTOR*(1-QE*(PHI_FIELD(V3)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
+                        **(-KAPPA_FLUID_C+1.)
                      END IF
 
                      SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + CHARGE*(POT1/6. + POT2/12. + POT3/12.)
@@ -3265,8 +3264,8 @@ MODULE fully_implicit
 
       BOLTZ_NRHOE = BOLTZ_N0 * exp(QE*(PHI_FIELD - BOLTZ_PHI0)/(KB*BOLTZ_TE))
       IF (BOOL_KAPPA_FLUID) THEN
-         BOLTZ_NRHOE = BOLTZ_N0*(KAPPA_FRACTION*(1-QE*(PHI_FIELD - BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
-         **(-KAPPA_FLUID_C+1./2.) + (1-KAPPA_FRACTION)*exp(QE*(PHI_FIELD - BOLTZ_PHI0)/(KB*BOLTZ_TE)))
+         BOLTZ_NRHOE = BOLTZ_N0*(1-QE*(PHI_FIELD - BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
+         **(-KAPPA_FLUID_C+1./2.)
       END IF
       BOLTZ_NRHOE = BOLTZ_NRHOE*BOLTZ_SOLID_NODES
 

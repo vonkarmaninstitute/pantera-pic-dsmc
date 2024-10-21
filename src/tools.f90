@@ -416,31 +416,8 @@ CONTAINS
          CALL MPI_REDUCE(DUMP_FORCE_INDIRECT,  DUMP_FORCE_INDIRECT, 3, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
       END IF
 
-
-      ! ! Dump particles that hit a boundary to file
-      ! WRITE(filename, "(A,A,I0.5)") TRIM(ADJUSTL(PARTDUMP_SAVE_PATH)), "bound_proc_", PROC_ID ! Compose filename
-
-      ! ! Open file for writing
-      ! IF (BOOL_BINARY_OUTPUT) THEN
-      !    OPEN(28479, FILE=filename, ACCESS='SEQUENTIAL', POSITION='APPEND', FORM='UNFORMATTED', &
-      !    STATUS='UNKNOWN', CONVERT='BIG_ENDIAN', RECL=84)
-      !    DO IP = 1, NP_DUMP_PROC
-      !       WRITE(28479) TIMESTEP, part_dump(IP)%X, part_dump(IP)%Y, part_dump(IP)%Z, &
-      !       part_dump(IP)%VX, part_dump(IP)%VY, part_dump(IP)%VZ, part_dump(IP)%EROT, part_dump(IP)%EVIB, &
-      !       part_dump(IP)%S_ID, part_dump(IP)%IC, part_dump(IP)%DTRIM
-      !    END DO
-      !    CLOSE(28479)
-      ! ELSE
-      !    OPEN(28479, FILE=filename )
-      !    !WRITE(10,*) '% TIMESTEP | X | Y | Z | VX | VY | VZ | EROT | EVIB | S_ID | IPG | DTRIM'
-      !    DO IP = 1, NP_DUMP_PROC
-      !       WRITE(28479,*) TIMESTEP, part_dump(IP)%X, part_dump(IP)%Y, part_dump(IP)%Z, &
-      !       part_dump(IP)%VX, part_dump(IP)%VY, part_dump(IP)%VZ, part_dump(IP)%EROT, part_dump(IP)%EVIB, &
-      !       part_dump(IP)%S_ID, part_dump(IP)%IC, part_dump(IP)%DTRIM
-      !    END DO
-      !    CLOSE(28479)
-      ! END IF
-
+      FORCE_DIRECT = 0.d0
+      FORCE_INDIRECT = 0.d0
    END SUBROUTINE DUMP_FORCE_FILE
 
 

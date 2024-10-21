@@ -50,7 +50,6 @@ MODULE global
    ! Option for Kappa distribution
    LOGICAL :: BOOL_KAPPA_FLUID    = .FALSE.
    REAL(KIND=8) :: KAPPA_FLUID_C  = 4.d0
-   REAL(KIND=8) :: KAPPA_FRACTION = 1.d0
 
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -184,6 +183,9 @@ TYPE(UNSTRUCTURED_3D_GRID_DATA_STRUCTURE) :: U3D_GRID
 
       LOGICAL :: DUMP_FORCE_BC = .FALSE.
 
+      LOGICAL :: CONDUCTIVE_BC = .TRUE.
+      REAL(KIND=8) :: CONDUCTIVE_BC_RESISTANCE = 1000.
+
       ! Washboard model
       REAL(KIND=8) :: A
       REAL(KIND=8) :: B
@@ -266,6 +268,7 @@ TYPE(UNSTRUCTURED_3D_GRID_DATA_STRUCTURE) :: U3D_GRID
    LOGICAL, DIMENSION(:), ALLOCATABLE :: IS_NEUMANN
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: SURFACE_CHARGE 
    LOGICAL, DIMENSION(:), ALLOCATABLE :: IS_DIELECTRIC
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CONDUCTIVE_DELTA_CHARGE
 
 
    REAL(KIND=8), DIMENSION(3) :: EXTERNAL_B_FIELD = 0
@@ -557,10 +560,10 @@ TYPE(UNSTRUCTURED_3D_GRID_DATA_STRUCTURE) :: U3D_GRID
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    REAL(KIND=8), DIMENSION(3) :: FORCE_DIRECT = 0.d0
    REAL(KIND=8), DIMENSION(3) :: FORCE_INDIRECT = 0.d0
-   LOGICAL                    :: BOOL_CALCULATE_FORCE = .FALSE.
-   INTEGER                    :: DUMP_FORCE_START = 0
+   INTEGER                    :: DUMP_FORCE_START = -1
+   integer                    :: DUMP_FORCE_EVERY = 1.
 
-   TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: part_force_direct
+
 
 
    REAL(KIND=8) :: FIELD_POWER

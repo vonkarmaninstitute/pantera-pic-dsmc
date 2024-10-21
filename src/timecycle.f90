@@ -29,6 +29,8 @@ MODULE timecycle
       ! Init variables
       NP_TOT = 0
       CALL INIT_POSTPROCESS
+      CALL INIT_BOUNDARY_POSTPROCESS
+      CALL BOUNDARY_RESET
 
       ALLOCATE(FIELD_POWER_AVG(FIELD_POWER_NUMAVG))
       FIELD_POWER_AVG = FIELD_POWER_TARGET
@@ -63,8 +65,8 @@ MODULE timecycle
       END IF
       
       ! ########### Dump particles and flowfield after the initial seeding ##########################################
-      IF ((tID .GE. DUMP_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
-         IF (MOD(tID-DUMP_START, DUMP_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
+      IF ((tID .GE. DUMP_PART_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
+         IF (MOD(tID-DUMP_PART_START, DUMP_PART_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
       END IF
 
       IF ((tID .GT. DUMP_GRID_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
@@ -88,11 +90,11 @@ MODULE timecycle
 
          CALL MPI_REDUCE(FIELD_POWER, FIELD_POWER_TOT, 1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
          CALL MPI_BCAST(FIELD_POWER_TOT, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-         FIELD_POWER_AVG(MOD(tID, FIELD_POWER_NUMAVG) + 1) = FIELD_POWER_TOT
-         IF (MOD(tID, FIELD_POWER_NUMAVG) .EQ. 0) THEN
-            WRITE(*,*) 'Adjusting coil current.'
-            COIL_CURRENT = COIL_CURRENT*SQRT(FIELD_POWER_TARGET/(SUM(FIELD_POWER_AVG)/DBLE(FIELD_POWER_NUMAVG)))
-         END IF
+         !FIELD_POWER_AVG(MOD(tID, FIELD_POWER_NUMAVG) + 1) = FIELD_POWER_TOT
+         !IF (MOD(tID, FIELD_POWER_NUMAVG) .EQ. 0) THEN
+         !   WRITE(*,*) 'Adjusting coil current.'
+         !   COIL_CURRENT = COIL_CURRENT*SQRT(FIELD_POWER_TARGET/(SUM(FIELD_POWER_AVG)/DBLE(FIELD_POWER_NUMAVG)))
+         !END IF
 
 
 
@@ -273,8 +275,8 @@ MODULE timecycle
 
          CALL TIMER_START(4)
          ! ########### Dump particles ##############################################
-         IF (tID .GE. DUMP_START) THEN
-            IF (MOD(tID-DUMP_START, DUMP_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
+         IF (tID .GE. DUMP_PART_START) THEN
+            IF (MOD(tID-DUMP_PART_START, DUMP_PART_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
          END IF
 
          ! ########### Dump flowfield ##############################################
@@ -287,6 +289,19 @@ MODULE timecycle
             ! If we are just in a grid average timestep, compute the grid average
             ELSE IF (MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY) .EQ. 0) THEN
                CALL GRID_AVG
+            END IF
+         END IF
+
+         ! ########### Dump boundary ##############################################
+         IF (tID .GT. DUMP_BOUND_START) THEN
+            ! If we are in the grid save timestep, average, then dump the cumulated averages
+            IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_AVG_EVERY*DUMP_BOUND_N_AVG) .EQ. 0) THEN
+               CALL BOUNDARY_GATHER
+               CALL BOUNDARY_SAVE
+               CALL BOUNDARY_RESET
+            ! If we are just in a grid average timestep, compute the grid average
+            ELSE IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_AVG_EVERY) .EQ. 0) THEN
+               CALL BOUNDARY_GATHER
             END IF
          END IF
 
@@ -496,7 +511,7 @@ MODULE timecycle
       IMPLICIT NONE
 
       INTEGER            :: IP, NP_INIT, IC
-      REAL(KIND=8)       :: Xp, Yp, Zp, VXp, VYp, VZp, EROT, EVIB, DOMAIN_VOLUME
+      REAL(KIND=8)       :: Xp, Yp, Zp, VXp, VYp, VZp, EROT, EVIB, DOMAIN_VOLUME, VOL
       INTEGER            :: CID
 
       REAL(KIND=8), DIMENSION(3) :: V1, V2, V3, V4
@@ -523,7 +538,12 @@ MODULE timecycle
 
                DO IC = 1, NCELLS
                   ! Compute number of particles of this species per process to be created in this cell.
-                  NP_INIT = RANDINT(DT*VOLUME_INJECT_TASKS(ITASK)%NRHODOT/(FNUM*SPECIES(S_ID)%SPWT)*CELL_VOLUMES(IC)* &
+                  IF (DIMS == 2) THEN
+                     VOL = U2D_GRID%CELL_VOLUMES(IC)
+                  ELSE
+                     VOL = U3D_GRID%CELL_VOLUMES(IC)
+                  END IF
+                  NP_INIT = RANDINT(DT*VOLUME_INJECT_TASKS(ITASK)%NRHODOT/(FNUM*SPECIES(S_ID)%SPWT)*VOL* &
                               MIXTURES(VOLUME_INJECT_TASKS(ITASK)%MIX_ID)%COMPONENTS(i)%MOLFRAC/N_MPI_THREADS)
                   IF (NP_INIT == 0) CYCLE
 
@@ -745,7 +765,7 @@ MODULE timecycle
    
                ! Init a particle object and assign it to the local vector of particles
                CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EROT,EVIB,S_ID,IC,DTFRAC,  particleNOW)
-               IF ((tID == TRAJECTORY_DUMP_START) .AND. (DUMP_COUNTER < TRAJECTORY_DUMP_NUMBER)) THEN
+               IF ((tID == DUMP_TRAJECTORY_START) .AND. (DUMP_COUNTER < DUMP_TRAJECTORY_NUMBER)) THEN
                   particleNOW%DUMP_TRAJ = .TRUE.
                   DUMP_COUNTER = DUMP_COUNTER + 1
                END IF
@@ -1262,9 +1282,15 @@ MODULE timecycle
 
                      IF (FACE_PG .NE. -1) THEN
 
-                        IF (GRID_BC(FACE_PG)%DUMP_FLUXES .AND. (tID .GE. DUMP_BOUND_START)) THEN
+                        IF (GRID_BC(FACE_PG)%DUMP_FLUXES .AND. (tID .GE. DUMP_PART_BOUND_START)) THEN
                            particleNOW = particles(IP)
                            CALL ADD_PARTICLE_ARRAY(particleNOW, NP_DUMP_PROC, part_dump)
+                        END IF
+
+
+                        ! Tally incident particle fluxes to boundary
+                        IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_AVG_EVERY) .EQ. 0) THEN
+                           CALL TALLY_PARTICLE_TO_BOUNDARY(.FALSE., particles(IP), IC, BOUNDCOLL)
                         END IF
 
                         !!!!!!!!! DIRECT COLLISION WITH SOLID BODY !!!!!!!!!
@@ -1479,6 +1505,14 @@ MODULE timecycle
                         ELSE
                            REMOVE_PART(IP) = .TRUE.
                            particles(IP)%DTRIM = 0.d0
+                        END IF
+
+
+                        ! Tally reflected particle fluxes to boundary
+                        IF (.NOT. REMOVE_PART(IP)) THEN
+                           IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_AVG_EVERY) .EQ. 0) THEN
+                              CALL TALLY_PARTICLE_TO_BOUNDARY(.TRUE., particles(IP), IC, BOUNDCOLL)
+                           END IF
                         END IF
 
                         !!!!!!!!! DIRECT COLLISION WITH SOLID BODY !!!!!!!!!
@@ -2004,8 +2038,8 @@ MODULE timecycle
       DEALLOCATE(LOCAL_WALL_COLL_COUNT)
 
 
-      IF ((tID .GT. DUMP_BOUND_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
-         IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_EVERY) .EQ. 0) THEN
+      IF ((tID .GT. DUMP_PART_BOUND_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
+         IF (MOD(tID-DUMP_PART_BOUND_START, DUMP_PART_BOUND_EVERY) .EQ. 0) THEN
             CALL DUMP_BOUNDARY_PARTICLES_FILE(tID)
             IF (ALLOCATED(part_dump)) DEALLOCATE(part_dump)
             NP_DUMP_PROC = 0
@@ -2024,7 +2058,7 @@ MODULE timecycle
                      ! IF (NEIGHBOR == -1) CYCLE
                      ! NEIGHBORPG = U2D_GRID%CELL_PG(NEIGHBOR)
                      FACE_PG =  U2D_GRID%CELL_EDGES_PG(IP, IC)
-                     IF (FACE_PG .NE. -1) THEN
+                     IF (FACE_PG .NE. -1 .AND. U2D_GRID%CELL_PG(IC) .NE. -1) THEN
                         IF (GRID_BC(FACE_PG)%DUMP_FORCE_BC .AND. (GRID_BC(U2D_GRID%CELL_PG(IC))%VOLUME_BC == FLUID)) THEN
                            AREA = U2D_GRID%CELL_EDGES_LEN(IP,IC)
                            E_MAG2 = E_FIELD(1,1,IC)*E_FIELD(1,1,IC) + E_FIELD(2,1,IC)*E_FIELD(2,1,IC)
@@ -2068,7 +2102,7 @@ MODULE timecycle
                      ! IF (NEIGHBOR == -1) CYCLE
                      ! NEIGHBORPG = U3D_GRID%CELL_PG(NEIGHBOR)
                      FACE_PG =  U3D_GRID%CELL_FACES_PG(IP, IC)
-                     IF (FACE_PG .NE. -1) THEN
+                     IF (FACE_PG .NE. -1 .AND. U3D_GRID%CELL_PG(IC) .NE. -1) THEN
                         IF (GRID_BC(FACE_PG)%DUMP_FORCE_BC .AND. (GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC == FLUID)) THEN
 
                            AREA = U3D_GRID%FACE_AREA(IP,IC)

@@ -154,7 +154,7 @@ MODULE fields
                CALL COMPUTE_DENSITY_TEMPERATURE(particles)
                IF (.NOT. ALLOCATED(DXLDRATIO)) ALLOCATE(DXLDRATIO(NCELLS))
                DO I = 1, NCELLS
-                  AREA = CELL_AREAS(I)
+                  AREA = U2D_GRID%CELL_AREAS(I)
                   IF (CELL_TE(I) > 0) THEN
                      DXLDRATIO(I) = AREA*(CELL_NE(I)*QE**2/(EPS0*KB*CELL_TE(I)))
                      !WRITE(*,*) 'Cell ', I, ' T= ', CELL_TE(I), ' n= ', CELL_NE(I), ' dx^2/lD^2= ', RATIO
@@ -173,7 +173,7 @@ MODULE fields
                ELSE
                   EPS_REL = GRID_BC(U2D_GRID%CELL_PG(I))%EPS_REL
                END IF
-               AREA = CELL_AREAS(I)
+               AREA = U2D_GRID%CELL_AREAS(I)
                V1 = U2D_GRID%CELL_NODES(1,I)
                V2 = U2D_GRID%CELL_NODES(2,I)
                V3 = U2D_GRID%CELL_NODES(3,I)            
@@ -365,7 +365,12 @@ MODULE fields
                CALL COMPUTE_DENSITY_TEMPERATURE(particles)
                IF (.NOT. ALLOCATED(DXLDRATIO)) ALLOCATE(DXLDRATIO(NCELLS))
                DO I = 1, NCELLS
-                  VOLUME = CELL_VOLUMES(I)
+                  IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
+                     VOLUME = U2D_GRID%CELL_VOLUMES(I)
+                  ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
+                     VOLUME = U3D_GRID%CELL_VOLUMES(I)
+                  END IF
+
                   IF (CELL_TE(I) > 0) THEN
                      DXLDRATIO(I) = VOLUME**(2./3.)*(CELL_NE(I)*QE**2/(EPS0*KB*CELL_TE(I)))
                      !WRITE(*,*) 'Cell ', I, ' T= ', CELL_TE(I), ' n= ', CELL_NE(I), ' dx^2/lD^2= ', RATIO
@@ -384,7 +389,11 @@ MODULE fields
                   EPS_REL = GRID_BC(U3D_GRID%CELL_PG(I))%EPS_REL
                END IF
 
-               VOLUME = CELL_VOLUMES(I)
+               IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
+                  VOLUME = U2D_GRID%CELL_VOLUMES(I)
+               ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
+                  VOLUME = U3D_GRID%CELL_VOLUMES(I)
+               END IF
 
                DO P = 1, 4
 
@@ -706,7 +715,7 @@ MODULE fields
                !    (V2-1 < Istart .OR. V2-1 >= Iend) .AND. &
                !    (V3-1 < Istart .OR. V3-1 >= Iend)) CYCLE
 
-               AREA = CELL_AREAS(I)
+               AREA = U2D_GRID%CELL_AREAS(I)
                X1 = U2D_GRID%NODE_COORDS(1, V1)
                X2 = U2D_GRID%NODE_COORDS(1, V2)
                X3 = U2D_GRID%NODE_COORDS(1, V3)
@@ -887,7 +896,11 @@ MODULE fields
             !DIRICHLET(0) = 0.d0
             DO I = 1, NCELLS
 
-               VOLUME = CELL_VOLUMES(I)
+               IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
+                  VOLUME = U2D_GRID%CELL_VOLUMES(I)
+               ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
+                  VOLUME = U3D_GRID%CELL_VOLUMES(I)
+               END IF
 
                DO P = 1, 4
                   VP = U3D_GRID%CELL_NODES(P,I) - 1
@@ -983,7 +996,7 @@ MODULE fields
 
             IF (DIMS == 2) THEN
                
-               AREA = CELL_AREAS(IC)
+               AREA = U2D_GRID%CELL_AREAS(IC)
 
                V1 = U2D_GRID%CELL_NODES(1,IC)
                V2 = U2D_GRID%CELL_NODES(2,IC)
@@ -1026,7 +1039,7 @@ MODULE fields
                                                             + particles(JP)%VY*U3D_GRID%BASIS_COEFFS(2,P,IC) &
                                                             + particles(JP)%VZ*U3D_GRID%BASIS_COEFFS(3,P,IC))*particles(JP)%DTRIM
                END DO
-               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/CELL_VOLUMES(IC)*FNUM &
+               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/U3D_GRID%CELL_VOLUMES(IC)*FNUM &
                                     * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
 
             END IF

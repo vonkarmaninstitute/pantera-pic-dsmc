@@ -1062,7 +1062,8 @@ MODULE initialization
          GRID_BC(IPG)%FIELD_BC = DIELECTRIC_BC
          IF (STRARRAY(3) == 'conductive') THEN 
             GRID_BC(IPG)%CONDUCTIVE_BC = .TRUE.
-            READ(STRARRAY(4), '(ES14.0)') GRID_BC(IPG)%CONDUCTIVE_BC_RESISTANCE
+            READ(STRARRAY(4), '(ES14.0)') GRID_BC(IPG)%CONDUCTIVE_BC_RESISTIVITY
+            READ(STRARRAY(5), '(ES14.0)') GRID_BC(IPG)%CONDUCTIVE_BC_AREA
          END IF
       !!! BCs for both particles and field
       ELSE IF (STRARRAY(2) == 'periodic_master') THEN

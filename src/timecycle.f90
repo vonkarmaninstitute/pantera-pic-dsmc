@@ -984,7 +984,7 @@ MODULE timecycle
       INTEGER :: VP
       REAL(KIND=8) :: Y1, Y2, AREA, E_MAG2
       INTEGER :: V1, V2, V3, VV1, VV2, VV3
-      REAL(KIND=8) :: POT1, POT2, POT3
+      REAL(KIND=8) :: POT1, POT2, POT3, RESISTANCE
 
       REAL(KIND=8) :: VXPRE, VYPRE, VZPRE
 
@@ -2017,7 +2017,7 @@ MODULE timecycle
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       !!!!!! INDIRECT FORCE CALC + SAVE DATA !!!!
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      IF ((tID .GT. DUMP_FORCE_START) .AND. (DUMP_FORCE_START .NE. -1)) THEN
+      IF ((tID .GT. DUMP_FORCE_START) .AND. (DUMP_FORCE_START .NE. -1) .AND. (PIC_TYPE .NE. NONE)) THEN
          IF (MOD(tID-DUMP_FORCE_START, DUMP_FORCE_EVERY) .EQ. 0) THEN
             IF (DIMS==2) THEN
                DO IC=1, NCELLS
@@ -2059,24 +2059,24 @@ MODULE timecycle
                                                    + (E_FIELD(2,1,IC)*E_FIELD(2,1,IC) - 0.5*E_MAG2)*U2D_GRID%EDGE_NORMAL(2,IP,IC))
                               END IF
                            END IF
-                           ! IF (GRID_BC(FACE_PG)%CONDUCTIVE_BC .AND. (GRID_BC(U2D_GRID%CELL_PG(IC))%VOLUME_BC == FLUID)) THEN
-                           !    IF (IP == 1) THEN
-                           !       VV1 = 1
-                           !       VV2 = 2
-                           !    ELSE IF (IP == 2) THEN
-                           !       VV1 = 2
-                           !       VV2 = 3
-                           !    ELSE IF (IP == 3) THEN
-                           !       VV1 = 3
-                           !       VV2 = 1
-                           !    END IF
-                           !    V1 = U2D_GRID%CELL_NODES(VV1,IC)
-                           !    V2 = U2D_GRID%CELL_NODES(VV2,IC)
+                           IF (GRID_BC(FACE_PG)%CONDUCTIVE_BC) THEN
+                              IF (IP == 1) THEN
+                                 VV1 = 1
+                                 VV2 = 2
+                              ELSE IF (IP == 2) THEN
+                                 VV1 = 2
+                                 VV2 = 3
+                              ELSE IF (IP == 3) THEN
+                                 VV1 = 3
+                                 VV2 = 1
+                              END IF
+                              V1 = U2D_GRID%CELL_NODES(VV1,IC)
+                              V2 = U2D_GRID%CELL_NODES(VV2,IC)
 
-                           !    RESISTANCE = GRID_BC(FACE_PG)%CONDUCTIVE_BC_RESISTANCE
-                           !    CONDUCTIVE_DELTA_CHARGE(V1) = DT*(PHI_FIELD(V2)-PHI_FIELD(V1))/RESISTANCE/2
-                           !    CONDUCTIVE_DELTA_CHARGE(V2) = -CONDUCTIVE_DELTA_CHARGE(V1)
-                           ! END IF
+                              RESISTANCE = GRID_BC(FACE_PG)%CONDUCTIVE_BC_RESISTIVITY
+                              CONDUCTIVE_DELTA_CHARGE(V1) = DT*(PHI_FIELD(V2)-PHI_FIELD(V1))/RESISTANCE/2
+                              CONDUCTIVE_DELTA_CHARGE(V2) = -CONDUCTIVE_DELTA_CHARGE(V1)
+                           END IF
                         END IF
                      END DO
                   END IF
@@ -2110,49 +2110,54 @@ MODULE timecycle
                               + (E_FIELD(3,1,IC)*E_FIELD(3,1,IC) - 0.5*E_MAG2)*U3D_GRID%FACE_NORMAL(3,IP,IC))
                            END IF
                         END IF
-                        ! IF (GRID_BC(FACE_PG)%CONDUCTIVE_BC .AND. (GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC == FLUID)) THEN
-                        !    IF (IP == 1) THEN
-                        !       VV1 = 1
-                        !       VV2 = 3
-                        !       VV3 = 2
-                        !    ELSE IF (IP == 2) THEN
-                        !       VV1 = 1
-                        !       VV2 = 2
-                        !       VV3 = 4
-                        !    ELSE IF (IP == 3) THEN
-                        !       VV1 = 2
-                        !       VV2 = 3
-                        !       VV3 = 4
-                        !    ELSE IF (IP == 4) THEN
-                        !       VV1 = 1
-                        !       VV2 = 4
-                        !       VV3 = 3
-                        !    END IF
+                        IF (GRID_BC(FACE_PG)%CONDUCTIVE_BC) THEN
+                           IF (IP == 1) THEN
+                              VV1 = 1
+                              VV2 = 3
+                              VV3 = 2
+                           ELSE IF (IP == 2) THEN
+                              VV1 = 1
+                              VV2 = 2
+                              VV3 = 4
+                           ELSE IF (IP == 3) THEN
+                              VV1 = 2
+                              VV2 = 3
+                              VV3 = 4
+                           ELSE IF (IP == 4) THEN
+                              VV1 = 1
+                              VV2 = 4
+                              VV3 = 3
+                           END IF
       
-                        !    V1 = U3D_GRID%CELL_NODES(VV1,IC)
-                        !    V2 = U3D_GRID%CELL_NODES(VV2,IC)
-                        !    V3 = U3D_GRID%CELL_NODES(VV3,IC) 
-                        !    RESISTANCE = GRID_BC(FACE_PG)%CONDUCTIVE_BC_RESISTANCE
+                           V1 = U3D_GRID%CELL_NODES(VV1,IC)
+                           V2 = U3D_GRID%CELL_NODES(VV2,IC)
+                           V3 = U3D_GRID%CELL_NODES(VV3,IC) 
+                           RESISTANCE = GRID_BC(FACE_PG)%CONDUCTIVE_BC_RESISTIVITY
 
-                        !    CONDUCTIVE_DELTA_CHARGE(V1) = DT*(PHI_FIELD(V2)-PHI_FIELD(V1))/RESISTANCE/2
-                        !    CONDUCTIVE_DELTA_CHARGE(V2) = -CONDUCTIVE_DELTA_CHARGE(V1)
+                           CONDUCTIVE_DELTA_CHARGE(V1) = DT*(PHI_FIELD(V2)-PHI_FIELD(V1))/RESISTANCE/2
+                           CONDUCTIVE_DELTA_CHARGE(V2) = -CONDUCTIVE_DELTA_CHARGE(V1)
 
-                        !    CONDUCTIVE_DELTA_CHARGE(V2) = DT*(PHI_FIELD(V3)-PHI_FIELD(V2))/RESISTANCE/2
-                        !    CONDUCTIVE_DELTA_CHARGE(V3) = -CONDUCTIVE_DELTA_CHARGE(V2)
+                           CONDUCTIVE_DELTA_CHARGE(V2) = DT*(PHI_FIELD(V3)-PHI_FIELD(V2))/RESISTANCE/2
+                           CONDUCTIVE_DELTA_CHARGE(V3) = -CONDUCTIVE_DELTA_CHARGE(V2)
 
-                        !    CONDUCTIVE_DELTA_CHARGE(V1) = DT*(PHI_FIELD(V3)-PHI_FIELD(V1))/RESISTANCE/2
-                        !    CONDUCTIVE_DELTA_CHARGE(V3) = -CONDUCTIVE_DELTA_CHARGE(V1)
-                        ! END IF
+                           CONDUCTIVE_DELTA_CHARGE(V1) = DT*(PHI_FIELD(V3)-PHI_FIELD(V1))/RESISTANCE/2
+                           CONDUCTIVE_DELTA_CHARGE(V3) = -CONDUCTIVE_DELTA_CHARGE(V1)
+                        END IF
                      END DO
                   END IF
                END DO
             END IF
-            ! SURFACE_CHARGE = SURFACE_CHARGE + CONDUCTIVE_DELTA_CHARGE
+            SURFACE_CHARGE = SURFACE_CHARGE + CONDUCTIVE_DELTA_CHARGE
 
-            CALL DUMP_FORCE_FILE(tID)
+            
          END IF
       END IF
 
+      IF ((tID .GT. DUMP_FORCE_START) .AND. (DUMP_FORCE_START .NE. -1)) THEN
+         IF (MOD(tID-DUMP_FORCE_START, DUMP_FORCE_EVERY) .EQ. 0) THEN
+            CALL DUMP_FORCE_FILE(tID)
+         END IF
+      END IF
 
       !CLOSE(66341)
 

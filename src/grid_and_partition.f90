@@ -695,15 +695,15 @@ MODULE grid_and_partition
       END DO
 
       ! Compute cell volumes
-      ALLOCATE(CELL_VOLUMES(NUM_CELLS))
+      ALLOCATE(U2D_GRID%CELL_VOLUMES(NUM_CELLS))
       DO I = 1, NUM_CELLS
          A = U2D_GRID%NODE_COORDS(:, U2D_GRID%CELL_NODES(1,I))
          B = U2D_GRID%NODE_COORDS(:, U2D_GRID%CELL_NODES(2,I))
          C = U2D_GRID%NODE_COORDS(:, U2D_GRID%CELL_NODES(3,I))
 
          IF (DIMS == 2 .AND. .NOT. AXI) THEN
-            CELL_VOLUMES(I) = 0.5*ABS(A(1)*(B(2)-C(2)) + B(1)*(C(2)-A(2)) + C(1)*(A(2)-B(2)))
-            WRITE(*,*) CELL_VOLUMES(I)
+            U2D_GRID%CELL_VOLUMES(I) = 0.5*ABS(A(1)*(B(2)-C(2)) + B(1)*(C(2)-A(2)) + C(1)*(A(2)-B(2)))
+            WRITE(*,*) U2D_GRID%CELL_VOLUMES(I)
          END IF
       END DO
 
@@ -784,6 +784,10 @@ MODULE grid_and_partition
 
       INTEGER, DIMENSION(:), ALLOCATABLE :: N_CELLS_WITH_NODE, CELL_WITH_NODE, IOF
       INTEGER :: IDX, JN, JC1, JC2
+
+      LOGICAL, DIMENSION(:), ALLOCATABLE :: NODE_ON_BOUNDARY
+      INTEGER, DIMENSION(:), ALLOCATABLE :: NODES_BOUNDARY_INDEX
+      INTEGER :: NUM_BOUNDARY_NODES, NUM_BOUNDARY_ELEM
 
       ! Open input file for reading
       OPEN(UNIT=in5,FILE=FILENAME, STATUS='old',IOSTAT=ios)
@@ -1007,21 +1011,21 @@ MODULE grid_and_partition
       END IF
 
       ! Compute cell volumes
-      ALLOCATE(CELL_AREAS(U2D_GRID%NUM_CELLS))
-      ALLOCATE(CELL_VOLUMES(U2D_GRID%NUM_CELLS))
+      ALLOCATE(U2D_GRID%CELL_AREAS(U2D_GRID%NUM_CELLS))
+      ALLOCATE(U2D_GRID%CELL_VOLUMES(U2D_GRID%NUM_CELLS))
       DO I = 1, U2D_GRID%NUM_CELLS
          A = U2D_GRID%NODE_COORDS(:, U2D_GRID%CELL_NODES(1,I))
          B = U2D_GRID%NODE_COORDS(:, U2D_GRID%CELL_NODES(2,I))
          C = U2D_GRID%NODE_COORDS(:, U2D_GRID%CELL_NODES(3,I))
 
-         CELL_AREAS(I) = 0.5*ABS(A(1)*(B(2)-C(2)) + B(1)*(C(2)-A(2)) + C(1)*(A(2)-B(2)))
+         U2D_GRID%CELL_AREAS(I) = 0.5*ABS(A(1)*(B(2)-C(2)) + B(1)*(C(2)-A(2)) + C(1)*(A(2)-B(2)))
          IF (DIMS == 2 .AND. .NOT. AXI) THEN
-            CELL_VOLUMES(I) = CELL_AREAS(I) * (ZMAX-ZMIN)
-            !WRITE(*,*) CELL_VOLUMES(I)
+            U2D_GRID%CELL_VOLUMES(I) = U2D_GRID%CELL_AREAS(I) * (ZMAX-ZMIN)
+            !WRITE(*,*) U2D_GRID%CELL_VOLUMES(I)
          END IF
          IF (DIMS == 2 .AND. AXI) THEN
             RAD = (A(2)+B(2)+C(2))/3.
-            CELL_VOLUMES(I) = CELL_AREAS(I) * (ZMAX-ZMIN)*RAD
+            U2D_GRID%CELL_VOLUMES(I) = U2D_GRID%CELL_AREAS(I) * (ZMAX-ZMIN)*RAD
          END IF
       END DO
 
@@ -1173,16 +1177,110 @@ MODULE grid_and_partition
          U2D_GRID%BASIS_COEFFS(2,3,I) =  X2-X1
          U2D_GRID%BASIS_COEFFS(3,3,I) =  X1*Y2 - X2*Y1
 
-         U2D_GRID%BASIS_COEFFS(:,:,I) = 0.5*U2D_GRID%BASIS_COEFFS(:,:,I)/CELL_AREAS(I)
+         U2D_GRID%BASIS_COEFFS(:,:,I) = 0.5*U2D_GRID%BASIS_COEFFS(:,:,I)/U2D_GRID%CELL_AREAS(I)
 
       END DO
 
-
       IF (PROC_ID == 0) THEN
          WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Creating boundary grid.'
+         WRITE(*,*) '==========================================='
+      END IF
+
+      ALLOCATE(U2D_GRID%CELL_EDGES_BOUNDARY_INDEX(3,NCELLS))
+      ALLOCATE(NODE_ON_BOUNDARY(NNODES))
+      NODE_ON_BOUNDARY = .FALSE.
+      ALLOCATE(U2D_GRID%NODES_BOUNDARY_INDEX(NNODES))
+      U2D_GRID%NODES_BOUNDARY_INDEX = -1
+      NUM_BOUNDARY_NODES = 0
+      NUM_BOUNDARY_ELEM = 0
+      DO I = 1, NCELLS
+         DO J = 1, 3
+            ! If the edge belongs to any physical group, it should be part of the boundary grid
+            ! Later, we may want to filter this further
+            IF (U2D_GRID%CELL_EDGES_PG(J,I) .NE. -1) THEN
+               NUM_BOUNDARY_ELEM = NUM_BOUNDARY_ELEM + 1
+               V1 = U2D_GRID%CELL_NODES(J, I)
+               IF (J == 3) THEN
+                  V2 = U2D_GRID%CELL_NODES(1, I)
+               ELSE
+                  V2 = U2D_GRID%CELL_NODES(J+1, I)
+               END IF
+               IF (.NOT. NODE_ON_BOUNDARY(V1)) THEN
+                  NUM_BOUNDARY_NODES = NUM_BOUNDARY_NODES + 1
+                  U2D_GRID%NODES_BOUNDARY_INDEX(V1) = NUM_BOUNDARY_NODES
+                  NODE_ON_BOUNDARY(V1) = .TRUE.
+               END IF
+               IF (.NOT. NODE_ON_BOUNDARY(V2)) THEN
+                  NUM_BOUNDARY_NODES = NUM_BOUNDARY_NODES + 1
+                  U2D_GRID%NODES_BOUNDARY_INDEX(V2) = NUM_BOUNDARY_NODES
+                  NODE_ON_BOUNDARY(V2) = .TRUE.
+               END IF
+               
+            END IF
+         END DO
+      END DO      
+
+      U1D_GRID%NUM_SEGMENTS = NUM_BOUNDARY_ELEM
+      U1D_GRID%NUM_NODES = NUM_BOUNDARY_NODES
+      ALLOCATE(U1D_GRID%SEGMENT_NODES(2, NUM_BOUNDARY_ELEM))
+      ALLOCATE(U1D_GRID%SEGMENT_PG(NUM_BOUNDARY_ELEM))
+      ALLOCATE(U1D_GRID%NODE_COORDS(3, NUM_BOUNDARY_NODES))
+
+      DO I = 1, NNODES
+         IF (NODE_ON_BOUNDARY(I)) THEN
+            U1D_GRID%NODE_COORDS(:,U2D_GRID%NODES_BOUNDARY_INDEX(I)) = U2D_GRID%NODE_COORDS(:,I)
+         END IF
+      END DO
+
+      NUM_BOUNDARY_ELEM = 0
+      NUM_BOUNDARY_NODES = 0
+      DO I = 1, NCELLS
+         DO J = 1, 3
+            IF (U2D_GRID%CELL_EDGES_PG(J,I) .NE. -1) THEN
+               NUM_BOUNDARY_ELEM = NUM_BOUNDARY_ELEM + 1
+               U1D_GRID%SEGMENT_PG(NUM_BOUNDARY_ELEM) = U2D_GRID%CELL_EDGES_PG(J,I)
+               U2D_GRID%CELL_EDGES_BOUNDARY_INDEX(J,I) = NUM_BOUNDARY_ELEM
+
+               V1 = U2D_GRID%CELL_NODES(J, I)
+               IF (J == 3) THEN
+                  V2 = U2D_GRID%CELL_NODES(1, I)
+               ELSE
+                  V2 = U2D_GRID%CELL_NODES(J+1, I)
+               END IF
+               U1D_GRID%SEGMENT_NODES(1, NUM_BOUNDARY_ELEM) = U2D_GRID%NODES_BOUNDARY_INDEX(V1)
+               U1D_GRID%SEGMENT_NODES(2, NUM_BOUNDARY_ELEM) = U2D_GRID%NODES_BOUNDARY_INDEX(V2)
+
+            END IF
+         END DO
+      END DO
+      
+      DEALLOCATE(NODE_ON_BOUNDARY)
+
+      NBOUNDARY = NUM_BOUNDARY_ELEM
+
+      ! Compute areas and lengths of boundary mesh
+      ALLOCATE(U1D_GRID%SEGMENT_LENGTHS(U1D_GRID%NUM_SEGMENTS))
+      ALLOCATE(U1D_GRID%SEGMENT_AREAS(U1D_GRID%NUM_SEGMENTS))
+      DO I = 1, U1D_GRID%NUM_SEGMENTS
+         A = U1D_GRID%NODE_COORDS(:, U1D_GRID%SEGMENT_NODES(1,I))
+         B = U1D_GRID%NODE_COORDS(:, U1D_GRID%SEGMENT_NODES(2,I))
+
+         U1D_GRID%SEGMENT_LENGTHS(I) = SQRT((B(1) - A(1))**2 + (B(2) - A(2))**2)
+         IF (.NOT. AXI) THEN
+            U1D_GRID%SEGMENT_AREAS(I) = U1D_GRID%SEGMENT_LENGTHS(I) * (ZMAX-ZMIN)
+         ELSE
+            RAD = 0.5*(A(2)+B(2))
+            U1D_GRID%SEGMENT_AREAS(I) = U1D_GRID%SEGMENT_LENGTHS(I) * (ZMAX-ZMIN)*RAD
+         END IF
+      END DO
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '============================================================='
          WRITE(*,*) 'Done reading grid file.'
          WRITE(*,*) 'It contains ', NNODES, ' nodes and ', NCELLS, ' cells.'
-         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'The boundary grid contains ', NBOUNDARY, ' elements'
+         WRITE(*,*) '============================================================='
       END IF
 
    END SUBROUTINE READ_2D_UNSTRUCTURED_GRID_SU2
@@ -1219,6 +1317,10 @@ MODULE grid_and_partition
       INTEGER :: IDX, JN, JC1, JC2
 
       REAL(KIND=8) :: VOLUME, X1, X2, X3, X4, Y1, Y2, Y3, Y4, Z1, Z2, Z3, Z4
+
+      LOGICAL, DIMENSION(:), ALLOCATABLE :: NODE_ON_BOUNDARY
+      INTEGER, DIMENSION(:), ALLOCATABLE :: NODES_BOUNDARY_INDEX
+      INTEGER :: NUM_BOUNDARY_NODES, NUM_BOUNDARY_ELEM
 
       ! Open input file for reading
       OPEN(UNIT=in5,FILE=FILENAME, STATUS='old',IOSTAT=ios)
@@ -1444,13 +1546,13 @@ MODULE grid_and_partition
       END IF
 
       ! Compute cell volumes
-      ALLOCATE(CELL_VOLUMES(U3D_GRID%NUM_CELLS))
+      ALLOCATE(U3D_GRID%CELL_VOLUMES(U3D_GRID%NUM_CELLS))
       DO I = 1, U3D_GRID%NUM_CELLS
          A = U3D_GRID%NODE_COORDS(:, U3D_GRID%CELL_NODES(2,I)) - U3D_GRID%NODE_COORDS(:, U3D_GRID%CELL_NODES(1,I))
          B = U3D_GRID%NODE_COORDS(:, U3D_GRID%CELL_NODES(3,I)) - U3D_GRID%NODE_COORDS(:, U3D_GRID%CELL_NODES(1,I))
          C = U3D_GRID%NODE_COORDS(:, U3D_GRID%CELL_NODES(4,I)) - U3D_GRID%NODE_COORDS(:, U3D_GRID%CELL_NODES(1,I))
 
-         CELL_VOLUMES(I) = ABS(C(1)*(A(2)*B(3)-A(3)*B(2)) + C(2)*(A(3)*B(1)-A(1)*B(3)) + C(3)*(A(1)*B(2)-A(2)*B(1))) / 6.
+         U3D_GRID%CELL_VOLUMES(I) = ABS(C(1)*(A(2)*B(3)-A(3)*B(2)) + C(2)*(A(3)*B(1)-A(1)*B(3)) + C(3)*(A(1)*B(2)-A(2)*B(1))) / 6.
       END DO
 
       IF (PROC_ID == 0) THEN
@@ -1596,7 +1698,7 @@ MODULE grid_and_partition
       ALLOCATE(U3D_GRID%BASIS_COEFFS(4,4,NCELLS))
 
       DO I = 1, NCELLS
-         VOLUME = CELL_VOLUMES(I)
+         VOLUME = U3D_GRID%CELL_VOLUMES(I)
          V1 = U3D_GRID%CELL_NODES(1,I)
          V2 = U3D_GRID%CELL_NODES(2,I)
          V3 = U3D_GRID%CELL_NODES(3,I)
@@ -1642,11 +1744,109 @@ MODULE grid_and_partition
 
       END DO
 
+
+
+
+
       IF (PROC_ID == 0) THEN
          WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Creating boundary grid.'
+         WRITE(*,*) '==========================================='
+      END IF
+
+      ALLOCATE(U3D_GRID%CELL_FACES_BOUNDARY_INDEX(4,NCELLS))
+      ALLOCATE(NODE_ON_BOUNDARY(NNODES))
+      NODE_ON_BOUNDARY = .FALSE.
+      ALLOCATE(U3D_GRID%NODES_BOUNDARY_INDEX(NNODES))
+      U3D_GRID%NODES_BOUNDARY_INDEX = -1
+      NUM_BOUNDARY_NODES = 0
+      NUM_BOUNDARY_ELEM = 0
+      DO I = 1, NCELLS
+         DO J = 1, 4
+            ! If the face belongs to any physical group, it should be part of the boundary grid
+            ! Later, we may want to filter this further
+            IF (U3D_GRID%CELL_FACES_PG(J,I) .NE. -1) THEN
+               NUM_BOUNDARY_ELEM = NUM_BOUNDARY_ELEM + 1
+
+               V1 = U3D_GRID%CELL_NODES(IND(J,1),I)
+               V2 = U3D_GRID%CELL_NODES(IND(J,2),I)
+               V3 = U3D_GRID%CELL_NODES(IND(J,3),I)
+
+               IF (.NOT. NODE_ON_BOUNDARY(V1)) THEN
+                  NUM_BOUNDARY_NODES = NUM_BOUNDARY_NODES + 1
+                  U3D_GRID%NODES_BOUNDARY_INDEX(V1) = NUM_BOUNDARY_NODES
+                  NODE_ON_BOUNDARY(V1) = .TRUE.
+               END IF
+               IF (.NOT. NODE_ON_BOUNDARY(V2)) THEN
+                  NUM_BOUNDARY_NODES = NUM_BOUNDARY_NODES + 1
+                  U3D_GRID%NODES_BOUNDARY_INDEX(V2) = NUM_BOUNDARY_NODES
+                  NODE_ON_BOUNDARY(V2) = .TRUE.
+               END IF
+               IF (.NOT. NODE_ON_BOUNDARY(V3)) THEN
+                  NUM_BOUNDARY_NODES = NUM_BOUNDARY_NODES + 1
+                  U3D_GRID%NODES_BOUNDARY_INDEX(V3) = NUM_BOUNDARY_NODES
+                  NODE_ON_BOUNDARY(V3) = .TRUE.
+               END IF
+               
+            END IF
+         END DO
+      END DO      
+
+      U2D_GRID%NUM_CELLS = NUM_BOUNDARY_ELEM
+      U2D_GRID%NUM_NODES = NUM_BOUNDARY_NODES
+      ALLOCATE(U2D_GRID%CELL_NODES(3, NUM_BOUNDARY_ELEM))
+      ALLOCATE(U2D_GRID%CELL_PG(NUM_BOUNDARY_ELEM))
+      ALLOCATE(U2D_GRID%NODE_COORDS(3, NUM_BOUNDARY_NODES))
+
+      DO I = 1, NNODES
+         IF (NODE_ON_BOUNDARY(I)) THEN
+            U2D_GRID%NODE_COORDS(:,U3D_GRID%NODES_BOUNDARY_INDEX(I)) = U3D_GRID%NODE_COORDS(:,I)
+         END IF
+      END DO
+
+      NUM_BOUNDARY_ELEM = 0
+      NUM_BOUNDARY_NODES = 0
+      DO I = 1, NCELLS
+         DO J = 1, 4
+            IF (U3D_GRID%CELL_FACES_PG(J,I) .NE. -1) THEN
+               NUM_BOUNDARY_ELEM = NUM_BOUNDARY_ELEM + 1
+               U2D_GRID%CELL_PG(NUM_BOUNDARY_ELEM) = U3D_GRID%CELL_FACES_PG(J,I)
+               U3D_GRID%CELL_FACES_BOUNDARY_INDEX(J,I) = NUM_BOUNDARY_ELEM
+
+               V1 = U3D_GRID%CELL_NODES(IND(J,1),I)
+               V2 = U3D_GRID%CELL_NODES(IND(J,2),I)
+               V3 = U3D_GRID%CELL_NODES(IND(J,3),I)
+               U2D_GRID%CELL_NODES(1, NUM_BOUNDARY_ELEM) = U3D_GRID%NODES_BOUNDARY_INDEX(V1)
+               U2D_GRID%CELL_NODES(2, NUM_BOUNDARY_ELEM) = U3D_GRID%NODES_BOUNDARY_INDEX(V2)
+               U2D_GRID%CELL_NODES(3, NUM_BOUNDARY_ELEM) = U3D_GRID%NODES_BOUNDARY_INDEX(V3)
+
+            END IF
+         END DO
+      END DO
+      
+      DEALLOCATE(NODE_ON_BOUNDARY)
+
+      NBOUNDARY = NUM_BOUNDARY_ELEM
+
+      ! Compute areas and lengths of boundary mesh
+      ALLOCATE(U2D_GRID%CELL_AREAS(U2D_GRID%NUM_CELLS))
+      DO I = 1, U2D_GRID%NUM_CELLS
+         A = U2D_GRID%NODE_COORDS(:, U2D_GRID%CELL_NODES(1,I))
+         B = U2D_GRID%NODE_COORDS(:, U2D_GRID%CELL_NODES(2,I))
+         C = U2D_GRID%NODE_COORDS(:, U2D_GRID%CELL_NODES(3,I))
+
+         U2D_GRID%CELL_AREAS(I) = 0.5*NORM2(CROSS(B-A, C-A))
+      END DO
+
+
+
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '============================================================='
          WRITE(*,*) 'Done reading grid file.'
          WRITE(*,*) 'It contains ', NNODES, ' nodes and ', NCELLS, ' cells.'
-         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'The boundary grid contains ', NBOUNDARY, ' elements'
+         WRITE(*,*) '============================================================='
       END IF
 
    END SUBROUTINE READ_3D_UNSTRUCTURED_GRID_SU2

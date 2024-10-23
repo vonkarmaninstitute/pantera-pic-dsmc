@@ -169,6 +169,7 @@ MODULE initialization
          ! ~~~~~~~~~~~~~  File output ~~~~~~~~~~~~~~~
 
          IF (line=='Flowfield_output:')        READ(in1,*) FLOWFIELD_SAVE_PATH
+         IF (line=='Boundary_output:')         READ(in1,*) BOUNDARY_SAVE_PATH
          IF (line=='Particle_dump_output:')    READ(in1,*) PARTDUMP_SAVE_PATH
          IF (line=='Trajectory_dump_output:')  READ(in1,*) TRAJDUMP_SAVE_PATH
          IF (line=='Fluxes_dump_output:')      READ(in1,*) FLUXDUMP_SAVE_PATH
@@ -180,20 +181,24 @@ MODULE initialization
             TRAJDUMP_SAVE_PATH = FLOWFIELD_SAVE_PATH
             PARTDUMP_SAVE_PATH = FLOWFIELD_SAVE_PATH
             RESIDUAL_SAVE_PATH = FLOWFIELD_SAVE_PATH
+            BOUNDARY_SAVE_PATH = FLOWFIELD_SAVE_PATH
          END IF
          IF (line=='Binary_output:')           READ(in1,*) BOOL_BINARY_OUTPUT
-         IF (line=='Dump_part_every:')         READ(in1,*) DUMP_EVERY
-         IF (line=='Dump_part_start:')         READ(in1,*) DUMP_START
+         IF (line=='Dump_part_every:')         READ(in1,*) DUMP_PART_EVERY
+         IF (line=='Dump_part_start:')         READ(in1,*) DUMP_PART_START
          IF (line=='Dump_part_fracsample:')    READ(in1,*) PARTDUMP_FRACSAMPLE
-         IF (line=='Dump_bound_every:')        READ(in1,*) DUMP_BOUND_EVERY
+         IF (line=='Dump_part_bound_every:')   READ(in1,*) DUMP_PART_BOUND_EVERY
+         IF (line=='Dump_part_bound_start:')   READ(in1,*) DUMP_PART_BOUND_START
+         IF (line=='Dump_bound_avgevery:')     READ(in1,*) DUMP_BOUND_AVG_EVERY
          IF (line=='Dump_bound_start:')        READ(in1,*) DUMP_BOUND_START
+         IF (line=='Dump_bound_numavgs:')      READ(in1,*) DUMP_BOUND_N_AVG
          IF (line=='Dump_grid_avgevery:')      READ(in1,*) DUMP_GRID_AVG_EVERY
          IF (line=='Dump_grid_start:')         READ(in1,*) DUMP_GRID_START
          IF (line=='Dump_grid_numavgs:')       READ(in1,*) DUMP_GRID_N_AVG
          IF (line=='Bool_dump_moments:')       READ(in1,*) BOOL_DUMP_MOMENTS
          IF (line=='Bool_dump_fluxes:')        READ(in1,*) BOOL_DUMP_FLUXES
-         IF (line=='Dump_traj_start:')         READ(in1,*) TRAJECTORY_DUMP_START
-         IF (line=='Dump_traj_number:')        READ(in1,*) TRAJECTORY_DUMP_NUMBER
+         IF (line=='Dump_traj_start:')         READ(in1,*) DUMP_TRAJECTORY_START
+         IF (line=='Dump_traj_number:')        READ(in1,*) DUMP_TRAJECTORY_NUMBER
          IF (line=='Dump_force_start:')        READ(in1,*) DUMP_FORCE_START
          IF (line=='Dump_force_every:')        READ(in1,*) DUMP_FORCE_EVERY
 
@@ -1933,7 +1938,7 @@ MODULE initialization
       IMPLICIT NONE
 
       INTEGER            :: IP, NP_INIT, IC
-      REAL(KIND=8)       :: Xp, Yp, Zp, VXp, VYp, VZp, EROT, EVIB, DOMAIN_VOLUME
+      REAL(KIND=8)       :: Xp, Yp, Zp, VXp, VYp, VZp, EROT, EVIB, DOMAIN_VOLUME, VOL
       INTEGER            :: CID
 
       REAL(KIND=8), DIMENSION(3) :: V1, V2, V3, V4
@@ -1979,7 +1984,12 @@ MODULE initialization
 
 
                   ! Compute number of particles of this species to be created in this cell.
-                  NP_INIT = RANDINT(INITIAL_PARTICLES_TASKS(ITASK)%NRHO/(FNUM*SPECIES(S_ID)%SPWT)*CELL_VOLUMES(IC)* &
+                  IF (DIMS == 2) THEN
+                     VOL = U2D_GRID%CELL_VOLUMES(IC)
+                  ELSE IF (DIMS == 3) THEN
+                     VOL = U3D_GRID%CELL_VOLUMES(IC)
+                  END IF
+                  NP_INIT = RANDINT(INITIAL_PARTICLES_TASKS(ITASK)%NRHO/(FNUM*SPECIES(S_ID)%SPWT)*VOL* &
                               MIXTURES(INITIAL_PARTICLES_TASKS(ITASK)%MIX_ID)%COMPONENTS(i)%MOLFRAC)
                   IF (NP_INIT == 0) CYCLE
 

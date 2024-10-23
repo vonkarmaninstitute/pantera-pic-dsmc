@@ -223,7 +223,7 @@ MODULE fully_implicit
 
       IF (DIMS == 2) THEN
          DO I = 1, NCELLS
-            AREA = CELL_AREAS(I)
+            AREA = U2D_GRID%CELL_AREAS(I)
             
             ! We need to ADD to a sparse matrix entry.
             DO P = 1, 3
@@ -257,7 +257,7 @@ MODULE fully_implicit
          END DO
       ELSE IF (DIMS == 3) THEN
          DO I = 1, NCELLS
-            VOLUME = CELL_VOLUMES(I)
+            VOLUME = U3D_GRID%CELL_VOLUMES(I)
             
             ! We need to ADD to a sparse matrix entry.
             DO P = 1, 4
@@ -342,7 +342,7 @@ MODULE fully_implicit
 
       IF (DIMS == 2) THEN
          DO I = 1, NCELLS
-            AREA = CELL_AREAS(I)
+            AREA = U2D_GRID%CELL_AREAS(I)
             V1 = U2D_GRID%CELL_NODES(1,I)
             V2 = U2D_GRID%CELL_NODES(2,I)
             V3 = U2D_GRID%CELL_NODES(3,I)            
@@ -373,7 +373,7 @@ MODULE fully_implicit
          END DO
       ELSE IF (DIMS == 3) THEN
          DO I = 1, NCELLS
-            VOLUME = CELL_VOLUMES(I)
+            VOLUME = U3D_GRID%CELL_VOLUMES(I)
             DO P = 1, 4
                VP = U3D_GRID%CELL_NODES(P,I)
                DO Q = 1, 4
@@ -520,7 +520,7 @@ MODULE fully_implicit
       CALL MatGetOwnershipRange( jac, Istart, Iend, ierr)
       IF (JACOBIAN_TYPE == 6) THEN
          DO I = 1, NCELLS
-            AREA = CELL_AREAS(I)
+            AREA = U2D_GRID%CELL_AREAS(I)
             DO P = 1, 3
                VP = U2D_GRID%CELL_NODES(P,I)
                IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
@@ -535,7 +535,7 @@ MODULE fully_implicit
 
       IF (JACOBIAN_TYPE == 7) THEN
          DO I = 1, NCELLS
-            AREA = CELL_AREAS(I)
+            AREA = U2D_GRID%CELL_AREAS(I)
             DO P = 1, 3
                VP = U2D_GRID%CELL_NODES(P,I)
                IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
@@ -598,7 +598,7 @@ MODULE fully_implicit
          ME = SPECIES(ELECTRON_S_ID)%MOLECULAR_MASS
          IF (DIMS == 2) THEN
             DO I = 1, NCELLS
-               AREA = CELL_AREAS(I)
+               AREA = U2D_GRID%CELL_AREAS(I)
                FACTOR1 = 0.25*DT*DT*KB*CELL_TE(I)/ME
                FACTOR2 = 0.25*DT*DT*QE*QE*CELL_NE(I)/EPS0/ME
                ! We need to ADD to a sparse matrix entry.
@@ -652,7 +652,7 @@ MODULE fully_implicit
 
       IF (DIMS == 2) THEN
          DO I = 1, NCELLS
-            AREA = CELL_AREAS(I)
+            AREA = U2D_GRID%CELL_AREAS(I)
             
             ! We need to ADD to a sparse matrix entry.
             DO P = 1, 3
@@ -686,7 +686,7 @@ MODULE fully_implicit
          END DO
       ELSE IF (DIMS == 3) THEN
          DO I = 1, NCELLS
-            VOLUME = CELL_VOLUMES(I)
+            VOLUME = U3D_GRID%CELL_VOLUMES(I)
             
             ! We need to ADD to a sparse matrix entry.
             DO P = 1, 4
@@ -826,7 +826,7 @@ MODULE fully_implicit
 
       IF (DIMS == 2) THEN
          DO I = 1, NCELLS
-            AREA = CELL_AREAS(I)
+            AREA = U2D_GRID%CELL_AREAS(I)
             V1 = U2D_GRID%CELL_NODES(1,I)
             V2 = U2D_GRID%CELL_NODES(2,I)
             V3 = U2D_GRID%CELL_NODES(3,I)            
@@ -857,7 +857,7 @@ MODULE fully_implicit
          END DO
       ELSE IF (DIMS == 3) THEN
          DO I = 1, NCELLS
-            VOLUME = CELL_VOLUMES(I)
+            VOLUME = U3D_GRID%CELL_VOLUMES(I)
             DO P = 1, 4
                VP = U3D_GRID%CELL_NODES(P,I)
                DO Q = 1, 4
@@ -951,7 +951,7 @@ MODULE fully_implicit
 
          IF (DIMS == 2) THEN
             DO I = 1, NCELLS
-               AREA = CELL_AREAS(I)
+               AREA = U2D_GRID%CELL_AREAS(I)
                FACTOR1 = 0.25*DT*DT*KB*CELL_TE(I)/ME
                FACTOR2 = -0.25*DT*DT*QE*QE*CELL_NE(I)/EPS0/ME
                ! We need to ADD to a sparse matrix entry.
@@ -1006,7 +1006,7 @@ MODULE fully_implicit
 
       IF (DIMS == 2) THEN
          DO I = 1, NCELLS
-            AREA = CELL_AREAS(I)
+            AREA = U2D_GRID%CELL_AREAS(I)
             
             ! We need to ADD to a sparse matrix entry.
             DO P = 1, 3
@@ -1040,7 +1040,7 @@ MODULE fully_implicit
          END DO
       ELSE IF (DIMS == 3) THEN
          DO I = 1, NCELLS
-            VOLUME = CELL_VOLUMES(I)
+            VOLUME = U3D_GRID%CELL_VOLUMES(I)
             
             ! We need to ADD to a sparse matrix entry.
             DO P = 1, 4
@@ -1113,12 +1113,12 @@ MODULE fully_implicit
 
             IF (DIMS == 2) THEN
                
-               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*part_to_deposit(JP)%DTRIM/EPS0/CELL_AREAS(IC)/(ZMAX-ZMIN)*FNUM &
+               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*part_to_deposit(JP)%DTRIM/EPS0/U2D_GRID%CELL_AREAS(IC)/(ZMAX-ZMIN)*FNUM &
                                  * (QE*CHARGE)**2/SPECIES(part_to_deposit(JP)%S_ID)%MOLECULAR_MASS
 
             ELSE IF (DIMS == 3) THEN
 
-               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*part_to_deposit(JP)%DTRIM/EPS0/CELL_VOLUMES(IC)*FNUM &
+               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*part_to_deposit(JP)%DTRIM/EPS0/U3D_GRID%CELL_VOLUMES(IC)*FNUM &
                                  * (QE*CHARGE)**2/SPECIES(part_to_deposit(JP)%S_ID)%MOLECULAR_MASS
 
             END IF
@@ -1245,7 +1245,11 @@ MODULE fully_implicit
             END IF
          END DO
    
-         CELL_NE = TIMESTEP_NP*FNUM / CELL_VOLUMES
+         IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
+            CELL_NE = TIMESTEP_NP*FNUM / U2D_GRID%CELL_VOLUMES
+         ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
+            CELL_NE = TIMESTEP_NP*FNUM / U3D_GRID%CELL_VOLUMES
+         END IF
          CELL_TE = (TIMESTEP_TTRX + TIMESTEP_TTRY + TIMESTEP_TTRZ) / 3.
 
       ELSE
@@ -2773,7 +2777,7 @@ MODULE fully_implicit
 
       IF (DIMS == 2) THEN
          DO I = 1, NCELLS
-            AREA = CELL_AREAS(I)
+            AREA = U2D_GRID%CELL_AREAS(I)
 
             IF (U2D_GRID%CELL_PG(I) == -1) THEN
                EPS_REL = 1.d0
@@ -2854,7 +2858,7 @@ MODULE fully_implicit
          END DO
       ELSE IF (DIMS == 3) THEN
          DO I = 1, NCELLS
-            VOLUME = CELL_VOLUMES(I)
+            VOLUME = U3D_GRID%CELL_VOLUMES(I)
 
             IF (U3D_GRID%CELL_PG(I) == -1) THEN
                EPS_REL = 1.d0
@@ -2976,7 +2980,7 @@ MODULE fully_implicit
 
       IF (DIMS == 2) THEN
          DO I = 1, NCELLS
-            AREA = CELL_AREAS(I)
+            AREA = U2D_GRID%CELL_AREAS(I)
 
             IF (U2D_GRID%CELL_PG(I) == -1) THEN
                EPS_REL = 1.d0
@@ -3058,7 +3062,8 @@ MODULE fully_implicit
          END DO
       ELSE IF (DIMS == 3) THEN
          DO I = 1, NCELLS
-            VOLUME = CELL_VOLUMES(I)
+
+            VOLUME = U3D_GRID%CELL_VOLUMES(I)
 
             IF (U3D_GRID%CELL_PG(I) == -1) THEN
                EPS_REL = 1.d0
@@ -3629,10 +3634,13 @@ MODULE fully_implicit
 
             CALL COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)
 
-            IF (GRID_TYPE == RECTILINEAR_UNIFORM .AND. .NOT. AXI) THEN
+   
+            IF (GRID_TYPE == RECTILINEAR_UNIFORM .AND. DIMS == 2) THEN
                VOL = CELL_VOL
-            ELSE
-               VOL = CELL_VOLUMES(part_adv(JP)%IC)
+            ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
+               VOL = U2D_GRID%CELL_VOLUMES(part_adv(JP)%IC)
+            ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
+               VOL = U3D_GRID%CELL_VOLUMES(part_adv(JP)%IC)
             END IF
 
             CFNUM = FNUM
@@ -4602,8 +4610,8 @@ MODULE fully_implicit
       !CALL VecDestroy(vals,ierr)
       !CALL VecDestroy(cols,ierr)
 
-      IF ((tID .GT. DUMP_BOUND_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
-         IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_EVERY) .EQ. 0) THEN
+      IF ((tID .GT. DUMP_PART_BOUND_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
+         IF (MOD(tID-DUMP_PART_BOUND_START, DUMP_PART_BOUND_EVERY) .EQ. 0) THEN
             CALL DUMP_BOUNDARY_PARTICLES_FILE(tID)
             IF (ALLOCATED(part_dump)) DEALLOCATE(part_dump)
             NP_DUMP_PROC = 0

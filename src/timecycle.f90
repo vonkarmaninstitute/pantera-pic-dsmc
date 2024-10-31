@@ -43,7 +43,7 @@ MODULE timecycle
 
          CALL DEPOSIT_CHARGE(particles)
          IF (PIC_TYPE == HYBRID) THEN
-            CALL SETUP_SOLID_NODES            
+            ! CALL SETUP_SOLID_NODES            
             CALL SOLVE_BOLTZMANN
          ELSE
             CALL SETUP_POISSON

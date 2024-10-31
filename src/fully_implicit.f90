@@ -3264,15 +3264,45 @@ MODULE fully_implicit
 
       IMPLICIT NONE
 
+      INTEGER :: IC, IP, V
+
       IF (ALLOCATED(BOLTZ_NRHOE)) DEALLOCATE(BOLTZ_NRHOE)
       ALLOCATE(BOLTZ_NRHOE(NNODES))
 
-      BOLTZ_NRHOE = BOLTZ_N0 * exp(QE*(PHI_FIELD - BOLTZ_PHI0)/(KB*BOLTZ_TE))
-      IF (BOOL_KAPPA_FLUID) THEN
-         BOLTZ_NRHOE = BOLTZ_N0*(1-QE*(PHI_FIELD - BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
-         **(-KAPPA_FLUID_C+1./2.)
+      IF (DIMS == 2) THEN
+         DO IC=1, NCELLS
+            IF (GRID_BC(U2D_GRID%CELL_PG(IC))%VOLUME_BC == FLUID) THEN
+               DO IP = 1, 3
+                  V = U2D_GRID%CELL_NODES(IP,IC)
+                  BOLTZ_NRHOE(V) = BOLTZ_N0 * exp(QE*(PHI_FIELD(V) - BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                  IF (BOOL_KAPPA_FLUID) THEN
+                     BOLTZ_NRHOE(V) = BOLTZ_N0*(1-QE*(PHI_FIELD(V) - BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
+                     **(-KAPPA_FLUID_C+1./2.)
+                  END IF
+               END DO
+            END IF
+         END DO
+      ELSE IF (DIMS==3) THEN      
+         DO IC=1, NCELLS
+            IF (GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC == FLUID) THEN
+               DO IP = 1, 4
+                  V = U3D_GRID%CELL_NODES(IP,IC)
+                  BOLTZ_NRHOE(V) = BOLTZ_N0 * exp(QE*(PHI_FIELD(V) - BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                  IF (BOOL_KAPPA_FLUID) THEN
+                     BOLTZ_NRHOE(V) = BOLTZ_N0*(1-QE*(PHI_FIELD(V) - BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
+                     **(-KAPPA_FLUID_C+1./2.)
+                  END IF
+               END DO
+            END IF
+         END DO
       END IF
-      BOLTZ_NRHOE = BOLTZ_NRHOE*BOLTZ_SOLID_NODES
+
+      ! BOLTZ_NRHOE = BOLTZ_N0 * exp(QE*(PHI_FIELD - BOLTZ_PHI0)/(KB*BOLTZ_TE))
+      ! IF (BOOL_KAPPA_FLUID) THEN
+      !    BOLTZ_NRHOE = BOLTZ_N0*(1-QE*(PHI_FIELD - BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
+      !    **(-KAPPA_FLUID_C+1./2.)
+      ! END IF
+      ! BOLTZ_NRHOE = BOLTZ_NRHOE*BOLTZ_SOLID_NODES
 
    END SUBROUTINE GET_BOLTZMANN_DENSITY
 

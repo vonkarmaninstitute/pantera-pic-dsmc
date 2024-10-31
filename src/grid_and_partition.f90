@@ -786,7 +786,6 @@ MODULE grid_and_partition
       INTEGER :: IDX, JN, JC1, JC2
 
       LOGICAL, DIMENSION(:), ALLOCATABLE :: NODE_ON_BOUNDARY
-      INTEGER, DIMENSION(:), ALLOCATABLE :: NODES_BOUNDARY_INDEX
       INTEGER :: NUM_BOUNDARY_NODES, NUM_BOUNDARY_ELEM
 
       ! Open input file for reading
@@ -1234,7 +1233,7 @@ MODULE grid_and_partition
       END DO
 
       NUM_BOUNDARY_ELEM = 0
-      NUM_BOUNDARY_NODES = 0
+
       DO I = 1, NCELLS
          DO J = 1, 3
             IF (U2D_GRID%CELL_EDGES_PG(J,I) .NE. -1) THEN
@@ -1257,7 +1256,8 @@ MODULE grid_and_partition
       
       DEALLOCATE(NODE_ON_BOUNDARY)
 
-      NBOUNDARY = NUM_BOUNDARY_ELEM
+      NBOUNDCELLS = NUM_BOUNDARY_ELEM
+      NBOUNDNODES = NUM_BOUNDARY_NODES
 
       ! Compute areas and lengths of boundary mesh
       ALLOCATE(U1D_GRID%SEGMENT_LENGTHS(U1D_GRID%NUM_SEGMENTS))
@@ -1279,7 +1279,7 @@ MODULE grid_and_partition
          WRITE(*,*) '============================================================='
          WRITE(*,*) 'Done reading grid file.'
          WRITE(*,*) 'It contains ', NNODES, ' nodes and ', NCELLS, ' cells.'
-         WRITE(*,*) 'The boundary grid contains ', NBOUNDARY, ' elements'
+         WRITE(*,*) 'The boundary grid contains ', NBOUNDCELLS, ' lines and ', NBOUNDNODES, ' nodes.'
          WRITE(*,*) '============================================================='
       END IF
 
@@ -1319,7 +1319,6 @@ MODULE grid_and_partition
       REAL(KIND=8) :: VOLUME, X1, X2, X3, X4, Y1, Y2, Y3, Y4, Z1, Z2, Z3, Z4
 
       LOGICAL, DIMENSION(:), ALLOCATABLE :: NODE_ON_BOUNDARY
-      INTEGER, DIMENSION(:), ALLOCATABLE :: NODES_BOUNDARY_INDEX
       INTEGER :: NUM_BOUNDARY_NODES, NUM_BOUNDARY_ELEM
 
       ! Open input file for reading
@@ -1805,7 +1804,7 @@ MODULE grid_and_partition
       END DO
 
       NUM_BOUNDARY_ELEM = 0
-      NUM_BOUNDARY_NODES = 0
+
       DO I = 1, NCELLS
          DO J = 1, 4
             IF (U3D_GRID%CELL_FACES_PG(J,I) .NE. -1) THEN
@@ -1826,7 +1825,8 @@ MODULE grid_and_partition
       
       DEALLOCATE(NODE_ON_BOUNDARY)
 
-      NBOUNDARY = NUM_BOUNDARY_ELEM
+      NBOUNDCELLS = NUM_BOUNDARY_ELEM
+      NBOUNDNODES = NUM_BOUNDARY_NODES
 
       ! Compute areas and lengths of boundary mesh
       ALLOCATE(U2D_GRID%CELL_AREAS(U2D_GRID%NUM_CELLS))
@@ -1845,7 +1845,7 @@ MODULE grid_and_partition
          WRITE(*,*) '============================================================='
          WRITE(*,*) 'Done reading grid file.'
          WRITE(*,*) 'It contains ', NNODES, ' nodes and ', NCELLS, ' cells.'
-         WRITE(*,*) 'The boundary grid contains ', NBOUNDARY, ' elements'
+         WRITE(*,*) 'The boundary grid contains ', NBOUNDCELLS, ' surfaces and ', NBOUNDNODES, ' nodes.'
          WRITE(*,*) '============================================================='
       END IF
 

@@ -16,7 +16,7 @@ MODULE washboard
 
       REAL(KIND=8), INTENT(OUT) :: VY_I
       REAL(KIND=8) :: A, G, ALPHA_N, ALPHA_T, T, CI, LIMIT_TRAP, MAXX, MAXX_NEG, PHI_A, R, THETA_A, THETA_LIM, W
-      INTEGER :: col_to_trap = 20
+      INTEGER :: col_to_trap = 3
       REAL(KIND=8), DIMENSION(3) :: VELOCITIES
       REAL(KIND=8), DIMENSION(2) :: ANGLE_VALUES
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: theta_i_v, theta_r_v, A_v, g_v1, g_v2
@@ -26,7 +26,7 @@ MODULE washboard
 
       REAL(KIND=8) :: ITPL
       
-      TRAPPING = 0
+      TRAPPING = 1
       VY_I = 0.d0
       NDOWN = 0
       NUP = 0
@@ -426,22 +426,24 @@ subroutine find_indices(arr, val, idx1, idx2, frac)
    integer :: i
    
    if (val <= arr(1)) then
-       idx1 = 1
-       idx2 = 2
-       frac = 0.0
+      idx1 = 1
+      idx2 = 2
+      frac = 0.0
+      WRITE(*,*) 'Value outside the interpolation range!'
    else if (val >= arr(size(arr))) then
-       idx1 = size(arr) - 1
-       idx2 = size(arr)
-       frac = 1.0
+      idx1 = size(arr) - 1
+      idx2 = size(arr)
+      frac = 1.0
+      WRITE(*,*) 'Value outside the interpolation range!'
    else
-       do i = 1, size(arr) - 1
-           if (val >= arr(i) .and. val <= arr(i+1)) then
-               idx1 = i
-               idx2 = i + 1
-               frac = (val - arr(i)) / (arr(i+1) - arr(i))
-               exit
-           end if
-       end do
+      do i = 1, size(arr) - 1
+         if (val >= arr(i) .and. val <= arr(i+1)) then
+            idx1 = i
+            idx2 = i + 1
+            frac = (val - arr(i)) / (arr(i+1) - arr(i))
+            exit
+         end if
+      end do
    end if
 end subroutine find_indices
 

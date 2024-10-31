@@ -7,15 +7,15 @@ CMP  = mpifort -c -cpp -I$(PETSC_DIR)/include
 LNK  = mpifort -cpp
 OPTF = -O3 -fimplicit-none
 
+SRCDIR = src/
+BUILDDIR = src/
+
 # A few more compiler flags for GNU fortran that could be useful:
 #-O0 -Ofast -Wall -Wextra -Warray-temporaries -ggdb3 -pedantic -fimplicit-none -fcheck=all -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow -mcmodel=medium # Debug options
 #-march=native -Wall -Wextra -fimplicit-none -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow -mcmodel=medium # Aggressive optimization options 
 
 # Objects: list of all objects *.o
 OBJS = $(BUILDDIR)mpi_common.o  $(BUILDDIR)global.o  $(BUILDDIR)screen.o  $(BUILDDIR)tools.o  $(BUILDDIR)initialization.o  $(BUILDDIR)timecycle.o  $(BUILDDIR)grid_and_partition.o  $(BUILDDIR)particle.o  $(BUILDDIR)collisions.o  $(BUILDDIR)postprocess.o  $(BUILDDIR)fields.o  $(BUILDDIR)mt19937.o  $(BUILDDIR)fully_implicit.o  $(BUILDDIR)washboard.o
-
-SRCDIR = src/
-BUILDDIR = build/
 
 #  The following variable must either be a path to petsc.pc or just "petsc" if petsc.pc
 #  has been installed to a system location or can be found in PKG_CONFIG_PATH.
@@ -107,7 +107,7 @@ createbuilddir:  clean
 
 clean: 
 	@echo cleaning objects, modules and executables 
-	rm -rf build *.exe
+	rm -rf build *.exe src/*.mod src/*.o
 
 cleanoutput:
 	@echo cleaning output and dump files

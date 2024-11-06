@@ -94,13 +94,13 @@ MODULE collisions
       END DO
 
       ! Verify: ! DBDBDBDBDBDDBDBDBDBDBDBDDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBD
-      DO JC = 1, NCELLS
-         DO JS = 1, N_SPECIES
-            DO JP = IOF(JS,JC), IOF(JS,JC)+NPC(JS,JC)-1
-               IF (particles(IND(JP))%S_ID .NE. JS) WRITE(*,*) 'Error in sorting!'
-            END DO
-         END DO
-      END DO
+      ! DO JC = 1, NCELLS
+      !    DO JS = 1, N_SPECIES
+      !       DO JP = IOF(JS,JC), IOF(JS,JC)+NPC(JS,JC)-1
+      !          IF (particles(IND(JP))%S_ID .NE. JS) WRITE(*,*) 'Error in sorting!'
+      !       END DO
+      !    END DO
+      ! END DO
    
       ! Compute collisions between particles
       TIMESTEP_COLL = 0

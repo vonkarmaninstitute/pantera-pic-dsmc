@@ -55,16 +55,24 @@ MODULE collisions
       IOFALL = -1
       IDX = 1
       IDXALL = 1
+      ! DO JC = 1, NCELLS
+      !    IF (NPCALL(JC) .NE. 0) THEN
+      !       IOFALL(JC) = IDXALL
+      !       IDXALL = IDXALL + NPCALL(JC)
+      !    END IF
+      !    DO JS = 1, N_SPECIES
+      !       IF (NPC(JS,JC) .NE. 0) THEN
+      !          IOF(JS,JC) = IDX
+      !          IDX = IDX + NPC(JS,JC)
+      !       END IF
+      !    END DO
+      ! END DO
       DO JC = 1, NCELLS
-         IF (NPCALL(JC) .NE. 0) THEN
-            IOFALL(JC) = IDXALL
-            IDXALL = IDXALL + NPCALL(JC)
-         END IF
+         IOFALL(JC) = IDXALL
+         IDXALL = IDXALL + NPCALL(JC)
          DO JS = 1, N_SPECIES
-            IF (NPC(JS,JC) .NE. 0) THEN
-               IOF(JS,JC) = IDX
-               IDX = IDX + NPC(JS,JC)
-            END IF
+            IOF(JS,JC) = IDX
+            IDX = IDX + NPC(JS,JC)
          END DO
       END DO
 
@@ -86,9 +94,11 @@ MODULE collisions
       END DO
 
       ! Verify: ! DBDBDBDBDBDDBDBDBDBDBDBDDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBD
-      DO JS = 1, N_SPECIES
-         DO JP = IOF(JS,1), IOF(JS,1)+NPC(JS,1)-1
-            IF (particles(IND(JP))%S_ID .NE. JS) WRITE(*,*) 'Error in sorting!'
+      DO JC = 1, NCELLS
+         DO JS = 1, N_SPECIES
+            DO JP = IOF(JS,JC), IOF(JS,JC)+NPC(JS,JC)-1
+               IF (particles(IND(JP))%S_ID .NE. JS) WRITE(*,*) 'Error in sorting!'
+            END DO
          END DO
       END DO
    
@@ -584,6 +594,9 @@ MODULE collisions
          SP_ID1 = REACTIONS(JR)%R1_SP_ID
          SP_ID2 = REACTIONS(JR)%R2_SP_ID
 
+         ! Test if there are enough particles of reactants
+         IF ( (NPC(SP_ID1,JC) .LT. 1) .OR. (NPC(SP_ID2,JC) .LT. 1) ) EXIT
+
          ! Step 1. Compute the number of pairs to test for collision
 
          VXMAX = -1.D+38
@@ -648,9 +661,9 @@ MODULE collisions
 
          IF (NCOLLMAX_INT .LT. 1) THEN
             NCOLL = 1
-         ELSE IF (NCOLLMAX_INT .GT. FLOOR(0.5*NPC(SP_ID1,JC))) THEN
+         ELSE IF (NCOLLMAX_INT .GT. FLOOR(FACTOR*NPC(SP_ID1,JC))) THEN
             NCOLL = FLOOR(0.5*NPC(SP_ID1,JC))
-         ELSE IF (NCOLLMAX_INT .GT. FLOOR(0.5*NPC(SP_ID2,JC))) THEN
+         ELSE IF (NCOLLMAX_INT .GT. FLOOR(FACTOR*NPC(SP_ID2,JC))) THEN
             NCOLL = FLOOR(0.5*NPC(SP_ID2,JC))
          ELSE 
             NCOLL = NCOLLMAX_INT
@@ -667,18 +680,27 @@ MODULE collisions
 
             ! Select a particle pair randomly.
 
-            DO
-               IND1 = IOF(SP_ID1,JC) + INT(NPC(SP_ID1,JC)*rf())
-               JP1 = IND(IND1)
-               IF (.NOT. HAS_REACTED(IND1)) EXIT
-            END DO
+            ! DO
+            !    IND1 = IOF(SP_ID1,JC) + INT(NPC(SP_ID1,JC)*rf())
+            !    JP1 = IND(IND1)
+            !    IF (.NOT. HAS_REACTED(IND1)) EXIT
+            ! END DO
+            !!!!!!!! TODO: check if the IF condition for CYCLE Is correct
+            IND1 = IOF(SP_ID1,JC) - IOF(1,JC) + INT(NPC(SP_ID1,JC)*rf()) + 1
+            JP1 = IND(IND1 + IOF(1,JC) - 1)
+            IF (HAS_REACTED(IND1)) CYCLE
 
             ! Select second collision partner randomly (shouldn't be JP1)
-            DO
-               IND2 = IOF(SP_ID2,JC) + INT(NPC(SP_ID2,JC)*rf())
-               JP2 = IND(IND2)
-               IF ((.NOT. HAS_REACTED(IND2)) .AND. (JP2 .NE. JP1)) EXIT
-            END DO
+            ! DO
+            !    IND2 = IOF(SP_ID2,JC) + INT(NPC(SP_ID2,JC)*rf())
+            !    JP2 = IND(IND2)
+            !    IND2 = IND2 - IOF(SP_ID2,JC) + 1
+            !    IF ((.NOT. HAS_REACTED(IND2)) .AND. (JP2 .NE. JP1)) EXIT
+            ! END DO
+            IND2 = IOF(SP_ID2,JC) - IOF(1,JC) + INT(NPC(SP_ID2,JC)*rf()) + 1
+            JP2 = IND(IND2 + IOF(1,JC) - 1)
+            IF (HAS_REACTED(IND2)) CYCLE
+            !!!!!!!!!!!!!!!!!!!!
 
             ! Compute the relative velocity
             VR2 = (particles(JP2)%VX - particles(JP1)%VX)**2 + &

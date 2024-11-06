@@ -683,8 +683,9 @@ MODULE collisions
             ! DO
             !    IND1 = IOF(SP_ID1,JC) + INT(NPC(SP_ID1,JC)*rf())
             !    JP1 = IND(IND1)
-            !    IF (.NOT. HAS_REACTED(IND1)) EXIT
+            !    IND1 = IND1 - IOF(1,JC) + 1
             ! END DO
+
             !!!!!!!! TODO: check if the IF condition for CYCLE Is correct
             IND1 = IOF(SP_ID1,JC) - IOF(1,JC) + INT(NPC(SP_ID1,JC)*rf()) + 1
             JP1 = IND(IND1 + IOF(1,JC) - 1)

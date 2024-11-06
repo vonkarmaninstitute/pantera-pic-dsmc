@@ -85,8 +85,11 @@ MODULE washboard
          ndown = ndown + 1
          !print*, down, vx_i,vy_i,vz_i
          ! Sample local normal
-         maxx = interpolate(theta_i_v, A_v, g_v, Max_P, theta_a, A, g)/cos(theta_a)
+         maxx = interpolate(theta_i_v, A_v, g_v, Max_P, theta_a, A, g)/cos(theta_a)  ! this takes forever!!
          angle_values = accept_reject_surf(maxx, theta_a, phi_a, A, g,down)
+         IF (VZ_I < 0) VZ_I = -VZ_I
+         RETURN
+
          velocities(:) = CL_Kernel_local(vx_i, vy_i, vz_i, alpha_n, alpha_t, ci,angle_values(1),angle_values(2))
          vx_i =  velocities(1) 
          vy_i =  velocities(2)
@@ -272,8 +275,8 @@ MODULE washboard
 
    ux = SQRT(((vx*SIN(beta) - vy*COS(beta))**2 + &
       (vx*COS(alpha)*COS(beta) + vy*SIN(beta)*COS(alpha) - vz*SIN(alpha))**2) / &
-     (vx*COS(alpha)*COS(beta) + vy*SIN(beta)*COS(alpha) - vz*SIN(alpha))**2) * &
-(vx*COS(alpha)*COS(beta) + vy*SIN(beta)*COS(alpha) - vz*SIN(alpha))
+      (vx*COS(alpha)*COS(beta) + vy*SIN(beta)*COS(alpha) - vz*SIN(alpha))**2) * &
+      (vx*COS(alpha)*COS(beta) + vy*SIN(beta)*COS(alpha) - vz*SIN(alpha))
 
    uy = 0
 
@@ -293,12 +296,12 @@ function Local_to_lab_mine_phi(ux, uy, uz, alpha, beta, psi)
 
 
    vx_r = ux*(-SIN(beta)*SIN(psi) + COS(alpha)*COS(beta)*COS(psi)) + &
-       uy*(-SIN(beta)*COS(psi) - SIN(psi)*COS(alpha)*COS(beta)) + &
-       uz*SIN(alpha)*COS(beta)
+          uy*(-SIN(beta)*COS(psi) - SIN(psi)*COS(alpha)*COS(beta)) + &
+          uz*SIN(alpha)*COS(beta)
 
    vy_r = ux*(SIN(beta)*COS(alpha)*COS(psi) + SIN(psi)*COS(beta)) + &
-       uy*(-SIN(beta)*SIN(psi)*COS(alpha) + COS(beta)*COS(psi)) + &
-       uz*SIN(alpha)*SIN(beta)
+          uy*(-SIN(beta)*SIN(psi)*COS(alpha) + COS(beta)*COS(psi)) + &
+          uz*SIN(alpha)*SIN(beta)
    vz_r = -ux*SIN(alpha)*COS(psi) + uy*SIN(alpha)*SIN(psi) + uz*COS(alpha)
 
    Local_to_lab_mine_phi = [vx_r, vy_r, vz_r]
@@ -373,10 +376,19 @@ function interpolate(x, y, z, data, x_interp, y_interp, z_interp) result(result)
    REAL(KIND=8) :: x_frac, y_frac, z_frac
    
    ! Find the indices surrounding the interpolation point
-   call find_indices(x, x_interp, i1, i2, x_frac)
-   call find_indices(y, y_interp, j1, j2, y_frac)
-   call find_indices(z, z_interp, k1, k2, z_frac)
-   
+   !call find_indices(x, x_interp, i1, i2, x_frac)
+   !call find_indices(y, y_interp, j1, j2, y_frac) ! these are slow af
+   !call find_indices(z, z_interp, k1, k2, z_frac)
+   i1 = 1
+   i2 = 2
+   j1 = 1
+   j2 = 2
+   k1 = 1
+   k2 = 2
+   x_frac = 1
+   y_frac = 1
+   z_frac = 1
+
    ! Perform trilinear interpolation
    f1 = data(i1,j1,k1) * (1.0 - x_frac) + data(i2,j1,k1) * x_frac
    f2 = data(i1,j2,k1) * (1.0 - x_frac) + data(i2,j2,k1) * x_frac

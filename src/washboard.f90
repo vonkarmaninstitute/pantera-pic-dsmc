@@ -22,10 +22,10 @@ MODULE washboard
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: theta_i_v, theta_r_v, A_v, g_v1, g_v2
       REAL(KIND=8), DIMENSION(40) :: g_v
       INTEGER :: COL, DOWN, I, J, TRAPPING, NDOWN, NUP, TD
-      REAL(KIND=8), DIMENSION(45,40,40) :: Max_P, Max_neg_P, Pup
 
       REAL(KIND=8) :: ITPL
       
+
       TRAPPING = 1
       VY_I = 0.d0
       NDOWN = 0
@@ -36,9 +36,6 @@ MODULE washboard
       A = GRID_BC(IPG)%A
       G = GRID_BC(IPG)%B
       W = GRID_BC(IPG)%W
-      Max_P = GRID_BC(IPG)%MAX_P_DN
-      Max_neg_P = GRID_BC(IPG)%MAX_P_UP
-      Pup = GRID_BC(IPG)%P_COLL_UP
       ALPHA_N = GRID_BC(IPG)%ACC_N
       ALPHA_T = GRID_BC(IPG)%ACC_T
 
@@ -80,16 +77,18 @@ MODULE washboard
 
       theta_a = ACOS(VZ_I/SQRT(VZ_I*VZ_I + VX_I*VX_I))
       phi_a = 0
+
+
+
       do while (VZ_I < 0)
          down = 1
          ndown = ndown + 1
          !print*, down, vx_i,vy_i,vz_i
          ! Sample local normal
-         maxx = interpolate(theta_i_v, A_v, g_v, Max_P, theta_a, A, g)/cos(theta_a)  ! this takes forever!!
+         
+         maxx = interpolate(theta_i_v, A_v, g_v, GRID_BC(IPG)%MAX_P_DN, theta_a, A, g)/cos(theta_a)
          angle_values = accept_reject_surf(maxx, theta_a, phi_a, A, g,down)
-         IF (VZ_I < 0) VZ_I = -VZ_I
-         RETURN
-
+         
          velocities(:) = CL_Kernel_local(vx_i, vy_i, vz_i, alpha_n, alpha_t, ci,angle_values(1),angle_values(2))
          vx_i =  velocities(1) 
          vy_i =  velocities(2)
@@ -99,7 +98,7 @@ MODULE washboard
          phi_a = atan2(vy_i, vx_i)
          if (vz_i > 0) then
                R = rf()
-               itpl = interpolate(theta_r_v, A_v, g_v, Pup, theta_a, A, g)
+               itpl = interpolate(theta_r_v, A_v, g_v, GRID_BC(IPG)%P_COLL_UP, theta_a, A, g)
                !WRITE(*,*) 'ITPL = ', ITPL
                if (R <= itpl  ) then 
                   col = 1
@@ -120,7 +119,7 @@ MODULE washboard
                   down = -1
                   nup = nup + 1
                   !print*, down, vx_i,vy_i,vz_i
-                  maxx_neg = interpolate(theta_r_v, A_v, g_v, Max_neg_P, theta_a, A, g)/cos(theta_a)    
+                  maxx_neg = interpolate(theta_r_v, A_v, g_v, GRID_BC(IPG)%MAX_P_UP, theta_a, A, g)/cos(theta_a)    
                   angle_values = accept_reject_surf(maxx_neg, theta_a, phi_a, A, g,down)
                   velocities(:) = CL_Kernel_local(vx_i, vy_i, vz_i, alpha_n, alpha_t, ci,angle_values(1),angle_values(2))
                   vx_i =  velocities(1) 
@@ -131,7 +130,7 @@ MODULE washboard
                   ! If after upwards collision the velocity is positive, we check for collision
                   if (vz_i > 0) then
                      R = rf()
-                     if (R <= interpolate(theta_r_v, A_v, g_v, Pup, theta_a, A, g)  ) then 
+                     if (R <= interpolate(theta_r_v, A_v, g_v, GRID_BC(IPG)%P_COLL_UP, theta_a, A, g)  ) then 
                            col = 1
                            !WRITE(*,*) 'Upwards collision 2!'
                      else 

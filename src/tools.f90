@@ -1228,7 +1228,7 @@ CONTAINS
          WRITE(*,*) '==================================================================='
          WRITE(*,*) 'Section             |    MAX    |    MIN    |    AVG    |  MAX/TOT'
 
-         WRITE(*,'(A21,F9.2,A3,F9.2,A3,F9.2,A3,F9.2,A2)') ' Initialization:     ',  &
+         WRITE(*,'(A21,F9.2,A3,F9.2,A3,F9.2,A3,F9.2,A2)') ' Misc:               ',  &
          TIMERS_MAX_AMONG_PROC(1),   ' s ', &
          TIMERS_MIN_AMONG_PROC(1),   ' s ', &
          TIMERS_AVG_AMONG_PROC(1),   ' s ', &

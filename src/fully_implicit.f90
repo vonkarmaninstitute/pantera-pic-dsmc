@@ -3185,6 +3185,12 @@ MODULE fully_implicit
                         POT2 = FACTOR*(1-QE*(PHI_FIELD(V2)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
                         **(-KAPPA_FLUID_C+1.)
                      END IF
+                     
+                     ! IF (IS_DIRICHLET(V1-1)) THEN
+                     !    POT1 = POT2
+                     ! ELSE IF (IS_DIRICHLET(V2-1)) THEN
+                     !    POT2 = POT1
+                     ! END IF
 
                      IF (AXI) THEN
                         SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) +&

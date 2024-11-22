@@ -230,8 +230,8 @@ MODULE timecycle
             CALL TIMER_STOP(2)
 
             CALL TIMER_START(3)
-            CALL FLUID_ELECTRONS_SURFACE_CHARGING
             CALL ADVECT
+            CALL FLUID_ELECTRONS_SURFACE_CHARGING
             CALL TIMER_STOP(3)
             
          ELSE

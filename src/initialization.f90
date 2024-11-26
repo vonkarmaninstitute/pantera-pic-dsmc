@@ -1065,11 +1065,8 @@ MODULE initialization
          READ(STRARRAY(3), '(ES14.0)') GRID_BC(IPG)%WALL_EFIELD
       ELSE IF (STRARRAY(2) == 'dielectric') THEN
          GRID_BC(IPG)%FIELD_BC = DIELECTRIC_BC
-         IF (STRARRAY(3) == 'conductive') THEN 
-            GRID_BC(IPG)%CONDUCTIVE_BC = .TRUE.
-            READ(STRARRAY(4), '(ES14.0)') GRID_BC(IPG)%CONDUCTIVE_BC_RESISTIVITY
-            READ(STRARRAY(5), '(ES14.0)') GRID_BC(IPG)%CONDUCTIVE_BC_AREA
-         END IF
+      ELSE IF (STRARRAY(2) == 'conductive') THEN
+         GRID_BC(IPG)%FIELD_BC = CONDUCTIVE_BC
       !!! BCs for both particles and field
       ELSE IF (STRARRAY(2) == 'periodic_master') THEN
          GRID_BC(IPG)%PARTICLE_BC = PERIODIC_MASTER
@@ -2243,8 +2240,6 @@ MODULE initialization
          EBAR_FIELD = 0.d0
          ALLOCATE(SURFACE_CHARGE(NNODES))
          SURFACE_CHARGE = 0.d0
-         ALLOCATE(CONDUCTIVE_DELTA_CHARGE(NNODES))
-         CONDUCTIVE_DELTA_CHARGE = 0.d0
       ELSE
          NPX = NX + 1
          IF (DIMS == 2) THEN

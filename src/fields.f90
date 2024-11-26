@@ -110,7 +110,8 @@ MODULE fields
                   IF (EDGE_PG .NE. -1) THEN
                      IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC &
                          .OR. GRID_BC(EDGE_PG)%FIELD_BC == RF_VOLTAGE_BC &
-                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC) THEN
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC &
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
                         IF (J==1) THEN
                            DIRICHLET(V1-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
                            DIRICHLET(V2-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
@@ -284,7 +285,8 @@ MODULE fields
                   IF (EDGE_PG .NE. -1) THEN
                      IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC &
                          .OR. GRID_BC(EDGE_PG)%FIELD_BC == RF_VOLTAGE_BC &
-                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC) THEN
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC &
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
                         IF (J==1) THEN
                            DIRICHLET(V1-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
                            DIRICHLET(V3-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL

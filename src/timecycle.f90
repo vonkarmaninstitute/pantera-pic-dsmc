@@ -1002,9 +1002,6 @@ MODULE timecycle
       INTEGER :: NEIGHBORPG
       REAL(KIND=8) :: CHARGE, K, PSIP, RHO_Q
       INTEGER :: VP
-      REAL(KIND=8) :: Y1, Y2, AREA, E_MAG2
-      INTEGER :: V1, V2, V3, VV1, VV2, VV3
-      REAL(KIND=8) :: POT1, POT2, POT3, RESISTANCE
 
       REAL(KIND=8) :: VXPRE, VYPRE, VZPRE
 
@@ -1297,12 +1294,8 @@ MODULE timecycle
                            IF (MOD(tID-DUMP_FORCE_START, DUMP_FORCE_EVERY) .EQ. 0) THEN
                               K = FNUM*SPECIES(particles(IP)%S_ID)%MOLECULAR_MASS                    
                               IF (DIMS == 2) THEN
-                                 IF (AXI) THEN
-                                    FORCE_DIRECT(1) = FORCE_DIRECT(1) + K*particles(IP)%VX/DT*2*PI/(ZMAX-ZMIN)
-                                 ELSE
-                                    FORCE_DIRECT(1) = FORCE_DIRECT(1) + K*particles(IP)%VX/DT
-                                    FORCE_DIRECT(2) = FORCE_DIRECT(2) + K*particles(IP)%VY/DT
-                                 END IF
+                                 FORCE_DIRECT(1) = FORCE_DIRECT(1) + K*particles(IP)%VX/DT
+                                 FORCE_DIRECT(2) = FORCE_DIRECT(2) + K*particles(IP)%VY/DT
                               ELSE IF (DIMS ==3) THEN
                                  FORCE_DIRECT(1) = FORCE_DIRECT(1) + K*particles(IP)%VX/DT
                                  FORCE_DIRECT(2) = FORCE_DIRECT(2) + K*particles(IP)%VY/DT
@@ -1312,7 +1305,8 @@ MODULE timecycle
                         END IF
                         
                         CHARGE = SPECIES(particles(IP)%S_ID)%CHARGE
-                        IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. ABS(CHARGE) .GE. 1.d-6) THEN
+                        IF ( (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC &
+                           .OR.GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC) .AND. ABS(CHARGE) .GE. 1.d-6) THEN
                            K = QE/(EPS0*EPS_SCALING**2)
                            IF (DIMS == 2) THEN
                               RHO_Q = K*CHARGE*FNUM/(ZMAX-ZMIN)
@@ -1522,12 +1516,8 @@ MODULE timecycle
                               IF (REMOVE_PART(IP)) CYCLE ! IF PARTICLE IS ABSORBED, CYCLE
                               K = FNUM*SPECIES(particles(IP)%S_ID)%MOLECULAR_MASS                           
                               IF (DIMS == 2) THEN
-                                 IF (AXI) THEN
-                                    FORCE_DIRECT(1) = FORCE_DIRECT(1) - K*particles(IP)%VX/DT*2*PI/(ZMAX-ZMIN)
-                                 ELSE
-                                    FORCE_DIRECT(1) = FORCE_DIRECT(1) - K*particles(IP)%VX/DT
-                                    FORCE_DIRECT(2) = FORCE_DIRECT(2) - K*particles(IP)%VY/DT
-                                 END IF
+                                 FORCE_DIRECT(1) = FORCE_DIRECT(1) - K*particles(IP)%VX/DT
+                                 FORCE_DIRECT(2) = FORCE_DIRECT(2) - K*particles(IP)%VY/DT
                               ELSE IF (DIMS ==3) THEN
                                  FORCE_DIRECT(1) = FORCE_DIRECT(1) - K*particles(IP)%VX/DT
                                  FORCE_DIRECT(2) = FORCE_DIRECT(2) - K*particles(IP)%VY/DT
@@ -2056,8 +2046,6 @@ MODULE timecycle
             IF (PIC_TYPE .NE. NONE) THEN
                CALL COMPUTE_INDIRECT_FORCE
             END IF
-            SURFACE_CHARGE = SURFACE_CHARGE + CONDUCTIVE_DELTA_CHARGE
-
             CALL DUMP_FORCE_FILE(tID)
          END IF
       END IF

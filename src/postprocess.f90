@@ -1111,40 +1111,42 @@ MODULE postprocess
          END DO
 
          DO IC = 1, NCELLS
-            E_MAG2 = E_FIELD(1,1,IC)*E_FIELD(1,1,IC) + E_FIELD(2,1,IC)*E_FIELD(2,1,IC)&
-            + E_FIELD(3,1,IC)*E_FIELD(3,1,IC)
-            IF (DIMS == 2) THEN
-               DO IP = 1, 3
-                  IF (U2D_GRID%CELL_EDGES_BOUNDARY_INDEX(IP, IC) .NE. -1) THEN
-                     INDEX = U2D_GRID%CELL_EDGES_BOUNDARY_INDEX(IP, IC)
+            IF (CELL_PROCS(IC)==PROC_ID) THEN
+               E_MAG2 = E_FIELD(1,1,IC)*E_FIELD(1,1,IC) + E_FIELD(2,1,IC)*E_FIELD(2,1,IC)&
+               + E_FIELD(3,1,IC)*E_FIELD(3,1,IC)
+               IF (DIMS == 2) THEN
+                  DO IP = 1, 3
+                     IF (U2D_GRID%CELL_EDGES_BOUNDARY_INDEX(IP, IC) .NE. -1) THEN
+                        INDEX = U2D_GRID%CELL_EDGES_BOUNDARY_INDEX(IP, IC)
 
-                     TIMESTEP_PXEM(INDEX) = TIMESTEP_PXEM(INDEX) + EPS0*&
-                     ( (E_FIELD(1,1,IC)*E_FIELD(1,1,IC) - 0.5*E_MAG2)*U2D_GRID%EDGE_NORMAL(1,IP,IC) &
-                     +  E_FIELD(1,1,IC)*E_FIELD(2,1,IC)*U2D_GRID%EDGE_NORMAL(2,IP,IC))
-                     TIMESTEP_PYEM(INDEX) = TIMESTEP_PYEM(INDEX) + EPS0*&
-                     (  E_FIELD(2,1,IC)*E_FIELD(1,1,IC)*U2D_GRID%EDGE_NORMAL(1,IP,IC) &
-                     + (E_FIELD(2,1,IC)*E_FIELD(2,1,IC) - 0.5*E_MAG2)*U2D_GRID%EDGE_NORMAL(2,IP,IC))
-                  END IF
-               END DO
-            ELSE IF (DIMS == 3) THEN
-               DO IP = 1, 4
-                  IF (U3D_GRID%CELL_FACES_BOUNDARY_INDEX(IP, IC) .NE. -1) THEN
-                     INDEX = U3D_GRID%CELL_FACES_BOUNDARY_INDEX(IP, IC)
+                        TIMESTEP_PXEM(INDEX) = TIMESTEP_PXEM(INDEX) + EPS0*&
+                        ( (E_FIELD(1,1,IC)*E_FIELD(1,1,IC) - 0.5*E_MAG2)*U2D_GRID%EDGE_NORMAL(1,IP,IC) &
+                        +  E_FIELD(1,1,IC)*E_FIELD(2,1,IC)*U2D_GRID%EDGE_NORMAL(2,IP,IC))
+                        TIMESTEP_PYEM(INDEX) = TIMESTEP_PYEM(INDEX) + EPS0*&
+                        (  E_FIELD(2,1,IC)*E_FIELD(1,1,IC)*U2D_GRID%EDGE_NORMAL(1,IP,IC) &
+                        + (E_FIELD(2,1,IC)*E_FIELD(2,1,IC) - 0.5*E_MAG2)*U2D_GRID%EDGE_NORMAL(2,IP,IC))
+                     END IF
+                  END DO
+               ELSE IF (DIMS == 3) THEN
+                  DO IP = 1, 4
+                     IF (U3D_GRID%CELL_FACES_BOUNDARY_INDEX(IP, IC) .NE. -1) THEN
+                        INDEX = U3D_GRID%CELL_FACES_BOUNDARY_INDEX(IP, IC)
 
-                     TIMESTEP_PXEM(INDEX) = TIMESTEP_PXEM(INDEX) + EPS0*&
-                     ( (E_FIELD(1,1,IC)*E_FIELD(1,1,IC) - 0.5*E_MAG2)*U3D_GRID%FACE_NORMAL(1,IP,IC) &
-                     +  E_FIELD(1,1,IC)*E_FIELD(2,1,IC)*U3D_GRID%FACE_NORMAL(2,IP,IC) &
-                     +  E_FIELD(1,1,IC)*E_FIELD(3,1,IC)*U3D_GRID%FACE_NORMAL(3,IP,IC))
-                     TIMESTEP_PYEM(INDEX) = TIMESTEP_PYEM(INDEX) + EPS0*&
-                     (  E_FIELD(2,1,IC)*E_FIELD(1,1,IC)*U3D_GRID%FACE_NORMAL(1,IP,IC) &
-                     + (E_FIELD(2,1,IC)*E_FIELD(2,1,IC) - 0.5*E_MAG2)*U3D_GRID%FACE_NORMAL(2,IP,IC) &
-                     +  E_FIELD(2,1,IC)*E_FIELD(3,1,IC)*U3D_GRID%FACE_NORMAL(3,IP,IC))
-                     TIMESTEP_PZEM(INDEX) = TIMESTEP_PZEM(INDEX) + EPS0*&
-                     (  E_FIELD(3,1,IC)*E_FIELD(1,1,IC)*U3D_GRID%FACE_NORMAL(1,IP,IC) &
-                     +  E_FIELD(3,1,IC)*E_FIELD(2,1,IC)*U3D_GRID%FACE_NORMAL(2,IP,IC) &
-                     + (E_FIELD(3,1,IC)*E_FIELD(3,1,IC) - 0.5*E_MAG2)*U3D_GRID%FACE_NORMAL(3,IP,IC))
-                  END IF
-               END DO
+                        TIMESTEP_PXEM(INDEX) = TIMESTEP_PXEM(INDEX) + EPS0*&
+                        ( (E_FIELD(1,1,IC)*E_FIELD(1,1,IC) - 0.5*E_MAG2)*U3D_GRID%FACE_NORMAL(1,IP,IC) &
+                        +  E_FIELD(1,1,IC)*E_FIELD(2,1,IC)*U3D_GRID%FACE_NORMAL(2,IP,IC) &
+                        +  E_FIELD(1,1,IC)*E_FIELD(3,1,IC)*U3D_GRID%FACE_NORMAL(3,IP,IC))
+                        TIMESTEP_PYEM(INDEX) = TIMESTEP_PYEM(INDEX) + EPS0*&
+                        (  E_FIELD(2,1,IC)*E_FIELD(1,1,IC)*U3D_GRID%FACE_NORMAL(1,IP,IC) &
+                        + (E_FIELD(2,1,IC)*E_FIELD(2,1,IC) - 0.5*E_MAG2)*U3D_GRID%FACE_NORMAL(2,IP,IC) &
+                        +  E_FIELD(2,1,IC)*E_FIELD(3,1,IC)*U3D_GRID%FACE_NORMAL(3,IP,IC))
+                        TIMESTEP_PZEM(INDEX) = TIMESTEP_PZEM(INDEX) + EPS0*&
+                        (  E_FIELD(3,1,IC)*E_FIELD(1,1,IC)*U3D_GRID%FACE_NORMAL(1,IP,IC) &
+                        +  E_FIELD(3,1,IC)*E_FIELD(2,1,IC)*U3D_GRID%FACE_NORMAL(2,IP,IC) &
+                        + (E_FIELD(3,1,IC)*E_FIELD(3,1,IC) - 0.5*E_MAG2)*U3D_GRID%FACE_NORMAL(3,IP,IC))
+                     END IF
+                  END DO
+               END IF
             END IF
          END DO
       END IF

@@ -70,8 +70,6 @@ MODULE fields
       NEUMANN = 0.d0
       IF (.NOT. ALLOCATED(IS_NEUMANN)) ALLOCATE(IS_NEUMANN(0:SIZE-1))
       IS_NEUMANN = .FALSE.
-      IF (.NOT. ALLOCATED(IS_DIELECTRIC)) ALLOCATE(IS_DIELECTRIC(0:SIZE-1))
-      IS_DIELECTRIC = .FALSE.
 
       one = 1
 
@@ -134,16 +132,6 @@ MODULE fields
                            IS_NEUMANN(V2-1) = .TRUE.; IS_NEUMANN(V3-1) = .TRUE.
                         ELSE
                            IS_NEUMANN(V3-1) = .TRUE.; IS_NEUMANN(V1-1) = .TRUE.
-                        END IF
-                     END IF
-                     
-                     IF (GRID_BC(EDGE_PG)%FIELD_BC == DIELECTRIC_BC) THEN
-                        IF (J==1) THEN
-                           IS_DIELECTRIC(V1-1) = .TRUE.; IS_DIELECTRIC(V2-1) = .TRUE.
-                        ELSE IF (J==2) THEN
-                           IS_DIELECTRIC(V2-1) = .TRUE.; IS_DIELECTRIC(V3-1) = .TRUE.
-                        ELSE
-                           IS_DIELECTRIC(V3-1) = .TRUE.; IS_DIELECTRIC(V1-1) = .TRUE.
                         END IF
                      END IF
                   END IF
@@ -335,26 +323,6 @@ MODULE fields
                            IS_NEUMANN(V1-1) = .TRUE.
                            IS_NEUMANN(V4-1) = .TRUE.
                            IS_NEUMANN(V3-1) = .TRUE.
-                        END IF
-                     END IF
-
-                     IF (GRID_BC(EDGE_PG)%FIELD_BC == DIELECTRIC_BC) THEN
-                        IF (J==1) THEN
-                           IS_DIELECTRIC(V1-1) = .TRUE.
-                           IS_DIELECTRIC(V3-1) = .TRUE.
-                           IS_DIELECTRIC(V2-1) = .TRUE.
-                        ELSE IF (J==2) THEN
-                           IS_DIELECTRIC(V1-1) = .TRUE.
-                           IS_DIELECTRIC(V2-1) = .TRUE.
-                           IS_DIELECTRIC(V4-1) = .TRUE.
-                        ELSE IF (J==3) THEN
-                           IS_DIELECTRIC(V2-1) = .TRUE.
-                           IS_DIELECTRIC(V3-1) = .TRUE.
-                           IS_DIELECTRIC(V4-1) = .TRUE.
-                        ELSE
-                           IS_DIELECTRIC(V4-1) = .TRUE.
-                           IS_DIELECTRIC(V3-1) = .TRUE.
-                           IS_DIELECTRIC(V1-1) = .TRUE.
                         END IF
                      END IF
                   END IF
@@ -636,8 +604,6 @@ MODULE fields
       NEUMANN = 0.d0
       IF (.NOT. ALLOCATED(IS_NEUMANN)) ALLOCATE(IS_NEUMANN(0:SIZE-1))
       IS_NEUMANN = .FALSE.
-      IF (.NOT. ALLOCATED(IS_DIELECTRIC)) ALLOCATE(IS_DIELECTRIC(0:SIZE-1))
-      IS_DIELECTRIC = .FALSE.
 
 
       ! Create the matrix in Sparse Triplet format.

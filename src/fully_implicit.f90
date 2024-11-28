@@ -2676,8 +2676,9 @@ MODULE fully_implicit
       CALL MatSetSizes(Jmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
       CALL MatSetType(Jmat, MATMPIAIJ, ierr)
 
-      CALL MatMPIAIJSetPreallocation(Jmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER, ierr)
-      CALL MatSetFromOptions(Jmat, ierr)
+      ! CALL MatMPIAIJSetPreallocation(Jmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
+      ! CALL MatSetFromOptions(Jmat,ierr)
+      ! CALL MatSetUp(Jmat,ierr)
 
       ! CALL MatCreate(PETSC_COMM_WORLD,Pmat,ierr)
       ! CALL MatSetSizes(Pmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
@@ -2710,8 +2711,7 @@ MODULE fully_implicit
       ! ------ SOLVE ------
       CALL SNESSolve(snes,PETSC_NULL_VEC,solvec,ierr)
       CALL SNESGetConvergedReason(snes,snesreason,ierr)
-      CALL SNESGetIterationNumber(snes,its,ierr)
-      IF (PROC_ID == 0) WRITE(*,*) 'SNESConvergedReason = ', snesreason, '  ||  SNESIterationNumber = ', its
+      IF (PROC_ID == 0) WRITE(*,*) 'SNESConvergedReason = ', snesreason
       
       CALL VecScatterCreateToAll(solvec,ctx,solvec_seq,ierr)
       CALL VecScatterBegin(ctx,solvec,solvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
@@ -2747,13 +2747,10 @@ MODULE fully_implicit
       PetscScalar, POINTER :: RESIDUAL(:)
       CHARACTER(LEN=512)  :: filename
 
-      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA, EPS_REL
+      REAL(KIND=8) :: Y1, Y2, Y3, AREA, EPS_REL
       INTEGER :: V1, V2, V3, I
       INTEGER :: P, Q, VP, VQ
       REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD, KE
-
-      TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: part_adv
-
 
       IF (PROC_ID == 0) THEN
          WRITE(*,*) 'FormFunctionBoltz Called'
@@ -2920,7 +2917,6 @@ MODULE fully_implicit
 
 
       CALL VecNorm(f,NORM_2,norm,ierr)
-      CALL SNESGetIterationNumber(snes,its,ierr)
       IF (PROC_ID == 0) THEN
          WRITE(*,*) '||RESIDUAL|| = ', norm
          WRITE(filename, "(A,A)") TRIM(ADJUSTL(RESIDUAL_SAVE_PATH)), "residuals" ! Compose filename   
@@ -2930,6 +2926,7 @@ MODULE fully_implicit
       END IF
 
       DEALLOCATE(RHS_NEW)
+
    END SUBROUTINE FormFunctionBoltz
 
    SUBROUTINE FormJacobianBoltz(snes,x,jac,prec,dummy,ierr_l)
@@ -2944,7 +2941,7 @@ MODULE fully_implicit
       INTEGER dummy(*)
       INTEGER I, IC
 
-      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, EPS_REL
+      REAL(KIND=8) :: Y1, Y2, Y3, EPS_REL
       INTEGER :: V1, V2, V3
       INTEGER :: P, Q, VP, VQ
       REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD, FACTOR, AREA
@@ -2953,14 +2950,13 @@ MODULE fully_implicit
          WRITE(*,*) 'FormJacobianBoltz Called'
       END IF
 
+      CALL MatMPIAIJSetPreallocation(jac,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
+      CALL MatSetFromOptions(jac,ierr)
+      CALL MatSetUp(jac,ierr)
 
-      !ALL MatSetFromOptions(jac,ierr)
-      !ALL MatSetUp(jac,ierr)
-!
-      !ALL MatZeroEntries(jac,ierr)
-
-      !CALL MatAssemblyBegin(jac,MAT_FLUSH_ASSEMBLY,ierr)
-      !CALL MatAssemblyEnd(jac,MAT_FLUSH_ASSEMBLY,ierr)
+      ! CALL MatZeroEntries(jac,ierr)
+      ! CALL MatAssemblyBegin(jac,MAT_FLUSH_ASSEMBLY,ierr)
+      ! CALL MatAssemblyEnd(jac,MAT_FLUSH_ASSEMBLY,ierr)
 
       CALL VecScatterCreateToAll(x,ctx,x_seq,ierr)
       CALL VecScatterBegin(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
@@ -3314,60 +3310,6 @@ MODULE fully_implicit
 
    END SUBROUTINE GET_BOLTZMANN_DENSITY
 
-   SUBROUTINE SETUP_SOLID_NODES
-
-      IMPLICIT NONE
-
-      INTEGER :: IC, IP, V
-      INTEGER :: FACE_PG
-
-      ALLOCATE(BOLTZ_SOLID_NODES(NNODES))
-      BOLTZ_SOLID_NODES = 1.
-      
-      IF (DIMS == 2) THEN
-         !! Set the value of BOLTZ_SOLID_NODES to 0. for every node inside the solid
-         DO IC=1, NCELLS
-            IF (GRID_BC(U2D_GRID%CELL_PG(IC))%VOLUME_BC == SOLID) THEN
-               DO IP = 1, 3
-                  V = U2D_GRID%CELL_NODES(IP,IC)
-                  IF (IS_DIELECTRIC(V-1)) THEN
-                     IF (U2D_GRID%CELL_NEIGHBORS(IP, IC) == -1) THEN
-                        IF (IP == 1) THEN
-                           BOLTZ_SOLID_NODES(U2D_GRID%CELL_NODES(1,IC)) = 0.
-                           BOLTZ_SOLID_NODES(U2D_GRID%CELL_NODES(2,IC)) = 0.
-                        ELSE IF (IP == 2) THEN
-                           BOLTZ_SOLID_NODES(U2D_GRID%CELL_NODES(2,IC)) = 0.
-                           BOLTZ_SOLID_NODES(U2D_GRID%CELL_NODES(3,IC)) = 0.
-                        ELSE IF (IP == 3) THEN
-                           BOLTZ_SOLID_NODES(U2D_GRID%CELL_NODES(3,IC)) = 0.
-                           BOLTZ_SOLID_NODES(U2D_GRID%CELL_NODES(1,IC)) = 0.
-                        END IF
-                     ELSE
-                        CYCLE ! We keep 1. on bundary
-                     END IF
-                  ELSE
-                     BOLTZ_SOLID_NODES(V) = 0.
-                  END IF
-               END DO
-            END IF
-         END DO
-
-      ELSE IF (DIMS==3) THEN      
-         !! Set the value of BOLTZ_SOLID_NODES to 0. for every node inside the solid
-         DO IC=1, NCELLS
-            IF (GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC == SOLID) THEN
-               DO IP = 1, 4
-                  V = U3D_GRID%CELL_NODES(IP,IC)
-                  IF (IS_DIELECTRIC(V-1)) THEN
-                     CYCLE ! We keep 1. on bundary
-                  ELSE
-                     BOLTZ_SOLID_NODES(V) = 0.
-                  END IF
-               END DO
-            END IF
-         END DO
-      END IF
-   END SUBROUTINE SETUP_SOLID_NODES
 
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -3895,7 +3837,8 @@ MODULE fully_implicit
                   IF (EDGE_PG .NE. -1) THEN
                      IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC &
                          .OR. GRID_BC(EDGE_PG)%FIELD_BC == RF_VOLTAGE_BC &
-                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC) THEN
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC &
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
 
                         IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC) THEN
                            POTENTIAL = GRID_BC(EDGE_PG)%WALL_POTENTIAL
@@ -3905,6 +3848,12 @@ MODULE fully_implicit
                         ELSE IF (GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC) THEN
                            POTENTIAL = GRID_BC(EDGE_PG)%WALL_POTENTIAL &
                                        + 0.5*GRID_BC(EDGE_PG)%WALL_RF_POTENTIAL*COS(2*PI*GRID_BC(EDGE_PG)%RF_FREQUENCY*tID*DT)
+                        ELSE IF (GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
+                           IF (.NOT. ALLOCATED(PHI_FIELD)) THEN
+                              ALLOCATE(PHI_FIELD(NNODES))
+                              PHI_FIELD = 0
+                           END IF
+                           CALL COMPUTE_FLOATING_POTENTIAL_FOR_CONDUCTIVE_SURFACE(POTENTIAL)
                         END IF
 
                         IF (J==1) THEN
@@ -4809,10 +4758,10 @@ MODULE fully_implicit
 
       INTEGER :: IC, IP, FACE_PG
       INTEGER :: V1, V2, V3, VV1, VV2, VV3, VE, VVE
-      REAL(KIND=8) :: Y1, Y2, AREA, H_DOT
+      REAL(KIND=8) :: Y1, Y2, AREA
       REAL(KIND=8), INTENT(INOUT) :: POTENTIAL
 
-      REAL(KIND=8) :: BOTTOM_FACTOR, TOP_FACTOR, TOTAL_CHARGE, GRAD_H
+      REAL(KIND=8) :: BOTTOM_FACTOR, TOP_FACTOR, TOTAL_CHARGE, GRAD_H, H_DOT
       BOTTOM_FACTOR = 0.d0
       TOP_FACTOR = 0.d0
       TOTAL_CHARGE = SUM(SURFACE_CHARGE)
@@ -4847,8 +4796,8 @@ MODULE fully_implicit
                      Y2 = U2D_GRID%NODE_COORDS(2, V2)       
                      AREA = U2D_GRID%CELL_EDGES_LEN(IP,IC)
 
-                     GRAD_H = - U2D_GRID%BASIS_COEFFS(1,VVE,IC)*U2D_GRID%EDGE_NORMAL(1,IP,IC)&
-                              - U2D_GRID%BASIS_COEFFS(2,VVE,IC)*U2D_GRID%EDGE_NORMAL(2,IP,IC)
+                     GRAD_H = SQRT(U2D_GRID%BASIS_COEFFS(1,VVE,IC)*U2D_GRID%BASIS_COEFFS(1,VVE,IC) + &
+                              U2D_GRID%BASIS_COEFFS(2,VVE,IC)*U2D_GRID%BASIS_COEFFS(2,VVE,IC))
                      H_DOT = U2D_GRID%BASIS_COEFFS(1,VV1,IC)*U2D_GRID%EDGE_NORMAL(1,IP,IC) +&
                            U2D_GRID%BASIS_COEFFS(2,VV1,IC)*U2D_GRID%EDGE_NORMAL(2,IP,IC) +&
                            U2D_GRID%BASIS_COEFFS(1,VV2,IC)*U2D_GRID%EDGE_NORMAL(1,IP,IC) +&
@@ -4899,9 +4848,9 @@ MODULE fully_implicit
                      VE = U3D_GRID%CELL_NODES(VVE,IC)
                      AREA = U3D_GRID%FACE_AREA(IP,IC)
 
-                     GRAD_H = - U3D_GRID%BASIS_COEFFS(1,VVE,IC)*U3D_GRID%FACE_NORMAL(1,IP,IC)&
-                              - U3D_GRID%BASIS_COEFFS(2,VVE,IC)*U3D_GRID%FACE_NORMAL(2,IP,IC)&
-                              - U3D_GRID%BASIS_COEFFS(3,VVE,IC)*U3D_GRID%FACE_NORMAL(3,IP,IC)
+                     GRAD_H = SQRT(U3D_GRID%BASIS_COEFFS(1,VVE,IC)*U3D_GRID%BASIS_COEFFS(1,VVE,IC)&
+                              + U3D_GRID%BASIS_COEFFS(2,VVE,IC)*U3D_GRID%BASIS_COEFFS(2,VVE,IC)&
+                              + U3D_GRID%BASIS_COEFFS(3,VVE,IC)*U3D_GRID%BASIS_COEFFS(2,VVE,IC))
 
                      H_DOT = U3D_GRID%BASIS_COEFFS(1,VV1,IC)*U3D_GRID%FACE_NORMAL(1,IP,IC)&
                            + U3D_GRID%BASIS_COEFFS(2,VV1,IC)*U3D_GRID%FACE_NORMAL(2,IP,IC)&
@@ -4925,8 +4874,9 @@ MODULE fully_implicit
                   BOTTOM_FACTOR
       ! IF (PROC_ID == 0) THEN
       !    IF ((POTENTIAL .NE. 0) .OR. (TOTAL_CHARGE .NE. 0)) THEN
-      !    WRITE(*,*) TOTAL_CHARGE/POTENTIAL
-      !    WRITE(*,*) TOTAL_CHARGE, TOP_FACTOR
+      !    WRITE(*,*) 'Capacitance: ', TOTAL_CHARGE/POTENTIAL
+      !    WRITE(*,*) 'Charge: ', TOTAL_CHARGE, 'Potential sum: ', TOP_FACTOR
+      !    WRITE(*,*) 'Bottom factor: ', BOTTOM_FACTOR
       !    WRITE(*,*) "------------"
       !    END IF
       ! END IF

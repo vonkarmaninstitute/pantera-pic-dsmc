@@ -2806,13 +2806,13 @@ MODULE fully_implicit
 
                         ! ---- FLUID ELECTRONS -----
                         
-                        VALUETOADD = QE*BOLTZ_N0/(EPS0)*AREA*EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                        VALUETOADD = QE*BOLTZ_N0/EPS0*AREA*EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
 
                         !!!!! TEST FOR SINH(U) POTENTIAL
                         ! VALUETOADD = QE*BOLTZ_N0/(EPS0)*AREA*SINH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
                         !!!!!
                         IF (BOOL_KAPPA_FLUID) THEN 
-                           VALUETOADD = QE*BOLTZ_N0/(EPS0)*AREA&
+                           VALUETOADD = QE*BOLTZ_N0/EPS0*AREA&
                            *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.))&
                            )**(-KAPPA_FLUID_C+1./2.)
                         END IF
@@ -2874,14 +2874,14 @@ MODULE fully_implicit
                      RHS_NEW(VP-1) = RHS_NEW(VP-1) + KPQ*PHI_FIELD_NEW(VQ)
 
                      ! FLUID ELECTRONS
-                     VALUETOADD = QE*BOLTZ_N0/(EPS0)*VOLUME*EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                     VALUETOADD = QE*BOLTZ_N0/EPS0*VOLUME*EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
 
                      !!!!! TEST FOR SINH(U) POTENTIAL
                      ! VALUETOADD = QE*BOLTZ_N0/(EPS0)*VOLUME*SINH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
                      !!!!!
 
                      IF (BOOL_KAPPA_FLUID) THEN 
-                        VALUETOADD = QE*BOLTZ_N0/(EPS0)*VOLUME&
+                        VALUETOADD = QE*BOLTZ_N0/EPS0*VOLUME&
                         *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
                         **(-KAPPA_FLUID_C+1./2.)
                      END IF

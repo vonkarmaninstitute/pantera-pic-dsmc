@@ -30,7 +30,7 @@ MODULE timecycle
       NP_TOT = 0
       CALL INIT_POSTPROCESS
       CALL INIT_BOUNDARY_POSTPROCESS
-      CALL BOUNDARY_RESET
+      ! CALL BOUNDARY_RESET
 
       ALLOCATE(FIELD_POWER_AVG(FIELD_POWER_NUMAVG))
       FIELD_POWER_AVG = FIELD_POWER_TARGET
@@ -42,8 +42,7 @@ MODULE timecycle
          CALL SET_WALL_POTENTIAL
 
          CALL DEPOSIT_CHARGE(particles)
-         IF (PIC_TYPE == HYBRID) THEN
-            ! CALL SETUP_SOLID_NODES            
+         IF (PIC_TYPE == HYBRID) THEN           
             CALL SOLVE_BOLTZMANN
          ELSE
             CALL SETUP_POISSON
@@ -67,12 +66,21 @@ MODULE timecycle
          IF (MOD(tID-DUMP_PART_START, DUMP_PART_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
       END IF
 
-      IF ((tID .GT. DUMP_GRID_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
+      IF ((tID .GE. DUMP_GRID_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
          ! If we are in the grid save timestep, average, then dump the cumulated averages
          IF (MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY*DUMP_GRID_N_AVG) .EQ. 0) THEN
             CALL GRID_AVG
             CALL GRID_SAVE
             CALL GRID_RESET
+         END IF
+      END IF
+
+      IF ((tID .GE. DUMP_BOUND_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
+         ! If we are in the grid save timestep, average, then dump the cumulated averages
+         IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_AVG_EVERY*DUMP_BOUND_N_AVG) .EQ. 0) THEN
+            CALL BOUNDARY_GATHER
+            CALL BOUNDARY_SAVE
+            CALL BOUNDARY_RESET
          END IF
       END IF
 
@@ -1284,8 +1292,10 @@ MODULE timecycle
 
 
                         ! Tally incident particle fluxes to boundary
-                        IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_AVG_EVERY) .EQ. 0) THEN
-                           CALL TALLY_PARTICLE_TO_BOUNDARY(.FALSE., particles(IP), IC, BOUNDCOLL)
+                        IF ((tID .GE. DUMP_GRID_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
+                           IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_AVG_EVERY) .EQ. 0) THEN
+                              CALL TALLY_PARTICLE_TO_BOUNDARY(.FALSE., particles(IP), IC, BOUNDCOLL)
+                           END IF
                         END IF
 
                         !!!!!!!!! DIRECT COLLISION WITH SOLID BODY !!!!!!!!!
@@ -1504,8 +1514,10 @@ MODULE timecycle
 
                         ! Tally reflected particle fluxes to boundary
                         IF (.NOT. REMOVE_PART(IP)) THEN
-                           IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_AVG_EVERY) .EQ. 0) THEN
-                              CALL TALLY_PARTICLE_TO_BOUNDARY(.TRUE., particles(IP), IC, BOUNDCOLL)
+                           IF ((tID .GE. DUMP_GRID_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
+                              IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_AVG_EVERY) .EQ. 0) THEN
+                                 CALL TALLY_PARTICLE_TO_BOUNDARY(.TRUE., particles(IP), IC, BOUNDCOLL)
+                              END IF
                            END IF
                         END IF
 

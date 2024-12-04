@@ -1,3 +1,21 @@
+! Copyright (C) 2024 von Karman Institute for Fluid Dynamics (VKI)
+!
+! This file is part of PANTERA PIC-DSMC, a software for the simulation
+! of rarefied gases and plasmas using particles.
+!
+! This program is free software: you can redistribute it and/or modify
+! it under the terms of the GNU General Public License as published by
+! the Free Software Foundation, either version 3 of the License, or
+! (at your option) any later version.
+
+! This program is distributed in the hope that it will be useful,
+! but WITHOUT ANY WARRANTY; without even the implied warranty of
+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+! GNU General Public License for more details.
+
+! You should have received a copy of the GNU General Public License
+! along with this program.  If not, see <https://www.gnu.org/licenses/>.PANTERA PIC-DSMC
+
 MODULE washboard
 
    USE global
@@ -16,7 +34,7 @@ MODULE washboard
 
       REAL(KIND=8), INTENT(OUT) :: VY_I
       REAL(KIND=8) :: A, G, ALPHA_N, ALPHA_T, T, CI, LIMIT_TRAP, MAXX, MAXX_NEG, PHI_A, R, THETA_A, THETA_LIM, W
-      INTEGER :: col_to_trap = 3
+      INTEGER :: col_to_trap = 20
       REAL(KIND=8), DIMENSION(3) :: VELOCITIES
       REAL(KIND=8), DIMENSION(2) :: ANGLE_VALUES
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: theta_i_v, theta_r_v, A_v, g_v1, g_v2
@@ -51,7 +69,7 @@ MODULE washboard
 
 
       !Get the grid where the pre-computed values were taken
-      theta_i_v = linspace(pi/2, pi, 45)
+      theta_i_v = linspace(pi/2, pi, 45)    ! DBDBDBBDBDBDBDDBBDDB include in the structure
       theta_r_v = linspace(0.0d0, pi/2, 45)
       !Careful!!! 
       !This is the range of validity of the precomputed values for 
@@ -375,18 +393,18 @@ function interpolate(x, y, z, data, x_interp, y_interp, z_interp) result(result)
    REAL(KIND=8) :: x_frac, y_frac, z_frac
    
    ! Find the indices surrounding the interpolation point
-   !call find_indices(x, x_interp, i1, i2, x_frac)
-   !call find_indices(y, y_interp, j1, j2, y_frac) ! these are slow af
-   !call find_indices(z, z_interp, k1, k2, z_frac)
-   i1 = 1
-   i2 = 2
-   j1 = 1
-   j2 = 2
-   k1 = 1
-   k2 = 2
-   x_frac = 1
-   y_frac = 1
-   z_frac = 1
+   call find_indices(x, x_interp, i1, i2, x_frac)
+   call find_indices(y, y_interp, j1, j2, y_frac) ! these are slow af
+   call find_indices(z, z_interp, k1, k2, z_frac)
+   ! i1 = 1
+   ! i2 = 2
+   ! j1 = 1
+   ! j2 = 2
+   ! k1 = 1
+   ! k2 = 2
+   ! x_frac = 1
+   ! y_frac = 1
+   ! z_frac = 1
 
    ! Perform trilinear interpolation
    f1 = data(i1,j1,k1) * (1.0 - x_frac) + data(i2,j1,k1) * x_frac

@@ -1,3 +1,21 @@
+! Copyright (C) 2024 von Karman Institute for Fluid Dynamics (VKI)
+!
+! This file is part of PANTERA PIC-DSMC, a software for the simulation
+! of rarefied gases and plasmas using particles.
+!
+! This program is free software: you can redistribute it and/or modify
+! it under the terms of the GNU General Public License as published by
+! the Free Software Foundation, either version 3 of the License, or
+! (at your option) any later version.
+
+! This program is distributed in the hope that it will be useful,
+! but WITHOUT ANY WARRANTY; without even the implied warranty of
+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+! GNU General Public License for more details.
+
+! You should have received a copy of the GNU General Public License
+! along with this program.  If not, see <https://www.gnu.org/licenses/>.PANTERA PIC-DSMC
+
 MODULE timecycle
 
    USE global
@@ -1032,7 +1050,7 @@ MODULE timecycle
 
       FIELD_POWER = 0
 
-      !OPEN(66341, FILE='washboarddump', POSITION='append', STATUS='unknown', ACTION='write')
+      OPEN(66341, FILE='washboarddump', POSITION='append', STATUS='unknown', ACTION='write')
 
 
       DO IP = 1, NP_PROC
@@ -1352,6 +1370,10 @@ MODULE timecycle
                            IF (GRID_BC(FACE_PG)%REACT) THEN
                               CALL WALL_REACT(particles, IP, REMOVE_PART(IP))
                            END IF
+                           
+                           VXPRE = particles(IP)%VX
+                           VYPRE = particles(IP)%VY
+                           VZPRE = particles(IP)%VZ
 
                            S_ID = particles(IP)%S_ID
                            WALL_TEMP = GRID_BC(FACE_PG)%WALL_TEMP
@@ -1377,6 +1399,12 @@ MODULE timecycle
                            
                            particles(IP)%EROT = EROT
                            particles(IP)%EVIB = EVIB
+
+                           IF (rf() < 0.01) THEN
+                              WRITE(66341,*) VXPRE, ',', VYPRE, ',', VZPRE, ',', &
+                              particles(IP)%VX, ',', particles(IP)%VY, ',', particles(IP)%VZ, ',',&
+                              FACE_NORMAL(1), ',', FACE_NORMAL(2), ',', FACE_NORMAL(3)
+                              END IF
 
                         ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == CLL) THEN
                            IF (GRID_BC(FACE_PG)%REACT) THEN
@@ -1498,8 +1526,11 @@ MODULE timecycle
                            particles(IP)%EROT = EROT
                            particles(IP)%EVIB = EVIB
 
-                           !WRITE(66341,*) VXPRE, ', ', VYPRE, ', ', VZPRE, ', ', &
-                           !particles(IP)%VX, ', ', particles(IP)%VY, ', ', particles(IP)%VZ
+                           IF (rf() < 0.01) THEN
+                           WRITE(66341,*) VXPRE, ',', VYPRE, ',', VZPRE, ',', &
+                           particles(IP)%VX, ',', particles(IP)%VY, ',', particles(IP)%VZ, ',',&
+                           FACE_NORMAL(1), ',', FACE_NORMAL(2), ',', FACE_NORMAL(3)
+                           END IF
                            
                         ELSE
                            REMOVE_PART(IP) = .TRUE.

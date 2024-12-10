@@ -2079,7 +2079,7 @@ MODULE timecycle
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       !!!!!! INDIRECT FORCE CALC + SAVE DATA !!!!
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      IF ((tID .GT. DUMP_FORCE_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
+      IF ((tID .GT. DUMP_FORCE_START) .AND. (tID .NE. RESTART_TIMESTEP) .AND. GRID_TYPE == UNSTRUCTURED) THEN
          IF (DIMS==2) THEN
             DO IC=1, NCELLS
                IF (CELL_PROCS(IC)==PROC_ID) THEN

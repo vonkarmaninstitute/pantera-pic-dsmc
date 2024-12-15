@@ -204,7 +204,7 @@ MODULE global
       LOGICAL :: REACT = .FALSE.
       LOGICAL :: DUMP_FLUXES = .FALSE.
 
-      LOGICAL :: DUMP_FORCE_BC = .FALSE.
+      ! LOGICAL :: DUMP_FORCE_BC = .FALSE.
 
       ! Washboard model
       REAL(KIND=8) :: A
@@ -633,12 +633,11 @@ MODULE global
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Drag force calculation !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-   REAL(KIND=8), DIMENSION(3) :: FORCE_DIRECT = 0.d0
-   REAL(KIND=8), DIMENSION(3) :: FORCE_INDIRECT = 0.d0
-   INTEGER                    :: DUMP_FORCE_START = -1
-   integer                    :: DUMP_FORCE_EVERY = 1.
-
+   ! REAL(KIND=8), DIMENSION(3) :: FORCE_DIRECT = 0.d0
+   ! REAL(KIND=8), DIMENSION(3) :: FORCE_INDIRECT = 0.d0
+   ! INTEGER                    :: DUMP_FORCE_START = -1
+   ! integer                    :: DUMP_FORCE_EVERY = 1.
+   !!!! TO BE DELETED
 
 
 

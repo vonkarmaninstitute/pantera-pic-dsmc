@@ -1299,20 +1299,19 @@ MODULE timecycle
                         END IF
 
                         !!!!!!!!! DIRECT COLLISION WITH SOLID BODY !!!!!!!!!
-                        !!!! TODO: IMPLEMENT DRAG FORCES ON INDIVIDUAL PHYSICAL GROUPS
-                        IF (GRID_BC(FACE_PG)%DUMP_FORCE_BC .AND. (tID .GE. DUMP_FORCE_START)) THEN
-                           IF (MOD(tID-DUMP_FORCE_START, DUMP_FORCE_EVERY) .EQ. 0) THEN
-                              K = FNUM*SPECIES(particles(IP)%S_ID)%MOLECULAR_MASS                    
-                              IF (DIMS == 2) THEN
-                                 FORCE_DIRECT(1) = FORCE_DIRECT(1) + K*particles(IP)%VX/DT
-                                 FORCE_DIRECT(2) = FORCE_DIRECT(2) + K*particles(IP)%VY/DT
-                              ELSE IF (DIMS ==3) THEN
-                                 FORCE_DIRECT(1) = FORCE_DIRECT(1) + K*particles(IP)%VX/DT
-                                 FORCE_DIRECT(2) = FORCE_DIRECT(2) + K*particles(IP)%VY/DT
-                                 FORCE_DIRECT(3) = FORCE_DIRECT(3) + K*particles(IP)%VZ/DT
-                              END IF
-                           END IF
-                        END IF
+                        ! IF (GRID_BC(FACE_PG)%DUMP_FORCE_BC .AND. (tID .GE. DUMP_FORCE_START)) THEN
+                        !    IF (MOD(tID-DUMP_FORCE_START, DUMP_FORCE_EVERY) .EQ. 0) THEN
+                        !       K = FNUM*SPECIES(particles(IP)%S_ID)%MOLECULAR_MASS                    
+                        !       IF (DIMS == 2) THEN
+                        !          FORCE_DIRECT(1) = FORCE_DIRECT(1) + K*particles(IP)%VX/DT
+                        !          FORCE_DIRECT(2) = FORCE_DIRECT(2) + K*particles(IP)%VY/DT
+                        !       ELSE IF (DIMS ==3) THEN
+                        !          FORCE_DIRECT(1) = FORCE_DIRECT(1) + K*particles(IP)%VX/DT
+                        !          FORCE_DIRECT(2) = FORCE_DIRECT(2) + K*particles(IP)%VY/DT
+                        !          FORCE_DIRECT(3) = FORCE_DIRECT(3) + K*particles(IP)%VZ/DT
+                        !       END IF
+                        !    END IF
+                        ! END IF
                         
                         CHARGE = SPECIES(particles(IP)%S_ID)%CHARGE
                         IF ( (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC &
@@ -1522,21 +1521,20 @@ MODULE timecycle
                         END IF
 
                         !!!!!!!!! DIRECT COLLISION WITH SOLID BODY !!!!!!!!!
-                        !!!! TODO: IMPLEMENT DRAG FORCES ON INDIVIDUAL PHYSICAL GROUPS
-                        IF (GRID_BC(FACE_PG)%DUMP_FORCE_BC .AND. (tID .GE. DUMP_FORCE_START) .AND. (DUMP_FORCE_START .NE. -1)) THEN
-                           IF (MOD(tID-DUMP_FORCE_START, DUMP_FORCE_EVERY) .EQ. 0) THEN
-                              IF (REMOVE_PART(IP)) CYCLE ! IF PARTICLE IS ABSORBED, CYCLE
-                              K = FNUM*SPECIES(particles(IP)%S_ID)%MOLECULAR_MASS                           
-                              IF (DIMS == 2) THEN
-                                 FORCE_DIRECT(1) = FORCE_DIRECT(1) - K*particles(IP)%VX/DT
-                                 FORCE_DIRECT(2) = FORCE_DIRECT(2) - K*particles(IP)%VY/DT
-                              ELSE IF (DIMS ==3) THEN
-                                 FORCE_DIRECT(1) = FORCE_DIRECT(1) - K*particles(IP)%VX/DT
-                                 FORCE_DIRECT(2) = FORCE_DIRECT(2) - K*particles(IP)%VY/DT
-                                 FORCE_DIRECT(3) = FORCE_DIRECT(3) - K*particles(IP)%VZ/DT
-                              END IF
-                           END IF
-                        END IF
+                        ! IF (GRID_BC(FACE_PG)%DUMP_FORCE_BC .AND. (tID .GE. DUMP_FORCE_START) .AND. (DUMP_FORCE_START .NE. -1)) THEN
+                        !    IF (MOD(tID-DUMP_FORCE_START, DUMP_FORCE_EVERY) .EQ. 0) THEN
+                        !       IF (REMOVE_PART(IP)) CYCLE ! IF PARTICLE IS ABSORBED, CYCLE
+                        !       K = FNUM*SPECIES(particles(IP)%S_ID)%MOLECULAR_MASS                           
+                        !       IF (DIMS == 2) THEN
+                        !          FORCE_DIRECT(1) = FORCE_DIRECT(1) - K*particles(IP)%VX/DT
+                        !          FORCE_DIRECT(2) = FORCE_DIRECT(2) - K*particles(IP)%VY/DT
+                        !       ELSE IF (DIMS ==3) THEN
+                        !          FORCE_DIRECT(1) = FORCE_DIRECT(1) - K*particles(IP)%VX/DT
+                        !          FORCE_DIRECT(2) = FORCE_DIRECT(2) - K*particles(IP)%VY/DT
+                        !          FORCE_DIRECT(3) = FORCE_DIRECT(3) - K*particles(IP)%VZ/DT
+                        !       END IF
+                        !    END IF
+                        ! END IF
                      ELSE
                         REMOVE_PART(IP) = .TRUE.
                         particles(IP)%DTRIM = 0.d0
@@ -2053,14 +2051,14 @@ MODULE timecycle
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       !!!!!! INDIRECT FORCE CALC + SAVE DATA !!!!
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      IF ((tID .GT. DUMP_FORCE_START) .AND. (DUMP_FORCE_START .NE. -1)) THEN
-         IF (MOD(tID-DUMP_FORCE_START, DUMP_FORCE_EVERY) .EQ. 0) THEN
-            IF (PIC_TYPE .NE. NONE) THEN
-               CALL COMPUTE_INDIRECT_FORCE
-            END IF
-            CALL DUMP_FORCE_FILE(tID)
-         END IF
-      END IF
+      ! IF ((tID .GT. DUMP_FORCE_START) .AND. (DUMP_FORCE_START .NE. -1)) THEN
+      !    IF (MOD(tID-DUMP_FORCE_START, DUMP_FORCE_EVERY) .EQ. 0) THEN
+      !       IF (PIC_TYPE .NE. NONE) THEN
+      !          CALL COMPUTE_INDIRECT_FORCE
+      !       END IF
+      !       CALL DUMP_FORCE_FILE(tID)
+      !    END IF
+      ! END IF
 
       !CLOSE(66341)
 

@@ -595,7 +595,7 @@ MODULE collisions
          SP_ID2 = REACTIONS(JR)%R2_SP_ID
 
          ! Test if there are enough particles of reactants
-         IF ( (NPC(SP_ID1,JC) .LT. 1) .OR. (NPC(SP_ID2,JC) .LT. 1) ) EXIT
+         IF ( (NPC(SP_ID1,JC) .LT. 1) .OR. (NPC(SP_ID2,JC) .LT. 1) ) CYCLE
 
          ! Step 1. Compute the number of pairs to test for collision
 

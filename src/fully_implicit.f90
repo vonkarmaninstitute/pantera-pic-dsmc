@@ -223,7 +223,7 @@ MODULE fully_implicit
 
       INTEGER :: V1, V2, V3
       INTEGER :: P, Q, VP, VQ
-      REAL(KIND=8) :: KPQ, VOLUME, AREA
+      REAL(KIND=8) :: KPQ, VOLUME, AREA, LENGTH
 
       IF (PROC_ID == 0) THEN
          WRITE(*,*) 'FormJacobianVectorProduct Called'
@@ -239,7 +239,31 @@ MODULE fully_implicit
 
       ! Accumulate Jacobian. All this is in principle not needed since we already have Amat.
 
-      IF (DIMS == 2) THEN
+      IF (DIMS == 1) THEN
+         DO I = 1, NCELLS
+            LENGTH = U1D_GRID%SEGMENT_LENGTHS(I)
+            
+            ! We need to ADD to a sparse matrix entry.
+            DO P = 1, 2
+               VP = U1D_GRID%CELL_NODES(P,I)
+               IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(VP-1)) THEN
+                     DO Q = 1, 2
+                        VQ = U1D_GRID%CELL_NODES(Q,I)
+                        KPQ = LENGTH*(U1D_GRID%BASIS_COEFFS(1,P,I)*U1D_GRID%BASIS_COEFFS(1,Q,I))
+
+                        IF (JACOBIAN_TYPE == 3 .OR. JACOBIAN_TYPE == 4) THEN
+                           KPQ = KPQ * (MASS_MATRIX(I)+1)
+                        END IF
+
+                        CALL MatSetValues(jac,one,VP-1,one,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
+                     END DO
+                  END IF
+               END IF
+            END DO
+
+         END DO
+      ELSE IF (DIMS == 2) THEN
          DO I = 1, NCELLS
             AREA = U2D_GRID%CELL_AREAS(I)
             
@@ -330,7 +354,7 @@ MODULE fully_implicit
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA
       INTEGER :: V1, V2, V3, I
       INTEGER :: P, Q, VP, VQ
-      REAL(KIND=8) :: KPQ, VOLUME
+      REAL(KIND=8) :: KPQ, VOLUME, LENGTH
 
       TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: part_adv
 
@@ -358,7 +382,21 @@ MODULE fully_implicit
       ALLOCATE(RHS_NEW, SOURCE = RHS)
       RHS_NEW = 0.d0
 
-      IF (DIMS == 2) THEN
+      IF (DIMS == 1) THEN
+         DO I = 1, NCELLS
+            LENGTH = U1D_GRID%SEGMENT_LENGTHS(I)
+            V1 = U1D_GRID%CELL_NODES(1,I)
+            V2 = U1D_GRID%CELL_NODES(2,I)
+
+
+            K11 = 1.0/LENGTH
+            K22 = 1.0/LENGTH
+            K12 =-1.0/LENGTH
+
+            RHS_NEW(V1-1) = RHS_NEW(V1-1) + K11*PHI_FIELD_NEW(V1) + K12*PHI_FIELD_NEW(V2)
+            RHS_NEW(V2-1) = RHS_NEW(V2-1) + K12*PHI_FIELD_NEW(V1) + K22*PHI_FIELD_NEW(V2)
+         END DO
+      ELSE IF (DIMS == 2) THEN
          DO I = 1, NCELLS
             AREA = U2D_GRID%CELL_AREAS(I)
             V1 = U2D_GRID%CELL_NODES(1,I)
@@ -470,7 +508,7 @@ MODULE fully_implicit
       REAL(KIND=8) :: AREA
       INTEGER :: V1, V2, V3
       INTEGER :: P, Q, VP, VQ
-      REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD
+      REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD, LENGTH
       TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: part_adv
       REAL(KIND=8) :: MPQ, FACTOR1, FACTOR2, ME
       INTEGER :: ELECTRON_S_ID
@@ -667,8 +705,31 @@ MODULE fully_implicit
 
 
       ! Accumulate Jacobian. All this is in principle not needed since we already have Amat.
+      IF (DIMS == 1) THEN
+         DO I = 1, NCELLS
+            LENGTH = U1D_GRID%SEGMENT_LENGTHS(I)
+            
+            ! We need to ADD to a sparse matrix entry.
+            DO P = 1, 2
+               VP = U1D_GRID%CELL_NODES(P,I)
+               IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(VP-1)) THEN
+                     DO Q = 1, 2
+                        VQ = U1D_GRID%CELL_NODES(Q,I)
+                        KPQ = LENGTH*(U2D_GRID%BASIS_COEFFS(1,P,I)*U2D_GRID%BASIS_COEFFS(1,Q,I))
 
-      IF (DIMS == 2) THEN
+                        IF (JACOBIAN_TYPE == 3 .OR. JACOBIAN_TYPE == 4) THEN
+                           KPQ = KPQ * (MASS_MATRIX(I)+1)
+                        END IF
+
+                        CALL MatSetValues(jac,one,VP-1,one,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
+                     END DO
+                  END IF
+               END IF
+            END DO
+
+         END DO
+      ELSE IF (DIMS == 2) THEN
          DO I = 1, NCELLS
             AREA = U2D_GRID%CELL_AREAS(I)
             
@@ -801,7 +862,7 @@ MODULE fully_implicit
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA
       INTEGER :: V1, V2, V3, I
       INTEGER :: P, Q, VP, VQ
-      REAL(KIND=8) :: KPQ, VOLUME
+      REAL(KIND=8) :: KPQ, VOLUME, LENGTH
       REAL(KIND=8) :: MPQ, FACTOR1, FACTOR2, ME
       INTEGER :: ELECTRON_S_ID
 
@@ -842,7 +903,21 @@ MODULE fully_implicit
       ALLOCATE(RHS_NEW, SOURCE = RHS)
       RHS_NEW = 0.d0
 
-      IF (DIMS == 2) THEN
+      IF (DIMS == 1) THEN
+         DO I = 1, NCELLS
+            LENGTH = U1D_GRID%SEGMENT_LENGTHS(I)
+            V1 = U1D_GRID%CELL_NODES(1,I)
+            V2 = U1D_GRID%CELL_NODES(2,I)
+
+
+            K11 = 1.0/LENGTH
+            K22 = 1.0/LENGTH
+            K12 =-1.0/LENGTH
+
+            RHS_NEW(V1-1) = RHS_NEW(V1-1) + K11*PHI_FIELD_NEW(V1) + K12*PHI_FIELD_NEW(V2)
+            RHS_NEW(V2-1) = RHS_NEW(V2-1) + K12*PHI_FIELD_NEW(V1) + K22*PHI_FIELD_NEW(V2)
+         END DO
+      ELSE IF (DIMS == 2) THEN
          DO I = 1, NCELLS
             AREA = U2D_GRID%CELL_AREAS(I)
             V1 = U2D_GRID%CELL_NODES(1,I)
@@ -1022,7 +1097,31 @@ MODULE fully_implicit
 
       ! Accumulate Jacobian. All this is in principle not needed since we already have Amat.
 
-      IF (DIMS == 2) THEN
+      IF (DIMS == 1) THEN
+         DO I = 1, NCELLS
+            LENGTH = U1D_GRID%SEGMENT_LENGTHS(I)
+            
+            ! We need to ADD to a sparse matrix entry.
+            DO P = 1, 2
+               VP = U1D_GRID%CELL_NODES(P,I)
+               IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(VP-1)) THEN
+                     DO Q = 1, 2
+                        VQ = U1D_GRID%CELL_NODES(Q,I)
+                        KPQ = LENGTH*(U2D_GRID%BASIS_COEFFS(1,P,I)*U2D_GRID%BASIS_COEFFS(1,Q,I))
+
+                        IF (JACOBIAN_TYPE == 3 .OR. JACOBIAN_TYPE == 4) THEN
+                           KPQ = KPQ * (MASS_MATRIX(I)+1)
+                        END IF
+
+                        CALL MatSetValues(Jmat,one,VP-1,one,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
+                     END DO
+                  END IF
+               END IF
+            END DO
+
+         END DO
+      ELSE IF (DIMS == 2) THEN
          DO I = 1, NCELLS
             AREA = U2D_GRID%CELL_AREAS(I)
             
@@ -1129,7 +1228,12 @@ MODULE fully_implicit
          IF (GRID_TYPE == UNSTRUCTURED) THEN
             IC = part_to_deposit(JP)%IC
 
-            IF (DIMS == 2) THEN
+            IF (DIMS == 1) THEN
+               
+               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*part_to_deposit(JP)%DTRIM/EPS0/U1D_GRID%SEGMENT_LENGTHS(IC)/(YMAX-YMIN) &
+                                 /(ZMAX-ZMIN)*FNUM * (QE*CHARGE)**2/SPECIES(part_to_deposit(JP)%S_ID)%MOLECULAR_MASS
+
+            ELSE IF (DIMS == 2) THEN
                
                MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*part_to_deposit(JP)%DTRIM/EPS0/U2D_GRID%CELL_AREAS(IC)/(ZMAX-ZMIN)*FNUM &
                                  * (QE*CHARGE)**2/SPECIES(part_to_deposit(JP)%S_ID)%MOLECULAR_MASS
@@ -1263,7 +1367,9 @@ MODULE fully_implicit
             END IF
          END DO
    
-         IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
+         IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 1) THEN
+            CELL_NE = TIMESTEP_NP*FNUM / U1D_GRID%CELL_VOLUMES
+         ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
             CELL_NE = TIMESTEP_NP*FNUM / U2D_GRID%CELL_VOLUMES
          ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
             CELL_NE = TIMESTEP_NP*FNUM / U3D_GRID%CELL_VOLUMES
@@ -1582,7 +1688,72 @@ MODULE fully_implicit
                ! For unstructured, we only need to check the boundaries of the cell.
 
                ! The new C-N procedure with uniform E field.
-               IF (DIMS == 2) THEN
+               IF (DIMS == 1) THEN
+                  COLLTIMES = -1.d0
+                  DO I = 1, 2
+                     IF (PIC_TYPE .NE. NONE) THEN
+                        ALPHA = 0.5*SPECIES(part_adv(IP)%S_ID)%CHARGE*QE/SPECIES(part_adv(IP)%S_ID)%MOLECULAR_MASS* E(1)
+                     ELSE
+                        ALPHA = 0.d0
+                     END IF
+
+                     BETA = part_adv(IP)%VX
+
+                     GAMMA = part_adv(IP)%X - U1D_GRID%NODE_COORDS(1, U1D_GRID%CELL_NODES(I,IC))
+
+                     IF (ALPHA == 0.d0) THEN
+                        COLLTIMES(2*(I-1) + 1) = - GAMMA/BETA
+                     ELSE
+                        DELTA = BETA*BETA - 4.0*ALPHA*GAMMA
+                        IF (DELTA >= 0.d0) THEN
+                           COLLTIMES(2*(I-1) + 1) = 0.5*(-BETA - SQRT(DELTA))/ALPHA
+                           COLLTIMES(2*I) =         0.5*(-BETA + SQRT(DELTA))/ALPHA
+                        END IF
+                     END IF
+                  END DO
+
+                  ! Find which collision happens first.
+                  DTCOLL = part_adv(IP)%DTRIM
+                  BOUNDCOLL = -1
+                  DO I = 1, 4
+                     IF (COLLTIMES(I) > 0 .AND. COLLTIMES(I) <= DTCOLL) THEN
+
+
+                        X_TEMP = part_adv(IP)%X
+                        Y_TEMP = part_adv(IP)%Y
+                        Z_TEMP = part_adv(IP)%Z
+
+                        VX_TEMP = part_adv(IP)%VX
+                        VY_TEMP = part_adv(IP)%VY
+                        VZ_TEMP = part_adv(IP)%VZ
+
+                        CALL MOVE_PARTICLE_CN(part_adv, IP, E, COLLTIMES(I))
+                        J = EDGEINDEX(I)
+
+                        ! ! A small check that we actually found an intersection.
+                        ! CHECKVALUE = U3D_GRID%CELL_FACES_COEFFS(1,J,IC)*part_adv(IP)%X &
+                        ! + U3D_GRID%CELL_FACES_COEFFS(2,J,IC)*part_adv(IP)%Y &
+                        ! + U3D_GRID%CELL_FACES_COEFFS(3,J,IC)*part_adv(IP)%Z &
+                        ! + U3D_GRID%CELL_FACES_COEFFS(4,J,IC)
+                        ! IF (ABS(CHECKVALUE) > 1.0d-12) WRITE(*,*) 'Checkvalue too large! = ', CHECKVALUE
+                        ! ! End of the small check.
+                        
+                        IF ((part_adv(IP)%VX*U1D_GRID%EDGE_NORMAL(1,J,IC)) > 0) THEN
+                           DTCOLL = COLLTIMES(I)
+                           BOUNDCOLL = J
+                        END IF
+
+                        part_adv(IP)%X = X_TEMP
+                        part_adv(IP)%Y = Y_TEMP
+                        part_adv(IP)%Z = Z_TEMP
+
+                        part_adv(IP)%VX = VX_TEMP
+                        part_adv(IP)%VY = VY_TEMP
+                        part_adv(IP)%VZ = VZ_TEMP
+
+                     END IF
+                  END DO
+               ELSE IF (DIMS == 2) THEN
                   COLLTIMES = -1.d0
                   DO I = 1, 3
                      J = NEXTVERT(I)
@@ -1904,7 +2075,22 @@ MODULE fully_implicit
                   part_adv(IP)%DTRIM = part_adv(IP)%DTRIM - DTCOLL
 
                   FLUIDBOUNDARY = .FALSE.
-                  IF (DIMS == 2) THEN
+                  IF (DIMS == 1) THEN
+                     NEIGHBOR = U1D_GRID%CELL_NEIGHBORS(BOUNDCOLL, IC)
+                     IF (NEIGHBOR == -1) THEN
+                        FLUIDBOUNDARY = .TRUE.
+                     ELSE
+                        NEIGHBORPG = U1D_GRID%CELL_PG(NEIGHBOR)
+                        IF (NEIGHBORPG .NE. -1) THEN
+                           IF (GRID_BC(NEIGHBORPG)%VOLUME_BC == SOLID) FLUIDBOUNDARY = .TRUE.
+                        END IF
+                     END IF
+
+                     FACE_PG = U1D_GRID%CELL_EDGES_PG(BOUNDCOLL, IC)
+                     FACE_NORMAL = U1D_GRID%EDGE_NORMAL(:,BOUNDCOLL,IC)
+                     FACE_TANG1 = [0.d0, FACE_NORMAL(1), 0.d0]
+                     FACE_TANG2 = [0.d0, 0.d0, 1.d0]
+                  ELSE IF (DIMS == 2) THEN
                      NEIGHBOR = U2D_GRID%CELL_NEIGHBORS(BOUNDCOLL, IC)
                      IF (NEIGHBOR == -1) THEN
                         FLUIDBOUNDARY = .TRUE.
@@ -1919,7 +2105,7 @@ MODULE fully_implicit
                      FACE_NORMAL = U2D_GRID%EDGE_NORMAL(:,BOUNDCOLL,IC)
                      FACE_TANG1 = [-FACE_NORMAL(2), FACE_NORMAL(1), 0.d0]
                      FACE_TANG2 = [0.d0, 0.d0, 1.d0]
-                  ELSE
+                  ELSE IF (DIMS == 3) THEN
                      NEIGHBOR = U3D_GRID%CELL_NEIGHBORS(BOUNDCOLL, IC)
                      IF (NEIGHBOR == -1) THEN
                         FLUIDBOUNDARY = .TRUE.
@@ -1944,7 +2130,15 @@ MODULE fully_implicit
                         CHARGE = SPECIES(part_adv(IP)%S_ID)%CHARGE
                         IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. ABS(CHARGE) .GE. 1.d-6 .AND. FINAL) THEN
                            K = QE/(EPS0*EPS_SCALING**2)
-                           IF (DIMS == 2) THEN
+                           IF (DIMS == 1) THEN
+                              RHO_Q = K*CHARGE*FNUM/(ZMAX-ZMIN)
+                              DO I = 1, 2
+                                 VP = U1D_GRID%CELL_NODES(I,IC)
+                                 PSIP = U1D_GRID%BASIS_COEFFS(1,I,IC)*part_adv(IP)%X &
+                                      + U1D_GRID%BASIS_COEFFS(2,I,IC)
+                                 SURFACE_CHARGE(VP) = SURFACE_CHARGE(VP) + RHO_Q*PSIP
+                              END DO
+                           ELSE IF (DIMS == 2) THEN
                               RHO_Q = K*CHARGE*FNUM/(ZMAX-ZMIN)
                               DO I = 1, 3
                                  VP = U2D_GRID%CELL_NODES(I,IC)
@@ -2326,7 +2520,31 @@ MODULE fully_implicit
    
          CALL MatGetOwnershipRange(dxde,first_row,last_row,ierr)
 
-         IF (DIMS == 2) THEN
+         IF (DIMS == 1) THEN
+            DO I = first_row, last_row-1
+               CALL MatGetRow(dxde,I,ncols,cols,vals,ierr)
+
+               DO JJ = 1, ncols
+                  J = cols(JJ)
+
+                  VAL = - vals(JJ)/EPS0/(YMAX-YMIN)/(ZMAX-ZMIN)*FNUM
+                  DO NI = 1, 2
+                     VNI = U1D_GRID%CELL_NODES(NI,I+1)
+                     IF (.NOT. IS_DIRICHLET(VNI - 1)) THEN
+                        DO NJ = 1, 2
+                           VNJ = U1D_GRID%CELL_NODES(NJ,J+1)
+                           CALL MatSetValues(jac,1,VNI-1,1,VNJ-1,VAL* &
+                            (U1D_GRID%BASIS_COEFFS(1,NI,I+1)*U1D_GRID%BASIS_COEFFS(1,NJ,J+1)),ADD_VALUES,ierr)
+                        END DO
+                     END IF
+                  END DO
+
+               END DO
+
+               CALL MatRestoreRow(dxde,I,ncols,cols,vals,ierr)
+
+            END DO
+         ELSE IF (DIMS == 2) THEN
             DO I = first_row, last_row-1
                CALL MatGetRow(dxde,I,ncols,cols,vals,ierr)
 
@@ -2765,7 +2983,7 @@ MODULE fully_implicit
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA, EPS_REL
       INTEGER :: V1, V2, V3, I
       INTEGER :: P, Q, VP, VQ
-      REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD, KE
+      REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD, KE, LENGTH
 
       TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: part_adv
 
@@ -2790,7 +3008,55 @@ MODULE fully_implicit
 
       CALL VecGetOwnershipRange( f, Istart, Iend, ierr)
 
-      IF (DIMS == 2) THEN
+      IF (DIMS == 1) THEN
+         DO I = 1, NCELLS
+            LENGTH = U1D_GRID%SEGMENT_LENGTHS(I)
+
+            IF (U1D_GRID%CELL_PG(I) == -1) THEN
+               EPS_REL = 1.d0
+            ELSE
+               EPS_REL = GRID_BC(U1D_GRID%CELL_PG(I))%EPS_REL
+            END IF
+            
+            ! We need to ADD to a sparse matrix entry.
+            DO P = 1, 2
+               VP = U1D_GRID%CELL_NODES(P,I)
+               IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(VP-1)) THEN
+                     DO Q = 1, 2
+                        VQ = U1D_GRID%CELL_NODES(Q,I)
+                        KPQ = LENGTH*(U1D_GRID%BASIS_COEFFS(1,P,I)*U1D_GRID%BASIS_COEFFS(1,Q,I))*EPS_REL
+
+                        RHS_NEW(VP-1) = RHS_NEW(VP-1) + KPQ*PHI_FIELD_NEW(VQ)
+
+                        ! ---- FLUID ELECTRONS -----
+                        
+                        VALUETOADD = QE*BOLTZ_N0/(EPS0)*LENGTH*EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+
+                        !!!!! TEST FOR SINH(U) POTENTIAL
+                        ! VALUETOADD = QE*BOLTZ_N0/(EPS0)*AREA*SINH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
+                        !!!!!
+                        IF (BOOL_KAPPA_FLUID) THEN 
+                           VALUETOADD = QE*BOLTZ_N0/(EPS0)*LENGTH &
+                           *(KAPPA_FRACTION*(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.))&
+                           )**(-KAPPA_FLUID_C+1./2.)&
+                           + (1-KAPPA_FRACTION)*EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE)))
+                        END IF
+
+                        IF (P == Q) THEN
+                           VALUETOADD = VALUETOADD/6.
+                        ELSE
+                           VALUETOADD = VALUETOADD/12.
+                        END IF
+                        IF (GRID_BC(U1D_GRID%CELL_PG(I))%VOLUME_BC == FLUID) THEN
+                           RHS_NEW(VP-1) = RHS_NEW(VP-1) + VALUETOADD*BOLTZ_SOLID_NODES(VQ)
+                        END IF
+                     END DO
+                  END IF
+               END IF
+            END DO
+         END DO
+      ELSE IF (DIMS == 2) THEN
          DO I = 1, NCELLS
             AREA = U2D_GRID%CELL_AREAS(I)
 
@@ -2964,7 +3230,7 @@ MODULE fully_implicit
       REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, EPS_REL
       INTEGER :: V1, V2, V3
       INTEGER :: P, Q, VP, VQ
-      REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD, FACTOR, AREA
+      REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD, FACTOR, AREA, LENGTH
 
       IF (PROC_ID == 0) THEN
          WRITE(*,*) 'FormJacobianBoltz Called'
@@ -2995,7 +3261,56 @@ MODULE fully_implicit
 
       ! Accumulate Jacobian. All this is in principle not needed since we already have Amat.
 
-      IF (DIMS == 2) THEN
+      IF (DIMS == 1) THEN
+         DO I = 1, NCELLS
+            AREA = U1D_GRID%SEGMENT_LENGTHS(I)
+
+            IF (U1D_GRID%CELL_PG(I) == -1) THEN
+               EPS_REL = 1.d0
+            ELSE
+               EPS_REL = GRID_BC(U1D_GRID%CELL_PG(I))%EPS_REL
+            END IF
+            
+            ! We need to ADD to a sparse matrix entry.
+            DO P = 1, 2
+               VP = U1D_GRID%CELL_NODES(P,I)
+               IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(VP-1)) THEN
+                     DO Q = 1, 2
+                        VQ = U1D_GRID%CELL_NODES(Q,I)
+                        KPQ = LENGTH*(U1D_GRID%BASIS_COEFFS(1,P,I)*U1D_GRID%BASIS_COEFFS(1,Q,I))*EPS_REL
+
+                        CALL MatSetValues(jac,one,VP-1,one,VQ-1,KPQ,ADD_VALUES,ierr)
+
+                        ! FLUID ELECTRONS
+                        VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*LENGTH &
+                        *EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+
+                        !!!!! TEST FOR SINH(U) POTENTIAL
+                        ! VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*AREA&
+                        ! *COSH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
+                        !!!!!
+                        IF (BOOL_KAPPA_FLUID) THEN 
+                           VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*LENGTH &
+                           *(KAPPA_FRACTION*(2.*KAPPA_FLUID_C-1.)/(2.*KAPPA_FLUID_C-3.)&
+                           *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))**(-KAPPA_FLUID_C-1./2.)&
+                           +(1-KAPPA_FRACTION)*EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE)))
+                        END IF
+
+                        IF (P == Q) THEN
+                           VALUETOADD = VALUETOADD/6.
+                        ELSE
+                           VALUETOADD = VALUETOADD/12.
+                        END IF
+                        IF (GRID_BC(U1D_GRID%CELL_PG(I))%VOLUME_BC == FLUID) THEN
+                           CALL MatSetValues(jac,one,VP-1,one,VQ-1,VALUETOADD*BOLTZ_SOLID_NODES(VQ),ADD_VALUES,ierr)
+                        END IF
+                     END DO
+                  END IF
+               END IF
+            END DO
+         END DO
+      ELSE IF (DIMS == 2) THEN
          DO I = 1, NCELLS
             AREA = U2D_GRID%CELL_AREAS(I)
 
@@ -3167,10 +3482,38 @@ MODULE fully_implicit
       REAL(KIND=8) :: Y1, Y2, AREA, CHARGE, FACTOR
       REAL(KIND=8) :: POT1, POT2, POT3
 
-      IF (DIMS==2) THEN
-         DO IC=1, NCELLS
-            IF (CELL_PROCS(IC)==PROC_ID) THEN
-               DO IP=1, 3
+      IF (DIMS == 1) THEN
+         DO IC = 1, NCELLS
+            IF (CELL_PROCS(IC) == PROC_ID) THEN
+               DO IP = 1, 2
+                  FACE_PG = U1D_GRID%CELL_EDGES_PG(IP, IC)
+                  IF (FACE_PG == -1) CYCLE
+                  IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. GRID_BC(U1D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
+
+                     V1 = U1D_GRID%CELL_NODES(IP,IC)
+                     AREA = (YMAX-YMIN)*(ZMAX-ZMIN)
+
+                     CHARGE = -QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*SQRT(KB*BOLTZ_TE/(2*PI*ME))*AREA*DT
+                     POT1 = EXP(QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+
+                     IF (BOOL_KAPPA_FLUID) THEN
+                        FACTOR = SQRT(KAPPA_FLUID_C-3./2.)*GAMMA(KAPPA_FLUID_C+1.)&
+                        /GAMMA(KAPPA_FLUID_C-1./2.)/(KAPPA_FLUID_C*(KAPPA_FLUID_C-1.))
+                        POT1 = KAPPA_FRACTION*FACTOR*(1-QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
+                        **(-KAPPA_FLUID_C+1.) + (1-KAPPA_FRACTION)*POT1
+                     END IF
+
+                     SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + CHARGE*(POT1) ! DBDBDBDB Jan please check this.
+
+                  END IF
+               END DO
+            END IF
+         END DO
+
+      ELSE IF (DIMS == 2) THEN
+         DO IC = 1, NCELLS
+            IF (CELL_PROCS(IC) == PROC_ID) THEN
+               DO IP = 1, 3
                   FACE_PG = U2D_GRID%CELL_EDGES_PG(IP, IC)
                   IF (FACE_PG == -1) CYCLE
                   IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. GRID_BC(U2D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
@@ -3190,7 +3533,7 @@ MODULE fully_implicit
                      V2 = U2D_GRID%CELL_NODES(VV2,IC)
                      Y1 = U2D_GRID%NODE_COORDS(2, V1)
                      Y2 = U2D_GRID%NODE_COORDS(2, V2)       
-                     AREA = U2D_GRID%CELL_EDGES_LEN(IP,IC)
+                     AREA = U2D_GRID%CELL_EDGES_LEN(IP,IC)*(ZMAX-ZMIN)  !!! DBDBDBDBDBBD Jan please check this.
 
                      CHARGE = -QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*SQRT(KB*BOLTZ_TE/(2*PI*ME))*AREA*DT
                      POT1 = EXP(QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
@@ -3219,9 +3562,9 @@ MODULE fully_implicit
             END IF
          END DO
 
-      ELSE IF (DIMS==3) THEN
-         DO IC=1, NCELLS
-            IF (CELL_PROCS(IC)==PROC_ID) THEN
+      ELSE IF (DIMS == 3) THEN
+         DO IC = 1, NCELLS
+            IF (CELL_PROCS(IC) == PROC_ID) THEN
                DO IP=1, 4
                   FACE_PG = U3D_GRID%CELL_FACES_PG(IP, IC)
                   IF (FACE_PG == -1) CYCLE
@@ -3305,7 +3648,30 @@ MODULE fully_implicit
       ALLOCATE(BOLTZ_SOLID_NODES(NNODES))
       BOLTZ_SOLID_NODES = 1.
       
-      IF (DIMS == 2) THEN
+      IF (DIMS == 1) THEN
+         !! Set the value of BOLTZ_SOLID_NODES to 0. for every node inside the solid
+         DO IC = 1, NCELLS
+            IF (GRID_BC(U1D_GRID%CELL_PG(IC))%VOLUME_BC == SOLID) THEN
+               DO IP = 1, 2
+                  V = U1D_GRID%CELL_NODES(IP,IC)
+                  IF (IS_DIELECTRIC(V-1)) THEN
+                     IF (U1D_GRID%CELL_NEIGHBORS(IP, IC) == -1) THEN
+                        IF (IP == 1) THEN
+                           BOLTZ_SOLID_NODES(U1D_GRID%CELL_NODES(1,IC)) = 0.
+                        ELSE IF (IP == 2) THEN
+                           BOLTZ_SOLID_NODES(U1D_GRID%CELL_NODES(2,IC)) = 0.
+                        END IF
+                     ELSE
+                        CYCLE ! We keep 1. on bundary
+                     END IF
+                  ELSE
+                     BOLTZ_SOLID_NODES(V) = 0.
+                  END IF
+               END DO
+            END IF
+         END DO
+
+      ELSE IF (DIMS == 2) THEN
          !! Set the value of BOLTZ_SOLID_NODES to 0. for every node inside the solid
          DO IC=1, NCELLS
             IF (GRID_BC(U2D_GRID%CELL_PG(IC))%VOLUME_BC == SOLID) THEN
@@ -3333,9 +3699,9 @@ MODULE fully_implicit
             END IF
          END DO
 
-      ELSE IF (DIMS==3) THEN      
+      ELSE IF (DIMS == 3) THEN      
          !! Set the value of BOLTZ_SOLID_NODES to 0. for every node inside the solid
-         DO IC=1, NCELLS
+         DO IC = 1, NCELLS
             IF (GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC == SOLID) THEN
                DO IP = 1, 4
                   V = U3D_GRID%CELL_NODES(IP,IC)
@@ -3430,7 +3796,19 @@ MODULE fully_implicit
       IF (GRID_TYPE == UNSTRUCTURED) THEN
 
          ! Compute the electric field at grid points
-         IF (DIMS == 2) THEN
+         IF (DIMS == 1) THEN
+
+            E_FIELD = 0.d0
+            EBAR_FIELD = 0.d0
+            DO I = 1, NCELLS
+               DO P = 1, 2
+                  VP = U1D_GRID%CELL_NODES(P,I)
+                  E_FIELD(1,1,I) =    E_FIELD(1,1,I)    - PHI_FIELD(VP)   *U1D_GRID%BASIS_COEFFS(1,P,I)
+                  EBAR_FIELD(1,1,I) = EBAR_FIELD(1,1,I) - PHIBAR_FIELD(VP)*U1D_GRID%BASIS_COEFFS(1,P,I)
+               END DO
+            END DO
+
+         ELSE IF (DIMS == 2) THEN
 
             E_FIELD = 0.d0
             EBAR_FIELD = 0.d0
@@ -3626,7 +4004,15 @@ MODULE fully_implicit
 
          IF (GRID_TYPE == UNSTRUCTURED) THEN 
             IC = part_adv(JP)%IC
-            IF (DIMS == 2) THEN
+            IF (DIMS == 1) THEN
+               RHO_Q = K*CHARGE*FNUM/(YMAX-YMIN)/(ZMAX-ZMIN)
+               DO P = 1, 2
+                  VP = U1D_GRID%CELL_NODES(P,IC) - 1
+                  PSIP = U1D_GRID%BASIS_COEFFS(1,P,IC)*part_adv(JP)%X &
+                       + U1D_GRID%BASIS_COEFFS(2,P,IC)
+                  RHS(VP) = RHS(VP) + RHO_Q*PSIP
+               END DO
+            ELSE IF (DIMS == 2) THEN
                RHO_Q = K*CHARGE*FNUM/(ZMAX-ZMIN)
                DO P = 1, 3
                   VP = U2D_GRID%CELL_NODES(P,IC) - 1
@@ -3654,6 +4040,8 @@ MODULE fully_implicit
    
             IF (GRID_TYPE == RECTILINEAR_UNIFORM .AND. DIMS == 2) THEN
                VOL = CELL_VOL
+            ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 1) THEN
+               VOL = U1D_GRID%CELL_VOLUMES(part_adv(JP)%IC)
             ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
                VOL = U2D_GRID%CELL_VOLUMES(part_adv(JP)%IC)
             ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
@@ -3729,7 +4117,41 @@ MODULE fully_implicit
 
       IF (GRID_TYPE == UNSTRUCTURED) THEN
 
-         IF (DIMS == 2) THEN
+         IF (DIMS == 1) THEN
+
+            DO I = 1, NCELLS
+               V1 = U1D_GRID%CELL_NODES(1,I)
+               V2 = U1D_GRID%CELL_NODES(2,I)
+               DO J = 1, 2
+                  EDGE_PG = U1D_GRID%CELL_EDGES_PG(J, I)
+                  IF (EDGE_PG .NE. -1) THEN
+                     IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC &
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == RF_VOLTAGE_BC &
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC) THEN
+                        
+                        IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC) THEN
+                           POTENTIAL = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                        ELSE IF (GRID_BC(EDGE_PG)%FIELD_BC == RF_VOLTAGE_BC) THEN
+                           POTENTIAL = GRID_BC(EDGE_PG)%WALL_POTENTIAL &
+                                     + 0.5*GRID_BC(EDGE_PG)%WALL_RF_POTENTIAL*COS(2*PI*GRID_BC(EDGE_PG)%RF_FREQUENCY*tID*DT)
+                        ELSE IF (GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC) THEN
+                           POTENTIAL = GRID_BC(EDGE_PG)%WALL_POTENTIAL &
+                                     + 0.5*GRID_BC(EDGE_PG)%WALL_RF_POTENTIAL*COS(2*PI*GRID_BC(EDGE_PG)%RF_FREQUENCY*tID*DT)
+                        END IF
+
+                        IF (J==1) THEN
+                           DIRICHLET(V1-1) = POTENTIAL
+                           IS_DIRICHLET(V1-1) = .TRUE.
+                        ELSE IF (J==2) THEN
+                           DIRICHLET(V2-1) = POTENTIAL
+                           IS_DIRICHLET(V2-1) = .TRUE.
+                        END IF
+                     END IF
+                  END IF
+               END DO
+            END DO
+
+         ELSE IF (DIMS == 2) THEN
 
             DO I = 1, NCELLS
                V1 = U2D_GRID%CELL_NODES(1,I)
@@ -4063,7 +4485,9 @@ MODULE fully_implicit
                ! For unstructured, we only need to check the boundaries of the cell.
 
                ! The new C-N procedure with uniform E field.
-               IF (DIMS == 2) THEN
+               IF (DIMS == 1) THEN
+                  CALL ERROR_ABORT('Not implemented!')
+               ELSE IF (DIMS == 2) THEN
                   CALL ERROR_ABORT('Not implemented!')
                   COLLTIMES = -1.d0
                   DO I = 1, 3
@@ -4293,7 +4717,22 @@ MODULE fully_implicit
                   part_adv(IP)%DTRIM = part_adv(IP)%DTRIM - DTCOLL
 
                   FLUIDBOUNDARY = .FALSE.
-                  IF (DIMS == 2) THEN
+                  IF (DIMS == 1) THEN
+                     NEIGHBOR = U1D_GRID%CELL_NEIGHBORS(BOUNDCOLL, IC)
+                     IF (NEIGHBOR == -1) THEN
+                        FLUIDBOUNDARY = .TRUE.
+                     ELSE
+                        NEIGHBORPG = U1D_GRID%CELL_PG(NEIGHBOR)
+                        IF (NEIGHBORPG .NE. -1) THEN
+                           IF (GRID_BC(NEIGHBORPG)%VOLUME_BC == SOLID) FLUIDBOUNDARY = .TRUE.
+                        END IF
+                     END IF
+
+                     FACE_PG = U1D_GRID%CELL_EDGES_PG(BOUNDCOLL, IC)
+                     FACE_NORMAL = U1D_GRID%EDGE_NORMAL(:,BOUNDCOLL,IC)
+                     FACE_TANG1 = [0.d0, FACE_NORMAL(1), 0.d0]
+                     FACE_TANG2 = [0.d0, 0.d0, 1.d0]
+                  ELSE IF (DIMS == 2) THEN
                      NEIGHBOR = U2D_GRID%CELL_NEIGHBORS(BOUNDCOLL, IC)
                      IF (NEIGHBOR == -1) THEN
                         FLUIDBOUNDARY = .TRUE.
@@ -4308,7 +4747,7 @@ MODULE fully_implicit
                      FACE_NORMAL = U2D_GRID%EDGE_NORMAL(:,BOUNDCOLL,IC)
                      FACE_TANG1 = [-FACE_NORMAL(2), FACE_NORMAL(1), 0.d0]
                      FACE_TANG2 = [0.d0, 0.d0, 1.d0]
-                  ELSE
+                  ELSE IF (DIMS == 3) THEN
                      NEIGHBOR = U3D_GRID%CELL_NEIGHBORS(BOUNDCOLL, IC)
                      IF (NEIGHBOR == -1) THEN
                         FLUIDBOUNDARY = .TRUE.
@@ -4338,7 +4777,15 @@ MODULE fully_implicit
                         CHARGE = SPECIES(part_adv(IP)%S_ID)%CHARGE
                         IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. ABS(CHARGE) .GE. 1.d-6 .AND. FINAL) THEN
                            K = QE/(EPS0*EPS_SCALING**2)
-                           IF (DIMS == 2) THEN
+                           IF (DIMS == 1) THEN
+                              RHO_Q = K*CHARGE*FNUM/(ZMAX-ZMIN)
+                              DO I = 1, 2
+                                 VP = U1D_GRID%CELL_NODES(I,IC)
+                                 PSIP = U1D_GRID%BASIS_COEFFS(1,I,IC)*part_adv(IP)%X &
+                                      + U1D_GRID%BASIS_COEFFS(2,I,IC)
+                                 SURFACE_CHARGE(VP) = SURFACE_CHARGE(VP) + RHO_Q*PSIP
+                              END DO
+                           ELSE IF (DIMS == 2) THEN
                               RHO_Q = K*CHARGE*FNUM/(ZMAX-ZMIN)
                               DO I = 1, 3
                                  VP = U2D_GRID%CELL_NODES(I,IC)

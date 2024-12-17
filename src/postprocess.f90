@@ -223,6 +223,8 @@ MODULE postprocess
 
             IF (GRID_TYPE == RECTILINEAR_UNIFORM .AND. .NOT. AXI) THEN
                VOL = CELL_VOL
+            ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 1) THEN
+               VOL = U1D_GRID%CELL_VOLUMES(JC)
             ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
                VOL = U2D_GRID%CELL_VOLUMES(JC)
             ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
@@ -489,7 +491,24 @@ MODULE postprocess
             WRITE(54321) 'BINARY'//ACHAR(10)
 
 
-            IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
+            IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 1) THEN
+               WRITE(54321) 'DATASET UNSTRUCTURED_GRID'//ACHAR(10)
+
+               WRITE(54321) 'POINTS '//ITOA(U1D_GRID%NUM_NODES)//' double'//ACHAR(10)
+               DO I = 1, U1D_GRID%NUM_NODES
+                  WRITE(54321) U1D_GRID%NODE_COORDS(:,I)
+               END DO
+
+               WRITE(54321) 'CELLS '//ITOA(U1D_GRID%NUM_CELLS)//' '//ITOA(3*U1D_GRID%NUM_CELLS)//ACHAR(10)
+               DO I = 1, U1D_GRID%NUM_CELLS
+                  WRITE(54321) 2, (U1D_GRID%CELL_NODES(:,I) - 1)
+               END DO
+
+               WRITE(54321) 'CELL_TYPES '//ITOA(U1D_GRID%NUM_CELLS)//ACHAR(10)
+               DO I = 1, U1D_GRID%NUM_CELLS
+                  WRITE(54321) 3
+               END DO
+            ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
                WRITE(54321) 'DATASET UNSTRUCTURED_GRID'//ACHAR(10)
 
                WRITE(54321) 'POINTS '//ITOA(U2D_GRID%NUM_NODES)//' double'//ACHAR(10)
@@ -578,6 +597,8 @@ MODULE postprocess
                   IF (BOOL_RADIAL_WEIGHTING) THEN
                      IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) THEN
                         WRITE(54321) CELL_FNUM*AVG_NP(FIRST:LAST)/CELL_VOLUMES, ACHAR(10)
+                     ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 1) THEN
+                        WRITE(54321) CELL_FNUM*AVG_NP(FIRST:LAST)/U1D_GRID%CELL_VOLUMES, ACHAR(10)
                      ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
                         WRITE(54321) CELL_FNUM*AVG_NP(FIRST:LAST)/U2D_GRID%CELL_VOLUMES, ACHAR(10)
                      ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
@@ -586,6 +607,8 @@ MODULE postprocess
                   ELSE
                      IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) THEN
                         WRITE(54321) FNUM*AVG_NP(FIRST:LAST)/CELL_VOLUMES, ACHAR(10)
+                     ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 1) THEN
+                        WRITE(54321) FNUM*AVG_NP(FIRST:LAST)/U1D_GRID%CELL_VOLUMES, ACHAR(10)
                      ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
                         WRITE(54321) FNUM*AVG_NP(FIRST:LAST)/U2D_GRID%CELL_VOLUMES, ACHAR(10)
                      ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
@@ -733,7 +756,24 @@ MODULE postprocess
             WRITE(54321,'(A)') 'vtk output'
             WRITE(54321,'(A)') 'ASCII'
 
-            IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
+            IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 1) THEN
+               WRITE(54321,'(A)') 'DATASET UNSTRUCTURED_GRID'
+               
+               WRITE(54321,'(A,I10,A7)') 'POINTS', U1D_GRID%NUM_NODES, 'double'
+               DO I = 1, U1D_GRID%NUM_NODES
+                  WRITE(54321,*) U1D_GRID%NODE_COORDS(:,I)
+               END DO
+
+               WRITE(54321,'(A,I10,I10)') 'CELLS', U1D_GRID%NUM_CELLS, 3*U1D_GRID%NUM_CELLS 
+               DO I = 1, U1D_GRID%NUM_CELLS
+                  WRITE(54321,*) 2, (U1D_GRID%CELL_NODES(:,I) - 1)
+               END DO
+
+               WRITE(54321,'(A,I10)') 'CELL_TYPES', U1D_GRID%NUM_CELLS
+               DO I = 1, U1D_GRID%NUM_CELLS
+                  WRITE(54321,*) 3
+               END DO
+            ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
                WRITE(54321,'(A)') 'DATASET UNSTRUCTURED_GRID'
                
                WRITE(54321,'(A,I10,A7)') 'POINTS', U2D_GRID%NUM_NODES, 'double'
@@ -822,6 +862,8 @@ MODULE postprocess
                   IF (BOOL_RADIAL_WEIGHTING) THEN
                      IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) THEN
                         WRITE(54321,*) CELL_FNUM*AVG_NP(FIRST:LAST)/CELL_VOLUMES
+                     ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 1) THEN
+                        WRITE(54321,*) CELL_FNUM*AVG_NP(FIRST:LAST)/U1D_GRID%CELL_VOLUMES
                      ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
                         WRITE(54321,*) CELL_FNUM*AVG_NP(FIRST:LAST)/U2D_GRID%CELL_VOLUMES
                      ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
@@ -830,6 +872,8 @@ MODULE postprocess
                   ELSE
                      IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) THEN
                         WRITE(54321,*) FNUM*AVG_NP(FIRST:LAST)/CELL_VOLUMES
+                     ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 1) THEN
+                        WRITE(54321,*) FNUM*AVG_NP(FIRST:LAST)/U1D_GRID%CELL_VOLUMES
                      ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
                         WRITE(54321,*) FNUM*AVG_NP(FIRST:LAST)/U2D_GRID%CELL_VOLUMES
                      ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
@@ -1063,7 +1107,10 @@ MODULE postprocess
 
       MOLMASS = SPECIES(PART%S_ID)%MOLECULAR_MASS
 
-      IF (DIMS == 2) THEN
+      IF (DIMS == 1) THEN
+         INDEX = U1D_GRID%SEGMENT_NODES_BOUNDARY_INDEX(IFACE, IC) + (PART%S_ID-1)*NBOUNDCELLS
+         AREA = U0D_GRID%VERTEX_AREAS(U1D_GRID%SEGMENT_NODES_BOUNDARY_INDEX(IFACE, IC))
+      ELSE IF (DIMS == 2) THEN
          INDEX = U2D_GRID%CELL_EDGES_BOUNDARY_INDEX(IFACE, IC) + (PART%S_ID-1)*NBOUNDCELLS
          AREA = U1D_GRID%SEGMENT_AREAS(U2D_GRID%CELL_EDGES_BOUNDARY_INDEX(IFACE, IC))
       ELSE IF (DIMS == 3) THEN
@@ -1117,7 +1164,12 @@ MODULE postprocess
 
       IF (PIC_TYPE .NE. NONE) THEN
          DO I = 1, NNODES
-            IF (DIMS == 2) THEN
+            IF (DIMS == 1) THEN
+               IF (U1D_GRID%NODES_BOUNDARY_INDEX(I) .NE. -1) THEN
+                  TIMESTEP_PHI_BOUND(U1D_GRID%NODES_BOUNDARY_INDEX(I)) = PHI_FIELD(I)
+                  TIMESTEP_QRHO_BOUND(U1D_GRID%NODES_BOUNDARY_INDEX(I)) = SURFACE_CHARGE(I)
+               END IF
+            ELSE IF (DIMS == 2) THEN
                IF (U2D_GRID%NODES_BOUNDARY_INDEX(I) .NE. -1) THEN
                   TIMESTEP_PHI_BOUND(U2D_GRID%NODES_BOUNDARY_INDEX(I)) = PHI_FIELD(I)
                   TIMESTEP_QRHO_BOUND(U2D_GRID%NODES_BOUNDARY_INDEX(I)) = SURFACE_CHARGE(I)
@@ -1242,8 +1294,24 @@ MODULE postprocess
             WRITE(54321) 'vtk output'//ACHAR(10)
             WRITE(54321) 'BINARY'//ACHAR(10)
 
+            IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 1) THEN
+               WRITE(54321) 'DATASET UNSTRUCTURED_GRID'//ACHAR(10)
 
-            IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
+               WRITE(54321) 'POINTS '//ITOA(U0D_GRID%NUM_NODES)//' double'//ACHAR(10)
+               DO I = 1, U0D_GRID%NUM_NODES
+                  WRITE(54321) U0D_GRID%NODE_COORDS(:,I)
+               END DO
+
+               WRITE(54321) 'CELLS '//ITOA(U0D_GRID%NUM_POINTS)//' '//ITOA(2*U0D_GRID%NUM_POINTS)//ACHAR(10)
+               DO I = 1, U0D_GRID%NUM_POINTS
+                  WRITE(54321) 1, (U0D_GRID%POINT_NODES(I) - 1)
+               END DO
+
+               WRITE(54321) 'CELL_TYPES '//ITOA(U0D_GRID%NUM_POINTS)//ACHAR(10)
+               DO I = 1, U0D_GRID%NUM_POINTS
+                  WRITE(54321) 1
+               END DO
+            ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
                WRITE(54321) 'DATASET UNSTRUCTURED_GRID'//ACHAR(10)
 
                WRITE(54321) 'POINTS '//ITOA(U1D_GRID%NUM_NODES)//' double'//ACHAR(10)
@@ -1251,13 +1319,13 @@ MODULE postprocess
                   WRITE(54321) U1D_GRID%NODE_COORDS(:,I)
                END DO
 
-               WRITE(54321) 'CELLS '//ITOA(U1D_GRID%NUM_SEGMENTS)//' '//ITOA(3*U1D_GRID%NUM_SEGMENTS)//ACHAR(10)
-               DO I = 1, U1D_GRID%NUM_SEGMENTS
-                  WRITE(54321) 2, (U1D_GRID%SEGMENT_NODES(:,I) - 1)
+               WRITE(54321) 'CELLS '//ITOA(U1D_GRID%NUM_CELLS)//' '//ITOA(3*U1D_GRID%NUM_CELLS)//ACHAR(10)
+               DO I = 1, U1D_GRID%NUM_CELLS
+                  WRITE(54321) 2, (U1D_GRID%CELL_NODES(:,I) - 1)
                END DO
 
-               WRITE(54321) 'CELL_TYPES '//ITOA(U1D_GRID%NUM_SEGMENTS)//ACHAR(10)
-               DO I = 1, U1D_GRID%NUM_SEGMENTS
+               WRITE(54321) 'CELL_TYPES '//ITOA(U1D_GRID%NUM_CELLS)//ACHAR(10)
+               DO I = 1, U1D_GRID%NUM_CELLS
                   WRITE(54321) 3
                END DO
             ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
@@ -1287,8 +1355,10 @@ MODULE postprocess
 
             ! Write per-cell value
             WRITE(54321) 'PHYSICAL_GROUP '//ITOA(1)//' '//ITOA(NBOUNDCELLS)//' integer'//ACHAR(10)
-            IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
-               WRITE(54321) U1D_GRID%SEGMENT_PG, ACHAR(10)
+            IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 1) THEN
+               WRITE(54321) U0D_GRID%POINT_PG, ACHAR(10)
+            ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
+               WRITE(54321) U1D_GRID%CELL_PG, ACHAR(10)
             ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
                WRITE(54321) U2D_GRID%CELL_PG, ACHAR(10)
             END IF
@@ -1375,7 +1445,24 @@ MODULE postprocess
             WRITE(54321,'(A)') 'vtk output'
             WRITE(54321,'(A)') 'ASCII'
 
-            IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
+            IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 1) THEN
+               WRITE(54321,'(A)') 'DATASET UNSTRUCTURED_GRID'
+               
+               WRITE(54321,'(A,I10,A7)') 'POINTS', U0D_GRID%NUM_NODES, 'double'
+               DO I = 1, U0D_GRID%NUM_NODES
+                  WRITE(54321,*) U0D_GRID%NODE_COORDS(:,I)
+               END DO
+
+               WRITE(54321,'(A,I10,I10)') 'CELLS', U0D_GRID%NUM_POINTS, 2*U0D_GRID%NUM_POINTS 
+               DO I = 1, U0D_GRID%NUM_POINTS
+                  WRITE(54321,*) 1, (U0D_GRID%POINT_NODES(I) - 1)
+               END DO
+
+               WRITE(54321,'(A,I10)') 'CELL_TYPES', U0D_GRID%NUM_POINTS
+               DO I = 1, U0D_GRID%NUM_POINTS
+                  WRITE(54321,*) 1
+               END DO
+            ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
                WRITE(54321,'(A)') 'DATASET UNSTRUCTURED_GRID'
                
                WRITE(54321,'(A,I10,A7)') 'POINTS', U1D_GRID%NUM_NODES, 'double'
@@ -1383,13 +1470,13 @@ MODULE postprocess
                   WRITE(54321,*) U1D_GRID%NODE_COORDS(:,I)
                END DO
 
-               WRITE(54321,'(A,I10,I10)') 'CELLS', U1D_GRID%NUM_SEGMENTS, 3*U1D_GRID%NUM_SEGMENTS 
-               DO I = 1, U1D_GRID%NUM_SEGMENTS
-                  WRITE(54321,*) 2, (U1D_GRID%SEGMENT_NODES(:,I) - 1)
+               WRITE(54321,'(A,I10,I10)') 'CELLS', U1D_GRID%NUM_CELLS, 3*U1D_GRID%NUM_CELLS 
+               DO I = 1, U1D_GRID%NUM_CELLS
+                  WRITE(54321,*) 2, (U1D_GRID%CELL_NODES(:,I) - 1)
                END DO
 
-               WRITE(54321,'(A,I10)') 'CELL_TYPES', U1D_GRID%NUM_SEGMENTS
-               DO I = 1, U1D_GRID%NUM_SEGMENTS
+               WRITE(54321,'(A,I10)') 'CELL_TYPES', U1D_GRID%NUM_CELLS
+               DO I = 1, U1D_GRID%NUM_CELLS
                   WRITE(54321,*) 3
                END DO
             ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
@@ -1419,8 +1506,10 @@ MODULE postprocess
 
             ! Write per-cell value
             WRITE(54321,'(A,I10,I10,A8)') 'PHYSICAL_GROUP', 1, NBOUNDCELLS, 'integer'
-            IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
-               WRITE(54321,*) U1D_GRID%SEGMENT_PG
+            IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 1) THEN
+               WRITE(54321,*) U0D_GRID%POINT_PG
+            ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
+               WRITE(54321,*) U1D_GRID%CELL_PG
             ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
                WRITE(54321,*) U2D_GRID%CELL_PG
             END IF
@@ -1716,7 +1805,9 @@ MODULE postprocess
          IF (GRID_TYPE == UNSTRUCTURED) THEN
             TOT_EE_FIELD = 0.d0
             DO JC = 1, NCELLS
-               IF (DIMS == 2) THEN
+               IF (DIMS == 1) THEN
+                  VOL = U1D_GRID%CELL_VOLUMES(JC)
+               ELSE IF (DIMS == 2) THEN
                   VOL = U2D_GRID%CELL_VOLUMES(JC)
                ELSE IF (DIMS == 3) THEN
                   VOL = U3D_GRID%CELL_VOLUMES(JC)

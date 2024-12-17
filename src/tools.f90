@@ -922,6 +922,123 @@ CONTAINS
    END SUBROUTINE REASSIGN_PARTICLES_TO_CELLS_2D
 
 
+   SUBROUTINE REASSIGN_PARTICLES_TO_CELLS_1D
+
+      IMPLICIT NONE
+
+      REAL(KIND=8) :: DX, CELLXMIN, CELLXMAX
+      REAL(KIND=8) :: X1, X2, XP, PSIP
+      INTEGER :: I, K, IC, IMIN, IMAX, V1, V2, N_PARTITIONS_X, IP, VP
+      INTEGER, DIMENSION(:), ALLOCATABLE :: NINGRIDCELL
+      INTEGER, DIMENSION(:,:), ALLOCATABLE :: SEGINGRID
+      LOGICAL :: INSIDE, CELLFOUND
+      REAL(KIND=8) :: MINABSPSI
+      LOGICAL, DIMENSION(:), ALLOCATABLE :: REMOVE_PART
+
+      N_PARTITIONS_X = 100
+
+      ALLOCATE(REMOVE_PART(NP_PROC))
+      REMOVE_PART = .FALSE.
+
+      ! First we assign the unstructured cells to the cells of a cartesian grid, which is easily indexable.
+      IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 1) THEN
+
+         DX = (XMAX-XMIN)/N_PARTITIONS_X
+         
+         ALLOCATE(NINGRIDCELL(N_PARTITIONS_X))
+         NINGRIDCELL = 0
+
+         DO IC = 1, NCELLS
+            V1 = U1D_GRID%CELL_NODES(1,IC)
+            V2 = U1D_GRID%CELL_NODES(2,IC)
+   
+            X1 = U1D_GRID%NODE_COORDS(1, V1)
+            X2 = U1D_GRID%NODE_COORDS(1, V2)
+
+            CELLXMIN = MIN(X1, X2)
+            CELLXMAX = MAX(X1, X2)
+
+            IMIN = INT((CELLXMIN - XMIN)/DX) + 1
+            IMAX = INT((CELLXMAX - XMIN)/DX) + 1
+
+            DO I = IMIN, IMAX
+               NINGRIDCELL(I) = NINGRIDCELL(I) + 1
+            END DO
+
+         END DO
+
+         ALLOCATE(SEGINGRID(MAXVAL(NINGRIDCELL), N_PARTITIONS_X))
+         NINGRIDCELL = 0
+
+         DO IC = 1, NCELLS
+            V1 = U1D_GRID%CELL_NODES(1,IC)
+            V2 = U1D_GRID%CELL_NODES(2,IC)
+   
+            X1 = U1D_GRID%NODE_COORDS(1, V1)
+            X2 = U1D_GRID%NODE_COORDS(1, V2)
+
+            CELLXMIN = MIN(X1, X2)
+            CELLXMAX = MAX(X1, X2)
+
+            IMIN = INT((CELLXMIN - XMIN)/DX) + 1
+            IMAX = INT((CELLXMAX - XMIN)/DX) + 1
+
+            DO I = IMIN, IMAX
+               NINGRIDCELL(I) = NINGRIDCELL(I) + 1
+               SEGINGRID(NINGRIDCELL(I), I) = IC
+            END DO
+
+         END DO
+
+         DO IP = 1, NP_PROC
+            XP = particles(IP)%X
+            IF (XP < XMIN .OR. XP > XMAX) THEN
+               WRITE(*,*) 'Particle with ID ', particles(IP)%ID, 'is out of the domain. Deleting it.'
+               REMOVE_PART(IP) = .TRUE.
+               CYCLE
+            END IF
+            I = INT((XP-XMIN)/DX) + 1
+            CELLFOUND = .FALSE.
+            DO K = 1, NINGRIDCELL(I)
+               MINABSPSI = 1.d100
+               IC = SEGINGRID(K, I)
+               ! Check if particle IP (XP, YP) is in unstructured cell IC.
+               INSIDE = .TRUE.
+               DO VP = 1, 2
+                  PSIP = XP*U1D_GRID%BASIS_COEFFS(1,VP,IC) + U1D_GRID%BASIS_COEFFS(2,VP,IC)
+                  IF (PSIP < 0) INSIDE = .FALSE.
+                  IF (ABS(PSIP) < MINABSPSI) MINABSPSI = ABS(PSIP)
+               END DO
+               IF (INSIDE) THEN
+                  IF (particles(IP)%IC .NE. IC) WRITE(*,*) 'Particle with ID ', particles(IP)%ID, &
+                  ' has been found in a different cell! IC=', IC, &
+                  ' instead of ', particles(IP)%IC, '. Minimum ABS(PSI) was ', MINABSPSI
+                  particles(IP)%IC = IC
+                  CELLFOUND = .TRUE.
+                  EXIT
+               END IF
+            END DO
+            IF (.NOT. CELLFOUND) THEN
+               WRITE(*,*) 'Particle with ID ', particles(IP)%ID, 'is out of the domain. Deleting it.'
+               REMOVE_PART(IP) = .TRUE.
+            END IF
+         END DO
+
+         IP = NP_PROC
+         DO WHILE (IP .GE. 1)
+            IF (REMOVE_PART(IP)) CALL REMOVE_PARTICLE_ARRAY(IP, particles, NP_PROC)
+            IP = IP - 1
+         END DO
+
+      ELSE
+         CALL ERROR_ABORT('Not implemented!')
+      END IF
+
+      DEALLOCATE(REMOVE_PART)
+
+   END SUBROUTINE REASSIGN_PARTICLES_TO_CELLS_1D
+
+
 
    SUBROUTINE DUPLICATE_PARTICLES
 

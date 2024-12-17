@@ -97,7 +97,9 @@ MODULE initialization
 
          IF (line=='Mesh_file_SU2:') THEN
             READ(in1,*) MESH_FILENAME
-            IF (DIMS == 2) THEN
+            IF (DIMS == 1) THEN
+               CALL READ_1D_UNSTRUCTURED_GRID_SU2(MESH_FILENAME)
+            ELSE IF (DIMS == 2) THEN
                CALL READ_2D_UNSTRUCTURED_GRID_SU2(MESH_FILENAME)
             ELSE IF (DIMS == 3) THEN
                CALL READ_3D_UNSTRUCTURED_GRID_SU2(MESH_FILENAME)
@@ -367,9 +369,6 @@ MODULE initialization
 
          IF (line=='Load_balance:')    READ(in1,*) LOAD_BALANCE
          IF (line=='Load_balance_every:')    READ(in1,*) LOAD_BALANCE_EVERY
-
-         IF (line=='Partition_num_blocks:')    READ(in1,*) N_BLOCKS_X, N_BLOCKS_Y
-
          
       END DO ! Loop for reading input file
 
@@ -1328,7 +1327,38 @@ MODULE initialization
 
       WRITE(*,*) 'Read boundary emit definition. Parameters: ', IPG, ', ', MIX_NAME, ', ', MIX_ID, ', ', NRHO, ', ',&
        UX, ', ', UY, ', ', UZ, ', ', TTRA, ', ', TROT, ', ', TVIB
-      IF (DIMS == 2) THEN 
+      IF (DIMS == 1) THEN 
+         DO IC = 1, NCELLS
+            DO I = 1, 2
+               IF (U1D_GRID%CELL_EDGES_PG(I,IC) == IPG) THEN
+                  
+                  IF (ALLOCATED(EMIT_TASKS)) THEN
+                     ALLOCATE(TEMP_EMIT_TASKS(N_EMIT_TASKS+1)) ! Append the mixture to the list
+                     TEMP_EMIT_TASKS(1:N_EMIT_TASKS) = EMIT_TASKS(1:N_EMIT_TASKS)
+                     CALL MOVE_ALLOC(TEMP_EMIT_TASKS, EMIT_TASKS)
+                  ELSE
+                     ALLOCATE(EMIT_TASKS(1))
+                  END IF
+                  N_EMIT_TASKS = N_EMIT_TASKS + 1
+   
+                  EMIT_TASKS(N_EMIT_TASKS)%NRHO = NRHO
+                  EMIT_TASKS(N_EMIT_TASKS)%UX = UX
+                  EMIT_TASKS(N_EMIT_TASKS)%UY = UY
+                  EMIT_TASKS(N_EMIT_TASKS)%UZ = UZ
+                  EMIT_TASKS(N_EMIT_TASKS)%TTRA = TTRA
+                  EMIT_TASKS(N_EMIT_TASKS)%TROT = TROT
+                  EMIT_TASKS(N_EMIT_TASKS)%TVIB = TVIB
+                  EMIT_TASKS(N_EMIT_TASKS)%MIX_ID = MIX_ID
+                  EMIT_TASKS(N_EMIT_TASKS)%IC = IC
+                  EMIT_TASKS(N_EMIT_TASKS)%IFACE = I
+   
+                  EMIT_TASKS(N_EMIT_TASKS)%IV1 = U1D_GRID%CELL_NODES(I,IC)
+   
+                  ! NFS WILL BE INITIALIZED LATER.
+               END IF
+            END DO
+         END DO
+      ELSE IF (DIMS == 2) THEN
          DO IC = 1, NCELLS
             DO I = 1, 3
                IF (U2D_GRID%CELL_EDGES_PG(I,IC) == IPG) THEN
@@ -1368,7 +1398,7 @@ MODULE initialization
                   ! NFS WILL BE INITIALIZED LATER.
                END IF
             END DO
-         END DO      
+         END DO
       ELSE IF (DIMS == 3) THEN
          DO IC = 1, NCELLS
             DO I = 1, 4
@@ -1985,10 +2015,13 @@ MODULE initialization
 
             IF (GRID_TYPE == UNSTRUCTURED) THEN
                DO IC = 1, NCELLS
-                  IF (DIMS == 2) THEN
+                  IF (DIMS == 1) THEN
+                     IF (CELL_PROCS(IC) .NE. PROC_ID) CYCLE
+                     CELL_PG = U1D_GRID%CELL_PG(IC)
+                  ELSE IF (DIMS == 2) THEN
                      IF (CELL_PROCS(IC) .NE. PROC_ID) CYCLE
                      CELL_PG = U2D_GRID%CELL_PG(IC)
-                  ELSE
+                  ELSE IF (DIMS == 3) THEN
                      IF (CELL_PROCS(IC) .NE. PROC_ID) CYCLE
                      CELL_PG = U3D_GRID%CELL_PG(IC)
                   END IF
@@ -1998,7 +2031,9 @@ MODULE initialization
 
 
                   ! Compute number of particles of this species to be created in this cell.
-                  IF (DIMS == 2) THEN
+                  IF (DIMS == 1) THEN
+                     VOL = U1D_GRID%CELL_VOLUMES(IC)
+                  ELSE IF (DIMS == 2) THEN
                      VOL = U2D_GRID%CELL_VOLUMES(IC)
                   ELSE IF (DIMS == 3) THEN
                      VOL = U3D_GRID%CELL_VOLUMES(IC)
@@ -2007,12 +2042,18 @@ MODULE initialization
                               MIXTURES(INITIAL_PARTICLES_TASKS(ITASK)%MIX_ID)%COMPONENTS(i)%MOLFRAC)
                   IF (NP_INIT == 0) CYCLE
 
-                  IF (DIMS == 2) THEN
+
+                  IF (DIMS == 1) THEN
+                     V1 = U1D_GRID%NODE_COORDS(:,U1D_GRID%CELL_NODES(1,IC))
+                     V2 = U1D_GRID%NODE_COORDS(:,U1D_GRID%CELL_NODES(2,IC))
+                     V3 = 0
+                     V4 = 0
+                  ELSE IF (DIMS == 2) THEN
                      V1 = U2D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(1,IC))
                      V2 = U2D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(2,IC))
                      V3 = U2D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(3,IC))
                      V4 = 0
-                  ELSE
+                  ELSE IF (DIMS == 3) THEN
                      V1 = U3D_GRID%NODE_COORDS(:,U3D_GRID%CELL_NODES(1,IC))
                      V2 = U3D_GRID%NODE_COORDS(:,U3D_GRID%CELL_NODES(2,IC))
                      V3 = U3D_GRID%NODE_COORDS(:,U3D_GRID%CELL_NODES(3,IC))
@@ -2030,7 +2071,11 @@ MODULE initialization
                         S = 1-S; T = 1-T
                      END IF
 
-                     IF (DIMS == 2) THEN
+                     IF (DIMS == 1) THEN
+                        XP = V1(1) + (V2(1)-V1(1))*S
+                        YP = YMIN + (YMAX-YMIN)*T
+                        ZP = ZMIN + (ZMAX-ZMIN)*U
+                     ELSE IF (DIMS == 2) THEN
                         XP = V1(1) + (V2(1)-V1(1))*S + (V3(1)-V1(1))*T
                         YP = V1(2) + (V2(2)-V1(2))*S + (V3(2)-V1(2))*T
                         IF (AXI) THEN
@@ -2038,7 +2083,7 @@ MODULE initialization
                         ELSE
                            ZP = ZMIN + (ZMAX-ZMIN)*U
                         END IF
-                     ELSE
+                     ELSE IF (DIMS == 3) THEN
                         ! http://vcg.isti.cnr.it/publications/papers/rndtetra_a.pdf
 
                         IF (S+T+U <= 1) THEN
@@ -2492,7 +2537,13 @@ MODULE initialization
          
          ALLOCATE(TASK_NFS(N_COMP))
 
-         IF (DIMS == 2) THEN
+         IF (DIMS == 1) THEN
+            NORMX = -U1D_GRID%EDGE_NORMAL(1, EMIT_TASKS(ITASK)%IFACE, EMIT_TASKS(ITASK)%IC)
+            NORMY = 0
+            NORMZ = 0
+
+            AREA = (YMAX-YMIN)*(ZMAX-ZMIN)
+         ELSE IF (DIMS == 2) THEN
 
             X1 = U2D_GRID%NODE_COORDS(1, EMIT_TASKS(ITASK)%IV1)
             Y1 = U2D_GRID%NODE_COORDS(2, EMIT_TASKS(ITASK)%IV1)
@@ -2511,7 +2562,7 @@ MODULE initialization
                AREA = LINELENGTH*(ZMAX-ZMIN)
             END IF
 
-         ELSE
+         ELSE IF (DIMS == 3) THEN
             NORMX = -U3D_GRID%FACE_NORMAL(1, EMIT_TASKS(ITASK)%IFACE, EMIT_TASKS(ITASK)%IC)
             NORMY = -U3D_GRID%FACE_NORMAL(2, EMIT_TASKS(ITASK)%IFACE, EMIT_TASKS(ITASK)%IC)
             NORMZ = -U3D_GRID%FACE_NORMAL(3, EMIT_TASKS(ITASK)%IFACE, EMIT_TASKS(ITASK)%IC)

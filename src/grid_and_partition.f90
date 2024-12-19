@@ -201,7 +201,7 @@ MODULE grid_and_partition
             COORDMAX = MAXVAL(CENTROID)
             COORDMIN = MINVAL(CENTROID)
 
-            WRITE(*,*) 'COORDMAX = ', COORDMAX, 'COORDMIN = ', COORDMIN
+            !WRITE(*,*) 'COORDMAX = ', COORDMAX, 'COORDMIN = ', COORDMIN
 
             DO I = 1, NCELLS
                CELL_PROCS(I) = INT((CENTROID(I)-COORDMIN)/(COORDMAX-COORDMIN)*REAL(N_MPI_THREADS))
@@ -667,7 +667,7 @@ MODULE grid_and_partition
       DO
          READ(in5,*, IOSTAT=ReasonEOF) LINE, NUM
          IF (ReasonEOF < 0) EXIT 
-         WRITE(*,*) 'Read line:', LINE, ' number ', NUM
+         !WRITE(*,*) 'Read line:', LINE, ' number ', NUM
          
          IF (LINE == 'NPOIN=') THEN
             ALLOCATE(U1D_GRID%NODE_COORDS(3,NUM))
@@ -705,7 +705,7 @@ MODULE grid_and_partition
                IF (LINE .NE. 'MARKER_TAG=') THEN
                   WRITE(*,*) 'Error! did not find marker name.'
                ELSE
-                  WRITE(*,*) 'Found marker tag, with groupname: ', GROUPNAME
+                  !WRITE(*,*) 'Found marker tag, with groupname: ', GROUPNAME
                END IF
          
                
@@ -713,7 +713,7 @@ MODULE grid_and_partition
                IF (LINE .NE. 'MARKER_ELEMS=') THEN
                   WRITE(*,*) 'Error! did not find marker elements.'
                ELSE
-                  WRITE(*,*) 'Found marker elements, with number of elements: ', NUMELEMS
+                  !WRITE(*,*) 'Found marker elements, with number of elements: ', NUMELEMS
                END IF
 
                DO J = 1, NUMELEMS
@@ -1100,7 +1100,7 @@ MODULE grid_and_partition
       DO
          READ(in5,*, IOSTAT=ReasonEOF) LINE, NUM
          IF (ReasonEOF < 0) EXIT 
-         WRITE(*,*) 'Read line:', LINE, ' number ', NUM
+         !WRITE(*,*) 'Read line:', LINE, ' number ', NUM
          
          IF (LINE == 'NPOIN=') THEN
             ALLOCATE(U2D_GRID%NODE_COORDS(3,NUM))
@@ -1137,7 +1137,7 @@ MODULE grid_and_partition
                IF (LINE .NE. 'MARKER_TAG=') THEN
                   WRITE(*,*) 'Error! did not find marker name.'
                ELSE
-                  WRITE(*,*) 'Found marker tag, with groupname: ', GROUPNAME
+                  !WRITE(*,*) 'Found marker tag, with groupname: ', GROUPNAME
                END IF
          
                
@@ -1145,7 +1145,7 @@ MODULE grid_and_partition
                IF (LINE .NE. 'MARKER_ELEMS=') THEN
                   WRITE(*,*) 'Error! did not find marker elements.'
                ELSE
-                  WRITE(*,*) 'Found marker elements, with number of elements: ', NUMELEMS
+                  !WRITE(*,*) 'Found marker elements, with number of elements: ', NUMELEMS
                END IF
 
                DO J = 1, NUMELEMS
@@ -1665,14 +1665,14 @@ MODULE grid_and_partition
                IF (LINE .NE. 'MARKER_TAG=') THEN
                   CALL ERROR_ABORT('Error! did not find marker name.')
                ELSE
-                  IF (PROC_ID == 0) WRITE(*,*) 'Found marker tag, with groupname: ', GROUPNAME
+                  !IF (PROC_ID == 0) WRITE(*,*) 'Found marker tag, with groupname: ', GROUPNAME
                END IF
 
                READ(in5,*, IOSTAT=ReasonEOF) LINE, NUMELEMS
                IF (LINE .NE. 'MARKER_ELEMS=') THEN
                   CALL ERROR_ABORT('Error! did not find marker elements.')
                ELSE
-                  IF (PROC_ID == 0) WRITE(*,*) 'Found marker elements, with number of elements: ', NUMELEMS
+                  !IF (PROC_ID == 0) WRITE(*,*) 'Found marker elements, with number of elements: ', NUMELEMS
                END IF
 
                DO J = 1, NUMELEMS

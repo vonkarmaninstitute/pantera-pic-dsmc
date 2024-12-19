@@ -402,16 +402,20 @@ MODULE initialization
  
          string = 'Domain limits:'
          WRITE(*,'(A5,A50)') '    ', string
-         WRITE(*,*)          '      X [m]:', XMIN, XMAX
-         WRITE(*,*)          '      Y [m]:', YMIN, YMAX
-         WRITE(*,*)          '      Z [m]:', ZMIN, ZMAX
+         WRITE(*,'(A13,ES14.3,ES14.3)')          '      X [m]: ', XMIN, XMAX
+         WRITE(*,'(A13,ES14.3,ES14.3)')          '      Y [m]: ', YMIN, YMAX
+         WRITE(*,'(A13,ES14.3,ES14.3)')          '      Z [m]: ', ZMIN, ZMAX
 
-         string = 'Domain periodicity along X, Y, Z [T/F]: '
-         WRITE(*,'(A5,A50,L4,L4,L4)')'    ',string,BOOL_X_PERIODIC,BOOL_Y_PERIODIC,BOOL_Z_PERIODIC
+         IF (GRID_TYPE == UNSTRUCTURED) THEN
+            string = 'Unstructured grid with number of cells, nodes: '
+            WRITE(*,'(A5,A50,I8,I8)')'    ',string,NCELLS,NNODES
+         ELSE
+            string = 'Structured grid with number of cells: '
+            WRITE(*,'(A5,A50, I8, I8, I8)') '    ', string, NX, NY, NZ
 
-         string = 'Number of cells:'
-         WRITE(*,'(A5,A50, I8, I8, I8)') '    ', string, NX, NY, NZ
-
+            string = 'Domain periodicity along X, Y, Z [T/F]: '
+            WRITE(*,'(A5,A50,L4,L4,L4)')'    ',string,BOOL_X_PERIODIC,BOOL_Y_PERIODIC,BOOL_Z_PERIODIC
+         END IF
   
          ! ~~~~ Numerical settings ~~~~
          WRITE(*,*) '  =========== Numerical settings ==================================='
@@ -421,7 +425,10 @@ MODULE initialization
          string = 'Timestep [s]:'
          WRITE(*,'(A5,A50,ES14.3)') '     ', string, DT
  
-         string = 'Number of timesteps:'
+         string = 'Initial timestep:'
+         WRITE(*,'(A5,A50,I9)') '     ',     string, RESTART_TIMESTEP
+
+         string = 'Final timestep:'
          WRITE(*,'(A5,A50,I9)') '     ',     string, NT
 
          string = 'RNG seed (global):'
@@ -498,15 +505,17 @@ MODULE initialization
 
          ! ~~~~ Multispecies ~~~~
          WRITE(*,*) '  =========== Species ========================='
-         WRITE(*,*) '    ','File read'
          WRITE(*,'(A5,A30,I9)') '    ','Number of species present: ', N_SPECIES
 
 
          WRITE(*,*) '  =========== Mixtures ========================='
+         string = 'Number of mixtures:'
+         WRITE(*,'(A5,A50,I9)') '    ', string, N_MIXTURES
          DO j = 1, N_MIXTURES
-            WRITE(*,*)'    ','Contents of mixture ', MIXTURES(j)%NAME, ' with ', MIXTURES(j)%N_COMPONENTS, ' components:'
+
+            WRITE(*,*)'    ','Mixture ', j, ' named ', TRIM(MIXTURES(j)%NAME), ' has ', MIXTURES(j)%N_COMPONENTS, ' components:'
             DO k = 1, MIXTURES(j)%N_COMPONENTS
-               WRITE(*,*) '    ','Mixture component ', MIXTURES(j)%COMPONENTS(k)%NAME, &
+               WRITE(*,*) '    ','Mixture component ', k, ' is ', TRIM(MIXTURES(j)%COMPONENTS(k)%NAME), &
                         ' with fraction ', MIXTURES(j)%COMPONENTS(k)%MOLFRAC, &
                         ' and ID ', MIXTURES(j)%COMPONENTS(k)%ID
             END DO
@@ -860,23 +869,23 @@ MODULE initialization
 
    
 
-      WRITE(*,*) 'Tref = ', TREF
-      WRITE(*,*) 'sigma = '
-      DO IS = 1, N_SPECIES
-         WRITE(*,*) VSS_SIGMAS(IS,:)
-      END DO
-      WRITE(*,*) 'omega = '
-      DO IS = 1, N_SPECIES
-         WRITE(*,*) VSS_OMEGAS(IS,:)
-      END DO
-      WRITE(*,*) 'alpha = '
-      DO IS = 1, N_SPECIES
-         WRITE(*,*) VSS_ALPHAS(IS,:)
-      END DO
-      WRITE(*,*) 'gref = '
-      DO IS = 1, N_SPECIES
-         WRITE(*,*) VSS_GREFS(IS,:)
-      END DO
+      ! WRITE(*,*) 'Tref = ', TREF
+      ! WRITE(*,*) 'sigma = '
+      ! DO IS = 1, N_SPECIES
+      !    WRITE(*,*) VSS_SIGMAS(IS,:)
+      ! END DO
+      ! WRITE(*,*) 'omega = '
+      ! DO IS = 1, N_SPECIES
+      !    WRITE(*,*) VSS_OMEGAS(IS,:)
+      ! END DO
+      ! WRITE(*,*) 'alpha = '
+      ! DO IS = 1, N_SPECIES
+      !    WRITE(*,*) VSS_ALPHAS(IS,:)
+      ! END DO
+      ! WRITE(*,*) 'gref = '
+      ! DO IS = 1, N_SPECIES
+      !    WRITE(*,*) VSS_GREFS(IS,:)
+      ! END DO
 
    END SUBROUTINE READ_VSS_BINARY
 
@@ -970,8 +979,8 @@ MODULE initialization
       READ(STRARRAY(10),'(ES14.0)') LINESOURCES(N_LINESOURCES)%TROT
       READ(STRARRAY(10),'(ES14.0)') LINESOURCES(N_LINESOURCES)%TVIB
       READ(STRARRAY(11),'(A10)') MIX_NAME
-      WRITE(*,*) LINESOURCES(N_LINESOURCES)%UX
-      WRITE(*,*) LINESOURCES(N_LINESOURCES)%NRHO
+      ! WRITE(*,*) LINESOURCES(N_LINESOURCES)%UX
+      ! WRITE(*,*) LINESOURCES(N_LINESOURCES)%NRHO
       MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
       LINESOURCES(N_LINESOURCES)%MIX_ID = MIX_ID
 
@@ -1325,8 +1334,8 @@ MODULE initialization
 
       MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
 
-      WRITE(*,*) 'Read boundary emit definition. Parameters: ', IPG, ', ', MIX_NAME, ', ', MIX_ID, ', ', NRHO, ', ',&
-       UX, ', ', UY, ', ', UZ, ', ', TTRA, ', ', TROT, ', ', TVIB
+      ! WRITE(*,*) 'Read boundary emit definition. Parameters: ', IPG, ', ', MIX_NAME, ', ', MIX_ID, ', ', NRHO, ', ',&
+      !  UX, ', ', UY, ', ', UZ, ', ', TTRA, ', ', TROT, ', ', TVIB
       IF (DIMS == 1) THEN 
          DO IC = 1, NCELLS
             DO I = 1, 2
@@ -1469,8 +1478,8 @@ MODULE initialization
 
       MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
 
-      WRITE(*,*) 'Read initial particle seed definition. Parameters: ', MIX_NAME, ', ', MIX_ID, ', ', NRHO, ', ',&
-       UX, ', ', UY, ', ', UZ, ', ', TTRAX, ', ', TTRAY, ', ', TTRAZ, ', ', TROT, ', ', TVIB
+      ! WRITE(*,*) 'Read initial particle seed definition. Parameters: ', MIX_NAME, ', ', MIX_ID, ', ', NRHO, ', ',&
+      !  UX, ', ', UY, ', ', UZ, ', ', TTRAX, ', ', TTRAY, ', ', TTRAZ, ', ', TROT, ', ', TVIB
 
       IF (ALLOCATED(INITIAL_PARTICLES_TASKS)) THEN
          ALLOCATE(TEMP_INITIAL_PARTICLES_TASK(N_INITIAL_PARTICLES_TASKS+1)) ! Append the mixture to the list
@@ -1526,8 +1535,8 @@ MODULE initialization
 
       MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
 
-      WRITE(*,*) 'Read volume inject definition. Parameters: ', MIX_NAME, ', ', MIX_ID, ', ', NRHODOT, ', ',&
-       UX, ', ', UY, ', ', UZ, ', ', TTRAX, ', ', TTRAY, ', ', TTRAZ, ', ', TROT, ', ', TVIB
+      ! WRITE(*,*) 'Read volume inject definition. Parameters: ', MIX_NAME, ', ', MIX_ID, ', ', NRHODOT, ', ',&
+      !  UX, ', ', UY, ', ', UZ, ', ', TTRAX, ', ', TTRAY, ', ', TTRAZ, ', ', TROT, ', ', TVIB
 
       IF (ALLOCATED(VOLUME_INJECT_TASKS)) THEN
          ALLOCATE(TEMP_VOLUME_INJECT_TASK(N_VOLUME_INJECT_TASKS+1)) ! Append the mixture to the list
@@ -1765,30 +1774,30 @@ MODULE initialization
       
       CLOSE(in3) ! Close input file
 
-      IF (PROC_ID == 0) THEN
-         DO index = 1, N_REACTIONS
-            WRITE(*,*) 'Reaction ', index, 'Has 2 reactants with ids:', REACTIONS(index)%R1_SP_ID, ' and ', &
-            REACTIONS(index)%R2_SP_ID
-            IF (REACTIONS(index)%N_PROD == 2) THEN
-               WRITE(*,*) REACTIONS(index)%N_PROD, 'products with ids:',  REACTIONS(index)%P1_SP_ID, ' and ', &
-               REACTIONS(index)%P2_SP_ID
-               IF (REACTIONS(index)%IS_CEX) WRITE(*,*) 'This is a CEX reaction'
-            ELSE IF (REACTIONS(index)%N_PROD == 3) THEN
-               WRITE(*,*) REACTIONS(index)%N_PROD, 'products with ids:',  REACTIONS(index)%P1_SP_ID, ', ', &
-               REACTIONS(index)%P2_SP_ID, ' and ', REACTIONS(index)%P3_SP_ID
-            END IF
-            IF (REACTIONS(index)%TYPE == TCE) THEN
-               WRITE(*,*) 'Parameters:', REACTIONS(index)%A, REACTIONS(index)%N, REACTIONS(index)%EA
-            ELSE IF (REACTIONS(index)%TYPE == LXCAT) THEN
-               WRITE(*,*) 'Reaction ', index, ' is from tabulated data in LxCat format.'
-               WRITE(*,*) 'Activation energy: ', REACTIONS(index)%EA
-               WRITE(*,*) 'Here are the energies (eV): ', REACTIONS(index)%TABLE_ENERGY
-               WRITE(*,*) 'And here are the cross sections (m^2): ', REACTIONS(index)%TABLE_CS
-            ELSE
-               WRITE(*,*) 'Reaction ', index, ' is not defined!'
-            END IF
-         END DO
-      END IF
+      ! IF (PROC_ID == 0) THEN
+      !    DO index = 1, N_REACTIONS
+      !       WRITE(*,*) 'Reaction ', index, 'Has 2 reactants with ids:', REACTIONS(index)%R1_SP_ID, ' and ', &
+      !       REACTIONS(index)%R2_SP_ID
+      !       IF (REACTIONS(index)%N_PROD == 2) THEN
+      !          WRITE(*,*) REACTIONS(index)%N_PROD, 'products with ids:',  REACTIONS(index)%P1_SP_ID, ' and ', &
+      !          REACTIONS(index)%P2_SP_ID
+      !          IF (REACTIONS(index)%IS_CEX) WRITE(*,*) 'This is a CEX reaction'
+      !       ELSE IF (REACTIONS(index)%N_PROD == 3) THEN
+      !          WRITE(*,*) REACTIONS(index)%N_PROD, 'products with ids:',  REACTIONS(index)%P1_SP_ID, ', ', &
+      !          REACTIONS(index)%P2_SP_ID, ' and ', REACTIONS(index)%P3_SP_ID
+      !       END IF
+      !       IF (REACTIONS(index)%TYPE == TCE) THEN
+      !          WRITE(*,*) 'Parameters:', REACTIONS(index)%A, REACTIONS(index)%N, REACTIONS(index)%EA
+      !       ELSE IF (REACTIONS(index)%TYPE == LXCAT) THEN
+      !          WRITE(*,*) 'Reaction ', index, ' is from tabulated data in LxCat format.'
+      !          WRITE(*,*) 'Activation energy: ', REACTIONS(index)%EA
+      !          WRITE(*,*) 'Here are the energies (eV): ', REACTIONS(index)%TABLE_ENERGY
+      !          WRITE(*,*) 'And here are the cross sections (m^2): ', REACTIONS(index)%TABLE_CS
+      !       ELSE
+      !          WRITE(*,*) 'Reaction ', index, ' is not defined!'
+      !       END IF
+      !    END DO
+      ! END IF
 
    END SUBROUTINE READ_REACTIONS
 
@@ -2530,7 +2539,7 @@ MODULE initialization
 
       ! =====================================================
       ! Injection from unstructured grid boundaries
-      WRITE(*,*) 'N emit tasks ', N_EMIT_TASKS
+      ! WRITE(*,*) 'N emit tasks ', N_EMIT_TASKS
       DO ITASK = 1, N_EMIT_TASKS ! Loop on line sources
 
          N_COMP = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%N_COMPONENTS

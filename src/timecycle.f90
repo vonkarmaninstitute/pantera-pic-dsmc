@@ -1088,7 +1088,7 @@ MODULE timecycle
 
       FIELD_POWER = 0
 
-      OPEN(66341, FILE='washboarddump', POSITION='append', STATUS='unknown', ACTION='write')
+      ! OPEN(66341, FILE='washboarddump', POSITION='append', STATUS='unknown', ACTION='write')
 
 
       DO IP = 1, NP_PROC
@@ -1476,11 +1476,11 @@ MODULE timecycle
                            particles(IP)%EROT = EROT
                            particles(IP)%EVIB = EVIB
 
-                           IF (rf() < 0.01) THEN
-                              WRITE(66341,*) VXPRE, ',', VYPRE, ',', VZPRE, ',', &
-                              particles(IP)%VX, ',', particles(IP)%VY, ',', particles(IP)%VZ, ',',&
-                              FACE_NORMAL(1), ',', FACE_NORMAL(2), ',', FACE_NORMAL(3)
-                              END IF
+                           ! IF (rf() < 0.01) THEN
+                           !    WRITE(66341,*) VXPRE, ',', VYPRE, ',', VZPRE, ',', &
+                           !    particles(IP)%VX, ',', particles(IP)%VY, ',', particles(IP)%VZ, ',',&
+                           !    FACE_NORMAL(1), ',', FACE_NORMAL(2), ',', FACE_NORMAL(3)
+                           ! END IF
 
                         ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == CLL) THEN
                            IF (GRID_BC(FACE_PG)%REACT) THEN
@@ -1602,11 +1602,11 @@ MODULE timecycle
                            particles(IP)%EROT = EROT
                            particles(IP)%EVIB = EVIB
 
-                           IF (rf() < 0.01) THEN
-                           WRITE(66341,*) VXPRE, ',', VYPRE, ',', VZPRE, ',', &
-                           particles(IP)%VX, ',', particles(IP)%VY, ',', particles(IP)%VZ, ',',&
-                           FACE_NORMAL(1), ',', FACE_NORMAL(2), ',', FACE_NORMAL(3)
-                           END IF
+                           ! IF (rf() < 0.01) THEN
+                           !    WRITE(66341,*) VXPRE, ',', VYPRE, ',', VZPRE, ',', &
+                           !    particles(IP)%VX, ',', particles(IP)%VY, ',', particles(IP)%VZ, ',',&
+                           !    FACE_NORMAL(1), ',', FACE_NORMAL(2), ',', FACE_NORMAL(3)
+                           ! END IF
                            
                         ELSE
                            REMOVE_PART(IP) = .TRUE.
@@ -2263,7 +2263,7 @@ MODULE timecycle
       END IF
 
 
-      CLOSE(66341)
+      ! CLOSE(66341)
 
    END SUBROUTINE ADVECT
 

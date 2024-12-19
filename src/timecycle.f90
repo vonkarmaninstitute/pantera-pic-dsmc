@@ -2257,7 +2257,7 @@ MODULE timecycle
             END DO
          END IF
 
-         CALL DUMP_FORCE_FILE(tID)
+         ! CALL DUMP_FORCE_FILE(tID)
          FORCE_DIRECT = 0.d0
          FORCE_INDIRECT = 0.d0
       END IF

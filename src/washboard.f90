@@ -103,6 +103,8 @@ MODULE washboard
          ndown = ndown + 1
          !print*, down, vx_i,vy_i,vz_i
          ! Sample local normal
+         theta_a = ACOS(VZ_I/SQRT(VX_I*VX_I + VY_I*VY_I + VZ_I*VZ_I))
+         phi_a = atan2(vy_i, vx_i)
          
          maxx = interpolate(theta_i_v, A_v, g_v, GRID_BC(IPG)%MAX_P_DN, theta_a, A, g)/cos(theta_a)
          angle_values = accept_reject_surf(maxx, theta_a, phi_a, A, g,down)

@@ -1065,6 +1065,8 @@ MODULE timecycle
 
       REAL(KIND=8) :: VXPRE, VYPRE, VZPRE
 
+      
+      REAL(KIND=8) :: TOL = 1.0d-15
 
       E = [0.d0, 0.d0, 0.d0]
       B = [0.d0, 0.d0, 0.d0]
@@ -1200,8 +1202,8 @@ MODULE timecycle
                            ! Compute the solutions, check if they are any good and, in case, order them to be checked further.
                            SOL1 = (-COEFB - SQRT(DELTA))/COEFA
                            SOL2 = (-COEFB + SQRT(DELTA))/COEFA
-                           IF (SOL1 >= 0 .AND. SOL1 < DTCOLL .AND. BETA+ALPHA*particles(IP)%VX*SOL1+EDGE_Y1 >= 0) THEN
-                              IF (SOL2 >= 0 .AND. SOL2 < DTCOLL .AND. BETA+ALPHA*particles(IP)%VX*SOL2+EDGE_Y1 >= 0) THEN
+                           IF (SOL1 >= -TOL .AND. SOL1 < DTCOLL .AND. BETA+ALPHA*particles(IP)%VX*SOL1+EDGE_Y1 >= 0) THEN
+                              IF (SOL2 >= -TOL .AND. SOL2 < DTCOLL .AND. BETA+ALPHA*particles(IP)%VX*SOL2+EDGE_Y1 >= 0) THEN
                                  GOODSOL = 2
                                  IF (SOL1 <= SOL2) THEN
                                     TEST(1) = SOL1
@@ -1215,7 +1217,7 @@ MODULE timecycle
                                  TEST(1) = SOL1
                               ENDIF
                            ELSE
-                              IF (SOL2 >= 0 .AND. SOL2 < DTCOLL .AND. BETA+ALPHA*particles(IP)%VX*SOL2+EDGE_Y1 >= 0) THEN
+                              IF (SOL2 >= -TOL .AND. SOL2 < DTCOLL .AND. BETA+ALPHA*particles(IP)%VX*SOL2+EDGE_Y1 >= 0) THEN
                                  GOODSOL = 1
                                  TEST(1) = SOL2
                               ELSE
@@ -1254,21 +1256,21 @@ MODULE timecycle
                ELSE
                   ! We are not axisymmetric (valid also for simplified axisymmetric procedure)
                
-               IF (DIMS == 1) THEN
-                  DO I = 1, 2
-                     VN = particles(IP)%VX * U1D_GRID%EDGE_NORMAL(1,I,IC)
-                     ! Compute the distance from the boundary
-                     DX = (U1D_GRID%NODE_COORDS(1,U1D_GRID%CELL_NODES(I,IC)) - particles(IP)%X) * U1D_GRID%EDGE_NORMAL(1,I,IC)
+                  IF (DIMS == 1) THEN
+                     DO I = 1, 2
+                        VN = particles(IP)%VX * U1D_GRID%EDGE_NORMAL(1,I,IC)
+                        ! Compute the distance from the boundary
+                        DX = (U1D_GRID%NODE_COORDS(1,U1D_GRID%CELL_NODES(I,IC)) - particles(IP)%X) * U1D_GRID%EDGE_NORMAL(1,I,IC)
 
-                     ! Check if a collision happens (sooner than previously calculated)
-                     IF (VN .GE. 0. .AND. VN * DTCOLL .GE. DX) THEN
-                        DTCOLL = DX/VN
-                        BOUNDCOLL = I
-                        TOTDTCOLL = TOTDTCOLL + DTCOLL  
-                        HASCOLLIDED = .TRUE.     
-                     END IF
-                  END DO
-               ELSE IF (DIMS == 2) THEN
+                        ! Check if a collision happens (sooner than previously calculated)
+                        IF (VN .GE. 0. .AND. VN * DTCOLL .GE. DX) THEN
+                           DTCOLL = DX/VN
+                           BOUNDCOLL = I
+                           TOTDTCOLL = TOTDTCOLL + DTCOLL  
+                           HASCOLLIDED = .TRUE.     
+                        END IF
+                     END DO
+                  ELSE IF (DIMS == 2) THEN
                      DO I = 1, 3
                         VN = particles(IP)%VX * U2D_GRID%EDGE_NORMAL(1,I,IC) &
                            + particles(IP)%VY * U2D_GRID%EDGE_NORMAL(2,I,IC)

@@ -3456,92 +3456,6 @@ MODULE fully_implicit
 
    END SUBROUTINE COMPUTE_E_FIELD
 
-   ! SUBROUTINE COMPUTE_INDIRECT_FORCE
-
-   !    IMPLICIT NONE
-
-   !    INTEGER      :: FACE_PG
-   !    REAL(KIND=8) :: Y1,Y2
-   !    REAL(KIND=8) :: AREA, E_MAG2, RESISTANCE
-   !    INTEGER      :: IP, IC, VV1, VV2, VV3, V1, V2, V3
-
-   !    IF (DIMS==2) THEN
-   !       DO IC=1, NCELLS
-   !          IF (CELL_PROCS(IC)==PROC_ID) THEN
-   !             DO IP=1, 3
-   !                FACE_PG =  U2D_GRID%CELL_EDGES_PG(IP, IC)
-   !                IF (FACE_PG .NE. -1 .AND. U2D_GRID%CELL_PG(IC) .NE. -1) THEN
-   !                   IF (GRID_BC(FACE_PG)%DUMP_FORCE_BC .AND. (GRID_BC(U2D_GRID%CELL_PG(IC))%VOLUME_BC == FLUID)) THEN
-
-   !                      AREA = U2D_GRID%CELL_EDGES_LEN(IP,IC)
-   !                      E_MAG2 = E_FIELD(1,1,IC)*E_FIELD(1,1,IC) + E_FIELD(2,1,IC)*E_FIELD(2,1,IC)
-   !                      IF (AXI) THEN
-   !                         IF (IP == 1) THEN
-   !                            VV1 = 1
-   !                            VV2 = 2
-   !                         ELSE IF (IP == 2) THEN
-   !                            VV1 = 2
-   !                            VV2 = 3
-   !                         ELSE IF (IP == 3) THEN
-   !                            VV1 = 3
-   !                            VV2 = 1
-   !                         END IF
-   !                         V1 = U2D_GRID%CELL_NODES(VV1,IC)
-   !                         V2 = U2D_GRID%CELL_NODES(VV2,IC)
-   !                         Y1 = U2D_GRID%NODE_COORDS(2, V1)
-   !                         Y2 = U2D_GRID%NODE_COORDS(2, V2)
-   !                         FORCE_INDIRECT(1) = FORCE_INDIRECT(1) + EPS0*AREA*(Y1+Y2)/2*(ZMAX-ZMIN)*&
-   !                                           ( (E_FIELD(1,1,IC)*E_FIELD(1,1,IC) - 0.5*E_MAG2)*U2D_GRID%EDGE_NORMAL(1,IP,IC) &
-   !                                           +  E_FIELD(1,1,IC)*E_FIELD(2,1,IC)*U2D_GRID%EDGE_NORMAL(2,IP,IC))
-   !                         FORCE_INDIRECT(2) = FORCE_INDIRECT(2) + EPS0*AREA*(Y1+Y2)/2*(ZMAX-ZMIN)*&
-   !                                           (  E_FIELD(2,1,IC)*E_FIELD(1,1,IC)*U2D_GRID%EDGE_NORMAL(1,IP,IC) &
-   !                                           + (E_FIELD(2,1,IC)*E_FIELD(2,1,IC) - 0.5*E_MAG2)*U2D_GRID%EDGE_NORMAL(2,IP,IC))
-   !                      ELSE
-   !                         FORCE_INDIRECT(1) = FORCE_INDIRECT(1) + EPS0*AREA*(ZMAX-ZMIN)*&
-   !                                           ( (E_FIELD(1,1,IC)*E_FIELD(1,1,IC) - 0.5*E_MAG2)*U2D_GRID%EDGE_NORMAL(1,IP,IC) &
-   !                                           +  E_FIELD(1,1,IC)*E_FIELD(2,1,IC)*U2D_GRID%EDGE_NORMAL(2,IP,IC))
-                           
-   !                         FORCE_INDIRECT(2) = FORCE_INDIRECT(2) + EPS0*AREA*(ZMAX-ZMIN)*&
-   !                                           (  E_FIELD(2,1,IC)*E_FIELD(1,1,IC)*U2D_GRID%EDGE_NORMAL(1,IP,IC) &
-   !                                           + (E_FIELD(2,1,IC)*E_FIELD(2,1,IC) - 0.5*E_MAG2)*U2D_GRID%EDGE_NORMAL(2,IP,IC))
-   !                      END IF
-   !                   END IF
-   !                END IF
-   !             END DO
-   !          END IF
-   !       END DO
-   !    ELSE IF (DIMS==3) THEN
-   !       DO IC=1, NCELLS
-   !          IF (CELL_PROCS(IC)==PROC_ID) THEN
-   !             DO IP=1, 4
-   !                FACE_PG =  U3D_GRID%CELL_FACES_PG(IP, IC)
-   !                IF (FACE_PG .NE. -1 .AND. U3D_GRID%CELL_PG(IC) .NE. -1) THEN
-   !                   IF (GRID_BC(FACE_PG)%DUMP_FORCE_BC .AND. (GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC == FLUID)) THEN
-
-   !                      AREA = U3D_GRID%FACE_AREA(IP,IC)
-   !                      E_MAG2 = E_FIELD(1,1,IC)*E_FIELD(1,1,IC) + E_FIELD(2,1,IC)*E_FIELD(2,1,IC)&
-   !                      + E_FIELD(3,1,IC)*E_FIELD(3,1,IC)
-
-   !                      FORCE_INDIRECT(1) = FORCE_INDIRECT(1) + EPS0*AREA*&
-   !                      ( (E_FIELD(1,1,IC)*E_FIELD(1,1,IC) - 0.5*E_MAG2)*U3D_GRID%FACE_NORMAL(1,IP,IC) &
-   !                      +  E_FIELD(1,1,IC)*E_FIELD(2,1,IC)*U3D_GRID%FACE_NORMAL(2,IP,IC) &
-   !                      +  E_FIELD(1,1,IC)*E_FIELD(3,1,IC)*U3D_GRID%FACE_NORMAL(3,IP,IC))
-   !                      FORCE_INDIRECT(2) = FORCE_INDIRECT(2) + EPS0*AREA*&
-   !                      (  E_FIELD(2,1,IC)*E_FIELD(1,1,IC)*U3D_GRID%FACE_NORMAL(1,IP,IC) &
-   !                      + (E_FIELD(2,1,IC)*E_FIELD(2,1,IC) - 0.5*E_MAG2)*U3D_GRID%FACE_NORMAL(2,IP,IC) &
-   !                      +  E_FIELD(2,1,IC)*E_FIELD(3,1,IC)*U3D_GRID%FACE_NORMAL(3,IP,IC))
-   !                      FORCE_INDIRECT(3) = FORCE_INDIRECT(3) + EPS0*AREA*&
-   !                      (  E_FIELD(3,1,IC)*E_FIELD(1,1,IC)*U3D_GRID%FACE_NORMAL(1,IP,IC) &
-   !                      +  E_FIELD(3,1,IC)*E_FIELD(2,1,IC)*U3D_GRID%FACE_NORMAL(2,IP,IC) &
-   !                      + (E_FIELD(3,1,IC)*E_FIELD(3,1,IC) - 0.5*E_MAG2)*U3D_GRID%FACE_NORMAL(3,IP,IC))
-   !                   END IF
-   !                END IF
-   !             END DO
-   !          END IF
-   !       END DO
-   !    END IF
-   ! END SUBROUTINE COMPUTE_INDIRECT_FORCE
-
 
    SUBROUTINE COMPUTE_WEIGHTS(JP, WEIGHTS, INDICES, INDI, INDJ)
 
@@ -3726,6 +3640,7 @@ MODULE fully_implicit
       ELSE
          CALL MPI_REDUCE(RHS,          RHS, SIZE, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
       END IF
+      IF (BOOL_LOAD_RHS) CALL LOAD_RHS_FILE
 
       CALL MPI_BCAST(RHS, SIZE, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 

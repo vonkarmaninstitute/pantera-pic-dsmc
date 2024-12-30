@@ -116,10 +116,6 @@ MODULE initialization
             CALL DEF_BOUNDARY_DUMP_FLUXES(BC_DEFINITION)
          END IF
 
-         ! IF (line=='Boundary_compute_force:') THEN
-         !    READ(in1,'(A)') BC_DEFINITION
-         !    CALL DEF_BOUNDARY_COMPUTE_FORCE(BC_DEFINITION)
-         ! END IF
 
          ! ~~~~~~~~~~~~~  Numerical settings  ~~~~~~~~~~~~~~~~~
          IF (line=='Fnum:')                    READ(in1,*) FNUM
@@ -199,8 +195,12 @@ MODULE initialization
          IF (line=='Bool_dump_fluxes:')        READ(in1,*) BOOL_DUMP_FLUXES
          IF (line=='Dump_traj_start:')         READ(in1,*) DUMP_TRAJECTORY_START
          IF (line=='Dump_traj_number:')        READ(in1,*) DUMP_TRAJECTORY_NUMBER
-         ! IF (line=='Dump_force_start:')        READ(in1,*) DUMP_FORCE_START
-         ! IF (line=='Dump_force_every:')        READ(in1,*) DUMP_FORCE_EVERY
+
+         IF (line=='Dump_rhs_file:') READ(in1,*) BOOL_DUMP_RHS
+         IF (line=='Load_rhs_file:') THEN 
+            BOOL_LOAD_RHS = .TRUE.
+            READ(in1,*) RHS_FILE_PATH
+         END IF
 
          IF (line=='Inject_from_file:') THEN
             BOOL_INJECT_FROM_FILE = .TRUE.
@@ -1243,33 +1243,6 @@ MODULE initialization
 
 
    END SUBROUTINE DEF_BOUNDARY_DUMP_FLUXES
-
-
-   ! SUBROUTINE DEF_BOUNDARY_COMPUTE_FORCE(DEFINITION)
-
-   !    IMPLICIT NONE
-
-   !    CHARACTER(LEN=*), INTENT(IN) :: DEFINITION
-
-   !    INTEGER :: N_STR, I, IPG
-   !    CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
-
-
-   !    CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
-
-   !    IF (N_STR .NE. 1) CALL ERROR_ABORT('Error in boundary definition for force calculation.')
-
-   !    ! phys_group type parameters
-   !    IPG = -1
-   !    DO I = 1, N_GRID_BC
-   !       IF (GRID_BC(I)%PHYSICAL_GROUP_NAME == STRARRAY(1)) IPG = I
-   !    END DO
-   !    IF (IPG == -1) CALL ERROR_ABORT('Error in boundary condition definition. Group name not found.')
-
-   !    GRID_BC(IPG)%DUMP_FORCE_BC = .TRUE.
-
-
-   ! END SUBROUTINE DEF_BOUNDARY_COMPUTE_FORCE
 
 
 

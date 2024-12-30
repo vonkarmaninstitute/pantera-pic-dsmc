@@ -386,40 +386,151 @@ CONTAINS
 
    END SUBROUTINE DUMP_BOUNDARY_PARTICLES_FILE
 
-   ! SUBROUTINE DUMP_FORCE_FILE(TIMESTEP)
 
-   !    IMPLICIT NONE
+   SUBROUTINE DUMP_RHS_FILE
 
-   !    REAL(KIND=8) :: CURRENT_TIME
-   !    INTEGER, INTENT(IN) :: TIMESTEP
-   !    CHARACTER(LEN=512)  :: filename
+      IMPLICIT NONE
 
-   !    REAL(KIND=8), DIMENSION(3) :: DUMP_FORCE_DIRECT, DUMP_FORCE_INDIRECT
+      CHARACTER(LEN=512)  :: filename
+      REAL(KIND=8) :: DUMP_RHS
+      INTEGER :: I
 
-   !    DUMP_FORCE_DIRECT = FORCE_DIRECT
-   !    DUMP_FORCE_INDIRECT = FORCE_INDIRECT
+      IF (PROC_ID .EQ. 0) THEN
+         CALL CALCULATE_FLUID_RHS
+         WRITE(filename, "(A,A,I0.5)") TRIM(ADJUSTL(FLOWFIELD_SAVE_PATH)), "dump_rhs" ! Compose filename
+         OPEN(54331, FILE=filename, POSITION='append', STATUS='unknown', ACTION='write')
+         DO I=0, NNODES-1
+            DUMP_RHS = RHS(I)
+            WRITE(54331,*) DUMP_RHS
+         END DO
+         CLOSE(54331)
+      END IF
+   END SUBROUTINE DUMP_RHS_FILE
 
-   !    CURRENT_TIME = TIMESTEP*DT
+   SUBROUTINE LOAD_RHS_FILE
+      IMPLICIT NONE
 
+      CHARACTER(LEN=512)  :: filename
+      REAL(KIND=8) :: DUMP_RHS
+      INTEGER :: I, ios
 
-   !    IF (PROC_ID .EQ. 0) THEN
-   !       CALL MPI_REDUCE(MPI_IN_PLACE,  DUMP_FORCE_DIRECT, 3, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-   !       CALL MPI_REDUCE(MPI_IN_PLACE,  DUMP_FORCE_INDIRECT, 3, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-         
-   !       WRITE(filename, "(A,A,I0.5)") TRIM(ADJUSTL(FLOWFIELD_SAVE_PATH)), "dump_force" ! Compose filename
-   !       OPEN(54331, FILE=filename, POSITION='append', STATUS='unknown', ACTION='write')
-   !       WRITE(54331,*) CURRENT_TIME, DUMP_FORCE_DIRECT, DUMP_FORCE_INDIRECT
-   !       CLOSE(54331)
+      IF (PROC_ID .EQ. 0) THEN
+         WRITE(filename, "(A,A,I0.5)") TRIM(ADJUSTL(RHS_FILE_PATH)) ! Compose filename
+         OPEN(54331, FILE=filename, STATUS='old', ACTION='read') ! Open the file for reading
+         DO I = 0, NNODES-1
+            READ(54331, *, IOSTAT=ios) DUMP_RHS  ! Read one value per line
+            IF (ios /= 0) EXIT  ! Exit loop on end-of-file or error
+            RHS(I) = RHS(I) + DUMP_RHS   ! Store the value in the RHS array
+         END DO
+         CLOSE(54331)
+      END IF
+   END SUBROUTINE LOAD_RHS_FILE
 
-   !    ELSE
-   !       CALL MPI_REDUCE(DUMP_FORCE_DIRECT,  DUMP_FORCE_DIRECT, 3, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-   !       CALL MPI_REDUCE(DUMP_FORCE_INDIRECT,  DUMP_FORCE_INDIRECT, 3, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-   !    END IF
+   SUBROUTINE CALCULATE_FLUID_RHS
 
-   !    FORCE_DIRECT = 0.d0
-   !    FORCE_INDIRECT = 0.d0
-   ! END SUBROUTINE DUMP_FORCE_FILE
+      IMPLICIT NONE
 
+      REAL(KIND=8) :: Y1, Y2, Y3, AREA, EPS_REL
+      INTEGER :: V1, V2, V3, I
+      INTEGER :: P, Q, VP, VQ
+      REAL(KIND=8) :: VOLUME, VALUETOADD
+
+      IF (DIMS == 2) THEN
+         DO I = 1, NCELLS
+            AREA = U2D_GRID%CELL_AREAS(I)
+
+            IF (U2D_GRID%CELL_PG(I) == -1) THEN
+               EPS_REL = 1.d0
+            ELSE
+               EPS_REL = GRID_BC(U2D_GRID%CELL_PG(I))%EPS_REL
+            END IF
+            
+            ! We need to ADD to a sparse matrix entry.
+            DO P = 1, 3
+               VP = U2D_GRID%CELL_NODES(P,I)
+                  IF (.NOT. IS_DIRICHLET(VP-1)) THEN
+                     DO Q = 1, 3
+                        VQ = U2D_GRID%CELL_NODES(Q,I)
+                        VALUETOADD = -QE*BOLTZ_N0/EPS0*AREA*EXP(QE*(PHI_FIELD(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+
+                        IF (BOOL_KAPPA_FLUID) THEN 
+                           VALUETOADD = -QE*BOLTZ_N0/EPS0*AREA&
+                           *(1-QE*(PHI_FIELD(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.))&
+                           )**(-KAPPA_FLUID_C+1./2.)
+                        END IF
+
+                        IF (P == Q) THEN
+                           VALUETOADD = VALUETOADD/6.
+                           IF (AXI) THEN
+                              ! We do cyclic permutation using MOD 
+                              V1 = U2D_GRID%CELL_NODES(1 + MOD(P-1,3),I) ! Start from P node in cell I
+                              V2 = U2D_GRID%CELL_NODES(1 + MOD(P,3),I)
+                              V3 = U2D_GRID%CELL_NODES(1 + MOD(P+1,3),I)
+                              Y1 = U2D_GRID%NODE_COORDS(2, V1)
+                              Y2 = U2D_GRID%NODE_COORDS(2, V2)
+                              Y3 = U2D_GRID%NODE_COORDS(2, V3)
+
+                              VALUETOADD = VALUETOADD*(3*Y1+Y2+Y3)/5.
+                           END IF
+                        ELSE
+                           VALUETOADD = VALUETOADD/12.
+                           IF (AXI) THEN
+                              ! We have to choose first P and Q node, then choose the last one using MOD
+                              V1 = VP
+                              V2 = VQ
+                              V3 = U2D_GRID%CELL_NODES(1 + MOD(Q,3),I)
+                              IF (V3 == V1 .OR. V3 == V1) V3 = U2D_GRID%CELL_NODES(1 + MOD(Q+1,3),I)
+                              Y1 = U2D_GRID%NODE_COORDS(2, V1)
+                              Y2 = U2D_GRID%NODE_COORDS(2, V2)
+                              Y3 = U2D_GRID%NODE_COORDS(2, V3)
+
+                              VALUETOADD = VALUETOADD*(2*Y1+2*Y2+Y3)/5.
+                           END IF
+                        END IF
+                        IF (GRID_BC(U2D_GRID%CELL_PG(I))%VOLUME_BC == FLUID) THEN
+                           RHS(VP-1) = RHS(VP-1) + VALUETOADD
+                        END IF
+                     END DO
+                  END IF
+            END DO
+         END DO
+      ELSE IF (DIMS == 3) THEN
+         DO I = 1, NCELLS
+            VOLUME = U3D_GRID%CELL_VOLUMES(I)
+
+            IF (U3D_GRID%CELL_PG(I) == -1) THEN
+               EPS_REL = 1.d0
+            ELSE
+               EPS_REL = GRID_BC(U3D_GRID%CELL_PG(I))%EPS_REL
+            END IF
+            
+            DO P = 1, 4
+               VP = U3D_GRID%CELL_NODES(P,I)
+                  DO Q = 1, 4
+                     VQ = U3D_GRID%CELL_NODES(Q,I)
+
+                     ! FLUID ELECTRONS
+                     VALUETOADD = -QE*BOLTZ_N0/EPS0*VOLUME*EXP(QE*(PHI_FIELD(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+
+                     IF (BOOL_KAPPA_FLUID) THEN 
+                        VALUETOADD = -QE*BOLTZ_N0/EPS0*VOLUME&
+                        *(1-QE*(PHI_FIELD(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
+                        **(-KAPPA_FLUID_C+1./2.)
+                     END IF
+
+                     IF (P == Q) THEN
+                        VALUETOADD = VALUETOADD/10.
+                     ELSE
+                        VALUETOADD = VALUETOADD/20.
+                     END IF
+                     IF (GRID_BC(U3D_GRID%CELL_PG(I))%VOLUME_BC == FLUID) THEN
+                        RHS(VP-1) = RHS(VP-1) + VALUETOADD
+                     END IF
+                  END DO
+            END DO
+         END DO 
+      END IF
+   END SUBROUTINE CALCULATE_FLUID_RHS
 
    SUBROUTINE READ_PARTICLES_FILE(TIMESTEP)
 

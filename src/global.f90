@@ -52,6 +52,10 @@ MODULE global
    REAL(KIND=8) :: KAPPA_FLUID_C  = 4.d0
 
 
+   LOGICAL :: BOOL_DUMP_RHS = .FALSE.
+   LOGICAL :: BOOL_LOAD_RHS = .FALSE.
+   CHARACTER*256 :: RHS_FILE_PATH
+
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Geometry, domain and grid !!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -203,8 +207,6 @@ MODULE global
 
       LOGICAL :: REACT = .FALSE.
       LOGICAL :: DUMP_FLUXES = .FALSE.
-
-      ! LOGICAL :: DUMP_FORCE_BC = .FALSE.
 
       ! Washboard model
       REAL(KIND=8) :: A
@@ -629,17 +631,7 @@ MODULE global
 
    REAL(KIND=8), DIMENSION(6) :: TIMERS_START_TIME = 0.d0
    REAL(KIND=8), DIMENSION(6) :: TIMERS_ELAPSED = 0.d0
-
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   !!!!!!!!! Drag force calculation !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   ! REAL(KIND=8), DIMENSION(3) :: FORCE_DIRECT = 0.d0
-   ! REAL(KIND=8), DIMENSION(3) :: FORCE_INDIRECT = 0.d0
-   ! INTEGER                    :: DUMP_FORCE_START = -1
-   ! integer                    :: DUMP_FORCE_EVERY = 1.
-   !!!! TO BE DELETED
-
-
+   
 
    REAL(KIND=8) :: FIELD_POWER
    REAL(KIND=8) :: COIL_CURRENT = 1.5d0

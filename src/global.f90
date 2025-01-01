@@ -56,6 +56,9 @@ MODULE global
    LOGICAL :: BOOL_LOAD_RHS = .FALSE.
    CHARACTER*256 :: RHS_FILE_PATH
 
+   LOGICAL :: BOOL_CONDUCTIVE_BC = .FALSE.
+   REAL(KIND=8) :: WALL_METAL_POTENTIAL
+
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Geometry, domain and grid !!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -207,6 +210,7 @@ MODULE global
 
       LOGICAL :: REACT = .FALSE.
       LOGICAL :: DUMP_FLUXES = .FALSE.
+      LOGICAL :: CONDUCTIVE_BC = .FALSE.
 
       ! Washboard model
       REAL(KIND=8) :: A

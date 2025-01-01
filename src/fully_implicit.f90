@@ -3683,6 +3683,14 @@ MODULE fully_implicit
 
       IF (GRID_TYPE == UNSTRUCTURED) THEN
 
+         IF (BOOL_CONDUCTIVE_BC) THEN
+            IF (.NOT. ALLOCATED(PHI_FIELD)) THEN
+               ALLOCATE(PHI_FIELD(NNODES))
+               PHI_FIELD = 0
+            END IF
+            CALL COMPUTE_FLOATING_POTENTIAL_FOR_CONDUCTIVE_SURFACE(WALL_METAL_POTENTIAL)
+         END IF
+
          IF (DIMS == 2) THEN
 
             DO I = 1, NCELLS
@@ -3706,11 +3714,7 @@ MODULE fully_implicit
                            POTENTIAL = GRID_BC(EDGE_PG)%WALL_POTENTIAL &
                                      + 0.5*GRID_BC(EDGE_PG)%WALL_RF_POTENTIAL*COS(2*PI*GRID_BC(EDGE_PG)%RF_FREQUENCY*tID*DT)
                         ELSE IF (GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
-                           IF (.NOT. ALLOCATED(PHI_FIELD)) THEN
-                              ALLOCATE(PHI_FIELD(NNODES))
-                              PHI_FIELD = 0
-                           END IF
-                           CALL COMPUTE_FLOATING_POTENTIAL_FOR_CONDUCTIVE_SURFACE(POTENTIAL)
+                           POTENTIAL = WALL_METAL_POTENTIAL
                         END IF
 
                         IF (J==1) THEN
@@ -3756,11 +3760,7 @@ MODULE fully_implicit
                            POTENTIAL = GRID_BC(EDGE_PG)%WALL_POTENTIAL &
                                        + 0.5*GRID_BC(EDGE_PG)%WALL_RF_POTENTIAL*COS(2*PI*GRID_BC(EDGE_PG)%RF_FREQUENCY*tID*DT)
                         ELSE IF (GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
-                           IF (.NOT. ALLOCATED(PHI_FIELD)) THEN
-                              ALLOCATE(PHI_FIELD(NNODES))
-                              PHI_FIELD = 0
-                           END IF
-                           CALL COMPUTE_FLOATING_POTENTIAL_FOR_CONDUCTIVE_SURFACE(POTENTIAL)
+                           POTENTIAL = WALL_METAL_POTENTIAL
                         END IF
 
                         IF (J==1) THEN
@@ -4757,7 +4757,7 @@ MODULE fully_implicit
 
                      GRAD_H = SQRT(U3D_GRID%BASIS_COEFFS(1,VVE,IC)*U3D_GRID%BASIS_COEFFS(1,VVE,IC)&
                               + U3D_GRID%BASIS_COEFFS(2,VVE,IC)*U3D_GRID%BASIS_COEFFS(2,VVE,IC)&
-                              + U3D_GRID%BASIS_COEFFS(3,VVE,IC)*U3D_GRID%BASIS_COEFFS(2,VVE,IC))
+                              + U3D_GRID%BASIS_COEFFS(3,VVE,IC)*U3D_GRID%BASIS_COEFFS(3,VVE,IC))
 
                      H_DOT = U3D_GRID%BASIS_COEFFS(1,VV1,IC)*U3D_GRID%FACE_NORMAL(1,IP,IC)&
                            + U3D_GRID%BASIS_COEFFS(2,VV1,IC)*U3D_GRID%FACE_NORMAL(2,IP,IC)&

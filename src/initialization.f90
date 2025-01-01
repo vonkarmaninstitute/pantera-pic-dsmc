@@ -1067,6 +1067,7 @@ MODULE initialization
          GRID_BC(IPG)%FIELD_BC = DIELECTRIC_BC
       ELSE IF (STRARRAY(2) == 'conductive') THEN
          GRID_BC(IPG)%FIELD_BC = CONDUCTIVE_BC
+         BOOL_CONDUCTIVE_BC = .TRUE.
       !!! BCs for both particles and field
       ELSE IF (STRARRAY(2) == 'periodic_master') THEN
          GRID_BC(IPG)%PARTICLE_BC = PERIODIC_MASTER

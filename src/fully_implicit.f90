@@ -3640,7 +3640,7 @@ MODULE fully_implicit
       ELSE
          CALL MPI_REDUCE(RHS,          RHS, SIZE, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
       END IF
-      IF (BOOL_LOAD_RHS) CALL LOAD_RHS_FILE
+      IF (BOOL_LOAD_RHS) CALL LOAD_RHS_FILE(.FALSE.,.FALSE.)
 
       CALL MPI_BCAST(RHS, SIZE, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 
@@ -4672,113 +4672,120 @@ MODULE fully_implicit
       BOTTOM_FACTOR = 0.d0
       TOP_FACTOR = 0.d0
       TOTAL_CHARGE = SUM(SURFACE_CHARGE)
-
+      IF (PROC_ID .EQ. 0) THEN
+         CALL MPI_REDUCE(MPI_IN_PLACE, TOTAL_CHARGE, 1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      ELSE
+         CALL MPI_REDUCE(TOTAL_CHARGE, TOTAL_CHARGE, 1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      END IF
+      CALL MPI_BCAST(TOTAL_CHARGE, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 
       IF (DIMS==2) THEN
          DO IC=1, NCELLS
-            IF (CELL_PROCS(IC)==PROC_ID) THEN
-               DO IP=1, 3
-                  FACE_PG = U2D_GRID%CELL_EDGES_PG(IP, IC)
-                  IF (FACE_PG == -1) CYCLE
-                  IF (GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC .AND. GRID_BC(U2D_GRID%CELL_PG(IC))%VOLUME_BC .EQ. FLUID) THEN
-                     ! VV1 = 1 + MOD(IP-1,3)
-                     ! VV2 = 1 + MOD(IP,3)
-                     IF (IP == 1) THEN
-                        VV1 = 1
-                        VV2 = 2
-                        VVE = 3
-                     ELSE IF (IP == 2) THEN
-                        VV1 = 2
-                        VV2 = 3
-                        VVE = 1
-                     ELSE IF (IP == 3) THEN
-                        VV1 = 3
-                        VV2 = 1
-                        VVE = 2
-                     END IF
-                     V1 = U2D_GRID%CELL_NODES(VV1,IC)
-                     V2 = U2D_GRID%CELL_NODES(VV2,IC)
-                     VE = U2D_GRID%CELL_NODES(VVE,IC)
-                     Y1 = U2D_GRID%NODE_COORDS(2, V1)
-                     Y2 = U2D_GRID%NODE_COORDS(2, V2)       
-                     AREA = U2D_GRID%CELL_EDGES_LEN(IP,IC)
-
-                     GRAD_H = SQRT(U2D_GRID%BASIS_COEFFS(1,VVE,IC)*U2D_GRID%BASIS_COEFFS(1,VVE,IC) + &
-                              U2D_GRID%BASIS_COEFFS(2,VVE,IC)*U2D_GRID%BASIS_COEFFS(2,VVE,IC))
-                     H_DOT = U2D_GRID%BASIS_COEFFS(1,VV1,IC)*U2D_GRID%EDGE_NORMAL(1,IP,IC) +&
-                           U2D_GRID%BASIS_COEFFS(2,VV1,IC)*U2D_GRID%EDGE_NORMAL(2,IP,IC) +&
-                           U2D_GRID%BASIS_COEFFS(1,VV2,IC)*U2D_GRID%EDGE_NORMAL(1,IP,IC) +&
-                           U2D_GRID%BASIS_COEFFS(2,VV2,IC)*U2D_GRID%EDGE_NORMAL(2,IP,IC)
-                     IF (AXI) THEN
-                        TOP_FACTOR = TOP_FACTOR + PHI_FIELD(VE)*GRAD_H*AREA*(Y1+Y2)/2.
-                        BOTTOM_FACTOR = BOTTOM_FACTOR - H_DOT*AREA*(Y1+Y2)/2.
-                     ELSE
-                        TOP_FACTOR = TOP_FACTOR + PHI_FIELD(VE)*GRAD_H*AREA
-                        BOTTOM_FACTOR = BOTTOM_FACTOR - H_DOT*AREA
-                     END IF
+            DO IP=1, 3
+               FACE_PG = U2D_GRID%CELL_EDGES_PG(IP, IC)
+               IF (FACE_PG == -1) CYCLE
+               IF (GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC .AND. GRID_BC(U2D_GRID%CELL_PG(IC))%VOLUME_BC .EQ. FLUID) THEN
+                  ! VV1 = 1 + MOD(IP-1,3)
+                  ! VV2 = 1 + MOD(IP,3)
+                  IF (IP == 1) THEN
+                     VV1 = 1
+                     VV2 = 2
+                     VVE = 3
+                  ELSE IF (IP == 2) THEN
+                     VV1 = 2
+                     VV2 = 3
+                     VVE = 1
+                  ELSE IF (IP == 3) THEN
+                     VV1 = 3
+                     VV2 = 1
+                     VVE = 2
                   END IF
-               END DO
-            END IF
-         END DO
-      ELSE IF (DIMS==3) THEN
-         DO IC=1, NCELLS
-            IF (CELL_PROCS(IC)==PROC_ID) THEN
-               DO IP=1, 4
-                  FACE_PG = U3D_GRID%CELL_FACES_PG(IP, IC)
-                  IF (FACE_PG == -1) CYCLE
-                  IF (GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC .AND. GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC .EQ. FLUID) THEN
-                     IF (IP == 1) THEN
-                        VV1 = 1
-                        VV2 = 3
-                        VV3 = 2
-                        VVE = 4
-                     ELSE IF (IP == 2) THEN
-                        VV1 = 1
-                        VV2 = 2
-                        VV3 = 4
-                        VVE = 3
-                     ELSE IF (IP == 3) THEN
-                        VV1 = 2
-                        VV2 = 3
-                        VV3 = 4
-                        VVE = 1
-                     ELSE IF (IP == 4) THEN
-                        VV1 = 1
-                        VV2 = 4
-                        VV3 = 3
-                        VVE = 1
-                     END IF
+                  V1 = U2D_GRID%CELL_NODES(VV1,IC)
+                  V2 = U2D_GRID%CELL_NODES(VV2,IC)
+                  VE = U2D_GRID%CELL_NODES(VVE,IC)
+                  Y1 = U2D_GRID%NODE_COORDS(2, V1)
+                  Y2 = U2D_GRID%NODE_COORDS(2, V2)       
+                  AREA = U2D_GRID%CELL_EDGES_LEN(IP,IC)
 
-                     V1 = U3D_GRID%CELL_NODES(VV1,IC)
-                     V2 = U3D_GRID%CELL_NODES(VV2,IC)
-                     V3 = U3D_GRID%CELL_NODES(VV3,IC)
-                     VE = U3D_GRID%CELL_NODES(VVE,IC)
-                     AREA = U3D_GRID%FACE_AREA(IP,IC)
+                  GRAD_H = SQRT(U2D_GRID%BASIS_COEFFS(1,VVE,IC)*U2D_GRID%BASIS_COEFFS(1,VVE,IC) + &
+                           U2D_GRID%BASIS_COEFFS(2,VVE,IC)*U2D_GRID%BASIS_COEFFS(2,VVE,IC))
+                  ! GRAD_H = SQRT(DOT(U2D_GRID%BASIS_COEFFS(1:2,VVE,IC),U2D_GRID%BASIS_COEFFS(1:2,VVE,IC)))
 
-                     GRAD_H = SQRT(U3D_GRID%BASIS_COEFFS(1,VVE,IC)*U3D_GRID%BASIS_COEFFS(1,VVE,IC)&
-                              + U3D_GRID%BASIS_COEFFS(2,VVE,IC)*U3D_GRID%BASIS_COEFFS(2,VVE,IC)&
-                              + U3D_GRID%BASIS_COEFFS(3,VVE,IC)*U3D_GRID%BASIS_COEFFS(3,VVE,IC))
+                  H_DOT = U2D_GRID%BASIS_COEFFS(1,VV1,IC)*U2D_GRID%EDGE_NORMAL(1,IP,IC) +&
+                        U2D_GRID%BASIS_COEFFS(2,VV1,IC)*U2D_GRID%EDGE_NORMAL(2,IP,IC) +&
+                        U2D_GRID%BASIS_COEFFS(1,VV2,IC)*U2D_GRID%EDGE_NORMAL(1,IP,IC) +&
+                        U2D_GRID%BASIS_COEFFS(2,VV2,IC)*U2D_GRID%EDGE_NORMAL(2,IP,IC)
+                  ! H_DOT = DOT(U2D_GRID%BASIS_COEFFS(1:2,VV1,IC),U2D_GRID%EDGE_NORMAL(1:2,IP,IC)) &
+                  !       + DOT(U2D_GRID%BASIS_COEFFS(1:2,VV2,IC),U2D_GRID%EDGE_NORMAL(1:2,IP,IC))
 
-                     H_DOT = U3D_GRID%BASIS_COEFFS(1,VV1,IC)*U3D_GRID%FACE_NORMAL(1,IP,IC)&
-                           + U3D_GRID%BASIS_COEFFS(2,VV1,IC)*U3D_GRID%FACE_NORMAL(2,IP,IC)&
-                           + U3D_GRID%BASIS_COEFFS(3,VV1,IC)*U3D_GRID%FACE_NORMAL(3,IP,IC)&
-                           + U3D_GRID%BASIS_COEFFS(1,VV2,IC)*U3D_GRID%FACE_NORMAL(1,IP,IC)&
-                           + U3D_GRID%BASIS_COEFFS(2,VV2,IC)*U3D_GRID%FACE_NORMAL(2,IP,IC)&
-                           + U3D_GRID%BASIS_COEFFS(3,VV2,IC)*U3D_GRID%FACE_NORMAL(3,IP,IC)&
-                           + U3D_GRID%BASIS_COEFFS(1,VV3,IC)*U3D_GRID%FACE_NORMAL(1,IP,IC)&
-                           + U3D_GRID%BASIS_COEFFS(2,VV3,IC)*U3D_GRID%FACE_NORMAL(2,IP,IC)&
-                           + U3D_GRID%BASIS_COEFFS(3,VV3,IC)*U3D_GRID%FACE_NORMAL(3,IP,IC)
-
+                  IF (AXI) THEN
+                     TOP_FACTOR = TOP_FACTOR + PHI_FIELD(VE)*GRAD_H*AREA*(Y1+Y2)/2.
+                     BOTTOM_FACTOR = BOTTOM_FACTOR - H_DOT*AREA*(Y1+Y2)/2.
+                  ELSE
                      TOP_FACTOR = TOP_FACTOR + PHI_FIELD(VE)*GRAD_H*AREA
                      BOTTOM_FACTOR = BOTTOM_FACTOR - H_DOT*AREA
                   END IF
-               END DO
-            END IF
+               END IF
+            END DO
+         END DO
+      ELSE IF (DIMS==3) THEN
+         DO IC=1, NCELLS
+            DO IP=1, 4
+               FACE_PG = U3D_GRID%CELL_FACES_PG(IP, IC)
+               IF (FACE_PG == -1) CYCLE
+               IF (GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC .AND. GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC .EQ. FLUID) THEN
+                  IF (IP == 1) THEN
+                     VV1 = 1
+                     VV2 = 3
+                     VV3 = 2
+                     VVE = 4
+                  ELSE IF (IP == 2) THEN
+                     VV1 = 1
+                     VV2 = 2
+                     VV3 = 4
+                     VVE = 3
+                  ELSE IF (IP == 3) THEN
+                     VV1 = 2
+                     VV2 = 3
+                     VV3 = 4
+                     VVE = 1
+                  ELSE IF (IP == 4) THEN
+                     VV1 = 1
+                     VV2 = 4
+                     VV3 = 3
+                     VVE = 1
+                  END IF
+
+                  V1 = U3D_GRID%CELL_NODES(VV1,IC)
+                  V2 = U3D_GRID%CELL_NODES(VV2,IC)
+                  V3 = U3D_GRID%CELL_NODES(VV3,IC)
+                  VE = U3D_GRID%CELL_NODES(VVE,IC)
+                  AREA = U3D_GRID%FACE_AREA(IP,IC)
+
+                  GRAD_H = SQRT(U3D_GRID%BASIS_COEFFS(1,VVE,IC)*U3D_GRID%BASIS_COEFFS(1,VVE,IC)&
+                           + U3D_GRID%BASIS_COEFFS(2,VVE,IC)*U3D_GRID%BASIS_COEFFS(2,VVE,IC)&
+                           + U3D_GRID%BASIS_COEFFS(3,VVE,IC)*U3D_GRID%BASIS_COEFFS(3,VVE,IC))
+
+                  H_DOT = U3D_GRID%BASIS_COEFFS(1,VV1,IC)*U3D_GRID%FACE_NORMAL(1,IP,IC)&
+                        + U3D_GRID%BASIS_COEFFS(2,VV1,IC)*U3D_GRID%FACE_NORMAL(2,IP,IC)&
+                        + U3D_GRID%BASIS_COEFFS(3,VV1,IC)*U3D_GRID%FACE_NORMAL(3,IP,IC)&
+                        + U3D_GRID%BASIS_COEFFS(1,VV2,IC)*U3D_GRID%FACE_NORMAL(1,IP,IC)&
+                        + U3D_GRID%BASIS_COEFFS(2,VV2,IC)*U3D_GRID%FACE_NORMAL(2,IP,IC)&
+                        + U3D_GRID%BASIS_COEFFS(3,VV2,IC)*U3D_GRID%FACE_NORMAL(3,IP,IC)&
+                        + U3D_GRID%BASIS_COEFFS(1,VV3,IC)*U3D_GRID%FACE_NORMAL(1,IP,IC)&
+                        + U3D_GRID%BASIS_COEFFS(2,VV3,IC)*U3D_GRID%FACE_NORMAL(2,IP,IC)&
+                        + U3D_GRID%BASIS_COEFFS(3,VV3,IC)*U3D_GRID%FACE_NORMAL(3,IP,IC)
+
+                  TOP_FACTOR = TOP_FACTOR + PHI_FIELD(VE)*GRAD_H*AREA
+                  BOTTOM_FACTOR = BOTTOM_FACTOR - H_DOT*AREA
+               END IF
+            END DO
          END DO
       END IF
 
       POTENTIAL = - (TOTAL_CHARGE + TOP_FACTOR)/&
                   BOTTOM_FACTOR
+
       ! IF (PROC_ID == 0) THEN
       !    IF ((POTENTIAL .NE. 0) .OR. (TOTAL_CHARGE .NE. 0)) THEN
       !    WRITE(*,*) 'Capacitance: ', TOTAL_CHARGE/POTENTIAL

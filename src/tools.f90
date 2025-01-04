@@ -393,7 +393,16 @@ CONTAINS
 
       CHARACTER(LEN=512)  :: filename
       REAL(KIND=8) :: DUMP_RHS
+      REAL(KIND=8) :: DUMP_SURFACE_Q
       INTEGER :: I
+      REAL(KIND=8), DIMENSION(NNODES) :: DUMP_SURFACE_CHARGE
+
+      DUMP_SURFACE_CHARGE = SURFACE_CHARGE
+      IF (PROC_ID .EQ. 0) THEN
+         CALL MPI_REDUCE(MPI_IN_PLACE, DUMP_SURFACE_CHARGE, NNODES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      ELSE
+         CALL MPI_REDUCE(DUMP_SURFACE_CHARGE, DUMP_SURFACE_CHARGE, NNODES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      END IF
 
       IF (PROC_ID .EQ. 0) THEN
          CALL CALCULATE_FLUID_RHS
@@ -401,28 +410,56 @@ CONTAINS
          OPEN(54331, FILE=filename, POSITION='append', STATUS='unknown', ACTION='write')
          DO I=0, NNODES-1
             DUMP_RHS = RHS(I)
-            WRITE(54331,*) DUMP_RHS
+            DUMP_SURFACE_Q = DUMP_SURFACE_CHARGE(I+1)
+            WRITE(54331,*) DUMP_RHS, DUMP_SURFACE_Q, PHI_FIELD(I+1)
          END DO
          CLOSE(54331)
       END IF
    END SUBROUTINE DUMP_RHS_FILE
 
-   SUBROUTINE LOAD_RHS_FILE
+   SUBROUTINE LOAD_RHS_FILE(INITIALIZE,INITIALIZE_POTENTIAL)
+
       IMPLICIT NONE
 
-      CHARACTER(LEN=512)  :: filename
-      REAL(KIND=8) :: DUMP_RHS
-      INTEGER :: I, ios
+      LOGICAL, INTENT(IN) :: INITIALIZE, INITIALIZE_POTENTIAL
 
-      IF (PROC_ID .EQ. 0) THEN
-         WRITE(filename, "(A,A,I0.5)") TRIM(ADJUSTL(RHS_FILE_PATH)) ! Compose filename
-         OPEN(54331, FILE=filename, STATUS='old', ACTION='read') ! Open the file for reading
-         DO I = 0, NNODES-1
-            READ(54331, *, IOSTAT=ios) DUMP_RHS  ! Read one value per line
-            IF (ios /= 0) EXIT  ! Exit loop on end-of-file or error
-            RHS(I) = RHS(I) + DUMP_RHS   ! Store the value in the RHS array
-         END DO
-         CLOSE(54331)
+      CHARACTER(LEN=512)  :: filename
+      REAL(KIND=8), DIMENSION(3) :: DUMP_RHS
+      INTEGER :: I, ios
+      IF (INITIALIZE_POTENTIAL) THEN
+         IF (PROC_ID .EQ. 0) THEN
+            WRITE(filename, "(A,A,I0.5)") TRIM(ADJUSTL(RHS_FILE_PATH)) ! Compose filename
+            OPEN(54331, FILE=filename, STATUS='old', ACTION='read') ! Open the file for reading
+            DO I = 1, NNODES
+               READ(54331, *, IOSTAT=ios) DUMP_RHS  ! Read one value per line
+               IF (ios /= 0) EXIT  ! Exit loop on end-of-file or error
+               PHI_FIELD(I) = DUMP_RHS(3)   ! Store the value in the RHS array
+            END DO
+            CLOSE(54331)
+         END IF
+      END IF
+      IF (INITIALIZE) THEN
+         IF (PROC_ID .EQ. 0) THEN
+            WRITE(filename, "(A,A,I0.5)") TRIM(ADJUSTL(RHS_FILE_PATH)) ! Compose filename
+            OPEN(54331, FILE=filename, STATUS='old', ACTION='read') ! Open the file for reading
+            DO I = 1, NNODES
+               READ(54331, *, IOSTAT=ios) DUMP_RHS  ! Read one value per line
+               IF (ios /= 0) EXIT  ! Exit loop on end-of-file or error
+               SURFACE_CHARGE(I) = DUMP_RHS(2)   ! Store the value in the RHS array
+            END DO
+            CLOSE(54331)
+         END IF
+      ELSE
+         IF (PROC_ID .EQ. 0) THEN
+            WRITE(filename, "(A,A,I0.5)") TRIM(ADJUSTL(RHS_FILE_PATH)) ! Compose filename
+            OPEN(54331, FILE=filename, STATUS='old', ACTION='read') ! Open the file for reading
+            DO I = 0, NNODES-1
+               READ(54331, *, IOSTAT=ios) DUMP_RHS  ! Read one value per line
+               IF (ios /= 0) EXIT  ! Exit loop on end-of-file or error
+               RHS(I) = RHS(I) + DUMP_RHS(1) - DUMP_RHS(2)   ! Store the value in the RHS array
+            END DO
+            CLOSE(54331)
+         END IF
       END IF
    END SUBROUTINE LOAD_RHS_FILE
 

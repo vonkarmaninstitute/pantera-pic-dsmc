@@ -38,7 +38,13 @@ MODULE timecycle
       ! ########### Compute poisson ##########################################
 
       IF (PIC_TYPE .NE. NONE) THEN
-
+         IF (BOOL_LOAD_RHS) THEN 
+            IF (.NOT. ALLOCATED(PHI_FIELD)) THEN
+               ALLOCATE(PHI_FIELD(NNODES))
+               PHI_FIELD = 0
+            END IF
+            CALL LOAD_RHS_FILE(.FALSE.,.TRUE.)
+         END IF
          CALL SET_WALL_POTENTIAL
 
          CALL DEPOSIT_CHARGE(particles)

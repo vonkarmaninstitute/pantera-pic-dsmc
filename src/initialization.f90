@@ -1,3 +1,21 @@
+! Copyright (C) 2024 von Karman Institute for Fluid Dynamics (VKI)
+!
+! This file is part of PANTERA PIC-DSMC, a software for the simulation
+! of rarefied gases and plasmas using particles.
+!
+! This program is free software: you can redistribute it and/or modify
+! it under the terms of the GNU General Public License as published by
+! the Free Software Foundation, either version 3 of the License, or
+! (at your option) any later version.
+
+! This program is distributed in the hope that it will be useful,
+! but WITHOUT ANY WARRANTY; without even the implied warranty of
+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+! GNU General Public License for more details.
+
+! You should have received a copy of the GNU General Public License
+! along with this program.  If not, see <https://www.gnu.org/licenses/>.PANTERA PIC-DSMC
+
 ! This module has the routines for initializing the program
 
 MODULE initialization
@@ -79,7 +97,9 @@ MODULE initialization
 
          IF (line=='Mesh_file_SU2:') THEN
             READ(in1,*) MESH_FILENAME
-            IF (DIMS == 2) THEN
+            IF (DIMS == 1) THEN
+               CALL READ_1D_UNSTRUCTURED_GRID_SU2(MESH_FILENAME)
+            ELSE IF (DIMS == 2) THEN
                CALL READ_2D_UNSTRUCTURED_GRID_SU2(MESH_FILENAME)
             ELSE IF (DIMS == 3) THEN
                CALL READ_3D_UNSTRUCTURED_GRID_SU2(MESH_FILENAME)
@@ -348,9 +368,6 @@ MODULE initialization
 
          IF (line=='Load_balance:')    READ(in1,*) LOAD_BALANCE
          IF (line=='Load_balance_every:')    READ(in1,*) LOAD_BALANCE_EVERY
-
-         IF (line=='Partition_num_blocks:')    READ(in1,*) N_BLOCKS_X, N_BLOCKS_Y
-
          
       END DO ! Loop for reading input file
 
@@ -384,16 +401,20 @@ MODULE initialization
  
          string = 'Domain limits:'
          WRITE(*,'(A5,A50)') '    ', string
-         WRITE(*,*)          '      X [m]:', XMIN, XMAX
-         WRITE(*,*)          '      Y [m]:', YMIN, YMAX
-         WRITE(*,*)          '      Z [m]:', ZMIN, ZMAX
+         WRITE(*,'(A13,ES14.3,ES14.3)')          '      X [m]: ', XMIN, XMAX
+         WRITE(*,'(A13,ES14.3,ES14.3)')          '      Y [m]: ', YMIN, YMAX
+         WRITE(*,'(A13,ES14.3,ES14.3)')          '      Z [m]: ', ZMIN, ZMAX
 
-         string = 'Domain periodicity along X, Y, Z [T/F]: '
-         WRITE(*,'(A5,A50,L4,L4,L4)')'    ',string,BOOL_X_PERIODIC,BOOL_Y_PERIODIC,BOOL_Z_PERIODIC
+         IF (GRID_TYPE == UNSTRUCTURED) THEN
+            string = 'Unstructured grid with number of cells, nodes: '
+            WRITE(*,'(A5,A50,I8,I8)')'    ',string,NCELLS,NNODES
+         ELSE
+            string = 'Structured grid with number of cells: '
+            WRITE(*,'(A5,A50, I8, I8, I8)') '    ', string, NX, NY, NZ
 
-         string = 'Number of cells:'
-         WRITE(*,'(A5,A50, I8, I8, I8)') '    ', string, NX, NY, NZ
-
+            string = 'Domain periodicity along X, Y, Z [T/F]: '
+            WRITE(*,'(A5,A50,L4,L4,L4)')'    ',string,BOOL_X_PERIODIC,BOOL_Y_PERIODIC,BOOL_Z_PERIODIC
+         END IF
   
          ! ~~~~ Numerical settings ~~~~
          WRITE(*,*) '  =========== Numerical settings ==================================='
@@ -403,7 +424,10 @@ MODULE initialization
          string = 'Timestep [s]:'
          WRITE(*,'(A5,A50,ES14.3)') '     ', string, DT
  
-         string = 'Number of timesteps:'
+         string = 'Initial timestep:'
+         WRITE(*,'(A5,A50,I9)') '     ',     string, RESTART_TIMESTEP
+
+         string = 'Final timestep:'
          WRITE(*,'(A5,A50,I9)') '     ',     string, NT
 
          string = 'RNG seed (global):'
@@ -480,15 +504,17 @@ MODULE initialization
 
          ! ~~~~ Multispecies ~~~~
          WRITE(*,*) '  =========== Species ========================='
-         WRITE(*,*) '    ','File read'
          WRITE(*,'(A5,A30,I9)') '    ','Number of species present: ', N_SPECIES
 
 
          WRITE(*,*) '  =========== Mixtures ========================='
+         string = 'Number of mixtures:'
+         WRITE(*,'(A5,A50,I9)') '    ', string, N_MIXTURES
          DO j = 1, N_MIXTURES
-            WRITE(*,*)'    ','Contents of mixture ', MIXTURES(j)%NAME, ' with ', MIXTURES(j)%N_COMPONENTS, ' components:'
+
+            WRITE(*,*)'    ','Mixture ', j, ' named ', TRIM(MIXTURES(j)%NAME), ' has ', MIXTURES(j)%N_COMPONENTS, ' components:'
             DO k = 1, MIXTURES(j)%N_COMPONENTS
-               WRITE(*,*) '    ','Mixture component ', MIXTURES(j)%COMPONENTS(k)%NAME, &
+               WRITE(*,*) '    ','Mixture component ', k, ' is ', TRIM(MIXTURES(j)%COMPONENTS(k)%NAME), &
                         ' with fraction ', MIXTURES(j)%COMPONENTS(k)%MOLFRAC, &
                         ' and ID ', MIXTURES(j)%COMPONENTS(k)%ID
             END DO
@@ -842,23 +868,23 @@ MODULE initialization
 
    
 
-      WRITE(*,*) 'Tref = ', TREF
-      WRITE(*,*) 'sigma = '
-      DO IS = 1, N_SPECIES
-         WRITE(*,*) VSS_SIGMAS(IS,:)
-      END DO
-      WRITE(*,*) 'omega = '
-      DO IS = 1, N_SPECIES
-         WRITE(*,*) VSS_OMEGAS(IS,:)
-      END DO
-      WRITE(*,*) 'alpha = '
-      DO IS = 1, N_SPECIES
-         WRITE(*,*) VSS_ALPHAS(IS,:)
-      END DO
-      WRITE(*,*) 'gref = '
-      DO IS = 1, N_SPECIES
-         WRITE(*,*) VSS_GREFS(IS,:)
-      END DO
+      ! WRITE(*,*) 'Tref = ', TREF
+      ! WRITE(*,*) 'sigma = '
+      ! DO IS = 1, N_SPECIES
+      !    WRITE(*,*) VSS_SIGMAS(IS,:)
+      ! END DO
+      ! WRITE(*,*) 'omega = '
+      ! DO IS = 1, N_SPECIES
+      !    WRITE(*,*) VSS_OMEGAS(IS,:)
+      ! END DO
+      ! WRITE(*,*) 'alpha = '
+      ! DO IS = 1, N_SPECIES
+      !    WRITE(*,*) VSS_ALPHAS(IS,:)
+      ! END DO
+      ! WRITE(*,*) 'gref = '
+      ! DO IS = 1, N_SPECIES
+      !    WRITE(*,*) VSS_GREFS(IS,:)
+      ! END DO
 
    END SUBROUTINE READ_VSS_BINARY
 
@@ -952,8 +978,8 @@ MODULE initialization
       READ(STRARRAY(10),'(ES14.0)') LINESOURCES(N_LINESOURCES)%TROT
       READ(STRARRAY(10),'(ES14.0)') LINESOURCES(N_LINESOURCES)%TVIB
       READ(STRARRAY(11),'(A10)') MIX_NAME
-      WRITE(*,*) LINESOURCES(N_LINESOURCES)%UX
-      WRITE(*,*) LINESOURCES(N_LINESOURCES)%NRHO
+      ! WRITE(*,*) LINESOURCES(N_LINESOURCES)%UX
+      ! WRITE(*,*) LINESOURCES(N_LINESOURCES)%NRHO
       MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
       LINESOURCES(N_LINESOURCES)%MIX_ID = MIX_ID
 
@@ -1283,9 +1309,40 @@ MODULE initialization
 
       MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
 
-      WRITE(*,*) 'Read boundary emit definition. Parameters: ', IPG, ', ', MIX_NAME, ', ', MIX_ID, ', ', NRHO, ', ',&
-       UX, ', ', UY, ', ', UZ, ', ', TTRA, ', ', TROT, ', ', TVIB
-      IF (DIMS == 2) THEN 
+      ! WRITE(*,*) 'Read boundary emit definition. Parameters: ', IPG, ', ', MIX_NAME, ', ', MIX_ID, ', ', NRHO, ', ',&
+      !  UX, ', ', UY, ', ', UZ, ', ', TTRA, ', ', TROT, ', ', TVIB
+      IF (DIMS == 1) THEN 
+         DO IC = 1, NCELLS
+            DO I = 1, 2
+               IF (U1D_GRID%CELL_EDGES_PG(I,IC) == IPG) THEN
+                  
+                  IF (ALLOCATED(EMIT_TASKS)) THEN
+                     ALLOCATE(TEMP_EMIT_TASKS(N_EMIT_TASKS+1)) ! Append the mixture to the list
+                     TEMP_EMIT_TASKS(1:N_EMIT_TASKS) = EMIT_TASKS(1:N_EMIT_TASKS)
+                     CALL MOVE_ALLOC(TEMP_EMIT_TASKS, EMIT_TASKS)
+                  ELSE
+                     ALLOCATE(EMIT_TASKS(1))
+                  END IF
+                  N_EMIT_TASKS = N_EMIT_TASKS + 1
+   
+                  EMIT_TASKS(N_EMIT_TASKS)%NRHO = NRHO
+                  EMIT_TASKS(N_EMIT_TASKS)%UX = UX
+                  EMIT_TASKS(N_EMIT_TASKS)%UY = UY
+                  EMIT_TASKS(N_EMIT_TASKS)%UZ = UZ
+                  EMIT_TASKS(N_EMIT_TASKS)%TTRA = TTRA
+                  EMIT_TASKS(N_EMIT_TASKS)%TROT = TROT
+                  EMIT_TASKS(N_EMIT_TASKS)%TVIB = TVIB
+                  EMIT_TASKS(N_EMIT_TASKS)%MIX_ID = MIX_ID
+                  EMIT_TASKS(N_EMIT_TASKS)%IC = IC
+                  EMIT_TASKS(N_EMIT_TASKS)%IFACE = I
+   
+                  EMIT_TASKS(N_EMIT_TASKS)%IV1 = U1D_GRID%CELL_NODES(I,IC)
+   
+                  ! NFS WILL BE INITIALIZED LATER.
+               END IF
+            END DO
+         END DO
+      ELSE IF (DIMS == 2) THEN
          DO IC = 1, NCELLS
             DO I = 1, 3
                IF (U2D_GRID%CELL_EDGES_PG(I,IC) == IPG) THEN
@@ -1325,7 +1382,7 @@ MODULE initialization
                   ! NFS WILL BE INITIALIZED LATER.
                END IF
             END DO
-         END DO      
+         END DO
       ELSE IF (DIMS == 3) THEN
          DO IC = 1, NCELLS
             DO I = 1, 4
@@ -1396,8 +1453,8 @@ MODULE initialization
 
       MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
 
-      WRITE(*,*) 'Read initial particle seed definition. Parameters: ', MIX_NAME, ', ', MIX_ID, ', ', NRHO, ', ',&
-       UX, ', ', UY, ', ', UZ, ', ', TTRAX, ', ', TTRAY, ', ', TTRAZ, ', ', TROT, ', ', TVIB
+      ! WRITE(*,*) 'Read initial particle seed definition. Parameters: ', MIX_NAME, ', ', MIX_ID, ', ', NRHO, ', ',&
+      !  UX, ', ', UY, ', ', UZ, ', ', TTRAX, ', ', TTRAY, ', ', TTRAZ, ', ', TROT, ', ', TVIB
 
       IF (ALLOCATED(INITIAL_PARTICLES_TASKS)) THEN
          ALLOCATE(TEMP_INITIAL_PARTICLES_TASK(N_INITIAL_PARTICLES_TASKS+1)) ! Append the mixture to the list
@@ -1453,8 +1510,8 @@ MODULE initialization
 
       MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
 
-      WRITE(*,*) 'Read volume inject definition. Parameters: ', MIX_NAME, ', ', MIX_ID, ', ', NRHODOT, ', ',&
-       UX, ', ', UY, ', ', UZ, ', ', TTRAX, ', ', TTRAY, ', ', TTRAZ, ', ', TROT, ', ', TVIB
+      ! WRITE(*,*) 'Read volume inject definition. Parameters: ', MIX_NAME, ', ', MIX_ID, ', ', NRHODOT, ', ',&
+      !  UX, ', ', UY, ', ', UZ, ', ', TTRAX, ', ', TTRAY, ', ', TTRAZ, ', ', TROT, ', ', TVIB
 
       IF (ALLOCATED(VOLUME_INJECT_TASKS)) THEN
          ALLOCATE(TEMP_VOLUME_INJECT_TASK(N_VOLUME_INJECT_TASKS+1)) ! Append the mixture to the list
@@ -1692,30 +1749,30 @@ MODULE initialization
       
       CLOSE(in3) ! Close input file
 
-      IF (PROC_ID == 0) THEN
-         DO index = 1, N_REACTIONS
-            WRITE(*,*) 'Reaction ', index, 'Has 2 reactants with ids:', REACTIONS(index)%R1_SP_ID, ' and ', &
-            REACTIONS(index)%R2_SP_ID
-            IF (REACTIONS(index)%N_PROD == 2) THEN
-               WRITE(*,*) REACTIONS(index)%N_PROD, 'products with ids:',  REACTIONS(index)%P1_SP_ID, ' and ', &
-               REACTIONS(index)%P2_SP_ID
-               IF (REACTIONS(index)%IS_CEX) WRITE(*,*) 'This is a CEX reaction'
-            ELSE IF (REACTIONS(index)%N_PROD == 3) THEN
-               WRITE(*,*) REACTIONS(index)%N_PROD, 'products with ids:',  REACTIONS(index)%P1_SP_ID, ', ', &
-               REACTIONS(index)%P2_SP_ID, ' and ', REACTIONS(index)%P3_SP_ID
-            END IF
-            IF (REACTIONS(index)%TYPE == TCE) THEN
-               WRITE(*,*) 'Parameters:', REACTIONS(index)%A, REACTIONS(index)%N, REACTIONS(index)%EA
-            ELSE IF (REACTIONS(index)%TYPE == LXCAT) THEN
-               WRITE(*,*) 'Reaction ', index, ' is from tabulated data in LxCat format.'
-               WRITE(*,*) 'Activation energy: ', REACTIONS(index)%EA
-               WRITE(*,*) 'Here are the energies (eV): ', REACTIONS(index)%TABLE_ENERGY
-               WRITE(*,*) 'And here are the cross sections (m^2): ', REACTIONS(index)%TABLE_CS
-            ELSE
-               WRITE(*,*) 'Reaction ', index, ' is not defined!'
-            END IF
-         END DO
-      END IF
+      ! IF (PROC_ID == 0) THEN
+      !    DO index = 1, N_REACTIONS
+      !       WRITE(*,*) 'Reaction ', index, 'Has 2 reactants with ids:', REACTIONS(index)%R1_SP_ID, ' and ', &
+      !       REACTIONS(index)%R2_SP_ID
+      !       IF (REACTIONS(index)%N_PROD == 2) THEN
+      !          WRITE(*,*) REACTIONS(index)%N_PROD, 'products with ids:',  REACTIONS(index)%P1_SP_ID, ' and ', &
+      !          REACTIONS(index)%P2_SP_ID
+      !          IF (REACTIONS(index)%IS_CEX) WRITE(*,*) 'This is a CEX reaction'
+      !       ELSE IF (REACTIONS(index)%N_PROD == 3) THEN
+      !          WRITE(*,*) REACTIONS(index)%N_PROD, 'products with ids:',  REACTIONS(index)%P1_SP_ID, ', ', &
+      !          REACTIONS(index)%P2_SP_ID, ' and ', REACTIONS(index)%P3_SP_ID
+      !       END IF
+      !       IF (REACTIONS(index)%TYPE == TCE) THEN
+      !          WRITE(*,*) 'Parameters:', REACTIONS(index)%A, REACTIONS(index)%N, REACTIONS(index)%EA
+      !       ELSE IF (REACTIONS(index)%TYPE == LXCAT) THEN
+      !          WRITE(*,*) 'Reaction ', index, ' is from tabulated data in LxCat format.'
+      !          WRITE(*,*) 'Activation energy: ', REACTIONS(index)%EA
+      !          WRITE(*,*) 'Here are the energies (eV): ', REACTIONS(index)%TABLE_ENERGY
+      !          WRITE(*,*) 'And here are the cross sections (m^2): ', REACTIONS(index)%TABLE_CS
+      !       ELSE
+      !          WRITE(*,*) 'Reaction ', index, ' is not defined!'
+      !       END IF
+      !    END DO
+      ! END IF
 
    END SUBROUTINE READ_REACTIONS
 
@@ -1942,10 +1999,13 @@ MODULE initialization
 
             IF (GRID_TYPE == UNSTRUCTURED) THEN
                DO IC = 1, NCELLS
-                  IF (DIMS == 2) THEN
+                  IF (DIMS == 1) THEN
+                     IF (CELL_PROCS(IC) .NE. PROC_ID) CYCLE
+                     CELL_PG = U1D_GRID%CELL_PG(IC)
+                  ELSE IF (DIMS == 2) THEN
                      IF (CELL_PROCS(IC) .NE. PROC_ID) CYCLE
                      CELL_PG = U2D_GRID%CELL_PG(IC)
-                  ELSE
+                  ELSE IF (DIMS == 3) THEN
                      IF (CELL_PROCS(IC) .NE. PROC_ID) CYCLE
                      CELL_PG = U3D_GRID%CELL_PG(IC)
                   END IF
@@ -1955,7 +2015,9 @@ MODULE initialization
 
 
                   ! Compute number of particles of this species to be created in this cell.
-                  IF (DIMS == 2) THEN
+                  IF (DIMS == 1) THEN
+                     VOL = U1D_GRID%CELL_VOLUMES(IC)
+                  ELSE IF (DIMS == 2) THEN
                      VOL = U2D_GRID%CELL_VOLUMES(IC)
                   ELSE IF (DIMS == 3) THEN
                      VOL = U3D_GRID%CELL_VOLUMES(IC)
@@ -1964,12 +2026,18 @@ MODULE initialization
                               MIXTURES(INITIAL_PARTICLES_TASKS(ITASK)%MIX_ID)%COMPONENTS(i)%MOLFRAC)
                   IF (NP_INIT == 0) CYCLE
 
-                  IF (DIMS == 2) THEN
+
+                  IF (DIMS == 1) THEN
+                     V1 = U1D_GRID%NODE_COORDS(:,U1D_GRID%CELL_NODES(1,IC))
+                     V2 = U1D_GRID%NODE_COORDS(:,U1D_GRID%CELL_NODES(2,IC))
+                     V3 = 0
+                     V4 = 0
+                  ELSE IF (DIMS == 2) THEN
                      V1 = U2D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(1,IC))
                      V2 = U2D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(2,IC))
                      V3 = U2D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(3,IC))
                      V4 = 0
-                  ELSE
+                  ELSE IF (DIMS == 3) THEN
                      V1 = U3D_GRID%NODE_COORDS(:,U3D_GRID%CELL_NODES(1,IC))
                      V2 = U3D_GRID%NODE_COORDS(:,U3D_GRID%CELL_NODES(2,IC))
                      V3 = U3D_GRID%NODE_COORDS(:,U3D_GRID%CELL_NODES(3,IC))
@@ -1987,7 +2055,11 @@ MODULE initialization
                         S = 1-S; T = 1-T
                      END IF
 
-                     IF (DIMS == 2) THEN
+                     IF (DIMS == 1) THEN
+                        XP = V1(1) + (V2(1)-V1(1))*S
+                        YP = YMIN + (YMAX-YMIN)*T
+                        ZP = ZMIN + (ZMAX-ZMIN)*U
+                     ELSE IF (DIMS == 2) THEN
                         XP = V1(1) + (V2(1)-V1(1))*S + (V3(1)-V1(1))*T
                         YP = V1(2) + (V2(2)-V1(2))*S + (V3(2)-V1(2))*T
                         IF (AXI) THEN
@@ -1995,7 +2067,7 @@ MODULE initialization
                         ELSE
                            ZP = ZMIN + (ZMAX-ZMIN)*U
                         END IF
-                     ELSE
+                     ELSE IF (DIMS == 3) THEN
                         ! http://vcg.isti.cnr.it/publications/papers/rndtetra_a.pdf
 
                         IF (S+T+U <= 1) THEN
@@ -2443,14 +2515,20 @@ MODULE initialization
 
       ! =====================================================
       ! Injection from unstructured grid boundaries
-      WRITE(*,*) 'N emit tasks ', N_EMIT_TASKS
+      ! WRITE(*,*) 'N emit tasks ', N_EMIT_TASKS
       DO ITASK = 1, N_EMIT_TASKS ! Loop on line sources
 
          N_COMP = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%N_COMPONENTS
          
          ALLOCATE(TASK_NFS(N_COMP))
 
-         IF (DIMS == 2) THEN
+         IF (DIMS == 1) THEN
+            NORMX = -U1D_GRID%EDGE_NORMAL(1, EMIT_TASKS(ITASK)%IFACE, EMIT_TASKS(ITASK)%IC)
+            NORMY = 0
+            NORMZ = 0
+
+            AREA = (YMAX-YMIN)*(ZMAX-ZMIN)
+         ELSE IF (DIMS == 2) THEN
 
             X1 = U2D_GRID%NODE_COORDS(1, EMIT_TASKS(ITASK)%IV1)
             Y1 = U2D_GRID%NODE_COORDS(2, EMIT_TASKS(ITASK)%IV1)
@@ -2469,7 +2547,7 @@ MODULE initialization
                AREA = LINELENGTH*(ZMAX-ZMIN)
             END IF
 
-         ELSE
+         ELSE IF (DIMS == 3) THEN
             NORMX = -U3D_GRID%FACE_NORMAL(1, EMIT_TASKS(ITASK)%IFACE, EMIT_TASKS(ITASK)%IC)
             NORMY = -U3D_GRID%FACE_NORMAL(2, EMIT_TASKS(ITASK)%IFACE, EMIT_TASKS(ITASK)%IC)
             NORMZ = -U3D_GRID%FACE_NORMAL(3, EMIT_TASKS(ITASK)%IFACE, EMIT_TASKS(ITASK)%IC)

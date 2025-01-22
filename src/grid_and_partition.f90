@@ -1,3 +1,21 @@
+! Copyright (C) 2024 von Karman Institute for Fluid Dynamics (VKI)
+!
+! This file is part of PANTERA PIC-DSMC, a software for the simulation
+! of rarefied gases and plasmas using particles.
+!
+! This program is free software: you can redistribute it and/or modify
+! it under the terms of the GNU General Public License as published by
+! the Free Software Foundation, either version 3 of the License, or
+! (at your option) any later version.
+
+! This program is distributed in the hope that it will be useful,
+! but WITHOUT ANY WARRANTY; without even the implied warranty of
+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+! GNU General Public License for more details.
+
+! You should have received a copy of the GNU General Public License
+! along with this program.  If not, see <https://www.gnu.org/licenses/>.PANTERA PIC-DSMC
+
 MODULE grid_and_partition 
 
    USE global
@@ -128,7 +146,37 @@ MODULE grid_and_partition
 
             ALLOCATE(CENTROID(NCELLS))
 
-            IF (DIMS == 3) THEN
+
+            IF (DIMS == 1) THEN
+
+               DO I = 1, NCELLS
+                  CELLCENTROID = (U1D_GRID%NODE_COORDS(:, U1D_GRID%CELL_NODES(1,I)) &
+                               +  U1D_GRID%NODE_COORDS(:, U1D_GRID%CELL_NODES(2,I))) / 2.
+                  IF (PARTITION_STYLE == STRIPSX) THEN
+                     CENTROID(I) = CELLCENTROID(1)
+                  ELSE
+                     CALL ERROR_ABORT('The specified partition style is not supported. Aborting!')
+                  END IF
+               END DO
+            
+            ELSE IF (DIMS == 2) THEN
+
+               DO I = 1, NCELLS
+                  CELLCENTROID = (U2D_GRID%NODE_COORDS(:, U2D_GRID%CELL_NODES(1,I)) &
+                               +  U2D_GRID%NODE_COORDS(:, U2D_GRID%CELL_NODES(2,I)) &
+                               +  U2D_GRID%NODE_COORDS(:, U2D_GRID%CELL_NODES(3,I))) / 3.
+                  IF (PARTITION_STYLE == STRIPSX) THEN
+                     CENTROID(I) = CELLCENTROID(1)
+                  ELSE IF (PARTITION_STYLE == STRIPSY) THEN
+                     CENTROID(I) = CELLCENTROID(2)
+                  ELSE IF (PARTITION_STYLE == SLICESZ) THEN
+                     CENTROID(I) = ATAN2(CELLCENTROID(2), CELLCENTROID(1))
+                  ELSE
+                     CALL ERROR_ABORT('The specified partition style is not supported. Aborting!')
+                  END IF
+               END DO
+
+            ELSE IF (DIMS == 3) THEN
 
                DO I = 1, NCELLS
                   CELLCENTROID = (U3D_GRID%NODE_COORDS(:, U3D_GRID%CELL_NODES(1,I)) &
@@ -147,33 +195,13 @@ MODULE grid_and_partition
                      CALL ERROR_ABORT('The specified partition style is not supported. Aborting!')
                   END IF
                END DO
-         
-               COORDMAX = MAXVAL(CENTROID)
-               COORDMIN = MINVAL(CENTROID)
+            
+            END IF
 
-               WRITE(*,*) 'COORDMAX = ', COORDMAX, 'COORDMIN = ', COORDMIN
-               
-            ELSE IF (DIMS == 2) THEN
+            COORDMAX = MAXVAL(CENTROID)
+            COORDMIN = MINVAL(CENTROID)
 
-               DO I = 1, NCELLS
-                  CELLCENTROID = (U2D_GRID%NODE_COORDS(:, U2D_GRID%CELL_NODES(1,I)) &
-                               +  U2D_GRID%NODE_COORDS(:, U2D_GRID%CELL_NODES(2,I)) &
-                               +  U2D_GRID%NODE_COORDS(:, U2D_GRID%CELL_NODES(3,I))) / 3.
-                  IF (PARTITION_STYLE == STRIPSX) THEN
-                     CENTROID(I) = CELLCENTROID(1)
-                  ELSE IF (PARTITION_STYLE == STRIPSY) THEN
-                     CENTROID(I) = CELLCENTROID(2)
-                  ELSE IF (PARTITION_STYLE == SLICESZ) THEN
-                     CENTROID(I) = ATAN2(CELLCENTROID(2), CELLCENTROID(1))
-                  ELSE
-                     CALL ERROR_ABORT('The specified partition style is not supported. Aborting!')
-                  END IF
-               END DO
-         
-               COORDMAX = MAXVAL(CENTROID)
-               COORDMIN = MINVAL(CENTROID)
-         
-            END IF   
+            !WRITE(*,*) 'COORDMAX = ', COORDMAX, 'COORDMIN = ', COORDMIN
 
             DO I = 1, NCELLS
                CELL_PROCS(I) = INT((CENTROID(I)-COORDMIN)/(COORDMAX-COORDMIN)*REAL(N_MPI_THREADS))
@@ -209,24 +237,21 @@ MODULE grid_and_partition
             
             WEIGHT_PER_PROC = SUM(WEIGHT) / DBLE(N_MPI_THREADS)
 
-            IF (DIMS == 3) THEN
+
+            IF (DIMS == 1) THEN
 
                DO I = 1, NCELLS
-                  CELLCENTROID = (U3D_GRID%NODE_COORDS(:, U3D_GRID%CELL_NODES(1,I)) &
-                               +  U3D_GRID%NODE_COORDS(:, U3D_GRID%CELL_NODES(2,I)) &
-                               +  U3D_GRID%NODE_COORDS(:, U3D_GRID%CELL_NODES(3,I)) &
-                               +  U3D_GRID%NODE_COORDS(:, U3D_GRID%CELL_NODES(4,I))) / 4.
+                  CELLCENTROID = (U1D_GRID%NODE_COORDS(:, U1D_GRID%CELL_NODES(1,I)) &
+                               +  U1D_GRID%NODE_COORDS(:, U1D_GRID%CELL_NODES(2,I))) / 2.
                   IF (PARTITION_STYLE == STRIPSX) THEN
                      CENTROID(I) = CELLCENTROID(1)
-                  ELSE IF (PARTITION_STYLE == STRIPSY) THEN
-                     CENTROID(I) = CELLCENTROID(2)
-                  ELSE IF (PARTITION_STYLE == STRIPSZ) THEN
-                     CENTROID(I) = CELLCENTROID(3)
+                  ELSE
+                     CALL ERROR_ABORT('The specified partition style is not supported. Aborting!')
                   END IF
 
                   ORDER(I) = I
                END DO
-               
+             
             ELSE IF (DIMS == 2) THEN
 
                DO I = 1, NCELLS
@@ -244,7 +269,24 @@ MODULE grid_and_partition
                   ORDER(I) = I
                END DO
          
-            END IF   
+            ELSE IF (DIMS == 3) THEN
+
+               DO I = 1, NCELLS
+                  CELLCENTROID = (U3D_GRID%NODE_COORDS(:, U3D_GRID%CELL_NODES(1,I)) &
+                               +  U3D_GRID%NODE_COORDS(:, U3D_GRID%CELL_NODES(2,I)) &
+                               +  U3D_GRID%NODE_COORDS(:, U3D_GRID%CELL_NODES(3,I)) &
+                               +  U3D_GRID%NODE_COORDS(:, U3D_GRID%CELL_NODES(4,I))) / 4.
+                  IF (PARTITION_STYLE == STRIPSX) THEN
+                     CENTROID(I) = CELLCENTROID(1)
+                  ELSE IF (PARTITION_STYLE == STRIPSY) THEN
+                     CENTROID(I) = CELLCENTROID(2)
+                  ELSE IF (PARTITION_STYLE == STRIPSZ) THEN
+                     CENTROID(I) = CELLCENTROID(3)
+                  END IF
+
+                  ORDER(I) = I
+               END DO
+            END IF
 
             CALL QUICKSORT(CENTROID, ORDER, 1, NCELLS)
 
@@ -580,33 +622,33 @@ MODULE grid_and_partition
    END SUBROUTINE EXCHANGE
 
 
-   SUBROUTINE READ_UNSTRUCTURED_GRID(FILENAME)
+
+
+   SUBROUTINE READ_1D_UNSTRUCTURED_GRID_SU2(FILENAME)
 
       IMPLICIT NONE
 
       CHARACTER*256, INTENT(IN) :: FILENAME
 
-      CHARACTER*256 :: LINE
-      
-      INTEGER, PARAMETER :: in5 = 2384
+      CHARACTER*256 :: LINE, GROUPNAME, DUMMYLINE
+
+      INTEGER, PARAMETER :: in5 = 2385
       INTEGER            :: ios
       INTEGER            :: ReasonEOF
 
-      INTEGER            :: NUM, I, J, FOUND, V1, V2, INDEX, ELEM_TYPE, NUM_GROUPS
-      REAL(KIND=8), DIMENSION(3) :: XYZ, A, B, C
+      INTEGER            :: NUM, I, J, FOUND, V1, V2, ELEM_TYPE, NUMELEMS
+      REAL(KIND=8)       :: X1, X2
+      REAL(KIND=8), DIMENSION(3) :: XYZ, A, B
 
-      INTEGER, DIMENSION(:,:), ALLOCATABLE      :: TEMP_CELL_NODES
-      INTEGER, DIMENSION(:,:), ALLOCATABLE      :: TEMP_LINE_NODES
-      INTEGER, DIMENSION(:), ALLOCATABLE        :: TEMP_POINT_NODES
       INTEGER, DIMENSION(:,:), ALLOCATABLE      :: TEMP_CELL_NEIGHBORS
-      INTEGER :: NUM_CELLS, NUM_LINES, NUM_POINTS
 
-      INTEGER, DIMENSION(2) :: WHICH1, WHICH2
+      INTEGER, DIMENSION(2) :: VLIST2
 
-      INTEGER :: N_STR
-      CHARACTER(LEN=80), ALLOCATABLE, DIMENSION(:) :: STRARRAY
+      INTEGER, DIMENSION(:), ALLOCATABLE :: N_CELLS_WITH_NODE, CELL_WITH_NODE, IOF
+      INTEGER :: IDX, JN, JC1, JC2
 
-      INTEGER :: NCELLSPP
+      LOGICAL, DIMENSION(:), ALLOCATABLE :: NODE_ON_BOUNDARY
+      INTEGER :: NUM_BOUNDARY_NODES, NUM_BOUNDARY_ELEM
 
       ! Open input file for reading
       OPEN(UNIT=in5,FILE=FILENAME, STATUS='old',IOSTAT=ios)
@@ -615,149 +657,402 @@ MODULE grid_and_partition
          CALL ERROR_ABORT('Attention, mesh file not found! ABORTING.')
       ENDIF
 
-      ! Read the mesh file. Gmsh v2 file format (*.msh)
-      WRITE(*,*) '==========================================='
-      WRITE(*,*) 'Reading grid file.'
-      WRITE(*,*) '==========================================='
-      NUM_CELLS = 0
+      ! Read the mesh file. SU2 file format (*.su2)
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Reading grid file in SU2 format.'
+         WRITE(*,*) '==========================================='
+      END IF
+      
       DO
-         READ(in5,*, IOSTAT=ReasonEOF) LINE
-         WRITE(*,*) 'Read line:', LINE
+         READ(in5,*, IOSTAT=ReasonEOF) LINE, NUM
          IF (ReasonEOF < 0) EXIT 
-         IF (LINE == '$Nodes') THEN
-            READ(in5,*, IOSTAT=ReasonEOF) NUM
-            ALLOCATE(U2D_GRID%NODE_COORDS(3,NUM))
-            ALLOCATE(U2D_GRID%CELL_NODES(3,NUM))
+         !WRITE(*,*) 'Read line:', LINE, ' number ', NUM
+         
+         IF (LINE == 'NPOIN=') THEN
+            ALLOCATE(U1D_GRID%NODE_COORDS(3,NUM))
             DO I = 1, NUM
-               READ(in5,*, IOSTAT=ReasonEOF) INDEX, XYZ
-               XYZ(3) = 0.d0 ! Stay in the x-y plane
-               U2D_GRID%NODE_COORDS(:,INDEX) = XYZ
+               READ(in5,*, IOSTAT=ReasonEOF) XYZ(1)
+               XYZ(2) = 0.d0
+               XYZ(3) = 0.d0 ! Stay on the x axis.
+               U1D_GRID%NODE_COORDS(:,I) = XYZ
             END DO
-            U2D_GRID%NUM_NODES = NUM
-         ELSE IF (LINE == '$Elements') THEN
-            READ(in5,*, IOSTAT=ReasonEOF) NUM
-            ALLOCATE(TEMP_POINT_NODES(NUM))
-            ALLOCATE(TEMP_LINE_NODES(2,NUM))
-            ALLOCATE(TEMP_CELL_NODES(3,NUM))
-            NUM_CELLS = 0
-            NUM_LINES = 0
-            NUM_POINTS = 0
+            U1D_GRID%NUM_NODES = NUM
+         ELSE IF (LINE == 'NELEM=') THEN
+            ALLOCATE(U1D_GRID%CELL_NODES(2,NUM))
+
             DO I = 1, NUM
-               READ(in5,'(A)', IOSTAT=ReasonEOF) LINE
-               CALL SPLIT_STR(LINE, ' ', STRARRAY, N_STR)
+               READ(in5,*, IOSTAT=ReasonEOF) ELEM_TYPE, U1D_GRID%CELL_NODES(:,I)
+               !WRITE(*,*) 'I read element ', I, ' has nodes ', U1D_GRID%CELL_NODES(:,I)
+               IF (ELEM_TYPE .NE. 3) WRITE(*,*) 'Element type was not 3!'
+            END DO
+            U1D_GRID%CELL_NODES = U1D_GRID%CELL_NODES + 1 ! Start indexing from 1.
 
-               READ(STRARRAY(1),*) INDEX
-               READ(STRARRAY(2),*) ELEM_TYPE
-               READ(STRARRAY(3),*) NUM_GROUPS
+            U1D_GRID%NUM_CELLS = NUM
 
-               IF (ELEM_TYPE == 15) THEN
-                  NUM_POINTS = NUM_POINTS + 1
-                  READ(STRARRAY(4+NUM_GROUPS),*) TEMP_POINT_NODES(NUM_POINTS)
-               ELSE IF (ELEM_TYPE == 1) THEN
-                  NUM_LINES = NUM_LINES + 1
-                  READ(STRARRAY(4+NUM_GROUPS),*) TEMP_LINE_NODES(1,NUM_LINES)
-                  READ(STRARRAY(5+NUM_GROUPS),*) TEMP_LINE_NODES(2,NUM_LINES)
-               ELSE IF (ELEM_TYPE == 2) THEN
-                  NUM_CELLS = NUM_CELLS + 1
-                  READ(STRARRAY(4+NUM_GROUPS),*) TEMP_CELL_NODES(1,NUM_CELLS)
-                  READ(STRARRAY(5+NUM_GROUPS),*) TEMP_CELL_NODES(2,NUM_CELLS)
-                  READ(STRARRAY(6+NUM_GROUPS),*) TEMP_CELL_NODES(3,NUM_CELLS)
+            ALLOCATE(U1D_GRID%CELL_EDGES_PG(2, U1D_GRID%NUM_CELLS))
+            U1D_GRID%CELL_EDGES_PG = -1
+
+            ALLOCATE(U1D_GRID%CELL_PG(U1D_GRID%NUM_CELLS))
+            U1D_GRID%CELL_PG = -1
+      
+         ELSE IF (LINE == 'NMARK=') THEN
+
+            ! Assign physical groups to cell edges.
+            DO I = 1, NUM
+               
+               READ(in5,*, IOSTAT=ReasonEOF) LINE, GROUPNAME
+               IF (LINE .NE. 'MARKER_TAG=') THEN
+                  WRITE(*,*) 'Error! did not find marker name.'
+               ELSE
+                  !WRITE(*,*) 'Found marker tag, with groupname: ', GROUPNAME
                END IF
-               DEALLOCATE(STRARRAY)
-            END DO
-            U2D_GRID%NUM_POINTS = NUM_POINTS
-            U2D_GRID%NUM_LINES = NUM_LINES
-            U2D_GRID%NUM_CELLS = NUM_CELLS
+         
+               
+               READ(in5,*, IOSTAT=ReasonEOF) LINE, NUMELEMS
+               IF (LINE .NE. 'MARKER_ELEMS=') THEN
+                  WRITE(*,*) 'Error! did not find marker elements.'
+               ELSE
+                  !WRITE(*,*) 'Found marker elements, with number of elements: ', NUMELEMS
+               END IF
 
-            U2D_GRID%POINT_NODES = TEMP_POINT_NODES(1:NUM_POINTS)
-            U2D_GRID%LINE_NODES = TEMP_LINE_NODES(:,1:NUM_LINES)
-            U2D_GRID%CELL_NODES = TEMP_CELL_NODES(:,1:NUM_CELLS)
+               DO J = 1, NUMELEMS
+                  READ(in5,*, IOSTAT=ReasonEOF) DUMMYLINE
+               END DO
+            END DO
+
+         END IF
+      END DO
+
+      REWIND(in5)
+
+      ALLOCATE(N_CELLS_WITH_NODE(U1D_GRID%NUM_NODES))
+      ALLOCATE(IOF(U1D_GRID%NUM_NODES))
+
+      N_CELLS_WITH_NODE = 0
+      DO I = 1, U1D_GRID%NUM_CELLS
+         DO V1 = 1, 2
+            JN = U1D_GRID%CELL_NODES(V1,I)
+            N_CELLS_WITH_NODE(JN) = N_CELLS_WITH_NODE(JN) + 1
+         END DO
+      END DO
+   
+      IOF = -1
+      IDX = 1
+      DO JN = 1, U1D_GRID%NUM_NODES
+         IF (N_CELLS_WITH_NODE(JN) .NE. 0) THEN
+            IOF(JN) = IDX
+            IDX = IDX + N_CELLS_WITH_NODE(JN)
+         END IF
+      END DO
+   
+      ALLOCATE(CELL_WITH_NODE(IDX))
+      
+      N_CELLS_WITH_NODE = 0
+      DO I = 1, U1D_GRID%NUM_CELLS
+         DO V1 = 1, 2
+            JN = U1D_GRID%CELL_NODES(V1,I)
+            CELL_WITH_NODE(IOF(JN) + N_CELLS_WITH_NODE(JN)) = I
+            N_CELLS_WITH_NODE(JN) = N_CELLS_WITH_NODE(JN) + 1
+         END DO
+      END DO
+
+
+      DO
+         READ(in5,*, IOSTAT=ReasonEOF) LINE, NUM
+         IF (ReasonEOF < 0) EXIT 
+         !WRITE(*,*) 'Read line:', LINE, ' number ', NUM
+         
+         IF (LINE == 'NPOIN=') THEN
+            DO I = 1, NUM
+               READ(in5,*, IOSTAT=ReasonEOF) DUMMYLINE
+            END DO
+         ELSE IF (LINE == 'NELEM=') THEN
+            DO I = 1, NUM
+               READ(in5,*, IOSTAT=ReasonEOF) DUMMYLINE
+            END DO
+         ELSE IF (LINE == 'NMARK=') THEN
+
+            ! Assign physical groups to cells/cell edges.
+
+            ALLOCATE(GRID_BC(NUM)) ! Append the physical group to the list
+            N_GRID_BC = NUM
+
+            DO I = 1, NUM
+               
+               READ(in5,*, IOSTAT=ReasonEOF) LINE, GROUPNAME
+      
+               GRID_BC(I)%PHYSICAL_GROUP_NAME = GROUPNAME
+         
+               READ(in5,*, IOSTAT=ReasonEOF) LINE, NUMELEMS
+
+               DO J = 1, NUMELEMS
+                  READ(in5,'(A)', IOSTAT=ReasonEOF) LINE
+
+                  READ(LINE,*) ELEM_TYPE
+
+                  IF (ELEM_TYPE == 1) THEN ! element in physical group is a vertex.
+
+                     READ(LINE,*) ELEM_TYPE, JN
+
+                     JN = JN + 1
+                     
+                     IF (N_CELLS_WITH_NODE(JN) > 0) THEN
+                        DO IDX = 0, N_CELLS_WITH_NODE(JN) - 1
+                           JC1 = CELL_WITH_NODE(IOF(JN) + IDX)
+                           FOUND = 0
+                           DO V1 = 1, 2
+                              IF (U1D_GRID%CELL_NODES(V1,JC1) == JN) THEN
+                                 U1D_GRID%CELL_EDGES_PG(V1, JC1) = I
+                              END IF
+                           END DO
+                        END DO
+                     END IF
+
+                  ELSE IF (ELEM_TYPE == 3) THEN ! element in physical group is a line.
+                     READ(LINE,*) ELEM_TYPE, VLIST2
+                     
+                     VLIST2 = VLIST2 + 1
+
+                     JN = VLIST2(1)
+                     IF (N_CELLS_WITH_NODE(JN) > 0) THEN
+                        DO IDX = 0, N_CELLS_WITH_NODE(JN) - 1
+                           JC1 = CELL_WITH_NODE(IOF(JN) + IDX)
+                           FOUND = 0
+                           DO V1 = 1, 2
+                              IF (ANY(VLIST2 == U1D_GRID%CELL_NODES(V1,JC1))) THEN
+                                 FOUND = FOUND + 1
+                              END IF
+                           END DO
+            
+                           IF (FOUND == 2) THEN
+                              U1D_GRID%CELL_PG(JC1) = I
+                           END IF
+                        END DO
+                     END IF
+
+                  ELSE
+                     WRITE(*,*) 'Error! element type was not point or line.'
+                  END IF
+
+               END DO
+            END DO
+
          END IF
       END DO
 
       ! Done reading
       CLOSE(in5)
 
-      IF (NUM_CELLS == 0) THEN
-         CALL ERROR_ABORT('Attention, mesh file does not contain any cell! ABORTING.')
-      ENDIF
-
-
-      WRITE(*,*) 'Read grid file. It contains ', U2D_GRID%NUM_POINTS, &
-                 'points, ', U2D_GRID%NUM_LINES, 'lines, and ', &
-                 U2D_GRID%NUM_CELLS, 'cells.'
+      !WRITE(*,*) 'Read grid file. It contains ', U1D_GRID%NUM_NODES, &
+      !           'points, and ', U1D_GRID%NUM_CELLS, 'cells.'
 
       ! Process the mesh: generate connectivity, normals and such...
       !XMIN, XMAX,...
 
-      DO I = 1, NUM_CELLS
-         WRITE(*,*) U2D_GRID%CELL_NODES(:,I)
-      END DO
+      !DO I = 1, U1D_GRID%NUM_CELLS
+      !   WRITE(*,*) U1D_GRID%CELL_NODES(:,I)
+      !END DO
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Computing cell volumes.'
+         WRITE(*,*) '==========================================='
+      END IF
 
       ! Compute cell volumes
-      ALLOCATE(U2D_GRID%CELL_VOLUMES(NUM_CELLS))
-      DO I = 1, NUM_CELLS
-         A = U2D_GRID%NODE_COORDS(:, U2D_GRID%CELL_NODES(1,I))
-         B = U2D_GRID%NODE_COORDS(:, U2D_GRID%CELL_NODES(2,I))
-         C = U2D_GRID%NODE_COORDS(:, U2D_GRID%CELL_NODES(3,I))
+      ALLOCATE(U1D_GRID%SEGMENT_LENGTHS(U1D_GRID%NUM_CELLS))
+      ALLOCATE(U1D_GRID%CELL_VOLUMES(U1D_GRID%NUM_CELLS))
+      DO I = 1, U1D_GRID%NUM_CELLS
+         A = U1D_GRID%NODE_COORDS(:, U1D_GRID%CELL_NODES(1,I))
+         B = U1D_GRID%NODE_COORDS(:, U1D_GRID%CELL_NODES(2,I))
 
-         IF (DIMS == 2 .AND. .NOT. AXI) THEN
-            U2D_GRID%CELL_VOLUMES(I) = 0.5*ABS(A(1)*(B(2)-C(2)) + B(1)*(C(2)-A(2)) + C(1)*(A(2)-B(2)))
-            WRITE(*,*) U2D_GRID%CELL_VOLUMES(I)
+         U1D_GRID%SEGMENT_LENGTHS(I) = ABS(A(1)-B(1))
+         U1D_GRID%CELL_VOLUMES(I) = U1D_GRID%SEGMENT_LENGTHS(I) * (YMAX-YMIN) * (ZMAX-ZMIN)
+      END DO
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Computing grid connectivity.'
+         WRITE(*,*) '==========================================='
+      END IF
+
+      ! Find cell connectivity
+      ALLOCATE(TEMP_CELL_NEIGHBORS(2, U1D_GRID%NUM_CELLS))
+      TEMP_CELL_NEIGHBORS = -1
+
+
+
+      DO JN = 1, U1D_GRID%NUM_NODES
+         !IF (PROC_ID == 0) WRITE(*,*) 'Checking node ', JN, ' of ',  U1D_GRID%NUM_NODES
+         IF (N_CELLS_WITH_NODE(JN) > 1) THEN
+            DO I = 0, N_CELLS_WITH_NODE(JN) - 1
+               DO J = I, N_CELLS_WITH_NODE(JN) - 1
+                  IF (I == J) CYCLE
+                  JC1 = CELL_WITH_NODE(IOF(JN) + I)
+                  JC2 = CELL_WITH_NODE(IOF(JN) + J)
+
+                  FOUND = 0
+                  DO V1 = 1, 2
+                     DO V2 = 1, 2
+                        IF (U1D_GRID%CELL_NODES(V1,JC1) == U1D_GRID%CELL_NODES(V2,JC2)) THEN
+                           FOUND = FOUND + 1
+                           IF (FOUND .GT. 1) CALL ERROR_ABORT('Error! Found duplicate cells in the mesh!')
+                           TEMP_CELL_NEIGHBORS(V1, JC1) = JC2
+                           TEMP_CELL_NEIGHBORS(V2, JC2) = JC1
+                        END IF
+                     END DO
+                  END DO
+
+               END DO
+            END DO
          END IF
       END DO
 
-      ! Find cell connectivity
-      ALLOCATE(TEMP_CELL_NEIGHBORS(3, NUM_CELLS))
-      TEMP_CELL_NEIGHBORS = -1
-      DO I = 1, NUM_CELLS
-         DO J = I, NUM_CELLS
-            IF (I == J) CYCLE
-            FOUND = 0
-            DO V1 = 1, 3
-               DO V2 = 1, 3
-                  IF (U2D_GRID%CELL_NODES(V1,I) == U2D_GRID%CELL_NODES(V2,J)) THEN
-                     FOUND = FOUND + 1
-                     IF (FOUND .GT. 2) CALL ERROR_ABORT('Error! Found duplicate cells in the mesh!')
-                     WHICH1(FOUND) = V1
-                     WHICH2(FOUND) = V2
-                  END IF
-               END DO
-            END DO
-            IF (FOUND == 2) THEN
-               IF (ANY(WHICH1 == 1) .AND. ANY(WHICH1 == 2)) TEMP_CELL_NEIGHBORS(1, I) = J
-               IF (ANY(WHICH1 == 2) .AND. ANY(WHICH1 == 3)) TEMP_CELL_NEIGHBORS(2, I) = J
-               IF (ANY(WHICH1 == 3) .AND. ANY(WHICH1 == 1)) TEMP_CELL_NEIGHBORS(3, I) = J
-               IF (ANY(WHICH2 == 1) .AND. ANY(WHICH2 == 2)) TEMP_CELL_NEIGHBORS(1, J) = I
-               IF (ANY(WHICH2 == 2) .AND. ANY(WHICH2 == 3)) TEMP_CELL_NEIGHBORS(2, J) = I
-               IF (ANY(WHICH2 == 3) .AND. ANY(WHICH2 == 1)) TEMP_CELL_NEIGHBORS(3, J) = I
+      U1D_GRID%CELL_NEIGHBORS = TEMP_CELL_NEIGHBORS
+
+
+
+      !WRITE(*,*) 'Generated grid connectivity. '
+      !DO I = 1, U1D_GRID%NUM_CELLS
+      !   WRITE(*,*) 'Cell ', I, ' neighbors cells ', TEMP_CELL_NEIGHBORS(:, I)
+      !END DO
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Computing face normals.'
+         WRITE(*,*) '==========================================='
+      END IF
+
+      ! Compute segment edge normals
+      ALLOCATE(U1D_GRID%EDGE_NORMAL(3, 2, U1D_GRID%NUM_CELLS))
+      DO I = 1, U1D_GRID%NUM_CELLS
+
+         U1D_GRID%EDGE_NORMAL(1,1,I) = -1.d0
+         U1D_GRID%EDGE_NORMAL(2,1,I) =  0.d0
+         U1D_GRID%EDGE_NORMAL(3,1,I) =  0.d0
+
+         U1D_GRID%EDGE_NORMAL(1,2,I) =  1.d0
+         U1D_GRID%EDGE_NORMAL(2,2,I) =  0.d0
+         U1D_GRID%EDGE_NORMAL(3,2,I) =  0.d0
+
+      END DO
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Checking ordering.'
+         WRITE(*,*) '==========================================='
+      END IF
+
+      DO I = 1, U1D_GRID%NUM_CELLS
+         X1 = U1D_GRID%NODE_COORDS(1, U1D_GRID%CELL_NODES(2,I)) &
+            - U1D_GRID%NODE_COORDS(1, U1D_GRID%CELL_NODES(1,I))
+
+         IF (X1 < 0) CALL ERROR_ABORT('1D mesh segment are reversed.')
+      END DO
+
+      NCELLS = U1D_GRID%NUM_CELLS
+      NNODES = U1D_GRID%NUM_NODES
+
+
+
+      ALLOCATE(U1D_GRID%BASIS_COEFFS(2,2,NCELLS))
+
+      DO I = 1, NCELLS
+         V1 = U1D_GRID%CELL_NODES(1,I)
+         V2 = U1D_GRID%CELL_NODES(2,I)
+
+         X1 = U1D_GRID%NODE_COORDS(1, V1)
+         X2 = U1D_GRID%NODE_COORDS(1, V2)
+
+         ! These are such that PSI_i = x * BASIS_COEFFS(1,i,IC) + BASIS_COEFFS(2,i,IC)
+
+         U1D_GRID%BASIS_COEFFS(1,1,I) = -1.d0
+         U1D_GRID%BASIS_COEFFS(2,1,I) =  X2
+
+         U1D_GRID%BASIS_COEFFS(1,2,I) =  1.d0
+         U1D_GRID%BASIS_COEFFS(2,2,I) = -X1
+         
+
+         U1D_GRID%BASIS_COEFFS(:,:,I) = U1D_GRID%BASIS_COEFFS(:,:,I)/U1D_GRID%SEGMENT_LENGTHS(I)
+
+      END DO
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Creating boundary grid.'
+         WRITE(*,*) '==========================================='
+      END IF
+
+      ALLOCATE(U1D_GRID%SEGMENT_NODES_BOUNDARY_INDEX(2,NCELLS))
+      ALLOCATE(NODE_ON_BOUNDARY(NNODES))
+      NODE_ON_BOUNDARY = .FALSE.
+      ALLOCATE(U1D_GRID%NODES_BOUNDARY_INDEX(NNODES))
+      U1D_GRID%NODES_BOUNDARY_INDEX = -1
+      NUM_BOUNDARY_NODES = 0
+      NUM_BOUNDARY_ELEM = 0
+      DO I = 1, NCELLS
+         DO J = 1, 2
+            ! If the vertex belongs to any physical group, it should be part of the boundary grid
+            ! Later, we may want to filter this further
+            IF (U1D_GRID%CELL_EDGES_PG(J,I) .NE. -1) THEN
+               NUM_BOUNDARY_ELEM = NUM_BOUNDARY_ELEM + 1
+               V1 = U1D_GRID%CELL_NODES(J, I)
+               IF (.NOT. NODE_ON_BOUNDARY(V1)) THEN
+                  NUM_BOUNDARY_NODES = NUM_BOUNDARY_NODES + 1
+                  U1D_GRID%NODES_BOUNDARY_INDEX(V1) = NUM_BOUNDARY_NODES
+                  NODE_ON_BOUNDARY(V1) = .TRUE.
+               END IF
             END IF
          END DO
       END DO
 
-      U2D_GRID%CELL_NEIGHBORS = TEMP_CELL_NEIGHBORS
+      U0D_GRID%NUM_POINTS = NUM_BOUNDARY_ELEM
+      U0D_GRID%NUM_NODES = NUM_BOUNDARY_NODES
+      ALLOCATE(U0D_GRID%POINT_NODES(NUM_BOUNDARY_ELEM))
+      ALLOCATE(U0D_GRID%POINT_PG(NUM_BOUNDARY_ELEM))
+      ALLOCATE(U0D_GRID%NODE_COORDS(3, NUM_BOUNDARY_NODES))
 
-
-      WRITE(*,*) 'Generated grid connectivity. '
-      DO I = 1, NUM_CELLS
-         WRITE(*,*) 'Cell ', I, ' neighbors cells ', TEMP_CELL_NEIGHBORS(:, I)
+      DO I = 1, NNODES
+         IF (NODE_ON_BOUNDARY(I)) THEN
+            U0D_GRID%NODE_COORDS(:,U1D_GRID%NODES_BOUNDARY_INDEX(I)) = U1D_GRID%NODE_COORDS(:,I)
+         END IF
       END DO
 
-      ! Distributing cells over MPI processes
-      NCELLSPP = CEILING(REAL(NUM_CELLS)/REAL(N_MPI_THREADS))
-      ALLOCATE(CELL_PROCS(NUM_CELLS))
-      DO I = 1, NUM_CELLS
-         CELL_PROCS(I) = INT((I-1)/NCELLSPP)
+      NUM_BOUNDARY_ELEM = 0
+
+      DO I = 1, NCELLS
+         DO J = 1, 2
+            IF (U1D_GRID%CELL_EDGES_PG(J,I) .NE. -1) THEN
+               NUM_BOUNDARY_ELEM = NUM_BOUNDARY_ELEM + 1
+               U0D_GRID%POINT_PG(NUM_BOUNDARY_ELEM) = U1D_GRID%CELL_EDGES_PG(J,I)
+               U1D_GRID%SEGMENT_NODES_BOUNDARY_INDEX(J,I) = NUM_BOUNDARY_ELEM
+
+               V1 = U1D_GRID%CELL_NODES(J, I)
+               U0D_GRID%POINT_NODES(NUM_BOUNDARY_ELEM) = U1D_GRID%NODES_BOUNDARY_INDEX(V1)
+
+            END IF
+         END DO
       END DO
+      
+      DEALLOCATE(NODE_ON_BOUNDARY)
 
-      WRITE(*,*) '==========================================='
-      WRITE(*,*) 'Done reading grid file.'
-      WRITE(*,*) '==========================================='
+      NBOUNDCELLS = NUM_BOUNDARY_ELEM
+      NBOUNDNODES = NUM_BOUNDARY_NODES
 
-   END SUBROUTINE READ_UNSTRUCTURED_GRID
+      ! Compute areas and lengths of boundary mesh
+      ALLOCATE(U0D_GRID%VERTEX_AREAS(U0D_GRID%NUM_POINTS))
+      U0D_GRID%VERTEX_AREAS = (YMAX-YMIN) * (ZMAX-ZMIN)
 
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '============================================================='
+         WRITE(*,*) 'Done reading grid file.'
+         WRITE(*,*) 'It contains ', NNODES, ' nodes and ', NCELLS, ' cells.'
+         WRITE(*,*) 'The boundary grid contains ', NBOUNDCELLS, ' lines and ', NBOUNDNODES, ' nodes.'
+         WRITE(*,*) '============================================================='
+      END IF
 
-
+   END SUBROUTINE READ_1D_UNSTRUCTURED_GRID_SU2
 
 
    SUBROUTINE READ_2D_UNSTRUCTURED_GRID_SU2(FILENAME)
@@ -805,7 +1100,7 @@ MODULE grid_and_partition
       DO
          READ(in5,*, IOSTAT=ReasonEOF) LINE, NUM
          IF (ReasonEOF < 0) EXIT 
-         WRITE(*,*) 'Read line:', LINE, ' number ', NUM
+         !WRITE(*,*) 'Read line:', LINE, ' number ', NUM
          
          IF (LINE == 'NPOIN=') THEN
             ALLOCATE(U2D_GRID%NODE_COORDS(3,NUM))
@@ -842,7 +1137,7 @@ MODULE grid_and_partition
                IF (LINE .NE. 'MARKER_TAG=') THEN
                   WRITE(*,*) 'Error! did not find marker name.'
                ELSE
-                  WRITE(*,*) 'Found marker tag, with groupname: ', GROUPNAME
+                  !WRITE(*,*) 'Found marker tag, with groupname: ', GROUPNAME
                END IF
          
                
@@ -850,7 +1145,7 @@ MODULE grid_and_partition
                IF (LINE .NE. 'MARKER_ELEMS=') THEN
                   WRITE(*,*) 'Error! did not find marker elements.'
                ELSE
-                  WRITE(*,*) 'Found marker elements, with number of elements: ', NUMELEMS
+                  !WRITE(*,*) 'Found marker elements, with number of elements: ', NUMELEMS
                END IF
 
                DO J = 1, NUMELEMS
@@ -1220,10 +1515,10 @@ MODULE grid_and_partition
          END DO
       END DO      
 
-      U1D_GRID%NUM_SEGMENTS = NUM_BOUNDARY_ELEM
+      U1D_GRID%NUM_CELLS = NUM_BOUNDARY_ELEM
       U1D_GRID%NUM_NODES = NUM_BOUNDARY_NODES
-      ALLOCATE(U1D_GRID%SEGMENT_NODES(2, NUM_BOUNDARY_ELEM))
-      ALLOCATE(U1D_GRID%SEGMENT_PG(NUM_BOUNDARY_ELEM))
+      ALLOCATE(U1D_GRID%CELL_NODES(2, NUM_BOUNDARY_ELEM))
+      ALLOCATE(U1D_GRID%CELL_PG(NUM_BOUNDARY_ELEM))
       ALLOCATE(U1D_GRID%NODE_COORDS(3, NUM_BOUNDARY_NODES))
 
       DO I = 1, NNODES
@@ -1238,7 +1533,7 @@ MODULE grid_and_partition
          DO J = 1, 3
             IF (U2D_GRID%CELL_EDGES_PG(J,I) .NE. -1) THEN
                NUM_BOUNDARY_ELEM = NUM_BOUNDARY_ELEM + 1
-               U1D_GRID%SEGMENT_PG(NUM_BOUNDARY_ELEM) = U2D_GRID%CELL_EDGES_PG(J,I)
+               U1D_GRID%CELL_PG(NUM_BOUNDARY_ELEM) = U2D_GRID%CELL_EDGES_PG(J,I)
                U2D_GRID%CELL_EDGES_BOUNDARY_INDEX(J,I) = NUM_BOUNDARY_ELEM
 
                V1 = U2D_GRID%CELL_NODES(J, I)
@@ -1247,8 +1542,8 @@ MODULE grid_and_partition
                ELSE
                   V2 = U2D_GRID%CELL_NODES(J+1, I)
                END IF
-               U1D_GRID%SEGMENT_NODES(1, NUM_BOUNDARY_ELEM) = U2D_GRID%NODES_BOUNDARY_INDEX(V1)
-               U1D_GRID%SEGMENT_NODES(2, NUM_BOUNDARY_ELEM) = U2D_GRID%NODES_BOUNDARY_INDEX(V2)
+               U1D_GRID%CELL_NODES(1, NUM_BOUNDARY_ELEM) = U2D_GRID%NODES_BOUNDARY_INDEX(V1)
+               U1D_GRID%CELL_NODES(2, NUM_BOUNDARY_ELEM) = U2D_GRID%NODES_BOUNDARY_INDEX(V2)
 
             END IF
          END DO
@@ -1260,11 +1555,11 @@ MODULE grid_and_partition
       NBOUNDNODES = NUM_BOUNDARY_NODES
 
       ! Compute areas and lengths of boundary mesh
-      ALLOCATE(U1D_GRID%SEGMENT_LENGTHS(U1D_GRID%NUM_SEGMENTS))
-      ALLOCATE(U1D_GRID%SEGMENT_AREAS(U1D_GRID%NUM_SEGMENTS))
-      DO I = 1, U1D_GRID%NUM_SEGMENTS
-         A = U1D_GRID%NODE_COORDS(:, U1D_GRID%SEGMENT_NODES(1,I))
-         B = U1D_GRID%NODE_COORDS(:, U1D_GRID%SEGMENT_NODES(2,I))
+      ALLOCATE(U1D_GRID%SEGMENT_LENGTHS(U1D_GRID%NUM_CELLS))
+      ALLOCATE(U1D_GRID%SEGMENT_AREAS(U1D_GRID%NUM_CELLS))
+      DO I = 1, U1D_GRID%NUM_CELLS
+         A = U1D_GRID%NODE_COORDS(:, U1D_GRID%CELL_NODES(1,I))
+         B = U1D_GRID%NODE_COORDS(:, U1D_GRID%CELL_NODES(2,I))
 
          U1D_GRID%SEGMENT_LENGTHS(I) = SQRT((B(1) - A(1))**2 + (B(2) - A(2))**2)
          IF (.NOT. AXI) THEN
@@ -1370,14 +1665,14 @@ MODULE grid_and_partition
                IF (LINE .NE. 'MARKER_TAG=') THEN
                   CALL ERROR_ABORT('Error! did not find marker name.')
                ELSE
-                  IF (PROC_ID == 0) WRITE(*,*) 'Found marker tag, with groupname: ', GROUPNAME
+                  !IF (PROC_ID == 0) WRITE(*,*) 'Found marker tag, with groupname: ', GROUPNAME
                END IF
 
                READ(in5,*, IOSTAT=ReasonEOF) LINE, NUMELEMS
                IF (LINE .NE. 'MARKER_ELEMS=') THEN
                   CALL ERROR_ABORT('Error! did not find marker elements.')
                ELSE
-                  IF (PROC_ID == 0) WRITE(*,*) 'Found marker elements, with number of elements: ', NUMELEMS
+                  !IF (PROC_ID == 0) WRITE(*,*) 'Found marker elements, with number of elements: ', NUMELEMS
                END IF
 
                DO J = 1, NUMELEMS

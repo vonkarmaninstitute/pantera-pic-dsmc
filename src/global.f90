@@ -1,3 +1,21 @@
+! Copyright (C) 2024 von Karman Institute for Fluid Dynamics (VKI)
+!
+! This file is part of PANTERA PIC-DSMC, a software for the simulation
+! of rarefied gases and plasmas using particles.
+!
+! This program is free software: you can redistribute it and/or modify
+! it under the terms of the GNU General Public License as published by
+! the Free Software Foundation, either version 3 of the License, or
+! (at your option) any later version.
+
+! This program is distributed in the hope that it will be useful,
+! but WITHOUT ANY WARRANTY; without even the implied warranty of
+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+! GNU General Public License for more details.
+
+! You should have received a copy of the GNU General Public License
+! along with this program.  If not, see <https://www.gnu.org/licenses/>.PANTERA PIC-DSMC
+
 ! This module holds global variables
 
 MODULE global
@@ -100,18 +118,33 @@ MODULE global
 
    LOGICAL :: LOAD_BALANCE = .FALSE.
    INTEGER :: LOAD_BALANCE_EVERY = 0
-  
+
+   TYPE UNSTRUCTURED_0D_GRID_DATA_STRUCTURE
+      INTEGER :: NUM_NODES, NUM_POINTS
+      REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: NODE_COORDS
+      INTEGER, DIMENSION(:), ALLOCATABLE        :: POINT_PG
+      INTEGER, DIMENSION(:,:), ALLOCATABLE      :: PG_NODES
+      INTEGER, DIMENSION(:), ALLOCATABLE      :: POINT_NODES
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: VERTEX_AREAS
+   END TYPE UNSTRUCTURED_0D_GRID_DATA_STRUCTURE
+
+   TYPE(UNSTRUCTURED_0D_GRID_DATA_STRUCTURE) :: U0D_GRID
+
 
    TYPE UNSTRUCTURED_1D_GRID_DATA_STRUCTURE
-      INTEGER :: NUM_NODES, NUM_SEGMENTS
+      INTEGER :: NUM_NODES, NUM_CELLS
       REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: NODE_COORDS
-      INTEGER, DIMENSION(:,:), ALLOCATABLE      :: SEGMENT_NODES
-      INTEGER, DIMENSION(:,:), ALLOCATABLE      :: SEGMENT_NEIGHBORS
-      REAL(KIND=8), DIMENSION(:,:,:), ALLOCATABLE :: SEGMENT_NORMAL
-      INTEGER, DIMENSION(:), ALLOCATABLE        :: SEGMENT_PG
+      INTEGER, DIMENSION(:,:), ALLOCATABLE      :: CELL_NODES
+      INTEGER, DIMENSION(:,:), ALLOCATABLE      :: CELL_NEIGHBORS
+      REAL(KIND=8), DIMENSION(:,:,:), ALLOCATABLE :: EDGE_NORMAL
+      INTEGER, DIMENSION(:), ALLOCATABLE        :: CELL_PG
+      INTEGER, DIMENSION(:,:), ALLOCATABLE      :: CELL_EDGES_PG
       INTEGER, DIMENSION(:,:), ALLOCATABLE      :: PG_NODES
       REAL(KIND=8), DIMENSION(:,:,:), ALLOCATABLE :: BASIS_COEFFS
       INTEGER, DIMENSION(:), ALLOCATABLE        :: PERIODIC_RELATED_NODE
+      INTEGER, DIMENSION(:,:), ALLOCATABLE      :: SEGMENT_NODES_BOUNDARY_INDEX
+      INTEGER, DIMENSION(:), ALLOCATABLE        :: NODES_BOUNDARY_INDEX
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CELL_VOLUMES
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: SEGMENT_AREAS
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: SEGMENT_LENGTHS
    END TYPE UNSTRUCTURED_1D_GRID_DATA_STRUCTURE
@@ -120,7 +153,7 @@ MODULE global
 
 
    TYPE UNSTRUCTURED_2D_GRID_DATA_STRUCTURE
-      INTEGER :: NUM_NODES, NUM_CELLS, NUM_LINES, NUM_POINTS
+      INTEGER :: NUM_NODES, NUM_CELLS, NUM_LINES
       REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: NODE_COORDS
       INTEGER, DIMENSION(:,:), ALLOCATABLE      :: CELL_NODES
       INTEGER, DIMENSION(:,:), ALLOCATABLE      :: LINE_NODES
@@ -438,13 +471,6 @@ MODULE global
    END TYPE WALL
 
    TYPE(WALL), DIMENSION(:), ALLOCATABLE :: WALLS
-
-   
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   !!!!!!!!! MPI parallelization !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-   INTEGER      :: N_BLOCKS_X, N_BLOCKS_Y ! Used for "block" partitioning
 
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

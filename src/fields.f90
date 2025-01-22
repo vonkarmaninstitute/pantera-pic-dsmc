@@ -1,3 +1,21 @@
+! Copyright (C) 2024 von Karman Institute for Fluid Dynamics (VKI)
+!
+! This file is part of PANTERA PIC-DSMC, a software for the simulation
+! of rarefied gases and plasmas using particles.
+!
+! This program is free software: you can redistribute it and/or modify
+! it under the terms of the GNU General Public License as published by
+! the Free Software Foundation, either version 3 of the License, or
+! (at your option) any later version.
+
+! This program is distributed in the hope that it will be useful,
+! but WITHOUT ANY WARRANTY; without even the implied warranty of
+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+! GNU General Public License for more details.
+
+! You should have received a copy of the GNU General Public License
+! along with this program.  If not, see <https://www.gnu.org/licenses/>.PANTERA PIC-DSMC
+
 ! Contains Electromagnetic fields related code
 
 MODULE fields
@@ -49,7 +67,7 @@ MODULE fields
       REAL(KIND=8) :: K11, K22, K33, K12, K23, K13, AREA, EDGELENGTH, FACEAREA
       INTEGER :: V1, V2, V3, V4
       INTEGER :: P, Q, VP, VQ
-      REAL(KIND=8) :: KIJ, VOLUME
+      REAL(KIND=8) :: KIJ, VOLUME, LENGTH
       INTEGER :: EDGE_PG
       LOGICAL, DIMENSION(:), ALLOCATABLE :: IS_UNUSED
       REAL(KIND=8) :: EPS_REL
@@ -92,8 +110,124 @@ MODULE fields
 
       ! At this point, populate the matrix
       IF (GRID_TYPE == UNSTRUCTURED) THEN
+         IF (DIMS == 1) THEN
 
-         IF (DIMS == 2) THEN
+            ALLOCATE(IS_UNUSED(0:SIZE-1))
+            IS_UNUSED = .TRUE.
+
+            DO I = 1, NCELLS
+               V1 = U1D_GRID%CELL_NODES(1,I)
+               V2 = U1D_GRID%CELL_NODES(2,I)
+               IS_UNUSED(V1-1) = .FALSE.; IS_UNUSED(V2-1) = .FALSE.
+               DO J = 1, 2
+                  EDGE_PG = U1D_GRID%CELL_EDGES_PG(J, I)
+                  IF (EDGE_PG .NE. -1) THEN
+                     IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC &
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == RF_VOLTAGE_BC &
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC) THEN
+                        IF (J==1) THEN
+                           DIRICHLET(V1-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           IS_DIRICHLET(V1-1) = .TRUE.
+                        ELSE IF (J==2) THEN
+                           DIRICHLET(V2-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           IS_DIRICHLET(V2-1) = .TRUE.
+                        END IF
+                     END IF
+
+                     IF (GRID_BC(EDGE_PG)%FIELD_BC == NEUMANN_BC) THEN
+                        IF (J==1) THEN
+                           IS_NEUMANN(V1-1) = .TRUE.
+                        ELSE IF (J==2) THEN
+                           IS_NEUMANN(V2-1) = .TRUE.
+                        END IF
+                     END IF
+                     
+                     IF (GRID_BC(EDGE_PG)%FIELD_BC == DIELECTRIC_BC) THEN
+                        IF (J==1) THEN
+                           IS_DIELECTRIC(V1-1) = .TRUE.
+                        ELSE IF (J==2) THEN
+                           IS_DIELECTRIC(V2-1) = .TRUE.
+                        END IF
+                     END IF
+                  END IF
+               END DO
+            END DO
+
+
+            IF (PIC_TYPE == EXPLICITLIMITED) THEN
+               CALL COMPUTE_DENSITY_TEMPERATURE(particles)
+               IF (.NOT. ALLOCATED(DXLDRATIO)) ALLOCATE(DXLDRATIO(NCELLS))
+               DO I = 1, NCELLS
+                  LENGTH = U1D_GRID%SEGMENT_LENGTHS(I)
+                  IF (CELL_TE(I) > 0) THEN
+                     DXLDRATIO(I) = LENGTH**2*(CELL_NE(I)*QE**2/(EPS0*KB*CELL_TE(I)))
+                     !WRITE(*,*) 'Cell ', I, ' T= ', CELL_TE(I), ' n= ', CELL_NE(I), ' dx^2/lD^2= ', RATIO
+                  ELSE
+                     DXLDRATIO(I) = 0
+                  END IF
+               END DO
+            END IF
+
+            !IS_DIRICHLET(0) = .TRUE.    ! DBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDDBDBDBDBDBDBDB
+            !DIRICHLET(0) = 0.d0
+
+            DO I = 1, NCELLS
+               IF (U1D_GRID%CELL_PG(I) == -1) THEN
+                  EPS_REL = 1.d0
+               ELSE
+                  EPS_REL = GRID_BC(U1D_GRID%CELL_PG(I))%EPS_REL
+               END IF
+               LENGTH = U1D_GRID%SEGMENT_LENGTHS(I)
+               V1 = U1D_GRID%CELL_NODES(1,I)
+               V2 = U1D_GRID%CELL_NODES(2,I)
+
+
+               K11 = 1.0/LENGTH*EPS_REL
+               K22 = 1.0/LENGTH*EPS_REL
+               K12 =-1.0/LENGTH*EPS_REL
+
+
+               IF (PIC_TYPE == EXPLICITLIMITED) THEN
+                  K11 = K11 * (1. + DXLDRATIO(I))
+                  K22 = K22 * (1. + DXLDRATIO(I))
+                  K12 = K12 * (1. + DXLDRATIO(I))
+               END IF
+
+               ! We need to ADD to a sparse matrix entry.
+               IF (V1-1 >= Istart .AND. V1-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(V1-1)) THEN
+                     CALL MatSetValues(Amat,one,V1-1,one,V1-1,K11,ADD_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,V1-1,one,V2-1,K12,ADD_VALUES,ierr)
+                  END IF
+               END IF
+               IF (V2-1 >= Istart .AND. V2-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(V2-1)) THEN
+                     CALL MatSetValues(Amat,one,V2-1,one,V1-1,K12,ADD_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,V2-1,one,V2-1,K22,ADD_VALUES,ierr)
+                  END IF
+               END IF
+
+               DO J = 1, 2
+                  EDGE_PG = U1D_GRID%CELL_EDGES_PG(J, I)
+                  IF (EDGE_PG == -1) CYCLE
+                  IF (GRID_BC(EDGE_PG)%FIELD_BC == NEUMANN_BC) THEN
+
+                     IF (J==1) THEN
+                        IF (.NOT. IS_DIRICHLET(V1-1)) THEN
+                           NEUMANN(V1-1) = NEUMANN(V1-1) + GRID_BC(EDGE_PG)%WALL_EFIELD
+                        END IF
+                     ELSE IF (J==2) THEN
+                        IF (.NOT. IS_DIRICHLET(V2-1)) THEN
+                           NEUMANN(V2-1) = NEUMANN(V2-1) + GRID_BC(EDGE_PG)%WALL_EFIELD
+                        END IF
+                     END IF
+
+                  END IF
+               END DO
+
+            END DO
+
+         ELSE IF (DIMS == 2) THEN
 
             ALLOCATE(IS_UNUSED(0:SIZE-1))
             IS_UNUSED = .TRUE.
@@ -143,9 +277,9 @@ MODULE fields
                CALL COMPUTE_DENSITY_TEMPERATURE(particles)
                IF (.NOT. ALLOCATED(DXLDRATIO)) ALLOCATE(DXLDRATIO(NCELLS))
                DO I = 1, NCELLS
-                  AREA = U2D_GRID%CELL_AREAS(I)
+                  LENGTH = U1D_GRID%SEGMENT_LENGTHS(I)
                   IF (CELL_TE(I) > 0) THEN
-                     DXLDRATIO(I) = AREA*(CELL_NE(I)*QE**2/(EPS0*KB*CELL_TE(I)))
+                     DXLDRATIO(I) = LENGTH**2*(CELL_NE(I)*QE**2/(EPS0*KB*CELL_TE(I)))
                      !WRITE(*,*) 'Cell ', I, ' T= ', CELL_TE(I), ' n= ', CELL_NE(I), ' dx^2/lD^2= ', RATIO
                   ELSE
                      DXLDRATIO(I) = 0
@@ -335,7 +469,9 @@ MODULE fields
                CALL COMPUTE_DENSITY_TEMPERATURE(particles)
                IF (.NOT. ALLOCATED(DXLDRATIO)) ALLOCATE(DXLDRATIO(NCELLS))
                DO I = 1, NCELLS
-                  IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
+                  IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 1) THEN
+                     VOLUME = U1D_GRID%CELL_VOLUMES(I)
+                  ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
                      VOLUME = U2D_GRID%CELL_VOLUMES(I)
                   ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
                      VOLUME = U3D_GRID%CELL_VOLUMES(I)
@@ -359,7 +495,9 @@ MODULE fields
                   EPS_REL = GRID_BC(U3D_GRID%CELL_PG(I))%EPS_REL
                END IF
 
-               IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
+               IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 1) THEN
+                  VOLUME = U1D_GRID%CELL_VOLUMES(I)
+               ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
                   VOLUME = U2D_GRID%CELL_VOLUMES(I)
                ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
                   VOLUME = U3D_GRID%CELL_VOLUMES(I)
@@ -585,7 +723,7 @@ MODULE fields
 
       INTEGER :: I, J
       INTEGER :: SIZE
-      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA, VOLUME
+      REAL(KIND=8) :: X1, X2, X3, Y1, Y2, Y3, K11, K22, K33, K12, K23, K13, AREA, VOLUME, LENGTH
       REAL(KIND=8) :: K11TILDE, K22TILDE, K33TILDE, K12TILDE, K23TILDE, K13TILDE, KIJ
       INTEGER :: V1, V2, V3, V4, P, Q, VP, VQ
       INTEGER :: EDGE_PG
@@ -627,8 +765,70 @@ MODULE fields
       IF (GRID_TYPE == UNSTRUCTURED) THEN
          ALLOCATE(IS_UNUSED(0:SIZE-1))
          IS_UNUSED = .TRUE.
+         IF (DIMS == 1) THEN
+            DO I = 1, NCELLS
+               V1 = U2D_GRID%CELL_NODES(1,I)
+               V2 = U2D_GRID%CELL_NODES(2,I)
 
-         IF (DIMS == 2) THEN
+               IS_UNUSED(V1-1) = .FALSE.; IS_UNUSED(V2-1) = .FALSE.
+               DO J = 1, 2
+                  EDGE_PG = U1D_GRID%CELL_EDGES_PG(J, I)
+                  IF (EDGE_PG .NE. -1) THEN
+                     IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC) THEN
+                        IF (J==1) THEN
+                           DIRICHLET(V1-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           IS_DIRICHLET(V1-1) = .TRUE.
+                        ELSE IF (J==2) THEN
+                           DIRICHLET(V2-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
+                           IS_DIRICHLET(V2-1) = .TRUE.
+                        END IF
+                     END IF
+
+                     IF (GRID_BC(EDGE_PG)%FIELD_BC == NEUMANN_BC) THEN
+                        IF (J==1) THEN
+                           IS_NEUMANN(V1-1) = .TRUE.
+                        ELSE IF (J==2) THEN
+                           IS_NEUMANN(V2-1) = .TRUE.
+                        END IF
+                     END IF
+                  END IF
+               END DO
+            END DO
+
+            !IS_DIRICHLET(0) = .TRUE. ! DBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDDBDBDBDBDBDBDB
+            !DIRICHLET(0) = 0.d0
+
+            DO I = 1, NCELLS
+               LENGTH = U1D_GRID%SEGMENT_LENGTHS(I)
+               V1 = U1D_GRID%CELL_NODES(1,I)
+               V2 = U1D_GRID%CELL_NODES(2,I)
+
+
+               K11 = 1.0/LENGTH
+               K22 = 1.0/LENGTH
+               K12 =-1.0/LENGTH
+
+
+               ! We need to ADD to a sparse matrix entry.
+               IF (V1-1 >= Istart .AND. V1-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(V1-1)) THEN
+                     CALL MatSetValues(Amat,one,V1-1,one,V1-1,(MASS_MATRIX(I)+1.)*K11,ADD_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,V1-1,one,V2-1,(MASS_MATRIX(I)+1.)*K12,ADD_VALUES,ierr)
+                     val = PHI_FIELD(V1)*K11+PHI_FIELD(V2)*K12
+                     CALL VecSetValues(bvec,one,V1-1,val,ADD_VALUES,ierr)
+                  END IF
+               END IF
+               IF (V2-1 >= Istart .AND. V2-1 < Iend) THEN
+                  IF (.NOT. IS_DIRICHLET(V2-1)) THEN
+                     CALL MatSetValues(Amat,one,V2-1,one,V1-1,(MASS_MATRIX(I)+1.)*K12,ADD_VALUES,ierr)
+                     CALL MatSetValues(Amat,one,V2-1,one,V2-1,(MASS_MATRIX(I)+1.)*K22,ADD_VALUES,ierr)
+                     val = PHI_FIELD(V1)*K12+PHI_FIELD(V2)*K22
+                     CALL VecSetValues(bvec,one,V2-1,val,ADD_VALUES,ierr)
+                  END IF
+               END IF
+
+            END DO
+         ELSE IF (DIMS == 2) THEN
             DO I = 1, NCELLS
                V1 = U2D_GRID%CELL_NODES(1,I)
                V2 = U2D_GRID%CELL_NODES(2,I)
@@ -962,7 +1162,23 @@ MODULE fields
          IF (GRID_TYPE == UNSTRUCTURED) THEN
             IC = particles(JP)%IC
 
-            IF (DIMS == 2) THEN
+            IF (DIMS == 1) THEN
+
+               V1 = U1D_GRID%CELL_NODES(1,IC)
+               V2 = U1D_GRID%CELL_NODES(2,IC)
+
+               DPSI1DX = U1D_GRID%BASIS_COEFFS(1,1,IC)
+               DPSI2DX = U1D_GRID%BASIS_COEFFS(1,2,IC)
+               
+               J_FIELD(V1-1) = J_FIELD(V1-1) &
+               + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI1DX)/(YMAX-YMIN)/(ZMAX-ZMIN)*particles(JP)%DTRIM
+               J_FIELD(V2-1) = J_FIELD(V2-1) &
+               + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI2DX)/(YMAX-YMIN)/(ZMAX-ZMIN)*particles(JP)%DTRIM
+              
+               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/U1D_GRID%CELL_VOLUMES(IC)*FNUM &
+                                 * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
+
+            ELSE IF (DIMS == 2) THEN
                
                AREA = U2D_GRID%CELL_AREAS(IC)
 
@@ -1084,7 +1300,20 @@ MODULE fields
 
       
       IF (GRID_TYPE == UNSTRUCTURED) THEN
-         IF (DIMS == 2) THEN
+         IF (DIMS == 1) THEN
+
+            IC = particles(JP)%IC
+
+            XP = particles(JP)%X
+
+            PHI = 0.d0
+            DO I = 1, 2
+               VI = U1D_GRID%CELL_NODES(I,IC)
+               PSII = XP*U1D_GRID%BASIS_COEFFS(1,I,IC) + U1D_GRID%BASIS_COEFFS(2,I,IC)
+               PHI = PHI + PSII*PHI_FIELD(VI)
+            END DO
+
+         ELSE IF (DIMS == 2) THEN
 
             IC = particles(JP)%IC
 

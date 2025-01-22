@@ -256,7 +256,7 @@ MODULE fully_implicit
                            KPQ = KPQ * (MASS_MATRIX(I)+1)
                         END IF
 
-                        CALL MatSetValues(jac,one,VP-1,one,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
+                        CALL MatSetValue(jac,VP-1,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
                      END DO
                   END IF
                END IF
@@ -290,7 +290,7 @@ MODULE fully_implicit
                            KPQ = KPQ * (MASS_MATRIX(I)+1)
                         END IF
 
-                        CALL MatSetValues(jac,one,VP-1,one,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
+                        CALL MatSetValue(jac,VP-1,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
                      END DO
                   END IF
                END IF
@@ -316,7 +316,7 @@ MODULE fully_implicit
                            KPQ = KPQ * (MASS_MATRIX(I)+1)
                         END IF
 
-                        CALL MatSetValues(jac,one,VP-1,one,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
+                        CALL MatSetValue(jac,VP-1,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
                      END DO
                   END IF
                END IF
@@ -329,7 +329,7 @@ MODULE fully_implicit
       CALL MatAssemblyEnd(jac,MAT_FLUSH_ASSEMBLY,ierr)
 
       DO I = Istart, Iend-1
-         IF (IS_DIRICHLET(I)) CALL MatSetValues(jac,one,I,one,I,-2.d0,INSERT_VALUES,ierr)
+         IF (IS_DIRICHLET(I)) CALL MatSetValue(jac,I,I,-2.d0,INSERT_VALUES,ierr)
       END DO
 
       CALL MatAssemblyBegin(jac,MAT_FINAL_ASSEMBLY,ierr)
@@ -582,7 +582,7 @@ MODULE fully_implicit
                IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
                   IF (.NOT. IS_DIRICHLET(VP-1)) THEN
                      VALUETOADD = -QE*QE*5.d11/(EPS0*KB*11600.d0)*AREA/3.
-                     CALL MatSetValues(jac,one,VP-1,one,VP-1,VALUETOADD,ADD_VALUES,ierr)
+                     CALL MatSetValue(jac,VP-1,VP-1,VALUETOADD,ADD_VALUES,ierr)
                   END IF
                END IF
             END DO
@@ -597,7 +597,7 @@ MODULE fully_implicit
                IF (VP-1 >= Istart .AND. VP-1 < Iend) THEN
                   IF (.NOT. IS_DIRICHLET(VP-1)) THEN
                      VALUETOADD = -QE*QE*CELL_NE(I)/(EPS0*KB*CELL_TE(I))*AREA/3.
-                     CALL MatSetValues(jac,one,VP-1,one,VP-1,VALUETOADD,ADD_VALUES,ierr)
+                     CALL MatSetValue(jac,VP-1,VP-1,VALUETOADD,ADD_VALUES,ierr)
                   END IF
                END IF
             END DO
@@ -616,7 +616,7 @@ MODULE fully_implicit
       CALL MatAssemblyBegin(jac,MAT_FLUSH_ASSEMBLY,ierr)
       CALL MatAssemblyEnd(jac,MAT_FLUSH_ASSEMBLY,ierr)
 
-      !CALL MatSetValues(jac,1,0,1,9,1.234d0,ADD_VALUES,ierr)
+      !CALL MatSetValue(jac,0,9,1.234d0,ADD_VALUES,ierr)
 
       !CALL MatAssemblyBegin(jac,MAT_FINAL_ASSEMBLY,ierr)
       !CALL MatAssemblyEnd(jac,MAT_FINAL_ASSEMBLY,ierr)
@@ -671,9 +671,9 @@ MODULE fully_implicit
                         KPQ = AREA*(U2D_GRID%BASIS_COEFFS(1,P,I)*U2D_GRID%BASIS_COEFFS(1,Q,I) &
                                   + U2D_GRID%BASIS_COEFFS(2,P,I)*U2D_GRID%BASIS_COEFFS(2,Q,I))
                         
-                        CALL MatSetValues(Qmat,one,VP-1,one,VQ-1,MPQ,ADD_VALUES,ierr)
-                        CALL MatSetValues(Qmat,one,VP-1,one,VQ-1,KPQ*FACTOR1,ADD_VALUES,ierr)
-                        CALL MatSetValues(Rmat,one,VP-1,one,VQ-1,KPQ*FACTOR2,ADD_VALUES,ierr)
+                        CALL MatSetValue(Qmat,VP-1,VQ-1,MPQ,ADD_VALUES,ierr)
+                        CALL MatSetValue(Qmat,VP-1,VQ-1,KPQ*FACTOR1,ADD_VALUES,ierr)
+                        CALL MatSetValue(Rmat,VP-1,VQ-1,KPQ*FACTOR2,ADD_VALUES,ierr)
                      END DO
                   END IF
                END DO
@@ -722,7 +722,7 @@ MODULE fully_implicit
                            KPQ = KPQ * (MASS_MATRIX(I)+1)
                         END IF
 
-                        CALL MatSetValues(jac,one,VP-1,one,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
+                        CALL MatSetValue(jac,VP-1,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
                      END DO
                   END IF
                END IF
@@ -756,7 +756,7 @@ MODULE fully_implicit
                            KPQ = KPQ * (MASS_MATRIX(I)+1)
                         END IF
 
-                        CALL MatSetValues(jac,one,VP-1,one,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
+                        CALL MatSetValue(jac,VP-1,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
                      END DO
                   END IF
                END IF
@@ -782,7 +782,7 @@ MODULE fully_implicit
                            KPQ = KPQ * (MASS_MATRIX(I)+1)
                         END IF
 
-                        CALL MatSetValues(jac,one,VP-1,one,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
+                        CALL MatSetValue(jac,VP-1,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
                      END DO
                   END IF
                END IF
@@ -795,7 +795,7 @@ MODULE fully_implicit
       CALL MatAssemblyEnd(jac,MAT_FLUSH_ASSEMBLY,ierr)
 
       DO I = Istart, Iend-1
-         IF (IS_DIRICHLET(I)) CALL MatSetValues(jac,one,I,one,I,-2.d0,INSERT_VALUES,ierr)
+         IF (IS_DIRICHLET(I)) CALL MatSetValue(jac,I,I,-2.d0,INSERT_VALUES,ierr)
       END DO
 
 
@@ -1061,9 +1061,9 @@ MODULE fully_implicit
                         KPQ = AREA*(U2D_GRID%BASIS_COEFFS(1,P,I)*U2D_GRID%BASIS_COEFFS(1,Q,I) &
                                   + U2D_GRID%BASIS_COEFFS(2,P,I)*U2D_GRID%BASIS_COEFFS(2,Q,I))
                         
-                        CALL MatSetValues(Qmat,one,VP-1,one,VQ-1,MPQ,ADD_VALUES,ierr)
-                        CALL MatSetValues(Qmat,one,VP-1,one,VQ-1,KPQ*FACTOR1,ADD_VALUES,ierr)
-                        CALL MatSetValues(Rmat,one,VP-1,one,VQ-1,KPQ*FACTOR2,ADD_VALUES,ierr)
+                        CALL MatSetValue(Qmat,VP-1,VQ-1,MPQ,ADD_VALUES,ierr)
+                        CALL MatSetValue(Qmat,VP-1,VQ-1,KPQ*FACTOR1,ADD_VALUES,ierr)
+                        CALL MatSetValue(Rmat,VP-1,VQ-1,KPQ*FACTOR2,ADD_VALUES,ierr)
                      END DO
                   END IF
                END DO
@@ -1114,7 +1114,7 @@ MODULE fully_implicit
                            KPQ = KPQ * (MASS_MATRIX(I)+1)
                         END IF
 
-                        CALL MatSetValues(Jmat,one,VP-1,one,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
+                        CALL MatSetValue(Jmat,VP-1,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
                      END DO
                   END IF
                END IF
@@ -1148,7 +1148,7 @@ MODULE fully_implicit
                            KPQ = KPQ * (MASS_MATRIX(I)+1)
                         END IF
 
-                        CALL MatSetValues(Jmat,one,VP-1,one,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
+                        CALL MatSetValue(Jmat,VP-1,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
                      END DO
                   END IF
                END IF
@@ -1174,7 +1174,7 @@ MODULE fully_implicit
                            KPQ = KPQ * (MASS_MATRIX(I)+1)
                         END IF
 
-                        CALL MatSetValues(Jmat,one,VP-1,one,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
+                        CALL MatSetValue(Jmat,VP-1,VQ-1,-2.*KPQ,ADD_VALUES,ierr)
                      END DO
                   END IF
                END IF
@@ -1187,7 +1187,7 @@ MODULE fully_implicit
       CALL MatAssemblyEnd(Jmat,MAT_FLUSH_ASSEMBLY,ierr)
 
       DO I = Istart, Iend-1
-         IF (IS_DIRICHLET(I)) CALL MatSetValues(Jmat,one,I,one,I,-2.d0,INSERT_VALUES,ierr)
+         IF (IS_DIRICHLET(I)) CALL MatSetValue(Jmat,I,I,-2.d0,INSERT_VALUES,ierr)
       END DO
 
       CALL MatAssemblyBegin(Jmat,MAT_FINAL_ASSEMBLY,ierr)
@@ -2457,28 +2457,28 @@ MODULE fully_implicit
                   VALYY = - DYDEYV(JJ)/EPS0/(ZMAX-ZMIN)*FNUM
 
                   IF (.NOT. IS_DIRICHLET(V1I-1)) THEN
-                     CALL MatSetValues(jac,1,V1I-1,1,V1J-1,VALXX*DPSI1DX*DPSJ1DX + VALXY*DPSI1DX*DPSJ1DY + &
-                                                           VALYX*DPSI1DY*DPSJ1DX + VALYY*DPSI1DY*DPSJ1DY,ADD_VALUES,ierr)
-                     CALL MatSetValues(jac,1,V1I-1,1,V2J-1,VALXX*DPSI1DX*DPSJ2DX + VALXY*DPSI1DX*DPSJ2DY + &
-                                                           VALYX*DPSI1DY*DPSJ2DX + VALYY*DPSI1DY*DPSJ2DY,ADD_VALUES,ierr)
-                     CALL MatSetValues(jac,1,V1I-1,1,V3J-1,VALXX*DPSI1DX*DPSJ3DX + VALXY*DPSI1DX*DPSJ3DY + &
-                                                           VALYX*DPSI1DY*DPSJ3DX + VALYY*DPSI1DY*DPSJ3DY,ADD_VALUES,ierr)
+                     CALL MatSetValue(jac,V1I-1,V1J-1,VALXX*DPSI1DX*DPSJ1DX + VALXY*DPSI1DX*DPSJ1DY + &
+                                                      VALYX*DPSI1DY*DPSJ1DX + VALYY*DPSI1DY*DPSJ1DY,ADD_VALUES,ierr)
+                     CALL MatSetValue(jac,V1I-1,V2J-1,VALXX*DPSI1DX*DPSJ2DX + VALXY*DPSI1DX*DPSJ2DY + &
+                                                      VALYX*DPSI1DY*DPSJ2DX + VALYY*DPSI1DY*DPSJ2DY,ADD_VALUES,ierr)
+                     CALL MatSetValue(jac,V1I-1,V3J-1,VALXX*DPSI1DX*DPSJ3DX + VALXY*DPSI1DX*DPSJ3DY + &
+                                                      VALYX*DPSI1DY*DPSJ3DX + VALYY*DPSI1DY*DPSJ3DY,ADD_VALUES,ierr)
                   END IF
                   IF (.NOT. IS_DIRICHLET(V2I-1)) THEN
-                     CALL MatSetValues(jac,1,V2I-1,1,V1J-1,VALXX*DPSI2DX*DPSJ1DX + VALXY*DPSI2DX*DPSJ1DY + &
-                                                           VALYX*DPSI2DY*DPSJ1DX + VALYY*DPSI2DY*DPSJ1DY,ADD_VALUES,ierr)
-                     CALL MatSetValues(jac,1,V2I-1,1,V2J-1,VALXX*DPSI2DX*DPSJ2DX + VALXY*DPSI2DX*DPSJ2DY + &
-                                                           VALYX*DPSI2DY*DPSJ2DX + VALYY*DPSI2DY*DPSJ2DY,ADD_VALUES,ierr)
-                     CALL MatSetValues(jac,1,V2I-1,1,V3J-1,VALXX*DPSI2DX*DPSJ3DX + VALXY*DPSI2DX*DPSJ3DY + &
-                                                           VALYX*DPSI2DY*DPSJ3DX + VALYY*DPSI2DY*DPSJ3DY,ADD_VALUES,ierr)
+                     CALL MatSetValue(jac,V2I-1,V1J-1,VALXX*DPSI2DX*DPSJ1DX + VALXY*DPSI2DX*DPSJ1DY + &
+                                                      VALYX*DPSI2DY*DPSJ1DX + VALYY*DPSI2DY*DPSJ1DY,ADD_VALUES,ierr)
+                     CALL MatSetValue(jac,V2I-1,V2J-1,VALXX*DPSI2DX*DPSJ2DX + VALXY*DPSI2DX*DPSJ2DY + &
+                                                      VALYX*DPSI2DY*DPSJ2DX + VALYY*DPSI2DY*DPSJ2DY,ADD_VALUES,ierr)
+                     CALL MatSetValue(jac,V2I-1,V3J-1,VALXX*DPSI2DX*DPSJ3DX + VALXY*DPSI2DX*DPSJ3DY + &
+                                                      VALYX*DPSI2DY*DPSJ3DX + VALYY*DPSI2DY*DPSJ3DY,ADD_VALUES,ierr)
                   END IF
                   IF (.NOT. IS_DIRICHLET(V3I-1)) THEN
-                     CALL MatSetValues(jac,1,V3I-1,1,V1J-1,VALXX*DPSI3DX*DPSJ1DX + VALXY*DPSI3DX*DPSJ1DY + &
-                                                           VALYX*DPSI3DY*DPSJ1DX + VALYY*DPSI3DY*DPSJ1DY,ADD_VALUES,ierr)
-                     CALL MatSetValues(jac,1,V3I-1,1,V2J-1,VALXX*DPSI3DX*DPSJ2DX + VALXY*DPSI3DX*DPSJ2DY + &
-                                                           VALYX*DPSI3DY*DPSJ2DX + VALYY*DPSI3DY*DPSJ2DY,ADD_VALUES,ierr)
-                     CALL MatSetValues(jac,1,V3I-1,1,V3J-1,VALXX*DPSI3DX*DPSJ3DX + VALXY*DPSI3DX*DPSJ3DY + &
-                                                           VALYX*DPSI3DY*DPSJ3DX + VALYY*DPSI3DY*DPSJ3DY,ADD_VALUES,ierr)
+                     CALL MatSetValue(jac,V3I-1,V1J-1,VALXX*DPSI3DX*DPSJ1DX + VALXY*DPSI3DX*DPSJ1DY + &
+                                                      VALYX*DPSI3DY*DPSJ1DX + VALYY*DPSI3DY*DPSJ1DY,ADD_VALUES,ierr)
+                     CALL MatSetValue(jac,V3I-1,V2J-1,VALXX*DPSI3DX*DPSJ2DX + VALXY*DPSI3DX*DPSJ2DY + &
+                                                      VALYX*DPSI3DY*DPSJ2DX + VALYY*DPSI3DY*DPSJ2DY,ADD_VALUES,ierr)
+                     CALL MatSetValue(jac,V3I-1,V3J-1,VALXX*DPSI3DX*DPSJ3DX + VALXY*DPSI3DX*DPSJ3DY + &
+                                                      VALYX*DPSI3DY*DPSJ3DX + VALYY*DPSI3DY*DPSJ3DY,ADD_VALUES,ierr)
                   END IF
 
                END DO
@@ -2533,7 +2533,7 @@ MODULE fully_implicit
                      IF (.NOT. IS_DIRICHLET(VNI - 1)) THEN
                         DO NJ = 1, 2
                            VNJ = U1D_GRID%CELL_NODES(NJ,J+1)
-                           CALL MatSetValues(jac,1,VNI-1,1,VNJ-1,VAL* &
+                           CALL MatSetValue(jac,VNI-1,VNJ-1,VAL* &
                             (U1D_GRID%BASIS_COEFFS(1,NI,I+1)*U1D_GRID%BASIS_COEFFS(1,NJ,J+1)),ADD_VALUES,ierr)
                         END DO
                      END IF
@@ -2557,7 +2557,7 @@ MODULE fully_implicit
                      IF (.NOT. IS_DIRICHLET(VNI - 1)) THEN
                         DO NJ = 1, 3
                            VNJ = U2D_GRID%CELL_NODES(NJ,J+1)
-                           CALL MatSetValues(jac,1,VNI-1,1,VNJ-1,VAL* &
+                           CALL MatSetValue(jac,VNI-1,VNJ-1,VAL* &
                             (U2D_GRID%BASIS_COEFFS(1,NI,I+1)*U2D_GRID%BASIS_COEFFS(1,NJ,J+1) &
                            + U2D_GRID%BASIS_COEFFS(2,NI,I+1)*U2D_GRID%BASIS_COEFFS(2,NJ,J+1)),ADD_VALUES,ierr)
                         END DO
@@ -2582,7 +2582,7 @@ MODULE fully_implicit
                      IF (.NOT. IS_DIRICHLET(VNI - 1)) THEN
                         DO NJ = 1, 4
                            VNJ = U3D_GRID%CELL_NODES(NJ,J+1)
-                           CALL MatSetValues(jac,1,VNI-1,1,VNJ-1,VAL* &
+                           CALL MatSetValue(jac,VNI-1,VNJ-1,VAL* &
                             (U3D_GRID%BASIS_COEFFS(1,NI,I+1)*U3D_GRID%BASIS_COEFFS(1,NJ,J+1) &
                            + U3D_GRID%BASIS_COEFFS(2,NI,I+1)*U3D_GRID%BASIS_COEFFS(2,NJ,J+1) &
                            + U3D_GRID%BASIS_COEFFS(3,NI,I+1)*U3D_GRID%BASIS_COEFFS(3,NJ,J+1)),ADD_VALUES,ierr)
@@ -3278,7 +3278,7 @@ MODULE fully_implicit
                         VQ = U1D_GRID%CELL_NODES(Q,I)
                         KPQ = LENGTH*(U1D_GRID%BASIS_COEFFS(1,P,I)*U1D_GRID%BASIS_COEFFS(1,Q,I))*EPS_REL
 
-                        CALL MatSetValues(jac,one,VP-1,one,VQ-1,KPQ,ADD_VALUES,ierr)
+                        CALL MatSetValue(jac,VP-1,VQ-1,KPQ,ADD_VALUES,ierr)
 
                         ! FLUID ELECTRONS
                         VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*LENGTH &
@@ -3301,7 +3301,7 @@ MODULE fully_implicit
                            VALUETOADD = VALUETOADD/12.
                         END IF
                         IF (GRID_BC(U1D_GRID%CELL_PG(I))%VOLUME_BC == FLUID) THEN
-                           CALL MatSetValues(jac,one,VP-1,one,VQ-1,VALUETOADD*BOLTZ_SOLID_NODES(VQ),ADD_VALUES,ierr)
+                           CALL MatSetValue(jac,VP-1,VQ-1,VALUETOADD*BOLTZ_SOLID_NODES(VQ),ADD_VALUES,ierr)
                         END IF
                      END DO
                   END IF
@@ -3338,7 +3338,7 @@ MODULE fully_implicit
 
                            KPQ = KPQ*(Y1+Y2+Y3)/3.
                         END IF
-                        CALL MatSetValues(jac,one,VP-1,one,VQ-1,KPQ,ADD_VALUES,ierr)
+                        CALL MatSetValue(jac,VP-1,VQ-1,KPQ,ADD_VALUES,ierr)
 
                         ! FLUID ELECTRONS
                         VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*AREA&
@@ -3383,7 +3383,7 @@ MODULE fully_implicit
                            END IF
                         END IF
                         IF (GRID_BC(U2D_GRID%CELL_PG(I))%VOLUME_BC == FLUID) THEN
-                           CALL MatSetValues(jac,one,VP-1,one,VQ-1,VALUETOADD,ADD_VALUES,ierr)
+                           CALL MatSetValue(jac,VP-1,VQ-1,VALUETOADD,ADD_VALUES,ierr)
                         END IF
                      END DO
                   END IF
@@ -3411,8 +3411,7 @@ MODULE fully_implicit
                         KPQ = VOLUME*(U3D_GRID%BASIS_COEFFS(1,P,I)*U3D_GRID%BASIS_COEFFS(1,Q,I) &
                                     + U3D_GRID%BASIS_COEFFS(2,P,I)*U3D_GRID%BASIS_COEFFS(2,Q,I) &
                                     + U3D_GRID%BASIS_COEFFS(3,P,I)*U3D_GRID%BASIS_COEFFS(3,Q,I))*EPS_REL
-                        ! CALL MatGetValue(Amat, VP-1, VQ-1, mat_value, ierr)
-                        CALL MatSetValues(jac,one,VP-1,one,VQ-1,KPQ,ADD_VALUES,ierr)
+                        CALL MatSetValue(jac,VP-1,VQ-1,KPQ,ADD_VALUES,ierr)
 
                         ! FLUID ELECTRONS
                         VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*VOLUME&
@@ -3435,7 +3434,7 @@ MODULE fully_implicit
                            VALUETOADD = VALUETOADD/20.
                         END IF
                         IF (GRID_BC(U3D_GRID%CELL_PG(I))%VOLUME_BC == FLUID) THEN
-                           CALL MatSetValues(jac,one,VP-1,one,VQ-1,VALUETOADD,ADD_VALUES,ierr)
+                           CALL MatSetValue(jac,VP-1,VQ-1,VALUETOADD,ADD_VALUES,ierr)
                         END IF
                      END DO
                   END IF
@@ -3448,7 +3447,7 @@ MODULE fully_implicit
       CALL MatAssemblyEnd(jac,MAT_FLUSH_ASSEMBLY,ierr)
 
       DO I = Istart, Iend-1
-         IF (IS_DIRICHLET(I)) CALL MatSetValues(jac,one,I,one,I,1.d0,INSERT_VALUES,ierr)
+         IF (IS_DIRICHLET(I)) CALL MatSetValue(jac,I,I,1.d0,INSERT_VALUES,ierr)
       END DO
 
       CALL MatAssemblyBegin(jac,MAT_FINAL_ASSEMBLY,ierr)
@@ -4052,7 +4051,7 @@ MODULE fully_implicit
             val = RHS(I)
          END IF
 
-         CALL VecSetValues(bvec,one,I,val,INSERT_VALUES,ierr)
+         CALL VecSetValue(bvec,I,val,INSERT_VALUES,ierr)
       END DO
 
 

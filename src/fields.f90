@@ -196,14 +196,14 @@ MODULE fields
                ! We need to ADD to a sparse matrix entry.
                IF (V1-1 >= Istart .AND. V1-1 < Iend) THEN
                   IF (.NOT. IS_DIRICHLET(V1-1)) THEN
-                     CALL MatSetValues(Amat,one,V1-1,one,V1-1,K11,ADD_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,V1-1,one,V2-1,K12,ADD_VALUES,ierr)
+                     CALL MatSetValue(Amat,V1-1,V1-1,K11,ADD_VALUES,ierr)
+                     CALL MatSetValue(Amat,V1-1,V2-1,K12,ADD_VALUES,ierr)
                   END IF
                END IF
                IF (V2-1 >= Istart .AND. V2-1 < Iend) THEN
                   IF (.NOT. IS_DIRICHLET(V2-1)) THEN
-                     CALL MatSetValues(Amat,one,V2-1,one,V1-1,K12,ADD_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,V2-1,one,V2-1,K22,ADD_VALUES,ierr)
+                     CALL MatSetValue(Amat,V2-1,V1-1,K12,ADD_VALUES,ierr)
+                     CALL MatSetValue(Amat,V2-1,V2-1,K22,ADD_VALUES,ierr)
                   END IF
                END IF
 
@@ -333,23 +333,23 @@ MODULE fields
                ! We need to ADD to a sparse matrix entry.
                IF (V1-1 >= Istart .AND. V1-1 < Iend) THEN
                   IF (.NOT. IS_DIRICHLET(V1-1)) THEN
-                     CALL MatSetValues(Amat,one,V1-1,one,V1-1,K11,ADD_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,V1-1,one,V2-1,K12,ADD_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,V1-1,one,V3-1,K13,ADD_VALUES,ierr)
+                     CALL MatSetValue(Amat,V1-1,V1-1,K11,ADD_VALUES,ierr)
+                     CALL MatSetValue(Amat,V1-1,V2-1,K12,ADD_VALUES,ierr)
+                     CALL MatSetValue(Amat,V1-1,V3-1,K13,ADD_VALUES,ierr)
                   END IF
                END IF
                IF (V2-1 >= Istart .AND. V2-1 < Iend) THEN
                   IF (.NOT. IS_DIRICHLET(V2-1)) THEN
-                     CALL MatSetValues(Amat,one,V2-1,one,V1-1,K12,ADD_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,V2-1,one,V3-1,K23,ADD_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,V2-1,one,V2-1,K22,ADD_VALUES,ierr)
+                     CALL MatSetValue(Amat,V2-1,V1-1,K12,ADD_VALUES,ierr)
+                     CALL MatSetValue(Amat,V2-1,V3-1,K23,ADD_VALUES,ierr)
+                     CALL MatSetValue(Amat,V2-1,V2-1,K22,ADD_VALUES,ierr)
                   END IF
                END IF
                IF (V3-1 >= Istart .AND. V3-1 < Iend) THEN
                   IF (.NOT. IS_DIRICHLET(V3-1)) THEN
-                     CALL MatSetValues(Amat,one,V3-1,one,V1-1,K13,ADD_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,V3-1,one,V2-1,K23,ADD_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,V3-1,one,V3-1,K33,ADD_VALUES,ierr)
+                     CALL MatSetValue(Amat,V3-1,V1-1,K13,ADD_VALUES,ierr)
+                     CALL MatSetValue(Amat,V3-1,V2-1,K23,ADD_VALUES,ierr)
+                     CALL MatSetValue(Amat,V3-1,V3-1,K33,ADD_VALUES,ierr)
                   END IF
                END IF
 
@@ -514,7 +514,7 @@ MODULE fields
                                        + U3D_GRID%BASIS_COEFFS(2,P,I)*U3D_GRID%BASIS_COEFFS(2,Q,I) &
                                        + U3D_GRID%BASIS_COEFFS(3,P,I)*U3D_GRID%BASIS_COEFFS(3,Q,I)) * EPS_REL
                            IF (PIC_TYPE == EXPLICITLIMITED) KIJ = KIJ * (1. + DXLDRATIO(I))
-                           CALL MatSetValues(Amat,one,VP,one,VQ,KIJ,ADD_VALUES,ierr)
+                           CALL MatSetValue(Amat,VP,VQ,KIJ,ADD_VALUES,ierr)
                         END DO
                      END IF
                   END IF
@@ -577,7 +577,7 @@ MODULE fields
 
          DO I = 1, NNODES
             IF (IS_UNUSED(I-1)) THEN
-               !CALL MatSetValues(Amat,one,I-1,one,I-1,1.d0,ADD_VALUES,ierr)
+               !CALL MatSetValue(Amat,I-1,I-1,1.d0,ADD_VALUES,ierr)
                IS_DIRICHLET(I-1) = .TRUE.
                DIRICHLET(I-1) = 0.d0
             END IF
@@ -615,9 +615,9 @@ MODULE fields
                      BX = -AX-CX
                   END IF
                         
-                  CALL MatSetValues(Amat,one,ICENTER,one,ICENTER,BX,INSERT_VALUES,ierr)
-                  CALL MatSetValues(Amat,one,ICENTER,one,IEAST,CX,INSERT_VALUES,ierr)
-                  CALL MatSetValues(Amat,one,ICENTER,one,IWEST,AX,INSERT_VALUES,ierr)
+                  CALL MatSetValue(Amat,ICENTER,ICENTER,BX,INSERT_VALUES,ierr)
+                  CALL MatSetValue(Amat,ICENTER,IEAST,CX,INSERT_VALUES,ierr)
+                  CALL MatSetValue(Amat,ICENTER,IWEST,AX,INSERT_VALUES,ierr)
 
                END IF
 
@@ -642,7 +642,7 @@ MODULE fields
                   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                   IF ((I == 0) .OR. (I == NPX-1) .OR. (J == 0) .OR. (J == NPY-1)) THEN
                      ! Boundary point
-                     ! CALL MatSetValues(Amat,one,ICENTER,one,ICENTER,1.d0,INSERT_VALUES,ierr)
+                     ! CALL MatSetValue(Amat,ICENTER,ICENTER,1.d0,INSERT_VALUES,ierr)
                      ! On the boundary or on the rest of the PFG.
                      DIRICHLET(ICENTER) = 0.d0
                      IS_DIRICHLET(ICENTER) = .TRUE.
@@ -685,11 +685,11 @@ MODULE fields
                         CY = CY + 1./(R*(H1Y+H2Y))
                      END IF
                      
-                     CALL MatSetValues(Amat,one,ICENTER,one,ICENTER,BX+BY,INSERT_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,ICENTER,one,INORTH,CY,INSERT_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,ICENTER,one,ISOUTH,AY,INSERT_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,ICENTER,one,IEAST,CX,INSERT_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,ICENTER,one,IWEST,AX,INSERT_VALUES,ierr)
+                     CALL MatSetValue(Amat,ICENTER,ICENTER,BX+BY,INSERT_VALUES,ierr)
+                     CALL MatSetValue(Amat,ICENTER,INORTH,CY,INSERT_VALUES,ierr)
+                     CALL MatSetValue(Amat,ICENTER,ISOUTH,AY,INSERT_VALUES,ierr)
+                     CALL MatSetValue(Amat,ICENTER,IEAST,CX,INSERT_VALUES,ierr)
+                     CALL MatSetValue(Amat,ICENTER,IWEST,AX,INSERT_VALUES,ierr)
 
                   END IF
 
@@ -704,7 +704,7 @@ MODULE fields
       CALL MatAssemblyEnd(Amat,MAT_FLUSH_ASSEMBLY,ierr)
 
       DO I = Istart, Iend-1
-         IF (IS_DIRICHLET(I)) CALL MatSetValues(Amat,one,I,one,I,1.d0,INSERT_VALUES,ierr)
+         IF (IS_DIRICHLET(I)) CALL MatSetValue(Amat,I,I,1.d0,INSERT_VALUES,ierr)
       END DO
 
       CALL MatAssemblyBegin(Amat,MAT_FINAL_ASSEMBLY,ierr)
@@ -812,18 +812,18 @@ MODULE fields
                ! We need to ADD to a sparse matrix entry.
                IF (V1-1 >= Istart .AND. V1-1 < Iend) THEN
                   IF (.NOT. IS_DIRICHLET(V1-1)) THEN
-                     CALL MatSetValues(Amat,one,V1-1,one,V1-1,(MASS_MATRIX(I)+1.)*K11,ADD_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,V1-1,one,V2-1,(MASS_MATRIX(I)+1.)*K12,ADD_VALUES,ierr)
+                     CALL MatSetValue(Amat,V1-1,V1-1,(MASS_MATRIX(I)+1.)*K11,ADD_VALUES,ierr)
+                     CALL MatSetValue(Amat,V1-1,V2-1,(MASS_MATRIX(I)+1.)*K12,ADD_VALUES,ierr)
                      val = PHI_FIELD(V1)*K11+PHI_FIELD(V2)*K12
-                     CALL VecSetValues(bvec,one,V1-1,val,ADD_VALUES,ierr)
+                     CALL VecSetValue(bvec,V1-1,val,ADD_VALUES,ierr)
                   END IF
                END IF
                IF (V2-1 >= Istart .AND. V2-1 < Iend) THEN
                   IF (.NOT. IS_DIRICHLET(V2-1)) THEN
-                     CALL MatSetValues(Amat,one,V2-1,one,V1-1,(MASS_MATRIX(I)+1.)*K12,ADD_VALUES,ierr)
-                     CALL MatSetValues(Amat,one,V2-1,one,V2-1,(MASS_MATRIX(I)+1.)*K22,ADD_VALUES,ierr)
+                     CALL MatSetValue(Amat,V2-1,V1-1,(MASS_MATRIX(I)+1.)*K12,ADD_VALUES,ierr)
+                     CALL MatSetValue(Amat,V2-1,V2-1,(MASS_MATRIX(I)+1.)*K22,ADD_VALUES,ierr)
                      val = PHI_FIELD(V1)*K12+PHI_FIELD(V2)*K22
-                     CALL VecSetValues(bvec,one,V2-1,val,ADD_VALUES,ierr)
+                     CALL VecSetValue(bvec,V2-1,val,ADD_VALUES,ierr)
                   END IF
                END IF
 
@@ -907,52 +907,52 @@ MODULE fields
                IF (V1-1 >= Istart .AND. V1-1 < Iend) THEN
                   IF (.NOT. IS_DIRICHLET(V1-1)) THEN
                      IF (AXI) THEN
-                        CALL MatSetValues(Amat,one,V1-1,one,V1-1,K11TILDE + MASS_MATRIX(I)*K11,ADD_VALUES,ierr)
-                        CALL MatSetValues(Amat,one,V1-1,one,V2-1,K12TILDE + MASS_MATRIX(I)*K12,ADD_VALUES,ierr)
-                        CALL MatSetValues(Amat,one,V1-1,one,V3-1,K13TILDE + MASS_MATRIX(I)*K13,ADD_VALUES,ierr)
+                        CALL MatSetValue(Amat,V1-1,V1-1,K11TILDE + MASS_MATRIX(I)*K11,ADD_VALUES,ierr)
+                        CALL MatSetValue(Amat,V1-1,V2-1,K12TILDE + MASS_MATRIX(I)*K12,ADD_VALUES,ierr)
+                        CALL MatSetValue(Amat,V1-1,V3-1,K13TILDE + MASS_MATRIX(I)*K13,ADD_VALUES,ierr)
                         val = PHI_FIELD(V1-1)*K11TILDE+PHI_FIELD(V2-1)*K12TILDE+PHI_FIELD(V3-1)*K13TILDE
-                        CALL VecSetValues(bvec,one,V1-1,val,ADD_VALUES,ierr)
+                        CALL VecSetValue(bvec,V1-1,val,ADD_VALUES,ierr)
                      ELSE
-                        CALL MatSetValues(Amat,one,V1-1,one,V1-1,(MASS_MATRIX(I)+1.)*K11,ADD_VALUES,ierr)
-                        CALL MatSetValues(Amat,one,V1-1,one,V2-1,(MASS_MATRIX(I)+1.)*K12,ADD_VALUES,ierr)
-                        CALL MatSetValues(Amat,one,V1-1,one,V3-1,(MASS_MATRIX(I)+1.)*K13,ADD_VALUES,ierr)
+                        CALL MatSetValue(Amat,V1-1,V1-1,(MASS_MATRIX(I)+1.)*K11,ADD_VALUES,ierr)
+                        CALL MatSetValue(Amat,V1-1,V2-1,(MASS_MATRIX(I)+1.)*K12,ADD_VALUES,ierr)
+                        CALL MatSetValue(Amat,V1-1,V3-1,(MASS_MATRIX(I)+1.)*K13,ADD_VALUES,ierr)
                         val = PHI_FIELD(V1)*K11+PHI_FIELD(V2)*K12+PHI_FIELD(V3)*K13
-                        CALL VecSetValues(bvec,one,V1-1,val,ADD_VALUES,ierr)
+                        CALL VecSetValue(bvec,V1-1,val,ADD_VALUES,ierr)
                      END IF
                   END IF
                END IF
                IF (V2-1 >= Istart .AND. V2-1 < Iend) THEN
                   IF (.NOT. IS_DIRICHLET(V2-1)) THEN
                      IF (AXI) THEN
-                        CALL MatSetValues(Amat,one,V2-1,one,V1-1,K12TILDE + MASS_MATRIX(I)*K12,ADD_VALUES,ierr)
-                        CALL MatSetValues(Amat,one,V2-1,one,V3-1,K23TILDE + MASS_MATRIX(I)*K23,ADD_VALUES,ierr)
-                        CALL MatSetValues(Amat,one,V2-1,one,V2-1,K22TILDE + MASS_MATRIX(I)*K22,ADD_VALUES,ierr)
+                        CALL MatSetValue(Amat,V2-1,V1-1,K12TILDE + MASS_MATRIX(I)*K12,ADD_VALUES,ierr)
+                        CALL MatSetValue(Amat,V2-1,V3-1,K23TILDE + MASS_MATRIX(I)*K23,ADD_VALUES,ierr)
+                        CALL MatSetValue(Amat,V2-1,V2-1,K22TILDE + MASS_MATRIX(I)*K22,ADD_VALUES,ierr)
                         val = PHI_FIELD(V1)*K12TILDE+PHI_FIELD(V2)*K22TILDE+PHI_FIELD(V3)*K23TILDE
-                        CALL VecSetValues(bvec,one,V2-1,val,ADD_VALUES,ierr)
+                        CALL VecSetValue(bvec,V2-1,val,ADD_VALUES,ierr)
                      ELSE
-                        CALL MatSetValues(Amat,one,V2-1,one,V1-1,(MASS_MATRIX(I)+1.)*K12,ADD_VALUES,ierr)
-                        CALL MatSetValues(Amat,one,V2-1,one,V3-1,(MASS_MATRIX(I)+1.)*K23,ADD_VALUES,ierr)
-                        CALL MatSetValues(Amat,one,V2-1,one,V2-1,(MASS_MATRIX(I)+1.)*K22,ADD_VALUES,ierr)
+                        CALL MatSetValue(Amat,V2-1,V1-1,(MASS_MATRIX(I)+1.)*K12,ADD_VALUES,ierr)
+                        CALL MatSetValue(Amat,V2-1,V3-1,(MASS_MATRIX(I)+1.)*K23,ADD_VALUES,ierr)
+                        CALL MatSetValue(Amat,V2-1,V2-1,(MASS_MATRIX(I)+1.)*K22,ADD_VALUES,ierr)
                         val = PHI_FIELD(V1)*K12+PHI_FIELD(V2)*K22+PHI_FIELD(V3)*K23
-                        CALL VecSetValues(bvec,one,V2-1,val,ADD_VALUES,ierr)
+                        CALL VecSetValue(bvec,V2-1,val,ADD_VALUES,ierr)
                      END IF
                   END IF
                END IF
                IF (V3-1 >= Istart .AND. V3-1 < Iend) THEN
                   IF (.NOT. IS_DIRICHLET(V3-1)) THEN
                      IF (AXI) THEN
-                        CALL MatSetValues(Amat,one,V3-1,one,V1-1,K13TILDE + MASS_MATRIX(I)*K13,ADD_VALUES,ierr)
-                        CALL MatSetValues(Amat,one,V3-1,one,V2-1,K23TILDE + MASS_MATRIX(I)*K23,ADD_VALUES,ierr)
-                        CALL MatSetValues(Amat,one,V3-1,one,V3-1,K33TILDE + MASS_MATRIX(I)*K33,ADD_VALUES,ierr)
+                        CALL MatSetValue(Amat,V3-1,V1-1,K13TILDE + MASS_MATRIX(I)*K13,ADD_VALUES,ierr)
+                        CALL MatSetValue(Amat,V3-1,V2-1,K23TILDE + MASS_MATRIX(I)*K23,ADD_VALUES,ierr)
+                        CALL MatSetValue(Amat,V3-1,V3-1,K33TILDE + MASS_MATRIX(I)*K33,ADD_VALUES,ierr)
                         val = PHI_FIELD(V1)*K13TILDE+PHI_FIELD(V2)*K23TILDE+PHI_FIELD(V3)*K33TILDE
-                        CALL VecSetValues(bvec,one,V3-1,val,ADD_VALUES,ierr)
+                        CALL VecSetValue(bvec,V3-1,val,ADD_VALUES,ierr)
                      ELSE
 
-                        CALL MatSetValues(Amat,one,V3-1,one,V1-1,(MASS_MATRIX(I)+1.)*K13,ADD_VALUES,ierr)
-                        CALL MatSetValues(Amat,one,V3-1,one,V2-1,(MASS_MATRIX(I)+1.)*K23,ADD_VALUES,ierr)
-                        CALL MatSetValues(Amat,one,V3-1,one,V3-1,(MASS_MATRIX(I)+1.)*K33,ADD_VALUES,ierr)
+                        CALL MatSetValue(Amat,V3-1,V1-1,(MASS_MATRIX(I)+1.)*K13,ADD_VALUES,ierr)
+                        CALL MatSetValue(Amat,V3-1,V2-1,(MASS_MATRIX(I)+1.)*K23,ADD_VALUES,ierr)
+                        CALL MatSetValue(Amat,V3-1,V3-1,(MASS_MATRIX(I)+1.)*K33,ADD_VALUES,ierr)
                         val = PHI_FIELD(V1)*K13+PHI_FIELD(V2)*K23+PHI_FIELD(V3)*K33
-                        CALL VecSetValues(bvec,one,V3-1,val,ADD_VALUES,ierr)
+                        CALL VecSetValue(bvec,V3-1,val,ADD_VALUES,ierr)
                      END IF
                   END IF
                END IF
@@ -1079,9 +1079,9 @@ MODULE fields
                            KIJ = VOLUME*(U3D_GRID%BASIS_COEFFS(1,P,I)*U3D_GRID%BASIS_COEFFS(1,Q,I) &
                                        + U3D_GRID%BASIS_COEFFS(2,P,I)*U3D_GRID%BASIS_COEFFS(2,Q,I) &
                                        + U3D_GRID%BASIS_COEFFS(3,P,I)*U3D_GRID%BASIS_COEFFS(3,Q,I))
-                           CALL MatSetValues(Amat,one,VP,one,VQ,(MASS_MATRIX(I)+1.)*KIJ,ADD_VALUES,ierr)
+                           CALL MatSetValue(Amat,VP,VQ,(MASS_MATRIX(I)+1.)*KIJ,ADD_VALUES,ierr)
                            val = PHI_FIELD(VQ+1)*KIJ
-                           CALL VecSetValues(bvec,one,VP,val,ADD_VALUES,ierr)
+                           CALL VecSetValue(bvec,VP,val,ADD_VALUES,ierr)
                         END DO
                      END IF
                   END IF
@@ -1093,12 +1093,12 @@ MODULE fields
 
          DO I = Istart, Iend-1
             IF (IS_UNUSED(I)) THEN
-               !CALL MatSetValues(Amat,one,I,one,I,1.d0,ADD_VALUES,ierr)
+               !CALL MatSetValue(Amat,I,I,1.d0,ADD_VALUES,ierr)
                IS_DIRICHLET(I) = .TRUE.
                DIRICHLET(I) = 0.d0
             ELSE IF (.NOT. IS_DIRICHLET(I) ) THEN
                val = 0.5/EPS0*J_FIELD(I)
-               CALL VecSetValues(bvec,one,I,val,ADD_VALUES,ierr)
+               CALL VecSetValue(bvec,I,val,ADD_VALUES,ierr)
             END IF
          END DO
          DEALLOCATE(IS_UNUSED)
@@ -1113,13 +1113,13 @@ MODULE fields
 
       DO I = Istart, Iend-1
          IF (IS_DIRICHLET(I)) THEN
-            CALL MatSetValues(Amat,one,I,one,I,1.d0,INSERT_VALUES,ierr)
+            CALL MatSetValue(Amat,I,I,1.d0,INSERT_VALUES,ierr)
 
             val = DIRICHLET(I)
-            CALL VecSetValues(bvec,one,I,val,ADD_VALUES,ierr)
+            CALL VecSetValue(bvec,I,val,ADD_VALUES,ierr)
          ELSE IF (IS_NEUMANN(I)) THEN
             val = NEUMANN(I)
-            CALL VecSetValues(bvec,one,I,val,ADD_VALUES,ierr)
+            CALL VecSetValue(bvec,I,val,ADD_VALUES,ierr)
          END IF
       END DO
 

@@ -96,7 +96,7 @@ MODULE fields
       CALL MatSetSizes( Amat,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
       CALL MatSetType( Amat, MATMPIAIJ, ierr)
       !CALL MatSetOption(Amat,MAT_SPD,PETSC_TRUE,ierr)
-      CALL MatMPIAIJSetPreallocation(Amat,100,PETSC_NULL_INTEGER,100,PETSC_NULL_INTEGER, ierr)
+      CALL MatMPIAIJSetPreallocation(Amat,100,PETSC_NULL_INTEGER_ARRAY,100,PETSC_NULL_INTEGER_ARRAY, ierr)
       CALL MatSetFromOptions( Amat, ierr)
       CALL MatSetUp( Amat, ierr)
       CALL MatGetOwnershipRange( Amat, Istart, Iend, ierr)
@@ -124,7 +124,8 @@ MODULE fields
                   IF (EDGE_PG .NE. -1) THEN
                      IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC &
                          .OR. GRID_BC(EDGE_PG)%FIELD_BC == RF_VOLTAGE_BC &
-                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC) THEN
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC &
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
                         IF (J==1) THEN
                            DIRICHLET(V1-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
                            IS_DIRICHLET(V1-1) = .TRUE.
@@ -139,14 +140,6 @@ MODULE fields
                            IS_NEUMANN(V1-1) = .TRUE.
                         ELSE IF (J==2) THEN
                            IS_NEUMANN(V2-1) = .TRUE.
-                        END IF
-                     END IF
-                     
-                     IF (GRID_BC(EDGE_PG)%FIELD_BC == DIELECTRIC_BC) THEN
-                        IF (J==1) THEN
-                           IS_DIELECTRIC(V1-1) = .TRUE.
-                        ELSE IF (J==2) THEN
-                           IS_DIELECTRIC(V2-1) = .TRUE.
                         END IF
                      END IF
                   END IF
@@ -751,7 +744,7 @@ MODULE fields
       CALL MatSetSizes( Amat,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
       CALL MatSetType( Amat, MATMPIAIJ, ierr)
       !CALL MatSetOption(Amat,MAT_SPD,PETSC_TRUE,ierr)
-      CALL MatMPIAIJSetPreallocation(Amat,30,PETSC_NULL_INTEGER,30,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
+      CALL MatMPIAIJSetPreallocation(Amat,30,PETSC_NULL_INTEGER_ARRAY,30,PETSC_NULL_INTEGER_ARRAY, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
       CALL MatSetFromOptions( Amat, ierr)
       CALL MatSetUp( Amat, ierr)
       CALL MatGetOwnershipRange( Amat, Istart, Iend, ierr)

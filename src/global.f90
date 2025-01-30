@@ -243,7 +243,6 @@ MODULE global
 
       LOGICAL :: REACT = .FALSE.
       LOGICAL :: DUMP_FLUXES = .FALSE.
-      LOGICAL :: CONDUCTIVE_BC = .FALSE.
 
       ! Washboard model
       REAL(KIND=8) :: A

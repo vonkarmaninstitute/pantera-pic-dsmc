@@ -2286,7 +2286,7 @@ MODULE initialization
          EBAR_FIELD = 0.d0
          ALLOCATE(SURFACE_CHARGE(NNODES))
          SURFACE_CHARGE = 0.d0
-         IF (BOOL_LOAD_RHS) CALL LOAD_RHS_FILE(.TRUE.,.FALSE.)
+         ! IF (BOOL_LOAD_RHS) CALL LOAD_RHS_FILE(.TRUE.,.FALSE.)
       ELSE
          NPX = NX + 1
          IF (DIMS == 2) THEN

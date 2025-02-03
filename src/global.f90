@@ -336,6 +336,15 @@ MODULE global
 
    TYPE(SOLENOID), DIMENSION(:), ALLOCATABLE :: SOLENOIDS
 
+   INTEGER         :: N_MAGNETS = 0
+
+   TYPE MAGNET
+      REAL(KIND=8) :: X1, Y1, X2, Y2
+      REAL(KIND=8) :: STRENGTH
+   END TYPE MAGNET
+
+   TYPE(MAGNET), DIMENSION(:), ALLOCATABLE :: MAGNETS
+
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Numerical settings !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

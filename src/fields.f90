@@ -1401,9 +1401,9 @@ MODULE fields
 
       IMPLICIT NONE
 
-      REAL(KIND=8) :: DTHETA, THETA, WIRER, WIREZ
+      REAL(KIND=8) :: DTHETA, THETA, WIRER, WIREZ, DIST
       REAL(KIND=8), DIMENSION(3) :: POINT, DL, RPRIME
-      INTEGER :: ICOIL, IN, IX, IY, ITHETA, NTHETA
+      INTEGER :: ICOIL, IMAG, IN, IX, IY, ITHETA, NTHETA
 
       NTHETA = 100
 
@@ -1453,7 +1453,38 @@ MODULE fields
             END DO
          END DO
 
-      ELSE IF (N_SOLENOIDS > 0) THEN
+
+         DO IMAG = 1, N_MAGNETS
+            WIRER = 0.5*(MAGNETS(IMAG)%Y1+MAGNETS(IMAG)%Y2)
+            WIREZ = 0.5*(MAGNETS(IMAG)%X1+MAGNETS(IMAG)%X2)
+            DO IN = 1, U2D_GRID%NUM_NODES
+               POINT = U2D_GRID%NODE_COORDS(:, IN)
+               
+               IF (POINT(1) > MAGNETS(IMAG)%X1 .AND. POINT(1) < MAGNETS(IMAG)%X2 &
+                .AND. POINT(2) > MAGNETS(IMAG)%Y1 .AND. POINT(2) < MAGNETS(IMAG)%Y2) CYCLE
+
+               DO ITHETA = 1, NTHETA
+                  
+                  THETA = 2*PI/REAL(NTHETA)*REAL(ITHETA-1)
+                  
+                  DL(1) = 1.d0
+                  DL(2) = 0.d0
+                  DL(3) = 0.d0
+                  
+                  RPRIME(1) = POINT(1) - WIREZ
+                  RPRIME(2) = POINT(2) - WIRER*COS(THETA)
+                  RPRIME(3) = POINT(3) - WIRER*SIN(THETA)
+
+                  DIST = NORM2(RPRIME)
+                  
+                  B_FIELD(:, 1, IN) = B_FIELD(:, 1, IN) + MAGNETS(IMAG)%STRENGTH*MU0/(4*PI)* & 
+                  (3.0*DOT(DL, RPRIME)*RPRIME - DL*DIST**2) / DIST**5
+               
+               END DO
+            END DO
+         END DO
+
+      ELSE IF (N_SOLENOIDS > 0 .OR. N_MAGNETS > 0) THEN
          CALL ERROR_ABORT('Error! B field from solenoids is only implemented for unstructured grids!')
       END IF
 

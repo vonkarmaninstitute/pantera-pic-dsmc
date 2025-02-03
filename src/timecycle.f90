@@ -1108,7 +1108,7 @@ MODULE timecycle
             !EBAR_FIELD = 0.d0
             CALL APPLY_E_FIELD(IP, E)
             B = 0
-            IF (N_SOLENOIDS > 0) CALL APPLY_B_FIELD(IP, B)
+            IF (N_SOLENOIDS > 0 .OR. N_MAGNETS > 0) CALL APPLY_B_FIELD(IP, B)
             B = B + EXTERNAL_B_FIELD
             ! CALL APPLY_RF_EB_FIELD(particles, IP, E, B)
             

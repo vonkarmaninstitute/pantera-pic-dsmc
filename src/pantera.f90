@@ -26,7 +26,6 @@ PROGRAM PANTERA
    USE timecycle
    USE grid_and_partition
    USE fields
-   USE fully_implicit
    USE washboard
 
    IMPLICIT NONE

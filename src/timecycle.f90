@@ -25,7 +25,6 @@ MODULE timecycle
    USE collisions
    USE postprocess
    USE fields
-   USE fully_implicit
    USE washboard
 
    CONTAINS

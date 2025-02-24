@@ -1,4 +1,4 @@
-! Copyright (C) 2024 von Karman Institute for Fluid Dynamics (VKI)
+! Copyright (C) 2025 von Karman Institute for Fluid Dynamics (VKI)
 !
 ! This file is part of PANTERA PIC-DSMC, a software for the simulation
 ! of rarefied gases and plasmas using particles.
@@ -1172,7 +1172,6 @@ MODULE timecycle
                   
                IF (AXI) THEN
                   DO I = 1, 3
-                     !!!! DBDBDBDBDDBBDBDBDBDBDBDBDBDBDBDDB work on this. To be adapted to the three sides of the cell.
                      ! We are axisymmetric
                      CANDIDATE_DTCOLL = DTCOLL
                      ! Compute auxiliary parameters

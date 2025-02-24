@@ -1,4 +1,4 @@
-! Copyright (C) 2024 von Karman Institute for Fluid Dynamics (VKI)
+! Copyright (C) 2025 von Karman Institute for Fluid Dynamics (VKI)
 !
 ! This file is part of PANTERA PIC-DSMC, a software for the simulation
 ! of rarefied gases and plasmas using particles.
@@ -4959,7 +4959,7 @@ MODULE fields
                         **(-KAPPA_FLUID_C+1.) + (1-KAPPA_FRACTION)*POT1
                      END IF
 
-                     SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + CHARGE*(POT1) ! DBDBDBDB Jan please check this.
+                     SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + CHARGE*(POT1) ! To be checked.
 
                   END IF
                END DO
@@ -4989,7 +4989,7 @@ MODULE fields
                      V2 = U2D_GRID%CELL_NODES(VV2,IC)
                      Y1 = U2D_GRID%NODE_COORDS(2, V1)
                      Y2 = U2D_GRID%NODE_COORDS(2, V2)       
-                     AREA = U2D_GRID%CELL_EDGES_LEN(IP,IC)*(ZMAX-ZMIN)  !!! DBDBDBDBDBBD Jan please check this.
+                     AREA = U2D_GRID%CELL_EDGES_LEN(IP,IC)*(ZMAX-ZMIN)  ! To be checked.
 
                      CHARGE = -QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*SQRT(KB*BOLTZ_TE/(2*PI*ME))*AREA*DT
                      POT1 = EXP(QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))

@@ -1,4 +1,4 @@
-! Copyright (C) 2024 von Karman Institute for Fluid Dynamics (VKI)
+! Copyright (C) 2025 von Karman Institute for Fluid Dynamics (VKI)
 !
 ! This file is part of PANTERA PIC-DSMC, a software for the simulation
 ! of rarefied gases and plasmas using particles.

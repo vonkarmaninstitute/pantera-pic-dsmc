@@ -1,6 +1,6 @@
 ! PANTERA PIC-DSMC - A software for the simulation of rarefied gases
 ! and plasmas using particles
-! Copyright (C) 2024 von Karman Institute for Fluid Dynamics (VKI)
+! Copyright (C) 2025 von Karman Institute for Fluid Dynamics (VKI)
 !
 ! This program is free software: you can redistribute it and/or modify
 ! it under the terms of the GNU General Public License as published by

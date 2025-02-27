@@ -95,7 +95,7 @@ MODULE fully_implicit
 
 
       !CALL MatSetOption(Jmat,MAT_SPD,PETSC_TRUE,ierr)
-      !CALL MatMPIAIJSetPreallocation(Jmat,30,PETSC_NULL_INTEGER_ARRAY,30,PETSC_NULL_INTEGER_ARRAY,ierr) ! DBDBDBDBDBDB Large preallocation!
+      !CALL MatMPIAIJSetPreallocation(Jmat,30,PETSC_NULL_INTEGER,30,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
       !CALL MatSetFromOptions(Jmat,ierr)
       !CALL MatSetUp(Jmat,ierr)
 
@@ -528,7 +528,7 @@ MODULE fully_implicit
          prec = precond
       END IF
 
-      CALL MatMPIAIJSetPreallocation(jac,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY,ierr) ! DBDBDBDBDBDB Large preallocation!
+      CALL MatMPIAIJSetPreallocation(jac,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
       CALL MatSetFromOptions(jac,ierr)
       CALL MatSetUp(jac,ierr)
 
@@ -639,14 +639,14 @@ MODULE fully_implicit
          CALL MatCreate(PETSC_COMM_WORLD,Qmat,ierr)
          CALL MatSetSizes(Qmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
          CALL MatSetType(Qmat, MATMPIAIJ, ierr)
-         CALL MatMPIAIJSetPreallocation(Qmat,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY,ierr) ! DBDBDBDBDBDB Large preallocation!
+         CALL MatMPIAIJSetPreallocation(Qmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
          CALL MatSetFromOptions(Qmat,ierr)
          CALL MatSetUp(Qmat,ierr)
 
          CALL MatCreate(PETSC_COMM_WORLD,Rmat,ierr)
          CALL MatSetSizes(Rmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
          CALL MatSetType(Rmat, MATMPIAIJ, ierr)
-         CALL MatMPIAIJSetPreallocation(Rmat,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY,ierr) ! DBDBDBDBDBDB Large preallocation!
+         CALL MatMPIAIJSetPreallocation(Rmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
          CALL MatSetFromOptions(Rmat,ierr)
          CALL MatSetUp(Rmat,ierr)
 
@@ -876,7 +876,7 @@ MODULE fully_implicit
 
 
 
-      CALL MatMPIAIJSetPreallocation(Jmat,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY,ierr) ! DBDBDBDBDBDB Large preallocation!
+      CALL MatMPIAIJSetPreallocation(Jmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
       CALL MatSetFromOptions(Jmat,ierr)
       CALL MatSetUp(Jmat,ierr)
       CALL MatZeroEntries(Jmat,ierr)
@@ -1028,14 +1028,14 @@ MODULE fully_implicit
          CALL MatCreate(PETSC_COMM_WORLD,Qmat,ierr)
          CALL MatSetSizes(Qmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
          CALL MatSetType(Qmat, MATMPIAIJ, ierr)
-         CALL MatMPIAIJSetPreallocation(Qmat,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY,ierr) ! DBDBDBDBDBDB Large preallocation!
+         CALL MatMPIAIJSetPreallocation(Qmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
          CALL MatSetFromOptions(Qmat,ierr)
          CALL MatSetUp(Qmat,ierr)
 
          CALL MatCreate(PETSC_COMM_WORLD,Rmat,ierr)
          CALL MatSetSizes(Rmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
          CALL MatSetType(Rmat, MATMPIAIJ, ierr)
-         CALL MatMPIAIJSetPreallocation(Rmat,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY,ierr) ! DBDBDBDBDBDB Large preallocation!
+         CALL MatMPIAIJSetPreallocation(Rmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
          CALL MatSetFromOptions(Rmat,ierr)
          CALL MatSetUp(Rmat,ierr)
 
@@ -1501,7 +1501,7 @@ MODULE fully_implicit
          CALL MatSetSizes(dxde,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
          CALL MatSetType(dxde, MATMPIAIJ, ierr)
          !CALL MatSetOption(dxde,MAT_SPD,PETSC_TRUE,ierr)
-         CALL MatMPIAIJSetPreallocation(dxde,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
+         CALL MatMPIAIJSetPreallocation(dxde,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
          CALL MatSetFromOptions(dxde, ierr)
          CALL MatSetUp(dxde,ierr)
 
@@ -1509,7 +1509,7 @@ MODULE fully_implicit
          CALL MatSetSizes(dxdexmat,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
          CALL MatSetType(dxdexmat, MATMPIAIJ, ierr)
          !CALL MatSetOption(dxdexmat,MAT_SPD,PETSC_TRUE,ierr)
-         CALL MatMPIAIJSetPreallocation(dxdexmat,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
+         CALL MatMPIAIJSetPreallocation(dxdexmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
          CALL MatSetFromOptions(dxdexmat, ierr)
          CALL MatSetUp(dxdexmat,ierr)
 
@@ -1517,7 +1517,7 @@ MODULE fully_implicit
          CALL MatSetSizes(dxdeymat,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
          CALL MatSetType(dxdeymat, MATMPIAIJ, ierr)
          !CALL MatSetOption(dxdeymat,MAT_SPD,PETSC_TRUE,ierr)
-         CALL MatMPIAIJSetPreallocation(dxdeymat,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
+         CALL MatMPIAIJSetPreallocation(dxdeymat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
          CALL MatSetFromOptions(dxdeymat, ierr)
          CALL MatSetUp(dxdeymat,ierr)
 
@@ -1525,7 +1525,7 @@ MODULE fully_implicit
          CALL MatSetSizes(dydexmat,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
          CALL MatSetType(dydexmat, MATMPIAIJ, ierr)
          !CALL MatSetOption(dydexmat,MAT_SPD,PETSC_TRUE,ierr)
-         CALL MatMPIAIJSetPreallocation(dydexmat,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
+         CALL MatMPIAIJSetPreallocation(dydexmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
          CALL MatSetFromOptions(dydexmat, ierr)
          CALL MatSetUp(dydexmat,ierr)
 
@@ -1533,7 +1533,7 @@ MODULE fully_implicit
          CALL MatSetSizes(dydeymat,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
          CALL MatSetType(dydeymat, MATMPIAIJ, ierr)
          !CALL MatSetOption(dydeymat,MAT_SPD,PETSC_TRUE,ierr)
-         CALL MatMPIAIJSetPreallocation(dydeymat,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
+         CALL MatMPIAIJSetPreallocation(dydeymat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
          CALL MatSetFromOptions(dydeymat, ierr)
          CALL MatSetUp(dydeymat,ierr)
 
@@ -1543,7 +1543,7 @@ MODULE fully_implicit
          CALL MatSetSizes(dxde,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
          CALL MatSetType(dxde, MATMPIAIJ, ierr)
          !CALL MatSetOption(dxde,MAT_SPD,PETSC_TRUE,ierr)
-         CALL MatMPIAIJSetPreallocation(dxde,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
+         CALL MatMPIAIJSetPreallocation(dxde,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
          CALL MatSetFromOptions(dxde, ierr)
          CALL MatSetUp(dxde,ierr)
 
@@ -2842,6 +2842,25 @@ MODULE fully_implicit
 
    END SUBROUTINE APPLY_RF_EB_FIELD
 
+   SUBROUTINE APPLY_B_DIPOLE_FIELD(JP, B)
+
+      IMPLICIT NONE
+
+      REAL(KIND=8), DIMENSION(3), INTENT(OUT) :: B
+      INTEGER, INTENT(IN) :: JP
+      INTEGER :: J, VJ, IC
+      REAL(KIND=8) :: PSIJ
+
+      REAL(KIND=8), DIMENSION(3) :: PART_POSITION, RELATIVE_POSITION
+
+      PART_POSITION = [particles(JP)%X,particles(JP)%Y,particles(JP)%Z]
+      RELATIVE_POSITION = PART_POSITION - DIPOLE_POSITION
+
+      B = MU0/4/PI*(MAGNETIC_MOMENT*RELATIVE_POSITION*DOT(RELATIVE_POSITION, DIPOLE_ORIENTATION)/MAG(RELATIVE_POSITION)**5 &
+         - MAGNETIC_MOMENT*DIPOLE_ORIENTATION/MAG(RELATIVE_POSITION)**3)
+
+   END SUBROUTINE APPLY_B_DIPOLE_FIELD
+
 
    SUBROUTINE WALL_REACT(part_adv, IP, REMOVE)
       
@@ -2912,7 +2931,7 @@ MODULE fully_implicit
       CALL MatSetSizes(Jmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
       CALL MatSetType(Jmat, MATMPIAIJ, ierr)
 
-      ! CALL MatMPIAIJSetPreallocation(Jmat,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY,ierr) ! DBDBDBDBDBDB Large preallocation!
+      ! CALL MatMPIAIJSetPreallocation(Jmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
       ! CALL MatSetFromOptions(Jmat,ierr)
       ! CALL MatSetUp(Jmat,ierr)
 
@@ -3045,7 +3064,7 @@ MODULE fully_implicit
                         ELSE
                            VALUETOADD = VALUETOADD/6.
                         END IF
-                        IF (GRID_BC(U1D_GRID%CELL_PG(I))%VOLUME_BC == FLUID) THEN
+                        IF (GRID_BC(U1D_GRID%CELL_PG(I))%VOLUME_BC .NE. SOLID) THEN
                            RHS_NEW(VP-1) = RHS_NEW(VP-1) + VALUETOADD*BOLTZ_SOLID_NODES(VQ)
                         END IF
                      END DO
@@ -3126,7 +3145,7 @@ MODULE fully_implicit
                               VALUETOADD = VALUETOADD*(2*Y1+2*Y2+Y3)/5.
                            END IF
                         END IF
-                        IF (GRID_BC(U2D_GRID%CELL_PG(I))%VOLUME_BC == FLUID) THEN
+                        IF (GRID_BC(U2D_GRID%CELL_PG(I))%VOLUME_BC .NE. SOLID) THEN
                            RHS_NEW(VP-1) = RHS_NEW(VP-1) + VALUETOADD
                         END IF
                      END DO
@@ -3172,7 +3191,7 @@ MODULE fully_implicit
                      ELSE
                         VALUETOADD = VALUETOADD/20.
                      END IF
-                     IF (GRID_BC(U3D_GRID%CELL_PG(I))%VOLUME_BC == FLUID) THEN
+                     IF (GRID_BC(U3D_GRID%CELL_PG(I))%VOLUME_BC .NE. SOLID) THEN
                         RHS_NEW(VP-1) = RHS_NEW(VP-1) + VALUETOADD
                      END IF
                   END DO
@@ -3230,7 +3249,7 @@ MODULE fully_implicit
 
       CALL ONLYMASTERPRINT1(PROC_ID, 'FormJacobianBoltz Called')
 
-      CALL MatMPIAIJSetPreallocation(jac,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY,ierr) ! DBDBDBDBDBDB Large preallocation!
+      CALL MatMPIAIJSetPreallocation(jac,100,PETSC_NULL_INTEGER,100,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
       CALL MatSetFromOptions(jac,ierr)
       CALL MatSetUp(jac,ierr)
 
@@ -3294,7 +3313,7 @@ MODULE fully_implicit
                         ELSE
                            VALUETOADD = VALUETOADD/6.
                         END IF
-                        IF (GRID_BC(U1D_GRID%CELL_PG(I))%VOLUME_BC == FLUID) THEN
+                        IF (GRID_BC(U1D_GRID%CELL_PG(I))%VOLUME_BC .NE. SOLID) THEN
                            CALL MatSetValue(jac,VP-1,VQ-1,VALUETOADD*BOLTZ_SOLID_NODES(VQ),ADD_VALUES,ierr)
                         END IF
                      END DO
@@ -3377,7 +3396,7 @@ MODULE fully_implicit
                               VALUETOADD = VALUETOADD*(2*Y1+2*Y2+Y3)/5.
                            END IF
                         END IF
-                        IF (GRID_BC(U2D_GRID%CELL_PG(I))%VOLUME_BC == FLUID) THEN
+                        IF (GRID_BC(U2D_GRID%CELL_PG(I))%VOLUME_BC .NE. SOLID) THEN
                            CALL MatSetValue(jac,VP-1,VQ-1,VALUETOADD,ADD_VALUES,ierr)
                         END IF
                      END DO
@@ -3428,7 +3447,7 @@ MODULE fully_implicit
                         ELSE
                            VALUETOADD = VALUETOADD/20.
                         END IF
-                        IF (GRID_BC(U3D_GRID%CELL_PG(I))%VOLUME_BC == FLUID) THEN
+                        IF (GRID_BC(U3D_GRID%CELL_PG(I))%VOLUME_BC .NE. SOLID) THEN
                            CALL MatSetValue(jac,VP-1,VQ-1,VALUETOADD,ADD_VALUES,ierr)
                         END IF
                      END DO
@@ -3473,16 +3492,15 @@ MODULE fully_implicit
       REAL(KIND=8) :: Y1, Y2, AREA, CHARGE, FACTOR
       REAL(KIND=8) :: POT1, POT2, POT3
 
-      REAL(KIND=8), DIMENSION(3) :: U_VECTOR
-      REAL(KIND=8) :: ENERGY_VAL, DOT_PRODUCT
-
       IF (DIMS == 1) THEN
          DO IC = 1, NCELLS
             IF (CELL_PROCS(IC) == PROC_ID) THEN
                DO IP = 1, 2
                   FACE_PG = U1D_GRID%CELL_EDGES_PG(IP, IC)
                   IF (FACE_PG == -1) CYCLE
-                  IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. GRID_BC(U1D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
+                  IF ( (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC & 
+                     .OR. GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC) &
+                     .AND. GRID_BC(U1D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
 
                      V1 = U1D_GRID%CELL_NODES(IP,IC)
                      AREA = 1. ! Flux should be on unit surface
@@ -3611,15 +3629,18 @@ MODULE fully_implicit
                      SURFACE_CHARGE(V3) = SURFACE_CHARGE(V3) + CHARGE*(POT1/12. + POT2/12. + POT3/6.)
 
                      ! Aurora flux test
+
+                     ! REAL(KIND=8), DIMENSION(3) :: U_VECTOR
+                     ! REAL(KIND=8) :: ENERGY_VAL, DOT_PRODUCT
                      ! U_VECTOR(1) = 0.
-                     ! U_VECTOR(2) = 1.
+                     ! U_VECTOR(2) = -1.
                      ! U_VECTOR(3) = 0.
-                     ! CHARGE = QE*1E6/EPS0*AREA*DT
+                     ! CHARGE = QE/EPS0*AREA*DT
                      ! ENERGY_VAL  = 1E4
 
                      ! DOT_PRODUCT = DOT(U_VECTOR,U3D_GRID%FACE_NORMAL(:,IP,IC))
                      ! IF (DOT_PRODUCT .GT. 0) THEN
-                     !    FACTOR = CHARGE*(SQRT(2*ENERGY_VAL*QE/16/MU0)-SQRT(2*ENERGY_VAL*QE/ME))*DOT_PRODUCT
+                     !    FACTOR = CHARGE*(1E6*SQRT(2*ENERGY_VAL*QE/16/MU0)-1E15)*DOT_PRODUCT
 
                      !    SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + FACTOR/3
                      !    SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) + FACTOR/3
@@ -4045,7 +4066,6 @@ MODULE fully_implicit
       ELSE
          CALL MPI_REDUCE(RHS,          RHS, SIZE, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
       END IF
-      ! IF (BOOL_LOAD_RHS) CALL LOAD_RHS_FILE(.FALSE.,.FALSE.)
 
       CALL MPI_BCAST(RHS, SIZE, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 

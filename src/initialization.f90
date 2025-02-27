@@ -131,6 +131,11 @@ MODULE initialization
 
          IF (line=='External_B_field:') READ(in1,*) EXTERNAL_B_FIELD(1), EXTERNAL_B_FIELD(2), EXTERNAL_B_FIELD(3)
 
+         IF (line=='Magnetic_dipole:') THEN
+            BOOL_MAGNETIC_DIPOLE = .TRUE.
+            READ(in1,*) DIPOLE_POSITION(:), DIPOLE_ORIENTATION(:), MAGNETIC_MOMENT
+         END IF
+
          IF (line=='Boundary_dump_fluxes:') THEN
             READ(in1,'(A)') BC_DEFINITION
             CALL DEF_BOUNDARY_DUMP_FLUXES(BC_DEFINITION)
@@ -216,11 +221,6 @@ MODULE initialization
          IF (line=='Dump_traj_start:')         READ(in1,*) DUMP_TRAJECTORY_START
          IF (line=='Dump_traj_number:')        READ(in1,*) DUMP_TRAJECTORY_NUMBER
 
-         IF (line=='Dump_rhs_file:') READ(in1,*) BOOL_DUMP_RHS
-         IF (line=='Load_rhs_file:') THEN 
-            BOOL_LOAD_RHS = .TRUE.
-            READ(in1,*) RHS_FILE_PATH
-         END IF
 
          IF (line=='Inject_from_file:') THEN
             BOOL_INJECT_FROM_FILE = .TRUE.
@@ -2286,7 +2286,6 @@ MODULE initialization
          EBAR_FIELD = 0.d0
          ALLOCATE(SURFACE_CHARGE(NNODES))
          SURFACE_CHARGE = 0.d0
-         ! IF (BOOL_LOAD_RHS) CALL LOAD_RHS_FILE(.TRUE.,.FALSE.)
       ELSE
          NPX = NX + 1
          IF (DIMS == 2) THEN

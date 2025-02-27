@@ -69,11 +69,6 @@ MODULE global
    LOGICAL :: BOOL_KAPPA_FLUID    = .FALSE.
    REAL(KIND=8) :: KAPPA_FLUID_C  = 4.d0
 
-
-   LOGICAL :: BOOL_DUMP_RHS = .FALSE.
-   LOGICAL :: BOOL_LOAD_RHS = .FALSE.
-   CHARACTER*256 :: RHS_FILE_PATH
-
    LOGICAL :: BOOL_CONDUCTIVE_BC = .FALSE.
    REAL(KIND=8) :: WALL_METAL_POTENTIAL
 
@@ -339,6 +334,11 @@ MODULE global
 
    TYPE(SOLENOID), DIMENSION(:), ALLOCATABLE :: SOLENOIDS
 
+   ! Magnetic field from magnetic dipole
+   LOGICAL :: BOOL_MAGNETIC_DIPOLE = .FALSE.
+   REAL(KIND=8), DIMENSION(3) :: DIPOLE_POSITION, DIPOLE_ORIENTATION
+   REAL(KIND=8) :: MAGNETIC_MOMENT
+   
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Numerical settings !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

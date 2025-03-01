@@ -310,9 +310,9 @@ MODULE fields
                CALL COMPUTE_DENSITY_TEMPERATURE(particles)
                IF (.NOT. ALLOCATED(DXLDRATIO)) ALLOCATE(DXLDRATIO(NCELLS))
                DO I = 1, NCELLS
-                  LENGTH = U1D_GRID%SEGMENT_LENGTHS(I)
+                  AREA = U2D_GRID%CELL_AREAS(I)
                   IF (CELL_TE(I) > 0) THEN
-                     DXLDRATIO(I) = LENGTH**2*(CELL_NE(I)*QE**2/(EPS0*KB*CELL_TE(I)))
+                     DXLDRATIO(I) = AREA*(CELL_NE(I)*QE**2/(EPS0*KB*CELL_TE(I)))
                      !WRITE(*,*) 'Cell ', I, ' T= ', CELL_TE(I), ' n= ', CELL_NE(I), ' dx^2/lD^2= ', RATIO
                   ELSE
                      DXLDRATIO(I) = 0

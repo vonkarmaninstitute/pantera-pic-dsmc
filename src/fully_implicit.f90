@@ -3629,7 +3629,6 @@ MODULE fully_implicit
                      SURFACE_CHARGE(V3) = SURFACE_CHARGE(V3) + CHARGE*(POT1/12. + POT2/12. + POT3/6.)
 
                      ! Aurora flux test
-
                      ! REAL(KIND=8), DIMENSION(3) :: U_VECTOR
                      ! REAL(KIND=8) :: ENERGY_VAL, DOT_PRODUCT
                      ! U_VECTOR(1) = 0.

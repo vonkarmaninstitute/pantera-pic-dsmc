@@ -2,6 +2,10 @@
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
+Copyright (C) 2025 von Karman Institute for Fluid Dynamics (VKI)
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
 # PANTERA PIC-DSMC
 
 PANTERA (*PArticle Numerical Tool for non-Equilibrium Reacting Aerodynamics*) is an open-source software for the simulation of nonequilibrium gas and plasma flows based on the Direct Simulation Monte Carlo and Particle-in-Cell methods, written in modern Fortran and parallelized for distributed memory machines.

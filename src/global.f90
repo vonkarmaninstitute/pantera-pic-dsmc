@@ -1,4 +1,4 @@
-! Copyright (C) 2024 von Karman Institute for Fluid Dynamics (VKI)
+! Copyright (C) 2025 von Karman Institute for Fluid Dynamics (VKI)
 !
 ! This file is part of PANTERA PIC-DSMC, a software for the simulation
 ! of rarefied gases and plasmas using particles.
@@ -333,6 +333,15 @@ MODULE global
    END TYPE SOLENOID
 
    TYPE(SOLENOID), DIMENSION(:), ALLOCATABLE :: SOLENOIDS
+
+   INTEGER         :: N_MAGNETS = 0
+
+   TYPE MAGNET
+      REAL(KIND=8) :: X1, Y1, X2, Y2
+      REAL(KIND=8) :: STRENGTH
+   END TYPE MAGNET
+
+   TYPE(MAGNET), DIMENSION(:), ALLOCATABLE :: MAGNETS
 
    ! Magnetic field from magnetic dipole
    LOGICAL :: BOOL_MAGNETIC_DIPOLE = .FALSE.

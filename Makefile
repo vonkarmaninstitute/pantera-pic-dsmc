@@ -15,7 +15,7 @@ BUILDDIR = src/
 #-march=native -Wall -Wextra -fimplicit-none -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow -mcmodel=medium # Aggressive optimization options 
 
 # Objects: list of all objects *.o
-OBJS = $(BUILDDIR)mpi_common.o  $(BUILDDIR)global.o  $(BUILDDIR)screen.o  $(BUILDDIR)tools.o  $(BUILDDIR)initialization.o  $(BUILDDIR)timecycle.o  $(BUILDDIR)grid_and_partition.o  $(BUILDDIR)particle.o  $(BUILDDIR)collisions.o  $(BUILDDIR)postprocess.o  $(BUILDDIR)fields.o  $(BUILDDIR)mt19937.o  $(BUILDDIR)fully_implicit.o  $(BUILDDIR)washboard.o
+OBJS = $(BUILDDIR)mpi_common.o  $(BUILDDIR)global.o  $(BUILDDIR)screen.o  $(BUILDDIR)tools.o  $(BUILDDIR)initialization.o  $(BUILDDIR)timecycle.o  $(BUILDDIR)grid_and_partition.o  $(BUILDDIR)particle.o  $(BUILDDIR)collisions.o  $(BUILDDIR)postprocess.o  $(BUILDDIR)fields.o  $(BUILDDIR)mt19937.o  $(BUILDDIR)washboard.o
 
 #  The following variable must either be a path to petsc.pc or just "petsc" if petsc.pc
 #  has been installed to a system location or can be found in PKG_CONFIG_PATH.
@@ -61,10 +61,7 @@ $(BUILDDIR)pantera.o: $(SRCDIR)pantera.f90  $(OBJS) createbuilddir
 $(BUILDDIR)global.o: $(SRCDIR)global.f90  $(BUILDDIR)mpi_common.o  $(BUILDDIR)particle.o  createbuilddir
 	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)global.f90
 
-$(BUILDDIR)fully_implicit.o: $(SRCDIR)fully_implicit.f90  $(BUILDDIR)global.o  $(BUILDDIR)screen.o  $(BUILDDIR)tools.o  createbuilddir
-	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)fully_implicit.f90
-
-$(BUILDDIR)timecycle.o: $(SRCDIR)timecycle.f90  $(BUILDDIR)global.o  $(BUILDDIR)particle.o  $(BUILDDIR)screen.o  $(BUILDDIR)collisions.o  $(BUILDDIR)postprocess.o  $(BUILDDIR)fields.o  $(BUILDDIR)fully_implicit.o  $(BUILDDIR)washboard.o  createbuilddir
+$(BUILDDIR)timecycle.o: $(SRCDIR)timecycle.f90  $(BUILDDIR)global.o  $(BUILDDIR)particle.o  $(BUILDDIR)screen.o  $(BUILDDIR)collisions.o  $(BUILDDIR)postprocess.o  $(BUILDDIR)fields.o  $(BUILDDIR)washboard.o  createbuilddir
 	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)timecycle.f90
 
 $(BUILDDIR)initialization.o: $(SRCDIR)initialization.f90  $(BUILDDIR)global.o  $(BUILDDIR)tools.o  $(BUILDDIR)grid_and_partition.o  createbuilddir
@@ -91,7 +88,7 @@ $(BUILDDIR)collisions.o: $(SRCDIR)collisions.f90  createbuilddir
 $(BUILDDIR)postprocess.o: $(SRCDIR)postprocess.f90  $(BUILDDIR)fields.o  createbuilddir
 	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)postprocess.f90
 
-$(BUILDDIR)fields.o: $(SRCDIR)fields.f90  $(BUILDDIR)fully_implicit.o  createbuilddir
+$(BUILDDIR)fields.o: $(SRCDIR)fields.f90  $(BUILDDIR)global.o  $(BUILDDIR)screen.o  $(BUILDDIR)tools.o  $(BUILDDIR)grid_and_partition.o  createbuilddir
 	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)fields.f90
 	
 $(BUILDDIR)washboard.o: $(SRCDIR)washboard.f90  $(BUILDDIR)tools.o  $(BUILDDIR)global.o  createbuilddir

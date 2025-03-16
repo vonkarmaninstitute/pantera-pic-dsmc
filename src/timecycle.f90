@@ -1,4 +1,4 @@
-! Copyright (C) 2024 von Karman Institute for Fluid Dynamics (VKI)
+! Copyright (C) 2025 von Karman Institute for Fluid Dynamics (VKI)
 !
 ! This file is part of PANTERA PIC-DSMC, a software for the simulation
 ! of rarefied gases and plasmas using particles.
@@ -25,7 +25,6 @@ MODULE timecycle
    USE collisions
    USE postprocess
    USE fields
-   USE fully_implicit
    USE washboard
 
    CONTAINS
@@ -1112,7 +1111,7 @@ MODULE timecycle
             !EBAR_FIELD = 0.d0
             CALL APPLY_E_FIELD(IP, E)
             B = 0
-            IF (N_SOLENOIDS > 0) CALL APPLY_B_FIELD(IP, B)
+            IF (N_SOLENOIDS > 0 .OR. N_MAGNETS > 0) CALL APPLY_B_FIELD(IP, B)
             IF (BOOL_MAGNETIC_DIPOLE) CALL APPLY_B_DIPOLE_FIELD(IP, B)
             B = B + EXTERNAL_B_FIELD
             ! CALL APPLY_RF_EB_FIELD(particles, IP, E, B)
@@ -1178,7 +1177,6 @@ MODULE timecycle
                   
                IF (AXI) THEN
                   DO I = 1, 3
-                     !!!! DBDBDBDBDDBBDBDBDBDBDBDBDBDBDBDDB work on this. To be adapted to the three sides of the cell.
                      ! We are axisymmetric
                      CANDIDATE_DTCOLL = DTCOLL
                      ! Compute auxiliary parameters

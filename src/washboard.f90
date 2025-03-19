@@ -65,319 +65,319 @@ MODULE washboard
 
       !Minimum angle for which we check for a collision going up. If the reflected angle is lower than this 
       ! we assume the particle does not collide.
-      theta_lim = 35./180.*pi
+      THETA_LIM = 35./180.*PI
 
 
       !Get the grid where the pre-computed values were taken
-      theta_i_v = linspace(pi/2, pi, 45)    ! DBDBDBBDBDBDBDDBBDDB include in the structure
-      theta_r_v = linspace(0.0d0, pi/2, 45)
+      THETA_I_V = LINSPACE(PI/2, PI, 45)    ! DBDBDBBDBDBDBDDBBDDB include in the structure
+      THETA_R_V = LINSPACE(0.0D0, PI/2, 45)
       !Careful!!! 
       !This is the range of validity of the precomputed values for 
       !the maximums of the probability distribution of the local surface normals.
       ! If you take values for A and g out of this range the sampling procedure is not guaranteed to be correct!
-      A_v = linspace(0.5d0, 1.5d0, 40)
-      g_v1 = linspace(0.2d0, 1.0d0, 20)       
-      g_v2 = linspace(1.05d0, 5.0d0, 20)    
+      A_V = LINSPACE(0.5d0, 1.5d0, 40)
+      G_V1 = LINSPACE(0.2d0, 1.0d0, 20)       
+      G_V2 = LINSPACE(1.05d0, 5.0d0, 20)    
   
       ! Concatenate g_v1 and g_v2 into g_v
-      j = 1
-      do i = 1, size(g_v1)
-         g_v(j) = g_v1(i)
-         j = j + 1
-      end do
-      do i = 1, size(g_v2)
-         g_v(j) = g_v2(i)
-         j = j + 1
-      end do
+      J = 1
+      DO I = 1, SIZE(G_V1)
+         G_V(J) = G_V1(I)
+         J = J + 1
+      END DO
+      DO I = 1, SIZE(G_V2)
+         G_V(J) = G_V2(I)
+         J = J + 1
+      END DO
 
 
       VZ_I = -SQRT(VZ_I*VZ_I + 2*W/MASS)
 
-      theta_a = ACOS(VZ_I/SQRT(VZ_I*VZ_I + VX_I*VX_I))
-      phi_a = 0
+      THETA_A = ACOS(VZ_I/SQRT(VZ_I*VZ_I + VX_I*VX_I))
+      PHI_A = 0
 
 
 
-      do while (VZ_I < 0)
-         down = 1
-         ndown = ndown + 1
+      DO WHILE (VZ_I < 0)
+         DOWN = 1
+         NDOWN = NDOWN + 1
          !print*, down, vx_i,vy_i,vz_i
          ! Sample local normal
-         theta_a = ACOS(VZ_I/SQRT(VX_I*VX_I + VY_I*VY_I + VZ_I*VZ_I))
-         phi_a = atan2(vy_i, vx_i)
+         THETA_A = ACOS(VZ_I/SQRT(VX_I*VX_I + VY_I*VY_I + VZ_I*VZ_I))
+         PHI_A = ATAN2(VY_I, VX_I)
          
-         maxx = interpolate(theta_i_v, A_v, g_v, GRID_BC(IPG)%MAX_P_DN, theta_a, A, g)/cos(theta_a)
-         angle_values = accept_reject_surf(maxx, theta_a, phi_a, A, g,down)
+         MAXX = INTERPOLATE(THETA_I_V, A_V, G_V, GRID_BC(IPG)%MAX_P_DN, THETA_A, A, G)/COS(THETA_A)
+         ANGLE_VALUES = ACCEPT_REJECT_SURF(MAXX, THETA_A, PHI_A, A, G,DOWN)
          
-         velocities(:) = CL_Kernel_local(vx_i, vy_i, vz_i, alpha_n, alpha_t, ci,angle_values(1),angle_values(2))
-         vx_i =  velocities(1) 
-         vy_i =  velocities(2)
-         vz_i =  velocities(3)
+         VELOCITIES(:) = CL_KERNEL_LOCAL(VX_I, VY_I, VZ_I, ALPHA_N, ALPHA_T, CI,ANGLE_VALUES(1),ANGLE_VALUES(2))
+         VX_I =  VELOCITIES(1) 
+         VY_I =  VELOCITIES(2)
+         VZ_I =  VELOCITIES(3)
 
-         theta_a = ACOS(VZ_I/SQRT(VX_I*VX_I + VY_I*VY_I + VZ_I*VZ_I))  
-         phi_a = atan2(vy_i, vx_i)
-         if (vz_i > 0) then
-               R = rf()
-               itpl = interpolate(theta_r_v, A_v, g_v, GRID_BC(IPG)%P_COLL_UP, theta_a, A, g)
-               !WRITE(*,*) 'ITPL = ', ITPL
-               if (R <= itpl  ) then 
-                  col = 1
-                  !WRITE(*,*) 'Upwards collision 1!'
-               else 
-                  col = 0
-                  if (vz_i < limit_trap .And. trapping == 1) then 
-                     vz_i = -vz_i
-                  end if 
-               end if 
-               ! col = 0 -> no collision | col = 1 -> collision
-               ! Upwards collision loop
-               do while (col == 1 .AND. theta_a > theta_lim)
-                  ! If col == 1, sample the next collision site.
-                  ! I also use a threshold for where the next collision can't occur.
-                  ! This is when the probability is very low and we would waste significant time finding local normal coordinates.
-                  ! Exactly the same as before but functions are specific for upwards collisions.
-                  down = -1
-                  nup = nup + 1
-                  !print*, down, vx_i,vy_i,vz_i
-                  maxx_neg = interpolate(theta_r_v, A_v, g_v, GRID_BC(IPG)%MAX_P_UP, theta_a, A, g)/cos(theta_a)    
-                  angle_values = accept_reject_surf(maxx_neg, theta_a, phi_a, A, g,down)
-                  velocities(:) = CL_Kernel_local(vx_i, vy_i, vz_i, alpha_n, alpha_t, ci,angle_values(1),angle_values(2))
-                  vx_i =  velocities(1) 
-                  vy_i =  velocities(2)
-                  vz_i =  velocities(3)
-                  theta_a = ACOS(VZ_I/SQRT(VX_I*VX_I + VY_I*VY_I + VZ_I*VZ_I))    
-                  phi_a = atan2(vy_i, vx_i)
-                  ! If after upwards collision the velocity is positive, we check for collision
-                  if (vz_i > 0) then
-                     R = rf()
-                     if (R <= interpolate(theta_r_v, A_v, g_v, GRID_BC(IPG)%P_COLL_UP, theta_a, A, g)  ) then 
-                           col = 1
-                           !WRITE(*,*) 'Upwards collision 2!'
-                     else 
-                           col = 0
-                           if (vz_i < limit_trap .And. trapping == 1) then 
-                              vz_i = -vz_i
-                           end if 
-                     end if 
-                  else
-                     col = 1
-                  end if
-               end do
-         end if 
+         THETA_A = ACOS(VZ_I/SQRT(VX_I*VX_I + VY_I*VY_I + VZ_I*VZ_I))  
+         PHI_A = ATAN2(VY_I, VX_I)
+         IF (VZ_I > 0) THEN
+            R = rf()
+            ITPL = INTERPOLATE(THETA_R_V, A_V, G_V, GRID_BC(IPG)%P_COLL_UP, THETA_A, A, G)
+            !WRITE(*,*) 'ITPL = ', ITPL
+            IF (R <= ITPL  ) THEN 
+               COL = 1
+               !WRITE(*,*) 'Upwards collision 1!'
+            ELSE 
+               COL = 0
+               IF (VZ_I < LIMIT_TRAP .AND. TRAPPING == 1) THEN 
+                  VZ_I = -VZ_I
+               END IF 
+            END IF 
+            ! col = 0 -> no collision | col = 1 -> collision
+            ! Upwards collision loop
+            DO WHILE (COL == 1 .AND. THETA_A > THETA_LIM)
+               ! If col == 1, sample the next collision site.
+               ! I also use a threshold for where the next collision can't occur.
+               ! This is when the probability is very low and we would waste significant time finding local normal coordinates.
+               ! Exactly the same as before but functions are specific for upwards collisions.
+               DOWN = -1
+               NUP = NUP + 1
+               !print*, down, vx_i,vy_i,vz_i
+               MAXX_NEG = INTERPOLATE(THETA_R_V, A_V, G_V, GRID_BC(IPG)%MAX_P_UP, THETA_A, A, G)/COS(THETA_A)    
+               ANGLE_VALUES = ACCEPT_REJECT_SURF(MAXX_NEG, THETA_A, PHI_A, A, G,DOWN)
+               VELOCITIES(:) = CL_KERNEL_LOCAL(VX_I, VY_I, VZ_I, ALPHA_N, ALPHA_T, CI,ANGLE_VALUES(1),ANGLE_VALUES(2))
+               VX_I =  VELOCITIES(1) 
+               VY_I =  VELOCITIES(2)
+               VZ_I =  VELOCITIES(3)
+               THETA_A = ACOS(VZ_I/SQRT(VX_I*VX_I + VY_I*VY_I + VZ_I*VZ_I))    
+               PHI_A = ATAN2(VY_I, VX_I)
+               ! If after upwards collision the velocity is positive, we check for collision
+               IF (VZ_I > 0) THEN
+                  R = RF()
+                  IF (R <= INTERPOLATE(THETA_R_V, A_V, G_V, GRID_BC(IPG)%P_COLL_UP, THETA_A, A, G)  ) THEN 
+                        COL = 1
+                        !WRITE(*,*) 'Upwards collision 2!'
+                  ELSE 
+                        COL = 0
+                        IF (VZ_I < LIMIT_TRAP .AND. TRAPPING == 1) THEN 
+                           VZ_I = -VZ_I
+                        END IF 
+                  END IF 
+               ELSE
+                  COL = 1
+               END IF
+            END DO
+         END IF 
          ! If we reach enough collisions we just assume full accommodation.
-         if (ndown + nup > col_to_trap .AND. trapping == 1) then
-               velocities(:) = CL_Kernel_local(vx_i, vy_i, vz_i, 1.0d0, 1.0d0, ci, 0.0d0, 0.0d0)
+         IF (NDOWN + NUP > COL_TO_TRAP .AND. TRAPPING == 1) THEN
+               VELOCITIES(:) = CL_KERNEL_LOCAL(VX_I, VY_I, VZ_I, 1.0D0, 1.0D0, CI, 0.0D0, 0.0D0)
                !TD = TD + 1
-               exit
-         end if 
+               EXIT
+         END IF 
 
-         if (vz_i > 0) then
-               if (vz_i > limit_trap) then 
-                  velocities(3) = sqrt(vz_i**2-2*W/MASS)
-               else 
-                  if (trapping == 1 .AND. theta_a < theta_lim ) then
-                     vz_i = - vz_i
-                  else if (trapping == 0) then
-                     velocities(:) = CL_Kernel_local(vx_i, vy_i, vz_i, 1.0d0, 1.0d0, ci, 0.0d0, 0.0d0)
+         IF (VZ_I > 0) THEN
+               IF (VZ_I > LIMIT_TRAP) THEN 
+                  VELOCITIES(3) = SQRT(VZ_I**2-2*W/MASS)
+               ELSE 
+                  IF (TRAPPING == 1 .AND. THETA_A < THETA_LIM ) THEN
+                     VZ_I = - VZ_I
+                  ELSE IF (TRAPPING == 0) THEN
+                     VELOCITIES(:) = CL_KERNEL_LOCAL(VX_I, VY_I, VZ_I, 1.0D0, 1.0D0, CI, 0.0D0, 0.0D0)
                      TD = TD + 1
-                     exit 
-                  end if 
-               end if 
-         end if 
-      end do
+                     EXIT 
+                  END IF 
+               END IF 
+         END IF 
+      END DO
 
-      vx_i =  velocities(1) 
-      vy_i =  velocities(2)
-      vz_i =  velocities(3)
+      VX_I =  VELOCITIES(1) 
+      VY_I =  VELOCITIES(2)
+      VZ_I =  VELOCITIES(3)
       !IF (NUP > 0) WRITE(*,*) 'NUP = ', nup
 
    END SUBROUTINE WB_SCATTER
 
 
    !Function analogous to numpy.linspace.
-   function linspace(start, end, num_points) result(result)
-      REAL(KIND=8), intent(in) :: start, end
-      integer, intent(in) :: num_points
-      REAL(KIND=8), dimension(num_points) :: result
+   FUNCTION LINSPACE(START, END, NUM_POINTS) RESULT(RESULT)
+      REAL(KIND=8), INTENT(IN) :: START, END
+      INTEGER, INTENT(IN) :: NUM_POINTS
+      REAL(KIND=8), DIMENSION(NUM_POINTS) :: RESULT
       
-      REAL(KIND=8) :: step
-      integer :: i
+      REAL(KIND=8) :: STEP
+      INTEGER :: I
       
-      step = (end - start) / real(num_points - 1)
+      STEP = (END - START) / REAL(NUM_POINTS - 1)
       
-      do i = 1, num_points
-          result(i) = start + real(i - 1) * step
-      end do
-   end function linspace
+      DO I = 1, NUM_POINTS
+          RESULT(I) = START + REAL(I - 1) * STEP
+      END DO
+   END FUNCTION LINSPACE
 
 
 
-   function surface_prof(theta_i, phi, alpha, beta, A, g,down)
-      REAL(KIND=8) :: surface_prof, theta_i, phi, alpha, beta, A, g
-      REAL(KIND=8) :: sec, arg, Ee2, den, term
-      integer :: down
+   FUNCTION SURFACE_PROF(THETA_I, PHI, ALPHA, BETA, A, G,DOWN)
+      REAL(KIND=8) :: SURFACE_PROF, THETA_I, PHI, ALPHA, BETA, A, G
+      REAL(KIND=8) :: SEC, ARG, EE2, DEN, TERM
+      INTEGER :: DOWN
 
-      sec = 1.0 / cos(alpha)
-      if (g>=1) then
-         arg = 1.0 - 1.0 / g**2
+      SEC = 1.0 / COS(ALPHA)
+      IF (G>=1) THEN
+         ARG = 1.0 - 1.0 / G**2
          ! Declare return type of m_ellipE as real when calling it
-         Ee2 = (m_ellipE(arg))**2
+         EE2 = (M_ELLIPE(ARG))**2
 
-         den = pi**2 * A**2 * cos(alpha)**3
-         term = g**2 * Ee2 / (A**2 * pi)
+         DEN = PI**2 * A**2 * COS(ALPHA)**3
+         TERM = G**2 * EE2 / (A**2 * PI)
          
-         surface_prof = g * Ee2 * sin(alpha) / den * exp(-term * (sec**2 - 1.0) * (cos(beta)**2 + 1.0 / g**2 * sin(beta)**2)) 
-      else if (g<1) then
-         arg = 1.0 -g**2
-         Ee2 = (m_ellipE(arg))**2
+         SURFACE_PROF = G * EE2 * SIN(ALPHA) / DEN * EXP(-TERM * (SEC**2 - 1.0) * (COS(BETA)**2 + 1.0 / G**2 * SIN(BETA)**2)) 
+      ELSE IF (G<1) THEN
+         ARG = 1.0 -G**2
+         EE2 = (M_ELLIPE(ARG))**2
    
-         den = g*pi**2*A**2*cos(alpha)**3
-         term = Ee2/(A**2*pi)
+         DEN = G*PI**2*A**2*COS(ALPHA)**3
+         TERM = EE2/(A**2*PI)
          
    
-         surface_prof = Ee2 * sin(alpha) / den * exp(- term * (sec**2 - 1) * (cos(beta)**2 + 1.0 / g**2 * sin(beta)**2))
-      end if
+         SURFACE_PROF = EE2 * SIN(ALPHA) / DEN * EXP(- TERM * (SEC**2 - 1) * (COS(BETA)**2 + 1.0 / G**2 * SIN(BETA)**2))
+      END IF
 
-      if (down == 1) then
-         surface_prof = surface_prof * max(0.0, (tan(theta_i) * tan(alpha) * cos(phi - beta) + 1.0))
-      else if (down == -1) then
-         surface_prof = surface_prof * max(0.0, -(tan(theta_i) * tan(alpha) * cos(phi - beta) + 1.0))
-      end if
+      IF (DOWN == 1) THEN
+         SURFACE_PROF = SURFACE_PROF * MAX(0.0, (TAN(THETA_I) * TAN(ALPHA) * COS(PHI - BETA) + 1.0))
+      ELSE IF (DOWN == -1) THEN
+         SURFACE_PROF = SURFACE_PROF * MAX(0.0, -(TAN(THETA_I) * TAN(ALPHA) * COS(PHI - BETA) + 1.0))
+      END IF
    
-   end function surface_prof
+   END FUNCTION SURFACE_PROF
 
-  !Approximation of the elliptical integral in the interval 0-1. 
-  function m_ellipE(x)
-      REAL(KIND=8) :: m_ellipE, x
-      m_ellipE = (1.56969 - 2.24458*x + 0.728559*x**2)/(1.0 - 1.18949*x + 0.243123*x**2)
-  end function m_ellipE
+   !Approximation of the elliptical integral in the interval 0-1. 
+   FUNCTION M_ELLIPE(X)
+      REAL(KIND=8) :: M_ELLIPE, X
+      M_ELLIPE = (1.56969 - 2.24458*X + 0.728559*X**2)/(1.0 - 1.18949*X + 0.243123*X**2)
+   END FUNCTION M_ELLIPE
 
-  !Acceptance rejection algorithm 
-  function accept_reject_surf(maxl, theta_i, phi, A, g,down) result(random_values)
-      implicit none
-      REAL(KIND=8), intent(in) :: maxl, theta_i, phi, A, g
-      REAL(KIND=8) :: alpha_test, beta_test, y
-      REAL(KIND=8), dimension(2) :: random_values
-      integer :: down
+   !Acceptance rejection algorithm 
+   FUNCTION ACCEPT_REJECT_SURF(MAXL, THETA_I, PHI, A, G,DOWN) RESULT(RANDOM_VALUES)
+      IMPLICIT NONE
+      REAL(KIND=8), INTENT(IN) :: MAXL, THETA_I, PHI, A, G
+      REAL(KIND=8) :: ALPHA_TEST, BETA_TEST, Y
+      REAL(KIND=8), DIMENSION(2) :: RANDOM_VALUES
+      INTEGER :: DOWN
 
       !call random_seed()    
-      do 
+      DO
          ! Initialize random number generator
 
          ! Generate random alpha_test
-         alpha_test = rf()
-         alpha_test = alpha_test * (pi / 2.0)
+         ALPHA_TEST = rf()
+         ALPHA_TEST = ALPHA_TEST * (PI / 2.0)
 
          ! Generate random beta_teste
-         beta_test = rf()
-         beta_test = (2.0 * pi) * (beta_test - 0.5)
+         BETA_TEST = rf()
+         BETA_TEST = (2.0 * PI) * (BETA_TEST - 0.5)
 
          ! Generate random y
-         y = rf()
-         y = y * maxl
+         Y = rf()
+         Y = Y * MAXL
 
-         if (y < surface_prof(theta_i, phi, alpha_test, beta_test, A, g,down)) then 
-            exit 
-         end if
-      end do 
-      random_values = [alpha_test, beta_test]
-  end function accept_reject_surf
+         IF (Y < SURFACE_PROF(THETA_I, PHI, ALPHA_TEST, BETA_TEST, A, G, DOWN)) THEN 
+            EXIT 
+         END IF
+      END DO 
+      RANDOM_VALUES = [ALPHA_TEST, BETA_TEST]
+   END FUNCTION ACCEPT_REJECT_SURF
 
-      ! Obtain velocity coordinates in a reference frame whose normal is given by the
-    ! polar angle, alpha, and azimuthal angle beta
-    ! Align the velocity so that there is only one tangential velocity component.
-  function Lab_to_local_mine_phi(vx, vy, vz, alpha, beta)
-   REAL(KIND=8), intent(in) :: vx, vy, vz, alpha, beta
-   REAL(KIND=8) :: cos_alpha, sin_alpha, cos_beta, sin_beta
-   REAL(KIND=8) :: ux, uy, uz, psi
-   REAL(KIND=8), dimension(4) :: Lab_to_local_mine_phi
+   ! Obtain velocity coordinates in a reference frame whose normal is given by the
+   ! polar angle, alpha, and azimuthal angle beta
+   ! Align the velocity so that there is only one tangential velocity component.
+   FUNCTION LAB_TO_LOCAL_MINE_PHI(VX, VY, VZ, ALPHA, BETA)
+      REAL(KIND=8), INTENT(IN) :: VX, VY, VZ, ALPHA, BETA
+      REAL(KIND=8) :: COS_ALPHA, SIN_ALPHA, COS_BETA, SIN_BETA
+      REAL(KIND=8) :: UX, UY, UZ, PSI
+      REAL(KIND=8), DIMENSION(4) :: LAB_TO_LOCAL_MINE_PHI
 
-   ux = SQRT(((vx*SIN(beta) - vy*COS(beta))**2 + &
-      (vx*COS(alpha)*COS(beta) + vy*SIN(beta)*COS(alpha) - vz*SIN(alpha))**2) / &
-      (vx*COS(alpha)*COS(beta) + vy*SIN(beta)*COS(alpha) - vz*SIN(alpha))**2) * &
-      (vx*COS(alpha)*COS(beta) + vy*SIN(beta)*COS(alpha) - vz*SIN(alpha))
+      UX = SQRT(((VX*SIN(BETA) - VY*COS(BETA))**2 + &
+         (VX*COS(ALPHA)*COS(BETA) + VY*SIN(BETA)*COS(ALPHA) - VZ*SIN(ALPHA))**2) / &
+         (VX*COS(ALPHA)*COS(BETA) + VY*SIN(BETA)*COS(ALPHA) - VZ*SIN(ALPHA))**2) * &
+         (VX*COS(ALPHA)*COS(BETA) + VY*SIN(BETA)*COS(ALPHA) - VZ*SIN(ALPHA))
 
-   uy = 0
+      UY = 0
 
-   uz = SIN(alpha)*COS(beta)*vx + SIN(alpha)*SIN(beta)*vy + COS(alpha)*vz
+      UZ = SIN(ALPHA)*COS(BETA)*VX + SIN(ALPHA)*SIN(BETA)*VY + COS(ALPHA)*VZ
 
-   psi = ATAN((-vx*SIN(beta) + vy*COS(beta)) / &
-(vx*COS(alpha)*COS(beta) + vy*SIN(beta)*COS(alpha) - vz*SIN(alpha)))
+      PSI = ATAN((-VX*SIN(BETA) + VY*COS(BETA)) / &
+      (VX*COS(ALPHA)*COS(BETA) + VY*SIN(BETA)*COS(ALPHA) - VZ*SIN(ALPHA)))
 
-   Lab_to_local_mine_phi = [ux, uy, uz, psi]
-end function Lab_to_local_mine_phi
+      LAB_TO_LOCAL_MINE_PHI = [UX, UY, UZ, PSI]
+   END FUNCTION LAB_TO_LOCAL_MINE_PHI
 
-! Inverse of the previous expresion.
-function Local_to_lab_mine_phi(ux, uy, uz, alpha, beta, psi)
-   REAL(KIND=8), intent(in) :: ux, uy, uz, alpha, beta, psi
-   REAL(KIND=8) :: vx_r, vy_r, vz_r
-   REAL(KIND=8), dimension(3) :: Local_to_lab_mine_phi
-
-
-   vx_r = ux*(-SIN(beta)*SIN(psi) + COS(alpha)*COS(beta)*COS(psi)) + &
-          uy*(-SIN(beta)*COS(psi) - SIN(psi)*COS(alpha)*COS(beta)) + &
-          uz*SIN(alpha)*COS(beta)
-
-   vy_r = ux*(SIN(beta)*COS(alpha)*COS(psi) + SIN(psi)*COS(beta)) + &
-          uy*(-SIN(beta)*SIN(psi)*COS(alpha) + COS(beta)*COS(psi)) + &
-          uz*SIN(alpha)*SIN(beta)
-   vz_r = -ux*SIN(alpha)*COS(psi) + uy*SIN(alpha)*SIN(psi) + uz*COS(alpha)
-
-   Local_to_lab_mine_phi = [vx_r, vy_r, vz_r]
-end function Local_to_lab_mine_phi
+   ! Inverse of the previous expresion.
+   FUNCTION LOCAL_TO_LAB_MINE_PHI(UX, UY, UZ, ALPHA, BETA, PSI)
+      REAL(KIND=8), INTENT(IN) :: UX, UY, UZ, ALPHA, BETA, PSI
+      REAL(KIND=8) :: VX_R, VY_R, VZ_R
+      REAL(KIND=8), DIMENSION(3) :: LOCAL_TO_LAB_MINE_PHI
 
 
-!Basic CL Kernel. 
-function CL_Kernel(un, ut, alpha_n, alpha_t, ci) !result(kernel_values)
-   REAL(KIND=8), intent(in) :: un, ut, alpha_n, alpha_t, ci
-   REAL(KIND=8) :: AL, AM, AN
-   REAL(KIND=8) :: rand1, rand2, rand3, rand4, rand5, rand6
-   REAL(KIND=8) :: r1, r3, r5, phi2, phi4, phi6, vnm, vtm
-   !REAL(KIND=8), dimension(3) :: kernel_values ! Declare the function result type
-   REAL(KIND=8), dimension(3) :: CL_kernel
+      VX_R = UX*(-SIN(BETA)*SIN(PSI) + COS(ALPHA)*COS(BETA)*COS(PSI)) + &
+            UY*(-SIN(BETA)*COS(PSI) - SIN(PSI)*COS(ALPHA)*COS(BETA)) + &
+            UZ*SIN(ALPHA)*COS(BETA)
 
-   ! Generate random numbers
-   rand1 = rf()
-   rand2 = rf()
-   rand3 = rf()
-   rand4 = rf()
-   rand5 = rf()
-   rand6 = rf()
+      VY_R = UX*(SIN(BETA)*COS(ALPHA)*COS(PSI) + SIN(PSI)*COS(BETA)) + &
+            UY*(-SIN(BETA)*SIN(PSI)*COS(ALPHA) + COS(BETA)*COS(PSI)) + &
+            UZ*SIN(ALPHA)*SIN(BETA)
+      VZ_R = -UX*SIN(ALPHA)*COS(PSI) + UY*SIN(ALPHA)*SIN(PSI) + UZ*COS(ALPHA)
 
-   ! Calculate r1, r3, r5
-   r1 = sqrt(-alpha_n * log(rand1))
-   r3 = sqrt(-alpha_t * log(rand2))
-   r5 = sqrt(-alpha_t * log(rand3))
+      LOCAL_TO_LAB_MINE_PHI = [VX_R, VY_R, VZ_R]
+   END FUNCTION LOCAL_TO_LAB_MINE_PHI
 
-   ! Calculate phi2, phi4, phi6
-   phi2 = 2 * PI * rand4 ! Use the declared constant PI
-   phi4 = 2 * PI * rand5
-   phi6 = 2 * PI * rand6
 
-   ! Calculate vnm, vtm
-   vnm = un / ci * sqrt(1 - alpha_n)
-   vtm = ut / ci * sqrt(1 - alpha_t)
+   !Basic CL Kernel. 
+   FUNCTION CL_KERNEL(UN, UT, ALPHA_N, ALPHA_T, CI) !RESULT(KERNEL_VALUES)
+      REAL(KIND=8), INTENT(IN) :: UN, UT, ALPHA_N, ALPHA_T, CI
+      REAL(KIND=8) :: AL, AM, AN
+      REAL(KIND=8) :: RAND1, RAND2, RAND3, RAND4, RAND5, RAND6
+      REAL(KIND=8) :: R1, R3, R5, PHI2, PHI4, PHI6, VNM, VTM
+      !REAL(KIND=8), dimension(3) :: kernel_values ! Declare the function result type
+      REAL(KIND=8), DIMENSION(3) :: CL_KERNEL
 
-   ! Calculate AM, AL, AN
-   AM = ci * sqrt(r1**2 + vnm**2 + 2*r1*vnm*cos(phi2))
-   AL = ci * (vtm + r3*cos(phi4))
-   AN = ci * (r5*cos(phi6))
+      ! Generate random numbers
+      RAND1 = rf()
+      RAND2 = rf()
+      RAND3 = rf()
+      RAND4 = rf()
+      RAND5 = rf()
+      RAND6 = rf()
 
-   CL_Kernel = [ AL,  AN, AM ]
-end function CL_Kernel
+      ! Calculate r1, r3, r5
+      R1 = SQRT(-ALPHA_N * LOG(RAND1))
+      R3 = SQRT(-ALPHA_T * LOG(RAND2))
+      R5 = SQRT(-ALPHA_T * LOG(RAND3))
 
-! CL Kernel with change to local coordinate frame. A
-! Alpha and Beta are the polar and azimuthal angles of the local normal
-! Velocities are changed back to the macroscopic normal frame and returned
-function CL_Kernel_local(vx, vy, vz, alpha_n, alpha_t, ci, alpha, beta) !result(kernel_values)
-   REAL(KIND=8) :: vx, vy, vz, alpha_n, alpha_t, ci, alpha, beta
-   REAL(KIND=8) :: ui_v(4), ur_v(3), vr_v(3)
-   REAL(KIND=8) :: CL_kernel_local(3)
+      ! Calculate phi2, phi4, phi6
+      PHI2 = 2 * PI * RAND4 ! Use the declared constant PI
+      PHI4 = 2 * PI * RAND5
+      PHI6 = 2 * PI * RAND6
 
-   ui_v = Lab_to_local_mine_phi(vx, vy, vz, alpha, beta)
-   ur_v = CL_Kernel(ui_v(3), ui_v(1), alpha_n, alpha_t, ci)
-   CL_Kernel_local = Local_to_lab_mine_phi(ur_v(1), ur_v(2), ur_v(3), alpha, beta, ui_v(4))
-end function CL_Kernel_local
+      ! Calculate vnm, vtm
+      VNM = UN / CI * SQRT(1 - ALPHA_N)
+      VTM = UT / CI * SQRT(1 - ALPHA_T)
+
+      ! Calculate AM, AL, AN
+      AM = CI * SQRT(R1**2 + VNM**2 + 2*R1*VNM*COS(PHI2))
+      AL = CI * (VTM + R3*COS(PHI4))
+      AN = CI * (R5*COS(PHI6))
+
+      CL_KERNEL = [AL, AN, AM]
+   END FUNCTION CL_KERNEL
+
+   ! CL Kernel with change to local coordinate frame. A
+   ! Alpha and Beta are the polar and azimuthal angles of the local normal
+   ! Velocities are changed back to the macroscopic normal frame and returned
+   FUNCTION CL_KERNEL_LOCAL(VX, VY, VZ, ALPHA_N, ALPHA_T, CI, ALPHA, BETA) !RESULT(KERNEL_VALUES)
+      REAL(KIND=8) :: VX, VY, VZ, ALPHA_N, ALPHA_T, CI, ALPHA, BETA
+      REAL(KIND=8) :: UI_V(4), UR_V(3), VR_V(3)
+      REAL(KIND=8) :: CL_KERNEL_LOCAL(3)
+
+      UI_V = LAB_TO_LOCAL_MINE_PHI(VX, VY, VZ, ALPHA, BETA)
+      UR_V = CL_KERNEL(UI_V(3), UI_V(1), ALPHA_N, ALPHA_T, CI)
+      CL_KERNEL_LOCAL = LOCAL_TO_LAB_MINE_PHI(UR_V(1), UR_V(2), UR_V(3), ALPHA, BETA, UI_V(4))
+   END FUNCTION CL_KERNEL_LOCAL
 
     ! Interpolates data that has a 3D input.
     ! x,y,z are the grid coordinates where the data was computed 
@@ -387,96 +387,96 @@ end function CL_Kernel_local
     ! whose indices and coefficients are computed once before and then just call 
     ! an evaluator when needed. This is not efficient because the interpolation 
     ! coefficients are computed on every call to the function. 
-function interpolate(x, y, z, data, x_interp, y_interp, z_interp) result(result)
-   REAL(KIND=8), intent(in) :: x(:), y(:), z(:), data(:,:,:), x_interp, y_interp, z_interp
-   REAL(KIND=8) :: result
-   REAL(KIND=8) :: f1, f2, f3, f4, f5, f6, f7, f8
-   INTEGER :: i, j, k, i1, j1, k1, i2, j2, k2
-   REAL(KIND=8) :: x_frac, y_frac, z_frac
-   
-   ! Find the indices surrounding the interpolation point
-   call find_indices(x, x_interp, i1, i2, x_frac)
-   call find_indices(y, y_interp, j1, j2, y_frac) ! these are slow af
-   call find_indices(z, z_interp, k1, k2, z_frac)
-   ! i1 = 1
-   ! i2 = 2
-   ! j1 = 1
-   ! j2 = 2
-   ! k1 = 1
-   ! k2 = 2
-   ! x_frac = 1
-   ! y_frac = 1
-   ! z_frac = 1
+   FUNCTION INTERPOLATE(X, Y, Z, DATA, X_INTERP, Y_INTERP, Z_INTERP) RESULT(RESULT)
+      REAL(KIND=8), INTENT(IN) :: X(:), Y(:), Z(:), DATA(:,:,:), X_INTERP, Y_INTERP, Z_INTERP
+      REAL(KIND=8) :: RESULT
+      REAL(KIND=8) :: F1, F2, F3, F4, F5, F6, F7, F8
+      INTEGER :: I, J, K, I1, J1, K1, I2, J2, K2
+      REAL(KIND=8) :: X_FRAC, Y_FRAC, Z_FRAC
+      
+      ! Find the indices surrounding the interpolation point
+      CALL FIND_INDICES(X, X_INTERP, I1, I2, X_FRAC)
+      CALL FIND_INDICES(Y, Y_INTERP, J1, J2, Y_FRAC)
+      CALL FIND_INDICES(Z, Z_INTERP, K1, K2, Z_FRAC)
+      ! i1 = 1
+      ! i2 = 2
+      ! j1 = 1
+      ! j2 = 2
+      ! k1 = 1
+      ! k2 = 2
+      ! x_frac = 1
+      ! y_frac = 1
+      ! z_frac = 1
 
-   ! Perform trilinear interpolation
-   f1 = data(i1,j1,k1) * (1.0 - x_frac) + data(i2,j1,k1) * x_frac
-   f2 = data(i1,j2,k1) * (1.0 - x_frac) + data(i2,j2,k1) * x_frac
-   f3 = data(i1,j1,k2) * (1.0 - x_frac) + data(i2,j1,k2) * x_frac
-   f4 = data(i1,j2,k2) * (1.0 - x_frac) + data(i2,j2,k2) * x_frac
-   
-   f5 = f1 * (1.0 - y_frac) + f2 * y_frac
-   f6 = f3 * (1.0 - y_frac) + f4 * y_frac
-   
-   f7 = f5 * (1.0 - z_frac) + f6 * z_frac
-   
-   result = f7
-   
-end function interpolate
+      ! Perform trilinear interpolation
+      F1 = DATA(I1,J1,K1) * (1.0 - X_FRAC) + DATA(I2,J1,K1) * X_FRAC
+      F2 = DATA(I1,J2,K1) * (1.0 - X_FRAC) + DATA(I2,J2,K1) * X_FRAC
+      F3 = DATA(I1,J1,K2) * (1.0 - X_FRAC) + DATA(I2,J1,K2) * X_FRAC
+      F4 = DATA(I1,J2,K2) * (1.0 - X_FRAC) + DATA(I2,J2,K2) * X_FRAC
+      
+      F5 = F1 * (1.0 - Y_FRAC) + F2 * Y_FRAC
+      F6 = F3 * (1.0 - Y_FRAC) + F4 * Y_FRAC
+      
+      F7 = F5 * (1.0 - Z_FRAC) + F6 * Z_FRAC
+      
+      RESULT = F7
+      
+   END FUNCTION INTERPOLATE
 
-! ! Find indices and fractional part for linear interpolation
-! subroutine find_indices(arr, val, idx1, idx2, frac)
-!    REAL(KIND=8), intent(in) :: arr(:), val
-!    integer, intent(out) :: idx1, idx2
-!    REAL(KIND=8), intent(out) :: frac
-!    integer :: i
+   ! ! Find indices and fractional part for linear interpolation
+   ! subroutine find_indices(arr, val, idx1, idx2, frac)
+   !    REAL(KIND=8), intent(in) :: arr(:), val
+   !    integer, intent(out) :: idx1, idx2
+   !    REAL(KIND=8), intent(out) :: frac
+   !    integer :: i
 
 
 
-   
-!    if (val <= arr(1)) then
-!        idx1 = 1
-!        idx2 = 2
-!        frac = 0.0
-!    else if (val >= arr(size(arr))) then
-!        idx1 = size(arr) - 1
-!        idx2 = size(arr)
-!        frac = 1.0
-!    else
-!       !ARRAY(INDEX) < VALUE < ARRAY(INDEX+1)
-!       idx1 = BINARY_SEARCH(val, arr)
-!       idx2 = idx1+1
-!       frac = (val - arr(i)) / (arr(i+1) - arr(i))
-!    end if
-! end subroutine find_indices
+      
+   !    if (val <= arr(1)) then
+   !        idx1 = 1
+   !        idx2 = 2
+   !        frac = 0.0
+   !    else if (val >= arr(size(arr))) then
+   !        idx1 = size(arr) - 1
+   !        idx2 = size(arr)
+   !        frac = 1.0
+   !    else
+   !       !ARRAY(INDEX) < VALUE < ARRAY(INDEX+1)
+   !       idx1 = BINARY_SEARCH(val, arr)
+   !       idx2 = idx1+1
+   !       frac = (val - arr(i)) / (arr(i+1) - arr(i))
+   !    end if
+   ! end subroutine find_indices
 
-    ! Find indices and fractional part for linear interpolation
-subroutine find_indices(arr, val, idx1, idx2, frac)
-   real(KIND=8), intent(in) :: arr(:), val
-   integer, intent(out) :: idx1, idx2
-   real(KIND=8), intent(out) :: frac
-   integer :: i
-   
-   if (val <= arr(1)) then
-      idx1 = 1
-      idx2 = 2
-      frac = 0.0
-      WRITE(*,*) 'Value outside the interpolation range!'
-   else if (val >= arr(size(arr))) then
-      idx1 = size(arr) - 1
-      idx2 = size(arr)
-      frac = 1.0
-      WRITE(*,*) 'Value outside the interpolation range!'
-   else
-      do i = 1, size(arr) - 1
-         if (val >= arr(i) .and. val <= arr(i+1)) then
-            idx1 = i
-            idx2 = i + 1
-            frac = (val - arr(i)) / (arr(i+1) - arr(i))
-            exit
-         end if
-      end do
-   end if
-end subroutine find_indices
+   ! FIND INDICES AND FRACTIONAL PART FOR LINEAR INTERPOLATION
+   SUBROUTINE FIND_INDICES(ARR, VAL, IDX1, IDX2, FRAC)
+      REAL(KIND=8), INTENT(IN) :: ARR(:), VAL
+      INTEGER, INTENT(OUT) :: IDX1, IDX2
+      REAL(KIND=8), INTENT(OUT) :: FRAC
+      INTEGER :: I
+      
+      IF (VAL <= ARR(1)) THEN
+         IDX1 = 1
+         IDX2 = 2
+         FRAC = 0.0
+         WRITE(*,*) 'Value outside the interpolation range!'
+      ELSE IF (VAL >= ARR(SIZE(ARR))) THEN
+         IDX1 = SIZE(ARR) - 1
+         IDX2 = SIZE(ARR)
+         FRAC = 1.0
+         WRITE(*,*) 'Value outside the interpolation range!'
+      ELSE
+         DO I = 1, SIZE(ARR) - 1
+            IF (VAL >= ARR(I) .AND. VAL <= ARR(I+1)) THEN
+               IDX1 = I
+               IDX2 = I + 1
+               FRAC = (VAL - ARR(I)) / (ARR(I+1) - ARR(I))
+               EXIT
+            END IF
+         END DO
+      END IF
+   END SUBROUTINE FIND_INDICES
 
 
 END MODULE washboard

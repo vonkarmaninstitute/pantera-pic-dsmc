@@ -10,141 +10,156 @@
 !!!! All units are SI [m, kg, s, ...]                                      !!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-!Restart:
-!    200
-
 ! ========= Computational domain and grid ===========
+
 Dimensions:
-    2
+   2 
 Axisymmetric:
-    .FALSE.
-Number_of_cells:
-    1    1    1
+    .TRUE.
 Domain_limits:
-    0.0    1.0    0.0    1.0    -0.5    0.5
+  -0.00001 10.0001e-3    0.0  5.0001e-3      -3.14  3.14
+Number_of_cells:
+    1    1    1 
 Domain_periodicity:
-    .TRUE.   .TRUE.   .TRUE.
+    .FALSE.   .FALSE.   .TRUE.
 Domain_specular:
-    .FALSE.    .FALSE.    .FALSE.    .FALSE.
+    .FALSE.    .FALSE.    .TRUE.    .FALSE.
 Domain_diffuse:
-    .FALSE.    .FALSE.    .FALSE.   .FALSE.
+    .FALSE.    .FALSE.    .FALSE.    .FALSE.
+
+Mesh_file_SU2:
+    '/students/2024/kirk/Pantera/retry/pantera-pic-dsmc/mesh_feb_20.su2'
+
 Boundary_temperature:
     300.0
-    
-PIC_type:
-    none
-Mesh_file_SU2:
-    'testbox1.su2'
+
 Bool_dump_moments:
     .FALSE.
 Bool_dump_fluxes:
     .FALSE.
-    
-All_output_path:
-    './dumps/'
 
-! ========= Numerical parameters ====================
+ !! '/students/2024/kirk/Pantera/pantera-pic-dsmc/dumps/'
+ !! '/nobackup/phd/kirk/dumps/'
+!!Flowfield_output:
+!!'/nobackup/phd/kirk/dumps/'
+
+!!Particle_dump_output:
+!!'/nobackup/phd/kirk/dumps/'
+
+!!Fluxes_dump_output:
+!!'/nobackup/phd/kirk/dumps/'
+
+!!Checks_output:
+!!'/nobackup/phd/kirk/dumps/'
+
+All_output_path:
+ '/students/2024/kirk/Pantera/retry/pantera-pic-dsmc/dumps/'
+
+
+! ========= Numerical parameters =============================
 
 Fnum:  ! Ratio of real-to-simulated particles
-    1.0e18
+    2e7 
 Timestep:
-    1.0e-12
+    2.50e-10
 Number_of_timesteps:
-    10
+    100000
 Stats_every:
     1
-
 RNG_seed:
-    65644
+    1
 Dump_part_every:
     1000000
-
-Binary_output:
-    .TRUE.
 Dump_grid_start:
-    10000000
+    10000
 Dump_grid_avgevery:
-    100
+    500 
 Dump_grid_numavgs:
-    1
-Dump_part_start:
-    10000000
+    20
 
-
+Dump_bound_start:
+   1000000
 Perform_checks:
     .TRUE.
-
-! ========= Multispecies ==============================
+! ========= Species and mixtures ==============================
 
 Species_file:
-    ar.species
-
+    Si_N5.species
 Def_mixture:
-    Neutrals Ar 1.0
+Evapo N2 0.5 Si 0.5
+Def_mixture: 
+    Silicon Si 1.0
+Def_mixture: 
+    Nitrogen N2 1.0
+! ========= Collisions ========================================
 
-Def_mixture:
-    Excited Ar* 1.0
-
-Def_mixture:
-    Ions Ar+ 1.0
-
-Def_mixture:
-    Electrons e 1.0
-
-! ========= Collisions ==============================
-
-Collision_type: ! [MCC / DSMC / BGK / NONE]
-    VAHEDI_MCC
+Collision_type: ! [MCC / DSMC / NONE]
+  DSMC
 
 MCC_background_dens:
-  1.0e24
-MCC_background_Ttra:
-  300.0
-MCC_background_mixture:
-  Neutrals
+  1.0e20
+MCC_cross_section:  
+  1.0e-18
 
-!BGK_sigma:
-!   1.0e-19
+DSMC_collisions_mixture:
+Evapo
 
-! DSMC VHS collisions
+VSS_parameters_binary_file: 
+    Si_N5.hsbin
+!VSS_parameters_file: 
+!     test.vss
 
-!DSMC_collisions_mixture:
-!    Plasma
-!VSS_parameters_file:
-!    ar.vss
 
 Thermal_bath_bool:
     .FALSE.
 Thermal_bath_Ttr:
-    10000.0
+    20000.0
 
 
 ! ========= Reactions ==============================
-Reactions_file:
-    ar.react
-
-!Wall_reactions_file:
-!    ar.wall
-
-
+!Reactions_file:
+Wall_reactions_file: 
+    Silicon_condensation     
 ! ========= Initial particle seed ===================
 
+Initial_particles_bool:
+    .FALSE.
+Initial_particles_dens:
+    1.e6
+Initial_particles_vel:
+    0.  0.  0.
+Initial_particles_Ttra:
+    300.0 300.0 300.0
+Initial_particles_Trot:
+    0.
+Initial_particles_Tvib:
+    0. 
+Initial_particles_mixture:
+    Nitrogen
+Initial_particles_mixture:
+    Silicon
 
-!Initial_particles:
-!    Neutrals   1.0e24    0.0    0.0    0.0    300.0    300.0    300.0    0.    0.
+! ========== Particle Injection ==================
+!   |Name| |Mix| |Dens|  |Vel -> x,y,z| |Temp -> x,y,z| |Vaporization Coefficient|
 
-Initial_particles:
-    Excited   1.0e22    0.0    0.0    0.0    300.0    300.0    300.0    0.    0.
+Boundary_emit: 
+    inlet  Nitrogen  6.3e19 21520.0 0.0 0.0 200.0 200.0 200.0 1.0  
+Boundary_emit: 
+    outlet Nitrogen  6.3e19 21520.0 0.0 0.0 200.0 200.0 200.0 1.0  
+Boundary_emit: 
+    top    Nitrogen  6.3e19 21520.0 0.0 0.0 200.0 200.0 200.0 1.0   
+Boundary_emit: 
+    bottom Nitrogen  6.3e19 21520.0 0.0 0.0 200.0 200.0 200.0 1.0   
 
-Initial_particles:
-    Ions   1.0e23    0.0    0.0    0.0    300.0    300.0    300.0    0.    0.
+!   |Name|     |Class| |Temp|
+Boundary_condition:
+    sphere      diffuse 3896.3
+Boundary_emit:
+    sphere Silicon 1.59e23 0.0 0.0 0.0 3896.3 3896.3 3896.3 0.5  
+!Boundary_condition: 
+!    sphere react  
 
-Initial_particles:
-    Electrons   1.0e23    0.0    0.0    0.0    116050.0    116050.0    116050.0    0.    0.
-
-!Volume_inject:
-!    Neutrals    1.0e36    0.0    0.0    0.0    300.0    300.0    300.0    0.    0.
-    
+     
 ! ========= MPI parallelization =====================
 ! == Style for MPI domain partition can be:
 ! ==
@@ -155,8 +170,13 @@ Initial_particles:
 ! the number of blocks along x and y.
 ! We expect the number of processes to be N_BLOCKS_X*N_BLOCKS_Y
 
-Partition_style:
-    stripsx
-
 Partition_num_blocks:
-    1  96
+    3  3
+
+Partition_style: 
+    stripsy
+
+Load_balance:
+    .FALSE.
+
+

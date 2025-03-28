@@ -223,6 +223,8 @@ MODULE collisions
       ! Compute the maximum expected number of collisions
       IF (GRID_TYPE == RECTILINEAR_UNIFORM .AND. DIMS == 2) THEN
          VOL = CELL_VOL
+      ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 1) THEN
+         VOL = U1D_GRID%CELL_VOLUMES(JC)
       ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
          VOL = U2D_GRID%CELL_VOLUMES(JC)
       ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
@@ -664,14 +666,19 @@ MODULE collisions
 
          IF (GRID_TYPE == RECTILINEAR_UNIFORM .AND. DIMS == 2) THEN
             VOL = CELL_VOL
+         ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 1) THEN
+            VOL = U1D_GRID%CELL_VOLUMES(JC)
          ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
             VOL = U2D_GRID%CELL_VOLUMES(JC)
          ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
             VOL = U3D_GRID%CELL_VOLUMES(JC)
          END IF
 
-         NCOLLMAX = FACTOR*NPC(SP_ID1,JC)*NPC(SP_ID2,JC)*MAX_SIGMA*VRMAX*CFNUM*DT/VOL
-
+         IF (SP_ID1 == SP_ID2) THEN
+            NCOLLMAX = FACTOR*NPC(SP_ID1,JC)*(NPC(SP_ID2,JC)-1)*MAX_SIGMA*VRMAX*CFNUM*DT/VOL
+         ELSE
+            NCOLLMAX = FACTOR*NPC(SP_ID1,JC)*NPC(SP_ID2,JC)*MAX_SIGMA*VRMAX*CFNUM*DT/VOL
+         END IF
          NCOLLMAX_INT = FLOOR(NCOLLMAX+0.5)
 
 
@@ -703,12 +710,6 @@ MODULE collisions
             !    JP1 = IND(IND1)
             !    IND1 = IND1 - IOF(1,JC) + 1
             ! END DO
-
-            !!!!!!!! TODO: check if the IF condition for CYCLE Is correct
-            IND1 = IOF(SP_ID1,JC) - IOF(1,JC) + INT(NPC(SP_ID1,JC)*rf()) + 1
-            JP1 = IND(IND1 + IOF(1,JC) - 1)
-            IF (HAS_REACTED(IND1)) CYCLE
-
             ! Select second collision partner randomly (shouldn't be JP1)
             ! DO
             !    IND2 = IOF(SP_ID2,JC) + INT(NPC(SP_ID2,JC)*rf())
@@ -716,9 +717,22 @@ MODULE collisions
             !    IND2 = IND2 - IOF(SP_ID2,JC) + 1
             !    IF ((.NOT. HAS_REACTED(IND2)) .AND. (JP2 .NE. JP1)) EXIT
             ! END DO
-            IND2 = IOF(SP_ID2,JC) - IOF(1,JC) + INT(NPC(SP_ID2,JC)*rf()) + 1
-            JP2 = IND(IND2 + IOF(1,JC) - 1)
-            IF (HAS_REACTED(IND2)) CYCLE
+
+            !!!!!!!! TODO: check if the IF condition for CYCLE Is correct
+            !!!!!!!! After checkup, it should be like this
+
+            ! Select a particle pair randomly.
+            DO
+               IND1 = IOF(SP_ID1,JC) + INT(NPC(SP_ID1,JC)*rf())
+               JP1 = IND(IND1)
+               IF (.NOT. HAS_REACTED(IND1)) EXIT
+            END DO
+            ! Select second collision partner randomly (shouldn't be JP1)
+            DO
+               IND2 = IOF(SP_ID2,JC) + INT(NPC(SP_ID2,JC)*rf())
+               JP2 = IND(IND2)
+               IF ( (.NOT. HAS_REACTED(IND2)) .AND. (JP2 .NE. JP1)) EXIT
+            END DO
             !!!!!!!!!!!!!!!!!!!!
 
             ! Compute the relative velocity

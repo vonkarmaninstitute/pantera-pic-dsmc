@@ -138,7 +138,7 @@ MODULE initialization
 
          IF (line=='Magnetic_dipole:') THEN
             BOOL_MAGNETIC_DIPOLE = .TRUE.
-            READ(in1,*) DIPOLE_POSITION(:), DIPOLE_ORIENTATION(:), MAGNETIC_MOMENT
+            READ(in1,*) MAGNETIC_MOMENT, DIPOLE_POSITION(:), DIPOLE_ORIENTATION(:)
          END IF
 
          IF (line=='Boundary_dump_fluxes:') THEN
@@ -152,6 +152,7 @@ MODULE initialization
          IF (line=='Bool_radial_weighting:')   READ(in1,*) BOOL_RADIAL_WEIGHTING
          IF (line=='Timestep:')                READ(in1,*) DT
          IF (line=='Number_of_timesteps:')     READ(in1,*) NT
+         IF (line=='Save_initial_timestep:')   READ(in1,*) SAVE_INITIAL_TIMESTEP
          IF (line=='RNG_seed:')                READ(in1,*) RNG_SEED_GLOBAL
          IF (line=='Perform_checks:')          READ(in1,*) PERFORM_CHECKS
          IF (line=='Checks_every:')            READ(in1,*) CHECKS_EVERY

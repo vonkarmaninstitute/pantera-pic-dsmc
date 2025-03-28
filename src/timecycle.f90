@@ -80,11 +80,11 @@ MODULE timecycle
       END IF
       
       ! ########### Dump particles and flowfield after the initial seeding ##########################################
-      IF ((tID .GE. DUMP_PART_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
+      IF ((tID .GE. DUMP_PART_START) .AND. (SAVE_INITIAL_TIMESTEP)) THEN
          IF (MOD(tID-DUMP_PART_START, DUMP_PART_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
       END IF
 
-      IF ((tID .GE. DUMP_GRID_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
+      IF ((tID .GE. DUMP_GRID_START) .AND. (SAVE_INITIAL_TIMESTEP)) THEN
          ! If we are in the grid save timestep, average, then dump the cumulated averages
          IF (MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY*DUMP_GRID_N_AVG) .EQ. 0) THEN
             CALL GRID_AVG
@@ -93,8 +93,8 @@ MODULE timecycle
          END IF
       END IF
 
-      IF ((tID .GE. DUMP_BOUND_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
-         ! If we are in the grid save timestep, average, then dump the cumulated averages
+      IF ((tID .GE. DUMP_BOUND_START) .AND. (SAVE_INITIAL_TIMESTEP)) THEN
+         ! If we are in the boundary save timestep, average, then dump the cumulated averages
          IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_AVG_EVERY*DUMP_BOUND_N_AVG) .EQ. 0) THEN
             CALL BOUNDARY_GATHER
             CALL BOUNDARY_SAVE

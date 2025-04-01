@@ -404,62 +404,6 @@ CONTAINS
 
    END SUBROUTINE DUMP_BOUNDARY_PARTICLES_FILE
 
-   SUBROUTINE DUMP_FORCE_FILE(TIMESTEP)
-
-      IMPLICIT NONE
-
-      REAL(KIND=8) :: CURRENT_TIME
-      INTEGER, INTENT(IN) :: TIMESTEP
-      CHARACTER(LEN=512)  :: filename
-
-      REAL(KIND=8), DIMENSION(3) :: DUMP_FORCE_DIRECT, DUMP_FORCE_INDIRECT
-
-      DUMP_FORCE_DIRECT = FORCE_DIRECT
-      DUMP_FORCE_INDIRECT = FORCE_INDIRECT
-
-      CURRENT_TIME = TIMESTEP*DT
-
-
-      IF (PROC_ID .EQ. 0) THEN
-         CALL MPI_REDUCE(MPI_IN_PLACE,  DUMP_FORCE_DIRECT, 3, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-         CALL MPI_REDUCE(MPI_IN_PLACE,  DUMP_FORCE_INDIRECT, 3, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-         
-         WRITE(filename, "(A,A,I0.5)") TRIM(ADJUSTL(FLOWFIELD_SAVE_PATH)), "dump_force" ! Compose filename
-         OPEN(54331, FILE=filename, POSITION='append', STATUS='unknown', ACTION='write')
-         WRITE(54331,*) CURRENT_TIME, DUMP_FORCE_DIRECT, DUMP_FORCE_INDIRECT
-         CLOSE(54331)
-
-      ELSE
-         CALL MPI_REDUCE(DUMP_FORCE_DIRECT,  DUMP_FORCE_DIRECT, 3, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-         CALL MPI_REDUCE(DUMP_FORCE_INDIRECT,  DUMP_FORCE_INDIRECT, 3, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-      END IF
-
-
-      ! ! Dump particles that hit a boundary to file
-      ! WRITE(filename, "(A,A,I0.5)") TRIM(ADJUSTL(PARTDUMP_SAVE_PATH)), "bound_proc_", PROC_ID ! Compose filename
-
-      ! ! Open file for writing
-      ! IF (BOOL_BINARY_OUTPUT) THEN
-      !    OPEN(28479, FILE=filename, ACCESS='SEQUENTIAL', POSITION='APPEND', FORM='UNFORMATTED', &
-      !    STATUS='UNKNOWN', CONVERT='BIG_ENDIAN', RECL=84)
-      !    DO IP = 1, NP_DUMP_PROC
-      !       WRITE(28479) TIMESTEP, part_dump(IP)%X, part_dump(IP)%Y, part_dump(IP)%Z, &
-      !       part_dump(IP)%VX, part_dump(IP)%VY, part_dump(IP)%VZ, part_dump(IP)%EROT, part_dump(IP)%EVIB, &
-      !       part_dump(IP)%S_ID, part_dump(IP)%IC, part_dump(IP)%DTRIM
-      !    END DO
-      !    CLOSE(28479)
-      ! ELSE
-      !    OPEN(28479, FILE=filename )
-      !    !WRITE(10,*) '% TIMESTEP | X | Y | Z | VX | VY | VZ | EROT | EVIB | S_ID | IPG | DTRIM'
-      !    DO IP = 1, NP_DUMP_PROC
-      !       WRITE(28479,*) TIMESTEP, part_dump(IP)%X, part_dump(IP)%Y, part_dump(IP)%Z, &
-      !       part_dump(IP)%VX, part_dump(IP)%VY, part_dump(IP)%VZ, part_dump(IP)%EROT, part_dump(IP)%EVIB, &
-      !       part_dump(IP)%S_ID, part_dump(IP)%IC, part_dump(IP)%DTRIM
-      !    END DO
-      !    CLOSE(28479)
-      ! END IF
-
-   END SUBROUTINE DUMP_FORCE_FILE
 
 
    SUBROUTINE READ_PARTICLES_FILE(TIMESTEP)
@@ -1299,7 +1243,13 @@ CONTAINS
       
    END FUNCTION DOT
 
+   FUNCTION MAG(A)
+      REAL(KIND=8) :: MAG
+      REAL(KIND=8), DIMENSION(3), INTENT(IN) :: A
 
+      MAG = SQRT(A(1)*A(1) + A(2)*A(2) + A(3)*A(3))
+
+   END FUNCTION MAG
 
    FUNCTION RANDINT(X)
       REAL(KIND=8), INTENT(IN) :: X

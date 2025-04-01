@@ -68,8 +68,9 @@ MODULE global
    ! Option for Kappa distribution
    LOGICAL :: BOOL_KAPPA_FLUID    = .FALSE.
    REAL(KIND=8) :: KAPPA_FLUID_C  = 4.d0
-   REAL(KIND=8) :: KAPPA_FRACTION = 1.d0
 
+   LOGICAL :: BOOL_CONDUCTIVE_BC = .FALSE.
+   REAL(KIND=8) :: WALL_METAL_POTENTIAL
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Geometry, domain and grid !!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -207,7 +208,7 @@ MODULE global
    END ENUM
 
    ENUM, BIND(C)
-      ENUMERATOR DIRICHLET_BC, NEUMANN_BC, DIELECTRIC_BC, ROBIN_BC, PERIODIC_MASTER_BC, PERIODIC_SLAVE_BC, &
+      ENUMERATOR DIRICHLET_BC, NEUMANN_BC, DIELECTRIC_BC, CONDUCTIVE_BC, ROBIN_BC, PERIODIC_MASTER_BC, PERIODIC_SLAVE_BC, &
                  RF_VOLTAGE_BC, DECOUPLED_RF_VOLTAGE_BC, NO_BC
    END ENUM
 
@@ -237,8 +238,6 @@ MODULE global
 
       LOGICAL :: REACT = .FALSE.
       LOGICAL :: DUMP_FLUXES = .FALSE.
-
-      LOGICAL :: DUMP_FORCE_BC = .FALSE.
 
       ! Washboard model
       REAL(KIND=8) :: A
@@ -321,7 +320,6 @@ MODULE global
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: NEUMANN
    LOGICAL, DIMENSION(:), ALLOCATABLE :: IS_NEUMANN
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: SURFACE_CHARGE 
-   LOGICAL, DIMENSION(:), ALLOCATABLE :: IS_DIELECTRIC
 
 
    REAL(KIND=8), DIMENSION(3) :: EXTERNAL_B_FIELD = 0
@@ -345,6 +343,10 @@ MODULE global
 
    TYPE(MAGNET), DIMENSION(:), ALLOCATABLE :: MAGNETS
 
+   ! Magnetic field from magnetic dipole
+   LOGICAL :: BOOL_MAGNETIC_DIPOLE = .FALSE.
+   REAL(KIND=8), DIMENSION(3) :: DIPOLE_POSITION, DIPOLE_ORIENTATION
+   REAL(KIND=8) :: MAGNETIC_MOMENT
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Numerical settings !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -352,6 +354,7 @@ MODULE global
 
    INTEGER      :: NT, tID
    INTEGER      :: RESTART_TIMESTEP = 0
+   LOGICAL      :: SAVE_INITIAL_TIMESTEP = .FALSE.
    REAL(KIND=8) :: FNUM, DT, START_CPU_TIME
    INTEGER(KIND=8) :: RNG_SEED_GLOBAL, RNG_SEED_LOCAL
    INTEGER      :: DUMP_PART_EVERY = 1
@@ -636,6 +639,8 @@ MODULE global
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_PHI_BOUND
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_QRHO_BOUND
 
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_PFLUID_BOUND
+
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_NIN
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_NOUT
 
@@ -656,24 +661,15 @@ MODULE global
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_PHI_BOUND
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_QRHO_BOUND
 
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_PFLUID_BOUND
+
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Timers !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
    REAL(KIND=8), DIMENSION(6) :: TIMERS_START_TIME = 0.d0
    REAL(KIND=8), DIMENSION(6) :: TIMERS_ELAPSED = 0.d0
-
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   !!!!!!!!! Drag force calculation !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-   REAL(KIND=8), DIMENSION(3) :: FORCE_DIRECT = 0.d0
-   REAL(KIND=8), DIMENSION(3) :: FORCE_INDIRECT = 0.d0
-   LOGICAL                    :: BOOL_CALCULATE_FORCE = .FALSE.
-   INTEGER                    :: DUMP_FORCE_START = 0
-
-   TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: part_force_direct
-
+   
 
    REAL(KIND=8) :: FIELD_POWER
    REAL(KIND=8) :: COIL_CURRENT = 1.5d0

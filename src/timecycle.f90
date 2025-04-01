@@ -48,7 +48,7 @@ MODULE timecycle
       NP_TOT = 0
       CALL INIT_POSTPROCESS
       CALL INIT_BOUNDARY_POSTPROCESS
-      CALL BOUNDARY_RESET
+      ! CALL BOUNDARY_RESET
 
       ALLOCATE(FIELD_POWER_AVG(FIELD_POWER_NUMAVG))
       FIELD_POWER_AVG = FIELD_POWER_TARGET
@@ -60,10 +60,7 @@ MODULE timecycle
          CALL SET_WALL_POTENTIAL
 
          CALL DEPOSIT_CHARGE(particles)
-         IF (PIC_TYPE == HYBRID) THEN
-            CALL SETUP_SOLID_NODES            
-            ALLOCATE(PHI_FIELD(NNODES))
-            PHI_FIELD=0
+         IF (PIC_TYPE == HYBRID) THEN           
             CALL SOLVE_BOLTZMANN
          ELSE
             CALL SETUP_POISSON
@@ -83,16 +80,25 @@ MODULE timecycle
       END IF
       
       ! ########### Dump particles and flowfield after the initial seeding ##########################################
-      IF ((tID .GE. DUMP_PART_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
+      IF ((tID .GE. DUMP_PART_START) .AND. (SAVE_INITIAL_TIMESTEP)) THEN
          IF (MOD(tID-DUMP_PART_START, DUMP_PART_EVERY) .EQ. 0) CALL DUMP_PARTICLES_FILE(tID)
       END IF
 
-      IF ((tID .GT. DUMP_GRID_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
+      IF ((tID .GE. DUMP_GRID_START) .AND. (SAVE_INITIAL_TIMESTEP)) THEN
          ! If we are in the grid save timestep, average, then dump the cumulated averages
          IF (MOD(tID-DUMP_GRID_START, DUMP_GRID_AVG_EVERY*DUMP_GRID_N_AVG) .EQ. 0) THEN
             CALL GRID_AVG
             CALL GRID_SAVE
             CALL GRID_RESET
+         END IF
+      END IF
+
+      IF ((tID .GE. DUMP_BOUND_START) .AND. (SAVE_INITIAL_TIMESTEP)) THEN
+         ! If we are in the boundary save timestep, average, then dump the cumulated averages
+         IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_AVG_EVERY*DUMP_BOUND_N_AVG) .EQ. 0) THEN
+            CALL BOUNDARY_GATHER
+            CALL BOUNDARY_SAVE
+            CALL BOUNDARY_RESET
          END IF
       END IF
 
@@ -1059,8 +1065,6 @@ MODULE timecycle
       INTEGER :: NEIGHBORPG
       REAL(KIND=8) :: CHARGE, K, PSIP, RHO_Q
       INTEGER :: VP
-      REAL(KIND=8) :: Y1, Y2, AREA, E_MAG2
-      INTEGER :: V1, V2, VV1, VV2
 
       REAL(KIND=8) :: VXPRE, VYPRE, VZPRE
 
@@ -1108,6 +1112,8 @@ MODULE timecycle
             CALL APPLY_E_FIELD(IP, E)
             B = 0
             IF (N_SOLENOIDS > 0 .OR. N_MAGNETS > 0) CALL APPLY_B_FIELD(IP, B)
+            IF (BOOL_MAGNETIC_DIPOLE) CALL APPLY_B_DIPOLE_FIELD(IP, B)
+
             B = B + EXTERNAL_B_FIELD
             ! CALL APPLY_RF_EB_FIELD(particles, IP, E, B)
             
@@ -1372,32 +1378,16 @@ MODULE timecycle
 
 
                         ! Tally incident particle fluxes to boundary
-                        IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_AVG_EVERY) .EQ. 0) THEN
-                           CALL TALLY_PARTICLE_TO_BOUNDARY(.FALSE., particles(IP), IC, BOUNDCOLL)
+                        IF ((tID .GE. DUMP_GRID_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
+                           IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_AVG_EVERY) .EQ. 0) THEN
+                              CALL TALLY_PARTICLE_TO_BOUNDARY(.FALSE., particles(IP), IC, BOUNDCOLL)
+                           END IF
                         END IF
 
-                        !!!!!!!!! DIRECT COLLISION WITH SOLID BODY !!!!!!!!!
-                        !!!! TODO: IMPLEMENT DRAG FORCES ON INDIVIDUAL PHYSICAL GROUPS
-                        IF (GRID_BC(FACE_PG)%DUMP_FORCE_BC .AND. (tID .GE. DUMP_FORCE_START)) THEN
-                           K = FNUM*SPECIES(particles(IP)%S_ID)%MOLECULAR_MASS                    
-                           IF (DIMS == 1) THEN
-                              FORCE_DIRECT(1) = FORCE_DIRECT(1) + K*particles(IP)%VX/DT
-                           ELSE IF (DIMS == 2) THEN
-                              IF (AXI) THEN
-                                 FORCE_DIRECT(1) = FORCE_DIRECT(1) + K*particles(IP)%VX/DT*2*PI/(ZMAX-ZMIN)
-                              ELSE
-                                 FORCE_DIRECT(1) = FORCE_DIRECT(1) + K*particles(IP)%VX/DT
-                                 FORCE_DIRECT(2) = FORCE_DIRECT(2) + K*particles(IP)%VY/DT
-                              END IF
-                           ELSE IF (DIMS ==3) THEN
-                              FORCE_DIRECT(1) = FORCE_DIRECT(1) + K*particles(IP)%VX/DT
-                              FORCE_DIRECT(2) = FORCE_DIRECT(2) + K*particles(IP)%VY/DT
-                              FORCE_DIRECT(3) = FORCE_DIRECT(3) + K*particles(IP)%VZ/DT
-                           END IF 
-                        END IF
                         
                         CHARGE = SPECIES(particles(IP)%S_ID)%CHARGE
-                        IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. ABS(CHARGE) .GE. 1.d-6) THEN
+                        IF ( (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC &
+                           .OR.GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC) .AND. ABS(CHARGE) .GE. 1.d-6) THEN
                            K = QE/(EPS0*EPS_SCALING**2)
                            IF (DIMS == 1) THEN
                               RHO_Q = K*CHARGE*FNUM/(YMAX-YMIN)/(ZMAX-ZMIN)
@@ -1616,29 +1606,10 @@ MODULE timecycle
 
                         ! Tally reflected particle fluxes to boundary
                         IF (.NOT. REMOVE_PART(IP)) THEN
-                           IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_AVG_EVERY) .EQ. 0) THEN
-                              CALL TALLY_PARTICLE_TO_BOUNDARY(.TRUE., particles(IP), IC, BOUNDCOLL)
-                           END IF
-                        END IF
-
-                        !!!!!!!!! DIRECT COLLISION WITH SOLID BODY !!!!!!!!!
-                        !!!! TODO: IMPLEMENT DRAG FORCES ON INDIVIDUAL PHYSICAL GROUPS
-                        IF (GRID_BC(FACE_PG)%DUMP_FORCE_BC .AND. (tID .GE. DUMP_FORCE_START)) THEN
-                           IF (REMOVE_PART(IP)) CYCLE ! IF PARTICLE IS ABSORBED, CYCLE
-                           K = FNUM*SPECIES(particles(IP)%S_ID)%MOLECULAR_MASS
-                           IF (DIMS == 1) THEN
-                              FORCE_DIRECT(1) = FORCE_DIRECT(1) - K*particles(IP)%VX/DT
-                           ELSE IF (DIMS == 2) THEN
-                              IF (AXI) THEN
-                                 FORCE_DIRECT(1) = FORCE_DIRECT(1) - K*particles(IP)%VX/DT*2*PI/(ZMAX-ZMIN)
-                              ELSE
-                                 FORCE_DIRECT(1) = FORCE_DIRECT(1) - K*particles(IP)%VX/DT
-                                 FORCE_DIRECT(2) = FORCE_DIRECT(2) - K*particles(IP)%VY/DT
+                           IF ((tID .GE. DUMP_GRID_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
+                              IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_AVG_EVERY) .EQ. 0) THEN
+                                 CALL TALLY_PARTICLE_TO_BOUNDARY(.TRUE., particles(IP), IC, BOUNDCOLL)
                               END IF
-                           ELSE IF (DIMS == 3) THEN
-                              FORCE_DIRECT(1) = FORCE_DIRECT(1) - K*particles(IP)%VX/DT
-                              FORCE_DIRECT(2) = FORCE_DIRECT(2) - K*particles(IP)%VY/DT
-                              FORCE_DIRECT(3) = FORCE_DIRECT(3) - K*particles(IP)%VZ/DT
                            END IF
                         END IF
                      ELSE
@@ -2154,116 +2125,8 @@ MODULE timecycle
          END IF
       END IF
 
-      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      !!!!!! INDIRECT FORCE CALC + SAVE DATA !!!!
-      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      IF ((tID .GT. DUMP_FORCE_START) .AND. (tID .NE. RESTART_TIMESTEP) .AND. GRID_TYPE == UNSTRUCTURED) THEN
-         IF (DIMS == 1) THEN
-            DO IC = 1, NCELLS
-               IF (CELL_PROCS(IC) == PROC_ID) THEN
-                  DO IP = 1, 2
-                     ! NEIGHBOR = U2D_GRID%CELL_NEIGHBORS(IP, IC)
-                     ! IF (NEIGHBOR == -1) CYCLE
-                     ! NEIGHBORPG = U2D_GRID%CELL_PG(NEIGHBOR)
-                     FACE_PG =  U1D_GRID%CELL_EDGES_PG(IP, IC)
-                     IF (FACE_PG .NE. -1 .AND. U1D_GRID%CELL_PG(IC) .NE. -1) THEN
-                        IF (GRID_BC(FACE_PG)%DUMP_FORCE_BC .AND. (GRID_BC(U1D_GRID%CELL_PG(IC))%VOLUME_BC == FLUID)) THEN
-                           AREA = (YMAX-YMIN)
-                           E_MAG2 = E_FIELD(1,1,IC)*E_FIELD(1,1,IC)
 
-                           FORCE_INDIRECT(1) = FORCE_INDIRECT(1) + EPS0*AREA*(ZMAX-ZMIN)*&
-                                             ( 0.5*E_MAG2*U1D_GRID%EDGE_NORMAL(1,IP,IC) )
-
-                        END IF
-                     END IF
-                  END DO
-               END IF
-            END DO
-         ELSE IF (DIMS == 2) THEN
-            DO IC = 1, NCELLS
-               IF (CELL_PROCS(IC) == PROC_ID) THEN
-                  DO IP = 1, 3
-                     ! NEIGHBOR = U2D_GRID%CELL_NEIGHBORS(IP, IC)
-                     ! IF (NEIGHBOR == -1) CYCLE
-                     ! NEIGHBORPG = U2D_GRID%CELL_PG(NEIGHBOR)
-                     FACE_PG =  U2D_GRID%CELL_EDGES_PG(IP, IC)
-                     IF (FACE_PG .NE. -1 .AND. U2D_GRID%CELL_PG(IC) .NE. -1) THEN
-                        IF (GRID_BC(FACE_PG)%DUMP_FORCE_BC .AND. (GRID_BC(U2D_GRID%CELL_PG(IC))%VOLUME_BC == FLUID)) THEN
-                           AREA = U2D_GRID%CELL_EDGES_LEN(IP,IC)
-                           E_MAG2 = E_FIELD(1,1,IC)*E_FIELD(1,1,IC) + E_FIELD(2,1,IC)*E_FIELD(2,1,IC)
-                           IF (AXI) THEN
-                              IF (IP == 1) THEN
-                                 VV1 = 1
-                                 VV2 = 2
-                              ELSE IF (IP == 2) THEN
-                                 VV1 = 2
-                                 VV2 = 3
-                              ELSE IF (IP == 3) THEN
-                                 VV1 = 3
-                                 VV2 = 1
-                              END IF
-                              V1 = U2D_GRID%CELL_NODES(VV1,IC)
-                              V2 = U2D_GRID%CELL_NODES(VV2,IC)
-                              Y1 = U2D_GRID%NODE_COORDS(2, V1)
-                              Y2 = U2D_GRID%NODE_COORDS(2, V2)
-                              FORCE_INDIRECT(1) = FORCE_INDIRECT(1) + EPS0*AREA*2*PI*(Y1+Y2)*&
-                                                ( (E_FIELD(1,1,IC)*E_FIELD(1,1,IC) - 0.5*E_MAG2)*U2D_GRID%EDGE_NORMAL(1,IP,IC) &
-                                                +  E_FIELD(1,1,IC)*E_FIELD(2,1,IC)*U2D_GRID%EDGE_NORMAL(2,IP,IC))
-                           ELSE
-                              FORCE_INDIRECT(1) = FORCE_INDIRECT(1) + EPS0*AREA*(ZMAX-ZMIN)*&
-                                                ( (E_FIELD(1,1,IC)*E_FIELD(1,1,IC) - 0.5*E_MAG2)*U2D_GRID%EDGE_NORMAL(1,IP,IC) &
-                                                +  E_FIELD(1,1,IC)*E_FIELD(2,1,IC)*U2D_GRID%EDGE_NORMAL(2,IP,IC))
-                              
-                              FORCE_INDIRECT(2) = FORCE_INDIRECT(2) + EPS0*AREA*(ZMAX-ZMIN)*&
-                                                (  E_FIELD(2,1,IC)*E_FIELD(1,1,IC)*U2D_GRID%EDGE_NORMAL(1,IP,IC) &
-                                                + (E_FIELD(2,1,IC)*E_FIELD(2,1,IC) - 0.5*E_MAG2)*U2D_GRID%EDGE_NORMAL(2,IP,IC))
-                           END IF
-                        END IF
-                     END IF
-                  END DO
-               END IF
-            END DO
-         ELSE IF (DIMS == 3) THEN
-            DO IC = 1, NCELLS
-               IF (CELL_PROCS(IC) == PROC_ID) THEN
-                  DO IP = 1, 4
-                     ! NEIGHBOR = U3D_GRID%CELL_NEIGHBORS(IP, IC)
-                     ! IF (NEIGHBOR == -1) CYCLE
-                     ! NEIGHBORPG = U3D_GRID%CELL_PG(NEIGHBOR)
-                     FACE_PG =  U3D_GRID%CELL_FACES_PG(IP, IC)
-                     IF (FACE_PG .NE. -1 .AND. U3D_GRID%CELL_PG(IC) .NE. -1) THEN
-                        IF (GRID_BC(FACE_PG)%DUMP_FORCE_BC .AND. (GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC == FLUID)) THEN
-
-                           AREA = U3D_GRID%FACE_AREA(IP,IC)
-                           E_MAG2 = E_FIELD(1,1,IC)*E_FIELD(1,1,IC) + E_FIELD(2,1,IC)*E_FIELD(2,1,IC)&
-                           + E_FIELD(3,1,IC)*E_FIELD(3,1,IC)
-
-                           FORCE_INDIRECT(1) = FORCE_INDIRECT(1) + EPS0*AREA*&
-                           ( (E_FIELD(1,1,IC)*E_FIELD(1,1,IC) - 0.5*E_MAG2)*U3D_GRID%FACE_NORMAL(1,IP,IC) &
-                           +  E_FIELD(1,1,IC)*E_FIELD(2,1,IC)*U3D_GRID%FACE_NORMAL(2,IP,IC) &
-                           +  E_FIELD(1,1,IC)*E_FIELD(3,1,IC)*U3D_GRID%FACE_NORMAL(3,IP,IC))
-                           FORCE_INDIRECT(2) = FORCE_INDIRECT(2) + EPS0*AREA*&
-                           (  E_FIELD(2,1,IC)*E_FIELD(1,1,IC)*U3D_GRID%FACE_NORMAL(1,IP,IC) &
-                           + (E_FIELD(2,1,IC)*E_FIELD(2,1,IC) - 0.5*E_MAG2)*U3D_GRID%FACE_NORMAL(2,IP,IC) &
-                           +  E_FIELD(2,1,IC)*E_FIELD(3,1,IC)*U3D_GRID%FACE_NORMAL(3,IP,IC))
-                           FORCE_INDIRECT(3) = FORCE_INDIRECT(3) + EPS0*AREA*&
-                           (  E_FIELD(3,1,IC)*E_FIELD(1,1,IC)*U3D_GRID%FACE_NORMAL(1,IP,IC) &
-                           +  E_FIELD(3,1,IC)*E_FIELD(2,1,IC)*U3D_GRID%FACE_NORMAL(2,IP,IC) &
-                           + (E_FIELD(3,1,IC)*E_FIELD(3,1,IC) - 0.5*E_MAG2)*U3D_GRID%FACE_NORMAL(3,IP,IC))
-                        END IF
-                     END IF
-                  END DO
-               END IF
-            END DO
-         END IF
-
-         ! CALL DUMP_FORCE_FILE(tID)
-         FORCE_DIRECT = 0.d0
-         FORCE_INDIRECT = 0.d0
-      END IF
-
-
-      ! CLOSE(66341)
+      !CLOSE(66341)
 
    END SUBROUTINE ADVECT
 

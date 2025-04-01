@@ -4278,7 +4278,6 @@ MODULE fields
 
    END SUBROUTINE APPLY_B_DIPOLE_FIELD
 
-
    SUBROUTINE WALL_REACT(part_adv, IP, REMOVE)
       
       IMPLICIT NONE
@@ -4348,6 +4347,7 @@ MODULE fields
       CALL MatSetSizes(Jmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
       CALL MatSetType(Jmat, MATMPIAIJ, ierr)
 
+
       ! CALL MatMPIAIJSetPreallocation(Jmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
       ! CALL MatSetFromOptions(Jmat,ierr)
       ! CALL MatSetUp(Jmat,ierr)
@@ -4372,6 +4372,7 @@ MODULE fields
       ELSE IF (.NOT. ALLOCATED(PHI_FIELD)) THEN
          ALLOCATE(PHI_FIELD(NNODES))
          PHI_FIELD=0
+
       ELSE
          CALL VecGetOwnershipRange(solvec,Istart,Iend,ierr)
          CALL VecGetArrayF90(solvec,solvec_l,ierr)
@@ -4384,6 +4385,7 @@ MODULE fields
       CALL SNESSolve(snes,PETSC_NULL_VEC,solvec,ierr)
       CALL SNESGetConvergedReason(snes,snesreason,ierr)
       IF (PROC_ID == 0) WRITE(*,*) 'SNESConvergedReason = ', snesreason
+
       
       CALL VecScatterCreateToAll(solvec,ctx,solvec_seq,ierr)
       CALL VecScatterBegin(ctx,solvec,solvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
@@ -4529,9 +4531,11 @@ MODULE fields
                         ! VALUETOADD = QE*BOLTZ_N0/(EPS0)*AREA*SINH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
                         !!!!!
                         IF (BOOL_KAPPA_FLUID) THEN 
+
                            VALUETOADD = QE*BOLTZ_N0/EPS0*AREA&
                            *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.))&
                            )**(-KAPPA_FLUID_C+1./2.)
+
                         END IF
 
                         IF (P == Q) THEN
@@ -4562,8 +4566,10 @@ MODULE fields
                               VALUETOADD = VALUETOADD*(2*Y1+2*Y2+Y3)/5.
                            END IF
                         END IF
+
                         IF (GRID_BC(U2D_GRID%CELL_PG(I))%VOLUME_BC .NE. SOLID) THEN
                            RHS_NEW(VP-1) = RHS_NEW(VP-1) + VALUETOADD
+
                         END IF
                      END DO
                   END IF
@@ -4591,16 +4597,19 @@ MODULE fields
                      RHS_NEW(VP-1) = RHS_NEW(VP-1) + KPQ*PHI_FIELD_NEW(VQ)
 
                      ! FLUID ELECTRONS
+
                      VALUETOADD = QE*BOLTZ_N0/EPS0*VOLUME*EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
 
                      !!!!! TEST FOR SINH(U) POTENTIAL
                      ! VALUETOADD = QE*BOLTZ_N0/(EPS0)*VOLUME*SINH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
                      !!!!!
 
-                     IF (BOOL_KAPPA_FLUID) THEN 
+                     IF (BOOL_KAPPA_FLUID) THEN
+
                         VALUETOADD = QE*BOLTZ_N0/EPS0*VOLUME&
                         *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
                         **(-KAPPA_FLUID_C+1./2.)
+
                      END IF
 
                      IF (P == Q) THEN
@@ -4608,8 +4617,10 @@ MODULE fields
                      ELSE
                         VALUETOADD = VALUETOADD/20.
                      END IF
+
                      IF (GRID_BC(U3D_GRID%CELL_PG(I))%VOLUME_BC .NE. SOLID) THEN
                         RHS_NEW(VP-1) = RHS_NEW(VP-1) + VALUETOADD
+
                      END IF
                   END DO
                END IF
@@ -4634,6 +4645,7 @@ MODULE fields
 
 
       CALL VecNorm(f,NORM_2,norm,ierr)
+
       IF (PROC_ID == 0) THEN
          WRITE(*,*) '||RESIDUAL|| = ', norm
          WRITE(filename, "(A,A)") TRIM(ADJUSTL(RESIDUAL_SAVE_PATH)), "residuals" ! Compose filename   
@@ -4660,9 +4672,11 @@ MODULE fields
       INTEGER I, IC
 
       REAL(KIND=8) :: Y1, Y2, Y3, EPS_REL
+
       INTEGER :: V1, V2, V3
       INTEGER :: P, Q, VP, VQ
       REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD, FACTOR, AREA, LENGTH
+
 
       CALL ONLYMASTERPRINT1(PROC_ID, 'FormJacobianBoltz Called')
 
@@ -4673,6 +4687,7 @@ MODULE fields
       ! CALL MatZeroEntries(jac,ierr)
       ! CALL MatAssemblyBegin(jac,MAT_FLUSH_ASSEMBLY,ierr)
       ! CALL MatAssemblyEnd(jac,MAT_FLUSH_ASSEMBLY,ierr)
+
 
       CALL VecScatterCreateToAll(x,ctx,x_seq,ierr)
       CALL VecScatterBegin(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
@@ -4720,6 +4735,7 @@ MODULE fields
                         ! *COSH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
                         !!!!!
                         IF (BOOL_KAPPA_FLUID) THEN 
+
                            VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*LENGTH&
                            *(2.*KAPPA_FLUID_C-1.)/(2.*KAPPA_FLUID_C-3.)&
                            *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))**(-KAPPA_FLUID_C-1./2.)
@@ -4731,6 +4747,7 @@ MODULE fields
                            VALUETOADD = VALUETOADD/6.
                         END IF
                         IF (GRID_BC(U1D_GRID%CELL_PG(I))%VOLUME_BC .NE. SOLID) THEN
+
                            CALL MatSetValue(jac,VP-1,VQ-1,VALUETOADD*BOLTZ_SOLID_NODES(VQ),ADD_VALUES,ierr)
                         END IF
                      END DO
@@ -4791,7 +4808,7 @@ MODULE fields
                               V1 = U2D_GRID%CELL_NODES(1 + MOD(P-1,3),I) ! Start from P node in cell I
                               V2 = U2D_GRID%CELL_NODES(1 + MOD(P,3),I)
                               V3 = U2D_GRID%CELL_NODES(1 + MOD(P+1,3),I)
-                              
+
                               Y1 = U2D_GRID%NODE_COORDS(2, V1)
                               Y2 = U2D_GRID%NODE_COORDS(2, V2)
                               Y3 = U2D_GRID%NODE_COORDS(2, V3)
@@ -4938,15 +4955,18 @@ MODULE fields
                END DO
             END IF
          END DO
+
       ELSE IF (DIMS == 2) THEN
          DO IC = 1, NCELLS
             IF (CELL_PROCS(IC) == PROC_ID) THEN
                DO IP = 1, 3
                   FACE_PG = U2D_GRID%CELL_EDGES_PG(IP, IC)
                   IF (FACE_PG == -1) CYCLE
+
                   IF ( (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC &
                      .OR.GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC) &
                      .AND. GRID_BC(U2D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
+
                      ! VV1 = 1 + MOD(IP-1,3)
                      ! VV2 = 1 + MOD(IP,3)
                      IF (IP == 1) THEN
@@ -4965,6 +4985,7 @@ MODULE fields
                      Y2 = U2D_GRID%NODE_COORDS(2, V2)
                      AREA = U2D_GRID%CELL_EDGES_LEN(IP,IC)
 
+
                      CHARGE = -QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*SQRT(KB*BOLTZ_TE/(2*PI*ME))*AREA*DT
                      POT1 = EXP(QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
                      POT2 = EXP(QE*(PHI_FIELD(V2)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
@@ -4972,12 +4993,12 @@ MODULE fields
                      IF (BOOL_KAPPA_FLUID) THEN
                         FACTOR = SQRT(KAPPA_FLUID_C-3./2.)*GAMMA(KAPPA_FLUID_C+1.)&
                         /GAMMA(KAPPA_FLUID_C-1./2.)/(KAPPA_FLUID_C*(KAPPA_FLUID_C-1.))
+
                         POT1 = FACTOR*(1-QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
                         **(-KAPPA_FLUID_C+1.)
                         POT2 = FACTOR*(1-QE*(PHI_FIELD(V2)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
                         **(-KAPPA_FLUID_C+1.)
                      END IF
-                     
 
                      IF (AXI) THEN
                         SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) +&
@@ -4999,6 +5020,7 @@ MODULE fields
                DO IP=1, 4
                   FACE_PG = U3D_GRID%CELL_FACES_PG(IP, IC)
                   IF (FACE_PG == -1) CYCLE
+
                   IF ((GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC &
                      .OR. GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC) &
                       .AND. GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
@@ -5120,6 +5142,7 @@ MODULE fields
             END IF
          END DO
       END IF
+
    END SUBROUTINE GET_BOLTZMANN_DENSITY
 
 
@@ -5524,6 +5547,7 @@ MODULE fields
 
       IF (GRID_TYPE == UNSTRUCTURED) THEN
 
+
          IF (BOOL_CONDUCTIVE_BC) THEN
             IF (.NOT. ALLOCATED(PHI_FIELD)) THEN
                ALLOCATE(PHI_FIELD(NNODES))
@@ -5533,6 +5557,7 @@ MODULE fields
          END IF
 
          IF (DIMS == 1) THEN
+
             DO I = 1, NCELLS
                V1 = U1D_GRID%CELL_NODES(1,I)
                V2 = U1D_GRID%CELL_NODES(2,I)
@@ -5543,6 +5568,7 @@ MODULE fields
                          .OR. GRID_BC(EDGE_PG)%FIELD_BC == RF_VOLTAGE_BC &
                          .OR. GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC &
                          .OR. GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
+
                         
                         IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC) THEN
                            POTENTIAL = GRID_BC(EDGE_PG)%WALL_POTENTIAL
@@ -5581,6 +5607,7 @@ MODULE fields
                          .OR. GRID_BC(EDGE_PG)%FIELD_BC == RF_VOLTAGE_BC &
                          .OR. GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC &
                          .OR. GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
+
                         
                         IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC) THEN
                            POTENTIAL = GRID_BC(EDGE_PG)%WALL_POTENTIAL
@@ -5627,6 +5654,7 @@ MODULE fields
                          .OR. GRID_BC(EDGE_PG)%FIELD_BC == RF_VOLTAGE_BC &
                          .OR. GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC &
                          .OR. GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
+
 
                         IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC) THEN
                            POTENTIAL = GRID_BC(EDGE_PG)%WALL_POTENTIAL

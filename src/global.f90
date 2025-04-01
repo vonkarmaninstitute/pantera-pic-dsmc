@@ -347,7 +347,6 @@ MODULE global
    LOGICAL :: BOOL_MAGNETIC_DIPOLE = .FALSE.
    REAL(KIND=8), DIMENSION(3) :: DIPOLE_POSITION, DIPOLE_ORIENTATION
    REAL(KIND=8) :: MAGNETIC_MOMENT
-   
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Numerical settings !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

@@ -1100,6 +1100,8 @@ MODULE initialization
       ELSE IF (STRARRAY(2) == 'conductive') THEN
          GRID_BC(IPG)%FIELD_BC = CONDUCTIVE_BC
          BOOL_CONDUCTIVE_BC = .TRUE.
+      ELSE IF (STRARRAY(2) == 'spicenode') THEN
+         GRID_BC(IPG)%FIELD_BC = SPICE_NODE_BC
       !!! BCs for both particles and field
       ELSE IF (STRARRAY(2) == 'periodic_master') THEN
          GRID_BC(IPG)%PARTICLE_BC = PERIODIC_MASTER
@@ -1138,11 +1140,11 @@ MODULE initialization
       IMPLICIT NONE
       
       INTEGER :: IPG ! Physical group index
-      INTEGER, PARAMETER :: file_unit = 938
+      INTEGER, PARAMETER :: FILE_UNIT = 938
       INTEGER :: I, J, K, IDX
-      INTEGER :: STATUS
+      INTEGER :: IOS
 
-      real, dimension(45, 1600) :: matrix, matrix_neg, matrix_pup
+      REAL, DIMENSION(45, 1600) :: MATRIX, MATRIX_NEG, MATRIX_PUP
 
       ALLOCATE(GRID_BC(IPG)%MAX_P_DN(45,40,40))
       ALLOCATE(GRID_BC(IPG)%MAX_P_UP(45,40,40))
@@ -1153,63 +1155,63 @@ MODULE initialization
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   
       ! Open the file
-      open(unit=file_unit, file='Max_P.csv', status='old', action='read', &
-           form='formatted', iostat=status)
-      if (status /= 0) then
+      OPEN(UNIT=FILE_UNIT, FILE='Max_P.csv', STATUS='OLD', ACTION='READ', &
+           FORM='FORMATTED', IOSTAT=IOS)
+      IF (IOS /= 0) THEN
          WRITE(*,*) 'Error opening file Max_P.csv'
-         stop
-      endif
+         STOP
+      ENDIF
       ! Read data from the file into the array
-      do i = 1, 45
-         read(file_unit, *) (matrix(i, j), j = 1, 1600)
-      end do
+      DO I = 1, 45
+         READ(FILE_UNIT, *) (MATRIX(I, J), J = 1, 1600)
+      END DO
       ! Close the file
-      close(unit=file_unit)
+      CLOSE(UNIT=FILE_UNIT)
   
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       !!!!!!!   Max_P_neg  !!!!!!!!!!!!!
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! Open the file
-      open(unit=file_unit, file='Max_neg_P.csv', status='old', action='read', &
-           form='formatted', iostat=status)
-      if (status /= 0) then
+      OPEN(UNIT=FILE_UNIT, FILE='Max_neg_P.csv', STATUS='OLD', ACTION='READ', &
+           FORM='FORMATTED', IOSTAT=IOS)
+      IF (IOS /= 0) THEN
          WRITE(*,*) 'Error opening file neg Max_neg_P.csv'
-         stop
-      endif
+         STOP
+      ENDIF
       ! Read data from the file into the array
-      do i = 1, 45
-          read(file_unit, *) (matrix_neg(i, j), j = 1, 1600)
-      end do
-      close(unit=file_unit)
+      DO I = 1, 45
+          READ(FILE_UNIT, *) (MATRIX_NEG(I, J), J = 1, 1600)
+      END DO
+      CLOSE(UNIT=FILE_UNIT)
   
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       !!!!!!!   P_up_col   !!!!!!!!!!!!!
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! Open the file
-      open(unit=file_unit, file='Pup_write.csv', status='old', action='read', &
-           form='formatted', iostat=status)
-      if (status /= 0) then
+      OPEN(UNIT=FILE_UNIT, FILE='Pup_write.csv', STATUS='OLD', ACTION='READ', &
+           FORM='FORMATTED', IOSTAT=IOS)
+      IF (IOS /= 0) THEN
          WRITE(*,*) 'Error opening file neg Pup_write.csv'
-         stop
-      endif
+         STOP
+      ENDIF
       ! Read data from the file into the array
-      do i = 1, 45
-         read(file_unit, *) (matrix_pup(i, j), j = 1, 1600)
-      end do
-      close(unit=file_unit)
+      DO I = 1, 45
+         READ(FILE_UNIT, *) (MATRIX_PUP(I, J), J = 1, 1600)
+      END DO
+      CLOSE(UNIT=FILE_UNIT)
   
       ! Reshape the matrix
-      do i = 1, 45
-         idx = 1
-         do j = 1, 40
-            do k = 1, 40
-               GRID_BC(IPG)%MAX_P_DN(i, j, k) = matrix(i, idx)
-               GRID_BC(IPG)%MAX_P_UP(i, j, k) = matrix_neg(i, idx)
-               GRID_BC(IPG)%P_COLL_UP(i, j, k) = matrix_pup(i, idx)
-               idx = idx + 1
-            end do
-         end do
-      end do
+      DO I = 1, 45
+         IDX = 1
+         DO J = 1, 40
+            DO K = 1, 40
+               GRID_BC(IPG)%MAX_P_DN(I, J, K) = MATRIX(I, IDX)
+               GRID_BC(IPG)%MAX_P_UP(I, J, K) = MATRIX_NEG(I, IDX)
+               GRID_BC(IPG)%P_COLL_UP(I, J, K) = MATRIX_PUP(I, IDX)
+               IDX = IDX + 1
+            END DO
+         END DO
+      END DO
 
    END SUBROUTINE READ_WASHBOARD_TABLES
 

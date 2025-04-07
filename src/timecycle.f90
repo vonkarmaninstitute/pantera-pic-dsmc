@@ -1417,6 +1417,8 @@ MODULE timecycle
                                  SURFACE_CHARGE(VP) = SURFACE_CHARGE(VP) + RHO_Q*PSIP
                               END DO
                            END IF
+                        ELSE IF (GRID_BC(FACE_PG)%FIELD_BC == SPICE_NODE_BC .AND. ABS(CHARGE) .GE. 1.d-6) THEN
+                           GRID_BC(FACE_PG)%SPICE_NODE_CURRENT = GRID_BC(FACE_PG)%SPICE_NODE_CURRENT + QE*FNUM*CHARGE/DT
                         END IF
 
                         ! Apply particle boundary condition
@@ -1610,6 +1612,11 @@ MODULE timecycle
                               IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_AVG_EVERY) .EQ. 0) THEN
                                  CALL TALLY_PARTICLE_TO_BOUNDARY(.TRUE., particles(IP), IC, BOUNDCOLL)
                               END IF
+                           END IF
+
+                           CHARGE = SPECIES(particles(IP)%S_ID)%CHARGE
+                           IF (GRID_BC(FACE_PG)%FIELD_BC == SPICE_NODE_BC .AND. ABS(CHARGE) .GE. 1.d-6) THEN
+                              GRID_BC(FACE_PG)%SPICE_NODE_CURRENT = GRID_BC(FACE_PG)%SPICE_NODE_CURRENT - QE*FNUM*CHARGE/DT
                            END IF
                         END IF
                      ELSE

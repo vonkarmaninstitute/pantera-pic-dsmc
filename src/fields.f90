@@ -147,7 +147,8 @@ MODULE fields
                      IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC &
                          .OR. GRID_BC(EDGE_PG)%FIELD_BC == RF_VOLTAGE_BC &
                          .OR. GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC &
-                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC &
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == SPICE_NODE_BC) THEN
                         IF (J==1) THEN
                            DIRICHLET(V1-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
                            IS_DIRICHLET(V1-1) = .TRUE.
@@ -258,7 +259,8 @@ MODULE fields
                      IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC &
                          .OR. GRID_BC(EDGE_PG)%FIELD_BC == RF_VOLTAGE_BC &
                          .OR. GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC &
-                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC &
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == SPICE_NODE_BC) THEN
                         IF (J==1) THEN
                            DIRICHLET(V1-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
                            DIRICHLET(V2-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
@@ -423,7 +425,8 @@ MODULE fields
                      IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC &
                          .OR. GRID_BC(EDGE_PG)%FIELD_BC == RF_VOLTAGE_BC &
                          .OR. GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC &
-                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC &
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == SPICE_NODE_BC) THEN
                         IF (J==1) THEN
                            DIRICHLET(V1-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
                            DIRICHLET(V3-1) = GRID_BC(EDGE_PG)%WALL_POTENTIAL
@@ -5543,6 +5546,86 @@ MODULE fields
       INTEGER :: V1, V2, V3, V4, I, J, EDGE_PG
       REAL(KIND=8) :: POTENTIAL
 
+      CHARACTER(LEN=256) :: COMMAND, SUBCOMMAND, LINE
+      INTEGER :: EXIT_CODE = 0
+      INTEGER :: IOS
+      INTEGER :: N_STR
+      CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
+      CHARACTER(LEN=80) :: NODE_NAME
+
+      ! Gather the currents on physical groups that are nodes for SPICE
+      COMMAND = 'ngspice'
+      DO I = 1, N_GRID_BC
+         IF (GRID_BC(I)%FIELD_BC .NE. SPICE_NODE_BC) CYCLE
+         IF (PROC_ID .EQ. 0) THEN
+            CALL MPI_REDUCE(MPI_IN_PLACE, GRID_BC(I)%SPICE_NODE_CURRENT, 1,MPI_DOUBLE_PRECISION,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+            
+            !OPEN(66341, FILE='currentdump', POSITION='append', STATUS='unknown', ACTION='write')
+            !WRITE(66341,*) GRID_BC(I)%SPICE_NODE_CURRENT
+            !CLOSE(66341)
+
+            SUBCOMMAND = ''
+            WRITE(SUBCOMMAND,'(A,A,A,ES0.7)') ' -D i', TRIM(GRID_BC(I)%PHYSICAL_GROUP_NAME), '=',GRID_BC(I)%SPICE_NODE_CURRENT
+            COMMAND = TRIM(COMMAND)//SUBCOMMAND
+         ELSE
+            CALL MPI_REDUCE(GRID_BC(I)%SPICE_NODE_CURRENT, GRID_BC(I)%SPICE_NODE_CURRENT, 1,MPI_DOUBLE_PRECISION,MPI_SUM,0,&
+            MPI_COMM_WORLD,ierr)
+         END IF
+         GRID_BC(I)%SPICE_NODE_CURRENT = 0.d0
+      END DO
+      IF (PROC_ID .EQ. 0) THEN
+         IF (tID <= 1) THEN
+            WRITE(SUBCOMMAND,'(A,ES0.7,A,ES0.7)') ' -D tsmall=', DT*0.01, ' -D tend=', DT*NT
+            COMMAND = TRIM(COMMAND)//SUBCOMMAND
+            COMMAND = TRIM(COMMAND)//' initial.cir >/dev/null 2>&1'
+         ELSE
+            !WRITE(SUBCOMMAND,'(A,ES0.7,A,ES0.7,A,ES0.7)') ' -D ti=', (tID-1)*DT, ' -D tf=', tID*DT, ' -D dt=', DT*0.01
+            !WRITE(SUBCOMMAND,'(A,ES0.7,A,ES0.7,A,ES0.7)') ' -D ti=', 0.d0, ' -D tf=', DT, ' -D dt=', DT*0.01
+            WRITE(SUBCOMMAND,'(A,ES0.7)') ' -D tf=', (tID-1)*DT
+            COMMAND = TRIM(COMMAND)//SUBCOMMAND
+            COMMAND = TRIM(COMMAND)//' update.cir >/dev/null 2>&1'
+         END IF
+         WRITE(*,*) TRIM(COMMAND)
+         CALL SYSTEM(TRIM(COMMAND), STATUS = EXIT_CODE)
+
+         ! Open results file for reading
+         OPEN(UNIT=50505, FILE='voltages', STATUS='old', IOSTAT=IOS)
+
+         IF (IOS .NE. 0) THEN
+            CALL ERROR_ABORT('Attention, voltages file not found! ABORTING.')
+         ENDIF
+
+         DO
+            LINE = '' ! Init empty
+            READ(50505,'(A)', IOSTAT=IOS) line ! Read line         
+
+            IF (IOS < 0) EXIT
+
+            CALL SPLIT_STR(line, ' ', STRARRAY, N_STR)
+
+            IF (STRARRAY(1) .NE. '.ic') CYCLE
+            NODE_NAME = STRARRAY(2)(INDEX(STRARRAY(2), '(')+1 : INDEX(STRARRAY(2), ')')-1)
+            READ(STRARRAY(4),*) POTENTIAL
+
+            DO I = 1, N_GRID_BC
+               IF (GRID_BC(I)%PHYSICAL_GROUP_NAME == NODE_NAME) THEN
+                  IF (GRID_BC(I)%FIELD_BC == SPICE_NODE_BC) THEN
+                     GRID_BC(I)%SPICE_NODE_POTENTIAL = POTENTIAL
+                     WRITE(*,*) 'Set node ', TRIM(NODE_NAME), ' to ', POTENTIAL, ' V.'
+
+                     !OPEN(66342, FILE='voltagedump', POSITION='append', STATUS='unknown', ACTION='write')
+                     !WRITE(66342,*) POTENTIAL
+                     !CLOSE(66342)
+                  END IF
+               END IF
+            END DO
+         END DO
+
+         CLOSE(50505)
+
+      END IF
+
+
 
 
       IF (GRID_TYPE == UNSTRUCTURED) THEN
@@ -5554,6 +5637,7 @@ MODULE fields
                PHI_FIELD = 0
             END IF
             CALL COMPUTE_FLOATING_POTENTIAL_FOR_CONDUCTIVE_SURFACE(WALL_METAL_POTENTIAL)
+            ! Make sure that GRID_BC(EDGE_PG)%SPICE_NODE_POTENTIAL is set.
          END IF
 
          IF (DIMS == 1) THEN
@@ -5567,7 +5651,8 @@ MODULE fields
                      IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC &
                          .OR. GRID_BC(EDGE_PG)%FIELD_BC == RF_VOLTAGE_BC &
                          .OR. GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC &
-                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC &
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == SPICE_NODE_BC) THEN
 
                         
                         IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC) THEN
@@ -5580,6 +5665,8 @@ MODULE fields
                                      + 0.5*GRID_BC(EDGE_PG)%WALL_RF_POTENTIAL*COS(2*PI*GRID_BC(EDGE_PG)%RF_FREQUENCY*tID*DT)
                         ELSE IF (GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
                            POTENTIAL = WALL_METAL_POTENTIAL
+                        ELSE IF (GRID_BC(EDGE_PG)%FIELD_BC == SPICE_NODE_BC) THEN
+                           POTENTIAL = GRID_BC(EDGE_PG)%SPICE_NODE_POTENTIAL
                         END IF
 
                         IF (J==1) THEN
@@ -5606,7 +5693,8 @@ MODULE fields
                      IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC &
                          .OR. GRID_BC(EDGE_PG)%FIELD_BC == RF_VOLTAGE_BC &
                          .OR. GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC &
-                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC &
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == SPICE_NODE_BC) THEN
 
                         
                         IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC) THEN
@@ -5619,6 +5707,8 @@ MODULE fields
                                      + 0.5*GRID_BC(EDGE_PG)%WALL_RF_POTENTIAL*COS(2*PI*GRID_BC(EDGE_PG)%RF_FREQUENCY*tID*DT)
                         ELSE IF (GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
                            POTENTIAL = WALL_METAL_POTENTIAL
+                        ELSE IF (GRID_BC(EDGE_PG)%FIELD_BC == SPICE_NODE_BC) THEN
+                           POTENTIAL = GRID_BC(EDGE_PG)%SPICE_NODE_POTENTIAL
                         END IF
 
                         IF (J==1) THEN
@@ -5653,7 +5743,8 @@ MODULE fields
                      IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC &
                          .OR. GRID_BC(EDGE_PG)%FIELD_BC == RF_VOLTAGE_BC &
                          .OR. GRID_BC(EDGE_PG)%FIELD_BC == DECOUPLED_RF_VOLTAGE_BC &
-                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC &
+                         .OR. GRID_BC(EDGE_PG)%FIELD_BC == SPICE_NODE_BC) THEN
 
 
                         IF (GRID_BC(EDGE_PG)%FIELD_BC == DIRICHLET_BC) THEN
@@ -5666,6 +5757,8 @@ MODULE fields
                                        + 0.5*GRID_BC(EDGE_PG)%WALL_RF_POTENTIAL*COS(2*PI*GRID_BC(EDGE_PG)%RF_FREQUENCY*tID*DT)
                         ELSE IF (GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
                            POTENTIAL = WALL_METAL_POTENTIAL
+                        ELSE IF (GRID_BC(EDGE_PG)%FIELD_BC == SPICE_NODE_BC) THEN
+                           POTENTIAL = GRID_BC(EDGE_PG)%SPICE_NODE_POTENTIAL
                         END IF
 
                         IF (J==1) THEN

@@ -5637,7 +5637,6 @@ MODULE fields
                PHI_FIELD = 0
             END IF
             CALL COMPUTE_FLOATING_POTENTIAL_FOR_CONDUCTIVE_SURFACE(WALL_METAL_POTENTIAL)
-            ! Make sure that GRID_BC(EDGE_PG)%SPICE_NODE_POTENTIAL is set.
          END IF
 
          IF (DIMS == 1) THEN

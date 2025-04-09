@@ -4304,14 +4304,14 @@ MODULE fields
                ELSE IF (WALL_REACTIONS(JR)%N_PROD == 1) THEN
                   JP = WALL_REACTIONS(JR)%P1_SP_ID
                   part_adv(IP)%S_ID = JP
-                  VEL_SCALE = SPECIES(JS)%MOLECULAR_MASS/SPECIES(JP)%MOLECULAR_MASS
+                  VEL_SCALE = SQRT(SPECIES(JS)%MOLECULAR_MASS/SPECIES(JP)%MOLECULAR_MASS)
                   part_adv(IP)%VX = part_adv(IP)%VX*VEL_SCALE
                   part_adv(IP)%VY = part_adv(IP)%VY*VEL_SCALE
                   part_adv(IP)%VZ = part_adv(IP)%VZ*VEL_SCALE
                ELSE
                   CALL ERROR_ABORT('Number of products in wall reaction not supported.')
                END IF
-
+               RETURN
             ELSE
                PROB_SCALE = PROB_SCALE - WALL_REACTIONS(JR)%PROB
             END IF
@@ -5546,6 +5546,7 @@ MODULE fields
       INTEGER :: V1, V2, V3, V4, I, J, EDGE_PG
       REAL(KIND=8) :: POTENTIAL
 
+      LOGICAL :: USE_SPICE = .FALSE.
       CHARACTER(LEN=256) :: COMMAND, SUBCOMMAND, LINE
       INTEGER :: EXIT_CODE = 0
       INTEGER :: IOS
@@ -5553,78 +5554,82 @@ MODULE fields
       CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
       CHARACTER(LEN=80) :: NODE_NAME
 
-      ! Gather the currents on physical groups that are nodes for SPICE
-      COMMAND = 'ngspice'
       DO I = 1, N_GRID_BC
-         IF (GRID_BC(I)%FIELD_BC .NE. SPICE_NODE_BC) CYCLE
-         IF (PROC_ID .EQ. 0) THEN
-            CALL MPI_REDUCE(MPI_IN_PLACE, GRID_BC(I)%SPICE_NODE_CURRENT, 1,MPI_DOUBLE_PRECISION,MPI_SUM,0,MPI_COMM_WORLD,ierr)
-            
-            !OPEN(66341, FILE='currentdump', POSITION='append', STATUS='unknown', ACTION='write')
-            !WRITE(66341,*) GRID_BC(I)%SPICE_NODE_CURRENT
-            !CLOSE(66341)
-
-            SUBCOMMAND = ''
-            WRITE(SUBCOMMAND,'(A,A,A,ES0.7)') ' -D i', TRIM(GRID_BC(I)%PHYSICAL_GROUP_NAME), '=',GRID_BC(I)%SPICE_NODE_CURRENT
-            COMMAND = TRIM(COMMAND)//SUBCOMMAND
-         ELSE
-            CALL MPI_REDUCE(GRID_BC(I)%SPICE_NODE_CURRENT, GRID_BC(I)%SPICE_NODE_CURRENT, 1,MPI_DOUBLE_PRECISION,MPI_SUM,0,&
-            MPI_COMM_WORLD,ierr)
-         END IF
-         GRID_BC(I)%SPICE_NODE_CURRENT = 0.d0
+         IF (GRID_BC(I)%FIELD_BC == SPICE_NODE_BC) USE_SPICE = .TRUE.
       END DO
-      IF (PROC_ID .EQ. 0) THEN
-         IF (tID <= 1) THEN
-            WRITE(SUBCOMMAND,'(A,ES0.7,A,ES0.7)') ' -D tsmall=', DT*0.01, ' -D tend=', DT*NT
-            COMMAND = TRIM(COMMAND)//SUBCOMMAND
-            COMMAND = TRIM(COMMAND)//' initial.cir >/dev/null 2>&1'
-         ELSE
-            !WRITE(SUBCOMMAND,'(A,ES0.7,A,ES0.7,A,ES0.7)') ' -D ti=', (tID-1)*DT, ' -D tf=', tID*DT, ' -D dt=', DT*0.01
-            !WRITE(SUBCOMMAND,'(A,ES0.7,A,ES0.7,A,ES0.7)') ' -D ti=', 0.d0, ' -D tf=', DT, ' -D dt=', DT*0.01
-            WRITE(SUBCOMMAND,'(A,ES0.7)') ' -D tf=', (tID-1)*DT
-            COMMAND = TRIM(COMMAND)//SUBCOMMAND
-            COMMAND = TRIM(COMMAND)//' update.cir >/dev/null 2>&1'
-         END IF
-         WRITE(*,*) TRIM(COMMAND)
-         CALL SYSTEM(TRIM(COMMAND), STATUS = EXIT_CODE)
+      IF (USE_SPICE) THEN
+         ! Gather the currents on physical groups that are nodes for SPICE
+         COMMAND = 'ngspice'
+         DO I = 1, N_GRID_BC
+            IF (GRID_BC(I)%FIELD_BC .NE. SPICE_NODE_BC) CYCLE
+            IF (PROC_ID .EQ. 0) THEN
+               CALL MPI_REDUCE(MPI_IN_PLACE, GRID_BC(I)%SPICE_NODE_CURRENT, 1,MPI_DOUBLE_PRECISION,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+               
+               !OPEN(66341, FILE='currentdump', POSITION='append', STATUS='unknown', ACTION='write')
+               !WRITE(66341,*) GRID_BC(I)%SPICE_NODE_CURRENT
+               !CLOSE(66341)
 
-         ! Open results file for reading
-         OPEN(UNIT=50505, FILE='voltages', STATUS='old', IOSTAT=IOS)
-
-         IF (IOS .NE. 0) THEN
-            CALL ERROR_ABORT('Attention, voltages file not found! ABORTING.')
-         ENDIF
-
-         DO
-            LINE = '' ! Init empty
-            READ(50505,'(A)', IOSTAT=IOS) line ! Read line         
-
-            IF (IOS < 0) EXIT
-
-            CALL SPLIT_STR(line, ' ', STRARRAY, N_STR)
-
-            IF (STRARRAY(1) .NE. '.ic') CYCLE
-            NODE_NAME = STRARRAY(2)(INDEX(STRARRAY(2), '(')+1 : INDEX(STRARRAY(2), ')')-1)
-            READ(STRARRAY(4),*) POTENTIAL
-
-            DO I = 1, N_GRID_BC
-               IF (GRID_BC(I)%PHYSICAL_GROUP_NAME == NODE_NAME) THEN
-                  IF (GRID_BC(I)%FIELD_BC == SPICE_NODE_BC) THEN
-                     GRID_BC(I)%SPICE_NODE_POTENTIAL = POTENTIAL
-                     WRITE(*,*) 'Set node ', TRIM(NODE_NAME), ' to ', POTENTIAL, ' V.'
-
-                     !OPEN(66342, FILE='voltagedump', POSITION='append', STATUS='unknown', ACTION='write')
-                     !WRITE(66342,*) POTENTIAL
-                     !CLOSE(66342)
-                  END IF
-               END IF
-            END DO
+               SUBCOMMAND = ''
+               WRITE(SUBCOMMAND,'(A,A,A,ES0.7)') ' -D i', TRIM(GRID_BC(I)%PHYSICAL_GROUP_NAME), '=',GRID_BC(I)%SPICE_NODE_CURRENT
+               COMMAND = TRIM(COMMAND)//SUBCOMMAND
+            ELSE
+               CALL MPI_REDUCE(GRID_BC(I)%SPICE_NODE_CURRENT, GRID_BC(I)%SPICE_NODE_CURRENT, 1,MPI_DOUBLE_PRECISION,MPI_SUM,0,&
+               MPI_COMM_WORLD,ierr)
+            END IF
+            GRID_BC(I)%SPICE_NODE_CURRENT = 0.d0
          END DO
+         IF (PROC_ID .EQ. 0) THEN
+            IF (tID <= 1) THEN
+               WRITE(SUBCOMMAND,'(A,ES0.7,A,ES0.7)') ' -D tsmall=', DT*0.01, ' -D tend=', DT*NT
+               COMMAND = TRIM(COMMAND)//SUBCOMMAND
+               COMMAND = TRIM(COMMAND)//' initial.cir >/dev/null 2>&1'
+            ELSE
+               !WRITE(SUBCOMMAND,'(A,ES0.7,A,ES0.7,A,ES0.7)') ' -D ti=', (tID-1)*DT, ' -D tf=', tID*DT, ' -D dt=', DT*0.01
+               !WRITE(SUBCOMMAND,'(A,ES0.7,A,ES0.7,A,ES0.7)') ' -D ti=', 0.d0, ' -D tf=', DT, ' -D dt=', DT*0.01
+               WRITE(SUBCOMMAND,'(A,ES0.7)') ' -D tf=', (tID-1)*DT
+               COMMAND = TRIM(COMMAND)//SUBCOMMAND
+               COMMAND = TRIM(COMMAND)//' update.cir >/dev/null 2>&1'
+            END IF
+            WRITE(*,*) TRIM(COMMAND)
+            CALL SYSTEM(TRIM(COMMAND), STATUS = EXIT_CODE)
 
-         CLOSE(50505)
+            ! Open results file for reading
+            OPEN(UNIT=50505, FILE='voltages', STATUS='old', IOSTAT=IOS)
 
+            IF (IOS .NE. 0) THEN
+               CALL ERROR_ABORT('Attention, voltages file not found! ABORTING.')
+            ENDIF
+
+            DO
+               LINE = '' ! Init empty
+               READ(50505,'(A)', IOSTAT=IOS) line ! Read line         
+
+               IF (IOS < 0) EXIT
+
+               CALL SPLIT_STR(line, ' ', STRARRAY, N_STR)
+
+               IF (STRARRAY(1) .NE. '.ic') CYCLE
+               NODE_NAME = STRARRAY(2)(INDEX(STRARRAY(2), '(')+1 : INDEX(STRARRAY(2), ')')-1)
+               READ(STRARRAY(4),*) POTENTIAL
+
+               DO I = 1, N_GRID_BC
+                  IF (GRID_BC(I)%PHYSICAL_GROUP_NAME == NODE_NAME) THEN
+                     IF (GRID_BC(I)%FIELD_BC == SPICE_NODE_BC) THEN
+                        GRID_BC(I)%SPICE_NODE_POTENTIAL = POTENTIAL
+                        WRITE(*,*) 'Set node ', TRIM(NODE_NAME), ' to ', POTENTIAL, ' V.'
+
+                        !OPEN(66342, FILE='voltagedump', POSITION='append', STATUS='unknown', ACTION='write')
+                        !WRITE(66342,*) POTENTIAL
+                        !CLOSE(66342)
+                     END IF
+                  END IF
+               END DO
+            END DO
+
+            CLOSE(50505)
+
+         END IF
       END IF
-
 
 
 

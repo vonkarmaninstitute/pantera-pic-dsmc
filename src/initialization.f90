@@ -26,6 +26,7 @@ MODULE initialization
    USE tools
    USE grid_and_partition
    USE mt19937_64
+   USE velocity_distribution
 
    IMPLICIT NONE
 
@@ -1290,9 +1291,10 @@ MODULE initialization
       INTEGER :: N_STR
       CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
 
-      CHARACTER*64 :: MIX_NAME
+      CHARACTER*64 :: MIX_NAME, VDF_NAME
       INTEGER      :: MIX_ID, I, IC, IPG
       TYPE(EMIT_TASK_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: TEMP_EMIT_TASKS
+      CLASS(VELOCITY_DISTRIBUTION_STRUCTURE), ALLOCATABLE :: TEMP_VDF
 
       REAL(KIND=8) :: NRHO, UX, UY, UZ, TTRA, TROT, TVIB
 
@@ -1313,6 +1315,9 @@ MODULE initialization
       READ(STRARRAY(7), '(ES14.0)') TTRA
       READ(STRARRAY(8),'(ES14.0)') TROT
       READ(STRARRAY(9),'(ES14.0)') TVIB
+      READ(STRARRAY(10),'(A10)') VDF_NAME
+
+      CALL ASSIGN_VDF(TEMP_VDF, VDF_NAME)
 
 
       MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
@@ -1343,6 +1348,7 @@ MODULE initialization
                   EMIT_TASKS(N_EMIT_TASKS)%MIX_ID = MIX_ID
                   EMIT_TASKS(N_EMIT_TASKS)%IC = IC
                   EMIT_TASKS(N_EMIT_TASKS)%IFACE = I
+                  ALLOCATE(EMIT_TASKS(N_EMIT_TASKS)%VDF, SOURCE=TEMP_VDF)
    
                   EMIT_TASKS(N_EMIT_TASKS)%IV1 = U1D_GRID%CELL_NODES(I,IC)
    
@@ -1374,6 +1380,7 @@ MODULE initialization
                   EMIT_TASKS(N_EMIT_TASKS)%MIX_ID = MIX_ID
                   EMIT_TASKS(N_EMIT_TASKS)%IC = IC
                   EMIT_TASKS(N_EMIT_TASKS)%IFACE = I
+                  ALLOCATE(EMIT_TASKS(N_EMIT_TASKS)%VDF, SOURCE=TEMP_VDF)
    
                   
                   IF (I == 1) THEN
@@ -1414,6 +1421,7 @@ MODULE initialization
                   EMIT_TASKS(N_EMIT_TASKS)%MIX_ID = MIX_ID
                   EMIT_TASKS(N_EMIT_TASKS)%IC = IC
                   EMIT_TASKS(N_EMIT_TASKS)%IFACE = I
+                  ALLOCATE(EMIT_TASKS(N_EMIT_TASKS)%VDF, SOURCE=TEMP_VDF)
    
                   ! NFS WILL BE INITIALIZED LATER.
                END IF
@@ -1439,9 +1447,10 @@ MODULE initialization
       INTEGER :: N_STR
       CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
 
-      CHARACTER*64 :: MIX_NAME
+      CHARACTER*64 :: MIX_NAME, VDF_NAME
       INTEGER      :: MIX_ID
       TYPE(INITIAL_PARTICLES_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: TEMP_INITIAL_PARTICLES_TASK
+      CLASS(VELOCITY_DISTRIBUTION_STRUCTURE), ALLOCATABLE :: TEMP_VDF
 
       REAL(KIND=8) :: NRHO, UX, UY, UZ, TTRAX, TTRAY, TTRAZ, TROT, TVIB
 
@@ -1458,6 +1467,9 @@ MODULE initialization
       READ(STRARRAY(8), '(ES14.0)') TTRAZ
       READ(STRARRAY(9), '(ES14.0)') TROT
       READ(STRARRAY(10),'(ES14.0)') TVIB
+      READ(STRARRAY(11),'(A10)') VDF_NAME
+
+      CALL ASSIGN_VDF(TEMP_VDF,VDF_NAME)
 
       MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
 
@@ -1483,6 +1495,7 @@ MODULE initialization
       INITIAL_PARTICLES_TASKS(N_INITIAL_PARTICLES_TASKS)%TROT = TROT
       INITIAL_PARTICLES_TASKS(N_INITIAL_PARTICLES_TASKS)%TVIB = TVIB
       INITIAL_PARTICLES_TASKS(N_INITIAL_PARTICLES_TASKS)%MIX_ID = MIX_ID
+      ALLOCATE(INITIAL_PARTICLES_TASKS(N_INITIAL_PARTICLES_TASKS)%VDF, SOURCE=TEMP_VDF)
 
    END SUBROUTINE DEF_INITIAL_PARTICLES
 
@@ -2127,13 +2140,13 @@ MODULE initialization
 
                      ! Assign velocity and energy following a Boltzmann distribution
                      M = SPECIES(S_ID)%MOLECULAR_MASS
-                     CALL MAXWELL(INITIAL_PARTICLES_TASKS(ITASK)%UX, &
-                                  INITIAL_PARTICLES_TASKS(ITASK)%UY, &
-                                  INITIAL_PARTICLES_TASKS(ITASK)%UZ, &
-                                  INITIAL_PARTICLES_TASKS(ITASK)%TTRAX, &
-                                  INITIAL_PARTICLES_TASKS(ITASK)%TTRAY, &
-                                  INITIAL_PARTICLES_TASKS(ITASK)%TTRAZ, &
-                                  VXP, VYP, VZP, M)
+                     CALL INITIAL_PARTICLES_TASKS(ITASK)%VDF%SAMPLE_VELOCITY(INITIAL_PARTICLES_TASKS(ITASK)%UX, &
+                                              INITIAL_PARTICLES_TASKS(ITASK)%UY, &
+                                              INITIAL_PARTICLES_TASKS(ITASK)%UZ, &
+                                              INITIAL_PARTICLES_TASKS(ITASK)%TTRAX, &
+                                              INITIAL_PARTICLES_TASKS(ITASK)%TTRAY, &
+                                              INITIAL_PARTICLES_TASKS(ITASK)%TTRAZ, &
+                                              VXP, VYP, VZP, M)
 
                      CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, INITIAL_PARTICLES_TASKS(ITASK)%TROT, EROT)
                      CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, INITIAL_PARTICLES_TASKS(ITASK)%TVIB, EVIB)
@@ -2186,13 +2199,13 @@ MODULE initialization
                
                   ! Assign velocity and energy following a Boltzmann distribution
                   M = SPECIES(S_ID)%MOLECULAR_MASS
-                  CALL MAXWELL(INITIAL_PARTICLES_TASKS(ITASK)%UX, &
-                               INITIAL_PARTICLES_TASKS(ITASK)%UY, &
-                               INITIAL_PARTICLES_TASKS(ITASK)%UZ, &
-                               INITIAL_PARTICLES_TASKS(ITASK)%TTRAX, &
-                               INITIAL_PARTICLES_TASKS(ITASK)%TTRAY, &
-                               INITIAL_PARTICLES_TASKS(ITASK)%TTRAZ, &
-                               VXP, VYP, VZP, M)
+                  CALL INITIAL_PARTICLES_TASKS(ITASK)%VDF%SAMPLE_VELOCITY(INITIAL_PARTICLES_TASKS(ITASK)%UX, &
+                                          INITIAL_PARTICLES_TASKS(ITASK)%UY, &
+                                          INITIAL_PARTICLES_TASKS(ITASK)%UZ, &
+                                          INITIAL_PARTICLES_TASKS(ITASK)%TTRAX, &
+                                          INITIAL_PARTICLES_TASKS(ITASK)%TTRAY, &
+                                          INITIAL_PARTICLES_TASKS(ITASK)%TTRAZ, &
+                                          VXP, VYP, VZP, M)
 
                   CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, INITIAL_PARTICLES_TASKS(ITASK)%TROT, EROT)
                   CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, INITIAL_PARTICLES_TASKS(ITASK)%TVIB, EVIB)
@@ -2374,7 +2387,6 @@ MODULE initialization
       REAL(KIND=8) :: BETA, FLUXBOUND, NtotINJECT, Snow
       REAL(KIND=8) :: U_NORM, S_NORM, FLUXLINESOURCE, LINELENGTH, NORMX, NORMY, NORMZ, AREA
       REAL(KIND=8) :: PI2  
-      REAL(KIND=8) :: INTEG1, INTEG2
 
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: nfs_LINE
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TASK_NFS
@@ -2600,42 +2612,23 @@ MODULE initialization
             S_ID = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%COMPONENTS(IS)%ID
             M = SPECIES(S_ID)%MOLECULAR_MASS
             FRAC = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%COMPONENTS(IS)%MOLFRAC
-            IF (EMIT_TASKS(ITASK)%TTRA == 0) THEN
-               BETA = 0
-            ELSE
-               BETA = 1./SQRT(2.*KB/M*EMIT_TASKS(ITASK)%TTRA) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
-            END IF
+            ! IF (EMIT_TASKS(ITASK)%TTRA == 0) THEN
+            !    BETA = 0
+            ! ELSE
+            !    BETA = 1./SQRT(2.*KB/M*EMIT_TASKS(ITASK)%TTRA) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
+            ! END IF
 
             U_NORM = EMIT_TASKS(ITASK)%UX*NORMX + EMIT_TASKS(ITASK)%UY*NORMY + EMIT_TASKS(ITASK)%UZ*NORMZ ! Molecular speed ratio normal to boundary
             EMIT_TASKS(ITASK)%U_NORM = U_NORM
-            S_NORM = U_NORM*BETA
+            ! S_NORM = U_NORM*BETA
 
             IF (EMIT_TASKS(ITASK)%TTRA == 0) THEN
                FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC*U_NORM      ! Tot number flux emitted
             ELSE
-               FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-S_NORM**2) &
-                              + SQRT(PI)*S_NORM*(1.+ERF1(S_NORM)))      ! Tot number flux emitted
+               ! FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-S_NORM**2) &
+               !                + SQRT(PI)*S_NORM*(1.+ERF1(S_NORM)))      ! Tot number flux emitted
+               FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC*EMIT_TASKS(ITASK)%VDF%FLUXSOURCE(S_NORM,U_NORM,EMIT_TASKS(ITASK)%TTRA,M)
             END IF
-
-            !!!!! KAPPA DISTRIBUTION !!!!! TODO: Obtain from Kappa distr func.
-            ! IF (BOOL_KAPPA_DISTRIBUTION) THEN
-            !    BETA = 1./SQRT(2.*KB/M*EMIT_TASKS(ITASK)%TTRA*(KAPPA_C-3./2.))
-            !    U_NORM = EMIT_TASKS(ITASK)%UX*NORMX + EMIT_TASKS(ITASK)%UY*NORMY + EMIT_TASKS(ITASK)%UZ*NORMZ ! Molecular speed ratio normal to boundary
-            !    EMIT_TASKS(ITASK)%U_NORM = U_NORM
-            !    S_NORM = U_NORM*BETA
-
-            !    INTEG1 = PI/2.
-            !    INTEG2 = ATAN(S_NORM)
-            !    DO I = 2, INT(KAPPA_C)
-            !       INTEG1 = (2.*I-3.)/(2.*(I-1.))*INTEG1
-            !       INTEG2 = S_NORM/(2.*(I-1.)*(1.+(S_NORM)**2)**(I-1.)) + (2.*I-3.)/(2.*(I-1.))*INTEG2
-            !    END DO
-               
-            !    FLUXLINESOURCE = GAMMA(KAPPA_C)/GAMMA(KAPPA_C-1./2.)*EMIT_TASKS(ITASK)%NRHO*FRAC/(BETA*SQRT(PI)) * &
-            !    ( 1./(KAPPA_C-1.)/2.*(1+S_NORM**2)**(-KAPPA_C+1.) + S_NORM*(INTEG1 +INTEG2))      ! Tot number flux emitted
-
-            ! END IF
-
 
             NtotINJECT = FLUXLINESOURCE*AREA*DT/FNUM         ! Tot num of particles to be injected
 

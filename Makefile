@@ -15,7 +15,7 @@ BUILDDIR = src/
 #-march=native -Wall -Wextra -fimplicit-none -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow -mcmodel=medium # Aggressive optimization options 
 
 # Objects: list of all objects *.o
-OBJS = $(BUILDDIR)mpi_common.o  $(BUILDDIR)global.o  $(BUILDDIR)screen.o  $(BUILDDIR)tools.o  $(BUILDDIR)initialization.o  $(BUILDDIR)timecycle.o  $(BUILDDIR)grid_and_partition.o  $(BUILDDIR)particle.o  $(BUILDDIR)collisions.o  $(BUILDDIR)postprocess.o  $(BUILDDIR)fields.o  $(BUILDDIR)mt19937.o  $(BUILDDIR)washboard.o
+OBJS = $(BUILDDIR)mpi_common.o  $(BUILDDIR)velocity_distribution.o  $(BUILDDIR)global.o  $(BUILDDIR)screen.o  $(BUILDDIR)tools.o  $(BUILDDIR)initialization.o  $(BUILDDIR)timecycle.o  $(BUILDDIR)grid_and_partition.o  $(BUILDDIR)particle.o  $(BUILDDIR)collisions.o  $(BUILDDIR)postprocess.o  $(BUILDDIR)fields.o  $(BUILDDIR)mt19937.o  $(BUILDDIR)washboard.o
 
 #  The following variable must either be a path to petsc.pc or just "petsc" if petsc.pc
 #  has been installed to a system location or can be found in PKG_CONFIG_PATH.
@@ -61,13 +61,13 @@ $(BUILDDIR)pantera.o: $(SRCDIR)pantera.f90  $(OBJS) createbuilddir
 $(BUILDDIR)global.o: $(SRCDIR)global.f90  $(BUILDDIR)mpi_common.o  $(BUILDDIR)particle.o  createbuilddir
 	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)global.f90
 
-$(BUILDDIR)timecycle.o: $(SRCDIR)timecycle.f90  $(BUILDDIR)global.o  $(BUILDDIR)particle.o  $(BUILDDIR)screen.o  $(BUILDDIR)collisions.o  $(BUILDDIR)postprocess.o  $(BUILDDIR)fields.o  $(BUILDDIR)washboard.o  createbuilddir
+$(BUILDDIR)timecycle.o: $(SRCDIR)timecycle.f90  $(BUILDDIR)global.o  $(BUILDDIR)particle.o  $(BUILDDIR)screen.o  $(BUILDDIR)velocity_distribution.o  $(BUILDDIR)collisions.o  $(BUILDDIR)postprocess.o  $(BUILDDIR)fields.o  $(BUILDDIR)washboard.o  createbuilddir
 	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)timecycle.f90
 
-$(BUILDDIR)initialization.o: $(SRCDIR)initialization.f90  $(BUILDDIR)global.o  $(BUILDDIR)tools.o  $(BUILDDIR)grid_and_partition.o  createbuilddir
+$(BUILDDIR)initialization.o: $(SRCDIR)initialization.f90  $(BUILDDIR)global.o  $(BUILDDIR)velocity_distribution.o  $(BUILDDIR)tools.o  $(BUILDDIR)grid_and_partition.o  createbuilddir
 	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)initialization.f90
 
-$(BUILDDIR)tools.o: $(SRCDIR)tools.f90  $(BUILDDIR)mpi_common.o  $(BUILDDIR)global.o  $(BUILDDIR)mt19937.o  createbuilddir
+$(BUILDDIR)tools.o: $(SRCDIR)tools.f90  $(BUILDDIR)mpi_common.o  $(BUILDDIR)global.o  $(BUILDDIR)screen.o  $(BUILDDIR)mt19937.o  createbuilddir
 	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)tools.f90
 
 $(BUILDDIR)grid_and_partition.o: $(SRCDIR)grid_and_partition.f90  $(BUILDDIR)mpi_common.o  $(BUILDDIR)global.o  $(BUILDDIR)tools.o  createbuilddir
@@ -81,6 +81,9 @@ $(BUILDDIR)mpi_common.o: $(SRCDIR)mpi_common.f90  createbuilddir
 
 $(BUILDDIR)particle.o: $(SRCDIR)particle.f90  createbuilddir
 	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)particle.f90
+
+$(BUILDDIR)velocity_distribution.o: $(SRCDIR)velocity_distribution.f90  $(BUILDDIR)tools.o  $(BUILDDIR)global.o  createbuilddir
+	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)velocity_distribution.f90
 
 $(BUILDDIR)collisions.o: $(SRCDIR)collisions.f90  createbuilddir
 	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)collisions.f90

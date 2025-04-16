@@ -432,15 +432,14 @@ MODULE timecycle
             IF (EMIT_TASK%TTRA == 0) THEN
                BETA = 0
             ELSE
-               BETA = 1./SQRT(2.*KB/M*EMIT_TASK%TTRA)
-               ! IF (BOOL_KAPPA_DISTRIBUTION)  BETA = 1./SQRT(2.*KB/M*EMIT_TASK%TTRA*(KAPPA_C-3./2.))
+               BETA = EMIT_TASK%VDF%BETA(EMIT_TASK%TTRA,M)
             END IF
 
             IF (COLOCATED_ELECTRONS) BETA_E = 1./SQRT(2.*KB/SPECIES(ELECTRON_S_ID)%MOLECULAR_MASS*COLOCATED_ELECTRONS_TTRA)
 
             DO IP = 1, NFS ! Loop on particles to be injected
 
-               CALL MAXWELL(0.d0, 0.d0, 0.d0, &
+               CALL EMIT_TASK%VDF%SAMPLE_VELOCITY(0.d0, 0.d0, 0.d0, &
                            EMIT_TASK%TTRA, EMIT_TASK%TTRA, EMIT_TASK%TTRA, &
                            Vdummy, V_TANG1, V_TANG2, M)
 
@@ -450,7 +449,7 @@ MODULE timecycle
                IF (EMIT_TASK%TTRA == 0) THEN
                   V_NORM = 0
                ELSE
-                  V_NORM = FLX(EMIT_TASK%U_NORM*BETA, EMIT_TASK%TTRA, M)
+                  V_NORM = EMIT_TASK%VDF%FLX(EMIT_TASK%U_NORM*BETA, EMIT_TASK%TTRA, M)
                END IF
 
                VX = EMIT_TASK%UX &

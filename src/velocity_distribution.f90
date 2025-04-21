@@ -36,8 +36,8 @@ MODULE velocity_distribution
     TYPE, EXTENDS(VELOCITY_DISTRIBUTION_STRUCTURE) :: MAXWELL_VDF
         CONTAINS
         PROCEDURE :: SAMPLE_VELOCITY => SAMPLE_VELOCITY_MAXWELL
-        PROCEDURE :: FLX => FLX_MAXWELL
-        PROCEDURE :: FLUXSOURCE => FLUXSOURCE_MAXWELL
+        PROCEDURE :: SAMPLE_NORMAL => SAMPLE_NORMAL_MAXWELL
+        PROCEDURE :: FLUX_DISTR => FLUX_DISTR_MAXWELL
         PROCEDURE :: BETA => BETA_MAXWELL
     END TYPE MAXWELL_VDF
 
@@ -50,8 +50,8 @@ MODULE velocity_distribution
         REAL(KIND=8) :: KAPPA = 3.d0
         CONTAINS
         PROCEDURE :: SAMPLE_VELOCITY => SAMPLE_VELOCITY_KAPPA
-        PROCEDURE :: FLX => FLX_KAPPA
-        PROCEDURE :: FLUXSOURCE => FLUXSOURCE_KAPPA
+        PROCEDURE :: SAMPLE_NORMAL => SAMPLE_NORMAL_KAPPA
+        PROCEDURE :: FLUX_DISTR => FLUX_DISTR_KAPPA
         PROCEDURE :: BETA => BETA_KAPPA
     END TYPE KAPPA_VDF
 
@@ -62,25 +62,33 @@ MODULE velocity_distribution
     ! =====  TO BE FINISHED ========
     ! This VDF should be manually loaded from a text file
 
+
     CONTAINS
 
+
+    !!!! Routine to assign a VDF during initialization !!!!
     SUBROUTINE ASSIGN_VDF(VDF, VDF_NAME)
         CLASS(VELOCITY_DISTRIBUTION_STRUCTURE), ALLOCATABLE, INTENT(INOUT) :: VDF
         CHARACTER(*), INTENT(IN) :: VDF_NAME
 
         SELECT CASE (VDF_NAME)
-        CASE('Maxwell')
-          ALLOCATE(MAXWELL_VDF :: VDF)
+            CASE('Maxwell')
+                ALLOCATE(MAXWELL_VDF :: VDF)
 
-        CASE('Kappa')
-          ALLOCATE(KAPPA_VDF :: VDF)
-          
-        CASE DEFAULT
-          ALLOCATE(MAXWELL_VDF :: VDF)
-          CALL ONLYMASTERPRINT1(PROC_ID, 'Velocity distribution not specified for this task! Assuming Maxwell-Boltzmann VDF...')
-      END SELECT
+            CASE('Kappa')
+                ALLOCATE(KAPPA_VDF :: VDF)
+            
+            CASE DEFAULT
+                ALLOCATE(MAXWELL_VDF :: VDF)
+                CALL ONLYMASTERPRINT1(PROC_ID, &
+                'Velocity distribution not specified for this task! Assuming Maxwell-Boltzmann VDF...')
+        END SELECT
     END SUBROUTINE ASSIGN_VDF
 
+
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    !!!!!!  MAXWELL-BOLTZMANN VDF - Define routines !!!!!!
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     SUBROUTINE SAMPLE_VELOCITY_MAXWELL(THIS,UX, UY, UZ, TX, TY, TZ, VX, VY, VZ, M)
 
@@ -142,7 +150,8 @@ MODULE velocity_distribution
 
     END SUBROUTINE SAMPLE_VELOCITY_MAXWELL
 
-    FUNCTION FLX_MAXWELL(THIS, SN, TINF, M) RESULT(OUT)
+
+    FUNCTION SAMPLE_NORMAL_MAXWELL(THIS, SN, TINF, M) RESULT(OUT)
 
         IMPLICIT NONE
 
@@ -177,26 +186,21 @@ MODULE velocity_distribution
 
         RETURN
 
-    END FUNCTION FLX_MAXWELL
+    END FUNCTION SAMPLE_NORMAL_MAXWELL
 
-    FUNCTION FLUXSOURCE_MAXWELL(THIS,S_NORM, U_NORM, TTRA, M) RESULT(OUT)
+    FUNCTION FLUX_DISTR_MAXWELL(THIS, BETA, S_NORM) RESULT(OUT)
         CLASS(MAXWELL_VDF), INTENT(IN) :: THIS
-        REAL(KIND=8), INTENT(INOUT) :: S_NORM
-        REAL(KIND=8), INTENT(IN) :: U_NORM,TTRA,M
+        REAL(KIND=8), INTENT(IN) :: BETA, S_NORM
         REAL(KIND=8) :: OUT
 
-        REAL(KIND=8) :: BETA
-
-        BETA = 1./SQRT(2.*KB/M*TTRA)
-        S_NORM = U_NORM*BETA
         OUT = 1.d0/(BETA*2.*SQRT(PI)) * (EXP(-S_NORM**2) &
-                                + SQRT(PI)*S_NORM*(1.+ERF1(S_NORM)))  
-    END FUNCTION FLUXSOURCE_MAXWELL
+                                + SQRT(PI)*S_NORM*(1.+ERF1(S_NORM)))
+    END FUNCTION FLUX_DISTR_MAXWELL
 
     FUNCTION BETA_MAXWELL(THIS, TTRA, M) RESULT(OUT)
         CLASS(MAXWELL_VDF), INTENT(IN) :: THIS
 
-        REAL(KIND=8), INTENT(IN) :: TTRA, m
+        REAL(KIND=8), INTENT(IN) :: TTRA, M
         REAL(KIND=8) :: OUT
 
         OUT = 1./SQRT(2.*KB*TTRA/M)
@@ -204,6 +208,10 @@ MODULE velocity_distribution
      END FUNCTION BETA_MAXWELL
 
 
+
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    !!!!!!  KAPPA VDF - Define routines !!!!!!
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
     SUBROUTINE SAMPLE_VELOCITY_KAPPA(THIS,UX, UY, UZ, TX, TY, TZ, VX, VY, VZ, M)
@@ -228,9 +236,6 @@ MODULE velocity_distribution
         TT(1) = TX
         TT(2) = TY
         TT(3) = TZ
-     
-     
-        !!!!! KAPPA DISTRIBUTION !!!!!
      
         DO I = 1,3
            ! Step 1.
@@ -263,7 +268,7 @@ MODULE velocity_distribution
         END SUBROUTINE SAMPLE_VELOCITY_KAPPA
 
 
-        FUNCTION FLX_KAPPA(THIS, SN, TINF, M) RESULT(OUT)
+        FUNCTION SAMPLE_NORMAL_KAPPA(THIS, SN, TINF, M) RESULT(OUT)
 
             IMPLICIT NONE
     
@@ -302,22 +307,19 @@ MODULE velocity_distribution
     
             RETURN
     
-        END FUNCTION FLX_KAPPA
+        END FUNCTION SAMPLE_NORMAL_KAPPA
+
     
-        FUNCTION FLUXSOURCE_KAPPA(THIS,S_NORM, U_NORM, TTRA, M) RESULT(OUT)
+        FUNCTION FLUX_DISTR_KAPPA(THIS, BETA, S_NORM) RESULT(OUT)
             CLASS(KAPPA_VDF), INTENT(IN) :: THIS
-            REAL(KIND=8), INTENT(INOUT) :: S_NORM
-            REAL(KIND=8), INTENT(IN) :: U_NORM,TTRA,M
+            REAL(KIND=8), INTENT(IN) :: BETA, S_NORM
             REAL(KIND=8) :: OUT
     
-            REAL(KIND=8) :: BETA, KAPPA_C
+            REAL(KIND=8) :: KAPPA_C
             REAL(KIND=8) :: INTEG1, INTEG2
             INTEGER :: I
 
             KAPPA_C = THIS%KAPPA
-    
-            BETA = 1./SQRT(2.*KB/M*TTRA*(KAPPA_C-3./2.))
-            S_NORM = U_NORM*BETA
 
             INTEG1 = PI/2.
             INTEG2 = ATAN(S_NORM)
@@ -328,12 +330,13 @@ MODULE velocity_distribution
             OUT = GAMMA(KAPPA_C)/GAMMA(KAPPA_C-1./2.)/(BETA*SQRT(PI)) * &
                 ( 1./(KAPPA_C-1.)/2.*(1+S_NORM**2)**(-KAPPA_C+1.) + S_NORM*(INTEG1 +INTEG2))
 
-        END FUNCTION FLUXSOURCE_KAPPA
+        END FUNCTION FLUX_DISTR_KAPPA
+
 
         FUNCTION BETA_KAPPA(THIS, TTRA, M) RESULT(OUT)
             CLASS(KAPPA_VDF), INTENT(IN) :: THIS
     
-            REAL(KIND=8), INTENT(IN) :: TTRA, m
+            REAL(KIND=8), INTENT(IN) :: TTRA, M
             REAL(KIND=8) :: OUT
 
             REAL(KIND=8) :: KAPPA_C

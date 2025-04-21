@@ -48,7 +48,8 @@ MODULE initialization
       CHARACTER*512      :: MIXTURE_DEFINITION, VSS_PARAMS_FILENAME, LINESOURCE_DEFINITION, WALL_DEFINITION, MCC_BG_FILENAME
       CHARACTER*512      :: BC_DEFINITION, SOLENOID_DEFINITION, MAGNET_DEFINITION
       CHARACTER*64       :: MIX_BOUNDINJECT_NAME, DSMC_COLL_MIX_NAME, MCC_BG_MIX_NAME, PIC_TYPE_STRING, PARTITION_STYLE_STRING, &
-      COLLISION_TYPE_STRING, REMOVE_MIX_NAME
+      COLLISION_TYPE_STRING, REMOVE_MIX_NAME, MIX_BOUNDINJECT_VDF_NAME
+      CLASS(VELOCITY_DISTRIBUTION_STRUCTURE), ALLOCATABLE :: TEMP_VDF_BOUND
 
       ! Open input file for reading
       OPEN(UNIT=in1,FILE='input', STATUS='old',IOSTAT=ios)
@@ -179,12 +180,8 @@ MODULE initialization
          END IF
          
          ! Fluid electrons setting
-         IF (line=='Fluid_electrons_n0:')      READ(in1,*) BOLTZ_N0
-         IF (line=='Fluid_electrons_phi0:')    READ(in1,*) BOLTZ_PHI0
-         IF (line=='Fluid_electrons_Te:')      READ(in1,*) BOLTZ_TE
-
-         IF (line=='Bool_kappa_fluid:')        READ(in1,*) BOOL_KAPPA_FLUID
-         IF (line=='Kappa_constant_fluid:')    READ(in1,*) KAPPA_FLUID_C
+         IF (line=='Fluid_electrons:')         READ(in1,*) BOLTZ_N0, BOLTZ_PHI0, BOLTZ_TE
+         IF (line=='Kappa_fluid:')             READ(in1,*) BOOL_KAPPA_FLUID, KAPPA_FLUID_C
 
          IF (line=='Jacobian_type:')           READ(in1,*) JACOBIAN_TYPE
          IF (line=='Residual_and_jacobian_combined:') READ(in1,*) RESIDUAL_AND_JACOBIAN_COMBINED
@@ -331,6 +328,11 @@ MODULE initialization
          IF (line=='Boundaries_inject_mixture:') THEN
             READ(in1,*) MIX_BOUNDINJECT_NAME
             MIX_BOUNDINJECT = MIXTURE_NAME_TO_ID(MIX_BOUNDINJECT_NAME)
+         END IF
+         IF (line=='Boundaries_velocity_distribution:') THEN
+            READ(in1,*) MIX_BOUNDINJECT_VDF_NAME
+            CALL ASSIGN_VDF(TEMP_VDF_BOUND,MIX_BOUNDINJECT_VDF_NAME)
+            ALLOCATE(VDF_BOUND, SOURCE=TEMP_VDF_BOUND)
          END IF
 
          ! ~~~~~~~~~~~~~  Particle injection at line source ~~~~~~~~~~~
@@ -956,9 +958,10 @@ MODULE initialization
       INTEGER :: N_STR
       CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
 
-      CHARACTER*64 :: MIX_NAME
+      CHARACTER*64 :: MIX_NAME, VDF_NAME
       INTEGER      :: MIX_ID
       TYPE(LINESOURCE), DIMENSION(:), ALLOCATABLE :: TEMP_LINESOURCES
+      CLASS(VELOCITY_DISTRIBUTION_STRUCTURE), ALLOCATABLE :: TEMP_VDF
 
       IF (ALLOCATED(LINESOURCES)) THEN
          ALLOCATE(TEMP_LINESOURCES(N_LINESOURCES+1)) ! Append the mixture to the list
@@ -985,10 +988,15 @@ MODULE initialization
       READ(STRARRAY(10),'(ES14.0)') LINESOURCES(N_LINESOURCES)%TROT
       READ(STRARRAY(10),'(ES14.0)') LINESOURCES(N_LINESOURCES)%TVIB
       READ(STRARRAY(11),'(A10)') MIX_NAME
+      READ(STRARRAY(12),'(A10)') VDF_NAME
+
+      CALL ASSIGN_VDF(TEMP_VDF, VDF_NAME)
+
       ! WRITE(*,*) LINESOURCES(N_LINESOURCES)%UX
       ! WRITE(*,*) LINESOURCES(N_LINESOURCES)%NRHO
       MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
       LINESOURCES(N_LINESOURCES)%MIX_ID = MIX_ID
+      ALLOCATE(LINESOURCES(N_LINESOURCES)%VDF, SOURCE=TEMP_VDF)
 
    END SUBROUTINE DEF_LINESOURCE
 
@@ -1453,6 +1461,7 @@ MODULE initialization
       CLASS(VELOCITY_DISTRIBUTION_STRUCTURE), ALLOCATABLE :: TEMP_VDF
 
       REAL(KIND=8) :: NRHO, UX, UY, UZ, TTRAX, TTRAY, TTRAZ, TROT, TVIB
+      REAL(KIND=8) :: KAPPA
 
       CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
 
@@ -1470,6 +1479,9 @@ MODULE initialization
       READ(STRARRAY(11),'(A10)') VDF_NAME
 
       CALL ASSIGN_VDF(TEMP_VDF,VDF_NAME)
+      ! SELECT TYPE(TEMP_VDF)
+      !    TYPE IS (KAPPA_VDF)
+            
 
       MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
 
@@ -1509,9 +1521,10 @@ MODULE initialization
       INTEGER :: N_STR
       CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
 
-      CHARACTER*64 :: MIX_NAME
+      CHARACTER*64 :: MIX_NAME, VDF_NAME
       INTEGER      :: MIX_ID
       TYPE(VOLUME_INJECT_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: TEMP_VOLUME_INJECT_TASK
+      CLASS(VELOCITY_DISTRIBUTION_STRUCTURE), ALLOCATABLE :: TEMP_VDF
 
       REAL(KIND=8) :: NRHODOT, UX, UY, UZ, TTRAX, TTRAY, TTRAZ, TROT, TVIB
 
@@ -1528,6 +1541,9 @@ MODULE initialization
       READ(STRARRAY(8), '(ES14.0)') TTRAZ
       READ(STRARRAY(9), '(ES14.0)') TROT
       READ(STRARRAY(10),'(ES14.0)') TVIB
+      READ(STRARRAY(11),'(A10)') VDF_NAME
+
+      CALL ASSIGN_VDF(TEMP_VDF, VDF_NAME)
 
       MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
 
@@ -1553,6 +1569,7 @@ MODULE initialization
       VOLUME_INJECT_TASKS(N_VOLUME_INJECT_TASKS)%TROT = TROT
       VOLUME_INJECT_TASKS(N_VOLUME_INJECT_TASKS)%TVIB = TVIB
       VOLUME_INJECT_TASKS(N_VOLUME_INJECT_TASKS)%MIX_ID = MIX_ID
+      ALLOCATE(VOLUME_INJECT_TASKS(N_VOLUME_INJECT_TASKS)%VDF, SOURCE=TEMP_VDF)
 
    END SUBROUTINE DEF_VOLUME_INJECT
 
@@ -2393,7 +2410,7 @@ MODULE initialization
       !INTEGER, DIMENSION(:), ALLOCATABLE :: EMIT_COUNT
  
       REAL(KIND=8)  :: M, FRAC
-      INTEGER :: N_COMP, IS, S_ID, ILINE, ITASK, I
+      INTEGER :: N_COMP, IS, S_ID, ILINE, ITASK
 
       REAL(KIND=8) :: X1, X2, Y1, Y2
     
@@ -2521,7 +2538,8 @@ MODULE initialization
             S_ID = MIXTURES(LINESOURCES(ILINE)%MIX_ID)%COMPONENTS(IS)%ID
             M = SPECIES(S_ID)%MOLECULAR_MASS
             FRAC = MIXTURES(LINESOURCES(ILINE)%MIX_ID)%COMPONENTS(IS)%MOLFRAC
-            BETA = 1./SQRT(2.*KB/M*LINESOURCES(ILINE)%TTRA) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
+            ! BETA = 1./SQRT(2.*KB/M*LINESOURCES(ILINE)%TTRA) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
+            BETA = LINESOURCES(ILINE)%VDF%BETA(LINESOURCES(ILINE)%TTRA,M)
          
             LINELENGTH = SQRT((LINESOURCES(ILINE)%X2-LINESOURCES(ILINE)%X1)**2 + (LINESOURCES(ILINE)%Y2-LINESOURCES(ILINE)%Y1)**2)
 
@@ -2535,8 +2553,9 @@ MODULE initialization
             LINESOURCES(ILINE)%S_NORM = S_NORM
             Snow   = S_NORM     ! temp variable
 
-            FLUXLINESOURCE   = LINESOURCES(ILINE)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) &
-                                    + SQRT(PI)*Snow*(1.+ERF1(Snow)))      ! Tot number flux emitted
+            ! FLUXLINESOURCE   = LINESOURCES(ILINE)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) &
+            !                         + SQRT(PI)*Snow*(1.+ERF1(Snow)))      ! Tot number flux emitted
+            FLUXLINESOURCE   = LINESOURCES(ILINE)%NRHO*FRAC*LINESOURCES(ILINE)%VDF%FLUX_DISTR(BETA,S_NORM)
 
             IF (AXI) THEN
                AREA = 0.5*(ZMAX-ZMIN)*LINELENGTH*(LINESOURCES(ILINE)%Y1+LINESOURCES(ILINE)%Y2)
@@ -2612,22 +2631,23 @@ MODULE initialization
             S_ID = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%COMPONENTS(IS)%ID
             M = SPECIES(S_ID)%MOLECULAR_MASS
             FRAC = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%COMPONENTS(IS)%MOLFRAC
-            ! IF (EMIT_TASKS(ITASK)%TTRA == 0) THEN
-            !    BETA = 0
-            ! ELSE
-            !    BETA = 1./SQRT(2.*KB/M*EMIT_TASKS(ITASK)%TTRA) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
-            ! END IF
+            IF (EMIT_TASKS(ITASK)%TTRA == 0) THEN
+               BETA = 0
+            ELSE
+               ! BETA = 1./SQRT(2.*KB/M*EMIT_TASKS(ITASK)%TTRA) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
+               BETA = EMIT_TASKS(ITASK)%VDF%BETA(EMIT_TASKS(ITASK)%TTRA,M)
+            END IF
 
             U_NORM = EMIT_TASKS(ITASK)%UX*NORMX + EMIT_TASKS(ITASK)%UY*NORMY + EMIT_TASKS(ITASK)%UZ*NORMZ ! Molecular speed ratio normal to boundary
             EMIT_TASKS(ITASK)%U_NORM = U_NORM
-            ! S_NORM = U_NORM*BETA
+            S_NORM = U_NORM*BETA
 
             IF (EMIT_TASKS(ITASK)%TTRA == 0) THEN
                FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC*U_NORM      ! Tot number flux emitted
             ELSE
                ! FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-S_NORM**2) &
                !                + SQRT(PI)*S_NORM*(1.+ERF1(S_NORM)))      ! Tot number flux emitted
-               FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC*EMIT_TASKS(ITASK)%VDF%FLUXSOURCE(S_NORM,U_NORM,EMIT_TASKS(ITASK)%TTRA,M)
+               FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC*EMIT_TASKS(ITASK)%VDF%FLUX_DISTR(BETA,S_NORM)
             END IF
 
             NtotINJECT = FLUXLINESOURCE*AREA*DT/FNUM         ! Tot num of particles to be injected

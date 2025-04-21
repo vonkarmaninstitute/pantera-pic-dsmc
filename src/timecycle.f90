@@ -449,7 +449,7 @@ MODULE timecycle
                IF (EMIT_TASK%TTRA == 0) THEN
                   V_NORM = 0
                ELSE
-                  V_NORM = EMIT_TASK%VDF%FLX(EMIT_TASK%U_NORM*BETA, EMIT_TASK%TTRA, M)
+                  V_NORM = EMIT_TASK%VDF%SAMPLE_NORMAL(EMIT_TASK%U_NORM*BETA, EMIT_TASK%TTRA, M)
                END IF
 
                VX = EMIT_TASK%UX &
@@ -658,7 +658,8 @@ MODULE timecycle
 
                      ! Assign velocity and energy following a Boltzmann distribution
                      M = SPECIES(S_ID)%MOLECULAR_MASS
-                     CALL MAXWELL(VOLUME_INJECT_TASKS(ITASK)%UX, &
+                     CALL VOLUME_INJECT_TASKS(ITASK)%VDF%SAMPLE_VELOCITY( &
+                                 VOLUME_INJECT_TASKS(ITASK)%UX, &
                                  VOLUME_INJECT_TASKS(ITASK)%UY, &
                                  VOLUME_INJECT_TASKS(ITASK)%UZ, &
                                  VOLUME_INJECT_TASKS(ITASK)%TTRAX, &
@@ -702,7 +703,8 @@ MODULE timecycle
                
                   ! Assign velocity and energy following a Boltzmann distribution
                   M = SPECIES(S_ID)%MOLECULAR_MASS
-                  CALL MAXWELL(VOLUME_INJECT_TASKS(ITASK)%UX, &
+                  CALL VOLUME_INJECT_TASKS(ITASK)%VDF%SAMPLE_VELOCITY( &
+                               VOLUME_INJECT_TASKS(ITASK)%UX, &
                                VOLUME_INJECT_TASKS(ITASK)%UY, &
                                VOLUME_INJECT_TASKS(ITASK)%UZ, &
                                VOLUME_INJECT_TASKS(ITASK)%TTRAX, &
@@ -777,14 +779,14 @@ MODULE timecycle
             DUMP_COUNTER = 0
             DO IP = 1, NFS ! Loop on particles to be injected
                
-               CALL MAXWELL(0.d0, 0.d0, 0.d0, &
+               CALL LINESOURCES(ILINE)%VDF%SAMPLE_VELOCITY(0.d0, 0.d0, 0.d0, &
                             LINESOURCES(ILINE)%TTRA, LINESOURCES(ILINE)%TTRA, LINESOURCES(ILINE)%TTRA, &
                             Vdummy, V_PERP, VZ, M)
 
                CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, LINESOURCES(ILINE)%TROT, EROT)
                CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, LINESOURCES(ILINE)%TVIB, EVIB)
                             
-               V_NORM = FLX(LINESOURCES(ILINE)%S_NORM, LINESOURCES(ILINE)%TTRA, M) !!AAAAAAAAAAA
+               V_NORM = LINESOURCES(ILINE)%VDF%SAMPLE_NORMAL(LINESOURCES(ILINE)%S_NORM, LINESOURCES(ILINE)%TTRA, M) !!AAAAAAAAAAA
 
                VX = V_NORM*LINESOURCES(ILINE)%NORMX - V_PERP*LINESOURCES(ILINE)%NORMY + LINESOURCES(ILINE)%UX
                VY = V_PERP*LINESOURCES(ILINE)%NORMX + V_NORM*LINESOURCES(ILINE)%NORMY + LINESOURCES(ILINE)%UY
@@ -879,14 +881,14 @@ MODULE timecycle
 
             DO IP = 1, NFS ! Loop on particles to be injected
 
-               CALL MAXWELL(UX_BOUND,UY_BOUND,UZ_BOUND, &
+               CALL VDF_BOUND%SAMPLE_VELOCITY(UX_BOUND,UY_BOUND,UZ_BOUND, &
                            TTRA_BOUND,TTRA_BOUND,TTRA_BOUND, &
                            Vdummy,VY,VZ,M)
                
                CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, TROT_BOUND, EROT)
                CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, TVIB_BOUND, EVIB)
 
-               VX = UX_BOUND + FLX(S_NORM_XMIN,TTRA_BOUND,M) !!AAAAAAAAAAA
+               VX = UX_BOUND + VDF_BOUND%SAMPLE_NORMAL(S_NORM_XMIN,TTRA_BOUND,M) !!AAAAAAAAAAA
 
                DTFRAC = rf()*DT
                X = XMIN
@@ -918,14 +920,14 @@ MODULE timecycle
 
             DO IP = 1, NFS ! Loop on particles to be injected
 
-               CALL MAXWELL(UX_BOUND,UY_BOUND,UZ_BOUND, &
+               CALL VDF_BOUND%SAMPLE_VELOCITY(UX_BOUND,UY_BOUND,UZ_BOUND, &
                            TTRA_BOUND,TTRA_BOUND,TTRA_BOUND, &
                            Vdummy,VY,VZ,M)
 
                CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, TROT_BOUND, EROT)
                CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, TVIB_BOUND, EVIB)
 
-               VX = UX_BOUND - FLX(S_NORM_XMAX,TTRA_BOUND,M) !! I think something was wrong here with the sign
+               VX = UX_BOUND - VDF_BOUND%SAMPLE_NORMAL(S_NORM_XMAX,TTRA_BOUND,M) !! I think something was wrong here with the sign
 
                DTFRAC = rf()*DT
                X = XMAX
@@ -956,14 +958,14 @@ MODULE timecycle
 
             DO IP = 1, NFS ! Loop on particles to be injected
 
-               CALL MAXWELL(UX_BOUND,UY_BOUND,UZ_BOUND, &
+               CALL VDF_BOUND%SAMPLE_VELOCITY(UX_BOUND,UY_BOUND,UZ_BOUND, &
                            TTRA_BOUND,TTRA_BOUND,TTRA_BOUND, &
                            VX,Vdummy,VZ,M)
 
                CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, TROT_BOUND, EROT)
                CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, TVIB_BOUND, EVIB)
 
-               VY = UY_BOUND + FLX(S_NORM_YMIN,TTRA_BOUND,M) !!AAAAAAAAAAA
+               VY = UY_BOUND + VDF_BOUND%SAMPLE_NORMAL(S_NORM_YMIN,TTRA_BOUND,M) !!AAAAAAAAAAA
 
                DTFRAC = rf()*DT
                X = XMIN + (XMAX-XMIN)*rf()
@@ -993,14 +995,14 @@ MODULE timecycle
 
             DO IP = 1, NFS ! Loop on particles to be injected
 
-               CALL MAXWELL(UX_BOUND,UY_BOUND,UZ_BOUND, &
+               CALL VDF_BOUND%SAMPLE_VELOCITY(UX_BOUND,UY_BOUND,UZ_BOUND, &
                            TTRA_BOUND,TTRA_BOUND,TTRA_BOUND, &
                            VX,Vdummy,VZ,M)
 
                CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, TROT_BOUND, EROT)
                CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, TVIB_BOUND, EVIB)
 
-               VY = UY_BOUND - FLX(S_NORM_YMAX,TTRA_BOUND,M) !!AAAAAAAAAAA
+               VY = UY_BOUND - VDF_BOUND%SAMPLE_NORMAL(S_NORM_YMAX,TTRA_BOUND,M) !!AAAAAAAAAAA
 
                DTFRAC = rf()*DT
                X = XMIN + (XMAX-XMIN)*rf() ! There was a bug here!

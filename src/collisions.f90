@@ -1648,7 +1648,7 @@ MODULE collisions
          REACTIONS(JR)%COUNTS = 0
       END DO
 
-      NULL_COLL_FREQ = MCC_BG_DENS*1e-12
+      NULL_COLL_FREQ = MCC_BG_DENS*2e-13
       P_NULL = 1 - EXP(-DT*NULL_COLL_FREQ)
       !P_NULL = DT*NULL_COLL_FREQ
       IF (P_NULL > 1) THEN
@@ -1802,7 +1802,11 @@ MODULE collisions
                            + SPECIES(P4_SP_ID)%MOLECULAR_MASS
                      END IF
                      TOTDOF = TOTDOF - 3.
-                     EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, 3)
+                     IF (REACTIONS(JR)%N_PROD == 3) THEN
+                        EI = COLL_INTERNAL_ENERGY_EQUAL(ECOLL, TOTDOF, 3)
+                     ELSE
+                        EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, 3)
+                     END IF
                      CALL HS_SCATTER(EI, M1, M2, C1, C2)
                      ECOLL = ECOLL - EI
       
@@ -1839,6 +1843,19 @@ MODULE collisions
                         C2(1),C2(2),C2(3),EROT,EVIB,P3_SP_ID,particles(JP2)%IC,DT, NEWparticle)
                         !WRITE(*,*) 'Should be adding particle!'
                         CALL ADD_PARTICLE_ARRAY(NEWparticle, NP_PROC, particles)
+
+                        ! WRITE(*,*) 'P1 SP', particles(JP1)%S_ID, &
+                        ! ' E = ', 0.5*SPECIES(particles(JP1)%S_ID)%MOLECULAR_MASS* &
+                        ! (particles(JP1)%VX*particles(JP1)%VX + particles(JP1)%VY*particles(JP1)%VY &
+                        !  + particles(JP1)%VZ*particles(JP1)%VZ), &
+                        ! 'P2 SP', particles(JP2)%S_ID, &
+                        ! ' E = ', 0.5*SPECIES(particles(JP2)%S_ID)%MOLECULAR_MASS* &
+                        ! (particles(JP2)%VX*particles(JP2)%VX + particles(JP2)%VY*particles(JP2)%VY &
+                        !  + particles(JP2)%VZ*particles(JP2)%VZ), &
+                        ! 'P3 SP', particles(NP_PROC)%S_ID, &
+                        ! ' E = ', 0.5*SPECIES(particles(NP_PROC)%S_ID)%MOLECULAR_MASS* &
+                        ! (particles(NP_PROC)%VX*particles(NP_PROC)%VX + particles(NP_PROC)%VY*particles(NP_PROC)%VY &
+                        ! + particles(NP_PROC)%VZ*particles(NP_PROC)%VZ)
                         
                      ELSE IF (REACTIONS(JR)%N_PROD == 4) THEN
                         TOTDOF = TOTDOF - SPECIES(P3_SP_ID)%VIBDOF

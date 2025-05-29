@@ -1284,7 +1284,7 @@ MODULE fields
       CALL KSPSolve(ksp,bvec,xvec,ierr)
       
       CALL KSPGetConvergedReason(ksp,reason,ierr)
-      IF (PROC_ID == 0) WRITE(*,*) 'KSPConvergedReason = ', reason
+      IF (MOD(tID, STATS_EVERY) .EQ. 0 .AND. PROC_ID == 0) WRITE(*,*) 'KSPConvergedReason = ', reason
       
       CALL VecScatterCreateToAll(xvec,ctx,X_SEQ,ierr)
       CALL VecScatterBegin(ctx,xvec,X_SEQ,INSERT_VALUES,SCATTER_FORWARD,ierr)
@@ -1592,7 +1592,7 @@ MODULE fields
 
       CALL SNESSolve(snes,PETSC_NULL_VEC,solvec,ierr)
       CALL SNESGetConvergedReason(snes,snesreason,ierr)
-      IF (PROC_ID == 0) WRITE(*,*) 'SNESConvergedReason = ', snesreason
+      IF (MOD(tID, STATS_EVERY) .EQ. 0 .AND. PROC_ID == 0)  WRITE(*,*) 'SNESConvergedReason = ', snesreason
       !CALL VecView(solvec,PETSC_VIEWER_STDOUT_WORLD,ierr)
       !IF (PROC_ID == 0) WRITE(*,*) 'PHI_FIELD was: ', PHI_FIELD
 
@@ -4387,7 +4387,7 @@ MODULE fields
       ! ------ SOLVE ------
       CALL SNESSolve(snes,PETSC_NULL_VEC,solvec,ierr)
       CALL SNESGetConvergedReason(snes,snesreason,ierr)
-      IF (PROC_ID == 0) WRITE(*,*) 'SNESConvergedReason = ', snesreason
+      IF (MOD(tID, STATS_EVERY) .EQ. 0 .AND. PROC_ID == 0) WRITE(*,*) 'SNESConvergedReason = ', snesreason
 
       
       CALL VecScatterCreateToAll(solvec,ctx,solvec_seq,ierr)
@@ -5187,7 +5187,7 @@ MODULE fields
       CALL KSPSolve(ksp,bvec,xvec,ierr)
 
       CALL KSPGetConvergedReason(ksp,reason,ierr)
-      IF (PROC_ID == 0) WRITE(*,*) 'KSPConvergedReason = ', reason
+      IF (MOD(tID, STATS_EVERY) .EQ. 0 .AND. PROC_ID == 0)  WRITE(*,*) 'KSPConvergedReason = ', reason
 
       CALL VecScatterCreateToAll(xvec,ctx,xvec_seq,ierr)
       CALL VecScatterBegin(ctx,xvec,xvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)

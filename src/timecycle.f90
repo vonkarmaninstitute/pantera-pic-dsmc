@@ -1,21 +1,3 @@
-! Copyright (C) 2025 von Karman Institute for Fluid Dynamics (VKI)
-!
-! This file is part of PANTERA PIC-DSMC, a software for the simulation
-! of rarefied gases and plasmas using particles.
-!
-! This program is free software: you can redistribute it and/or modify
-! it under the terms of the GNU General Public License as published by
-! the Free Software Foundation, either version 3 of the License, or
-! (at your option) any later version.
-
-! This program is distributed in the hope that it will be useful,
-! but WITHOUT ANY WARRANTY; without even the implied warranty of
-! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-! GNU General Public License for more details.
-
-! You should have received a copy of the GNU General Public License
-! along with this program.  If not, see <https://www.gnu.org/licenses/>.PANTERA PIC-DSMC
-
 MODULE timecycle
 
    USE global
@@ -25,6 +7,7 @@ MODULE timecycle
    USE collisions
    USE postprocess
    USE fields
+   USE fully_implicit
    USE washboard
 
    CONTAINS
@@ -40,7 +23,6 @@ MODULE timecycle
       INTEGER :: NP_TOT, NCOLL_TOT, NREAC_TOT
       REAL(KIND=8) :: FIELD_POWER_TOT
       REAL(KIND=8) :: CURRENT_TIME, CURRENT_CPU_TIME, EST_TIME
-      INTEGER :: EST_TIME_H, EST_TIME_M
 
       CHARACTER(len=512) :: stringTMP
 
@@ -129,9 +111,7 @@ MODULE timecycle
          CURRENT_TIME = tID*DT
          CALL CPU_TIME(CURRENT_CPU_TIME)
          CURRENT_CPU_TIME = CURRENT_CPU_TIME - START_CPU_TIME 
-         EST_TIME = DBLE(NT-tID)/DBLE(tID-RESTART_TIMESTEP)*CURRENT_CPU_TIME
-         EST_TIME_H = INT(EST_TIME/3600.d0)
-         EST_TIME_M = INT((EST_TIME - EST_TIME_H*3600.d0)/60.d0)
+         EST_TIME = DBLE(NT-tID)/DBLE(tID-RESTART_TIMESTEP)*CURRENT_CPU_TIME/3600.d0
 
          IF (MOD(tID, STATS_EVERY) .EQ. 0) THEN
             CALL MPI_REDUCE(NP_PROC, NP_TOT, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
@@ -141,25 +121,15 @@ MODULE timecycle
 
             
 
-            WRITE(stringTMP, '(A13,I8,A4,I8,A9,ES14.3,A17,F10.1,A27,I5,A5,I2,A4,A24,I10,A25,I10,A24,I10)') &
+            WRITE(stringTMP, '(A13,I8,A4,I8,A9,ES14.3,A17,F10.1,A27,F10.1,A28,I10,A25,I10,A24,I10,A23,ES14.3,A4,A17,ES14.3,A4)') &
                            '   Timestep: ', tID, ' of ', NT, &
                            ' - time: ', CURRENT_TIME, ' [s] - CPU time: ', CURRENT_CPU_TIME, &
-                           ' [s] - est. time required: ', EST_TIME_H, ' [h] ' , EST_TIME_M, ' [m]',&
-                           ' - number of particles: ', NP_TOT, &
+                           ' [s] - est. time required: ', EST_TIME, &
+                           ' [h] - number of particles: ', NP_TOT, &
                            ' - number of collisions: ', NCOLL_TOT, &
-                           ' - number of reactions: ', NREAC_TOT
-
-            ! Use this tho have the coil current and field power output to console.
-            ! WRITE(stringTMP, '(A13,I8,A4,I8,A9,ES14.3,A17,F10.1,A27,I5,A5,I2,A4,A24,I10, &
-            ! A25,I10,A24,I10,A23,ES14.3,A4,A17,ES14.3,A4)') &
-            !                '   Timestep: ', tID, ' of ', NT, &
-            !                ' - time: ', CURRENT_TIME, ' [s] - CPU time: ', CURRENT_CPU_TIME, &
-            !                ' [s] - est. time required: ', EST_TIME_H, ' [h] ' , EST_TIME_M, ' [m]',&
-            !                ' - number of particles: ', NP_TOT, &
-            !                ' - number of collisions: ', NCOLL_TOT, &
-            !                ' - number of reactions: ', NREAC_TOT, &
-            !                ' - rf power deposited: ', FIELD_POWER_TOT, ' [W]', &
-            !                ' - coil current: ', COIL_CURRENT, ' [A]'
+                           ' - number of reactions: ', NREAC_TOT, &
+                           ' - rf power deposited: ', FIELD_POWER_TOT, ' [W]', &
+                           ' - coil current: ', COIL_CURRENT, ' [A]'
 
             CALL ONLYMASTERPRINT1(PROC_ID, TRIM(stringTMP))
 
@@ -288,7 +258,6 @@ MODULE timecycle
          IF (COLLISION_TYPE == MCC)  CALL MCC_COLLISIONS
          IF (COLLISION_TYPE == MCC_VAHEDI)  CALL MCC_COLLISIONS_VAHEDI
 
-
          IF (COLLISION_TYPE == DSMC .OR. COLLISION_TYPE == DSMC_VAHEDI) THEN
             CALL DSMC_COLLISIONS
          END IF
@@ -387,14 +356,7 @@ MODULE timecycle
 
          IC = EMIT_TASK%IC
 
-         IF (DIMS == 1) THEN
-            X1 = U1D_GRID%NODE_COORDS(1, EMIT_TASK%IV1)
-            X2 = U1D_GRID%NODE_COORDS(1, EMIT_TASK%IV2)
-
-            FACE_NORMAL = U1D_GRID%EDGE_NORMAL(:,EMIT_TASK%IFACE,IC)
-            FACE_TANG1 = [0.d0, FACE_NORMAL(1), 0.d0]
-            FACE_TANG2 = [0.d0, 0.d0, 1.d0]
-         ELSE IF (DIMS == 2) THEN
+         IF (DIMS == 2) THEN
             X1 = U2D_GRID%NODE_COORDS(1, EMIT_TASK%IV1)
             Y1 = U2D_GRID%NODE_COORDS(2, EMIT_TASK%IV1)
             X2 = U2D_GRID%NODE_COORDS(1, EMIT_TASK%IV2)
@@ -462,14 +424,7 @@ MODULE timecycle
 
                DTFRAC = rf()*DT
 
-
-               IF (DIMS == 1) THEN
-                  R = rf()
-
-                  X = X1 + R*(X2-X1)
-                  Y = YMIN + (YMAX-YMIN)*rf()
-                  Z = ZMIN + (ZMAX-ZMIN)*rf()
-               ELSE IF (DIMS == 2) THEN
+               IF (DIMS == 2) THEN
                   R = rf()
                   IF (AXI) THEN
                      IF (Y1 == Y2) THEN
@@ -582,28 +537,21 @@ MODULE timecycle
 
                DO IC = 1, NCELLS
                   ! Compute number of particles of this species per process to be created in this cell.
-                  IF (DIMS == 1) THEN
-                     VOL = U1D_GRID%CELL_VOLUMES(IC)   
-                  ELSE IF (DIMS == 2) THEN
+                  IF (DIMS == 2) THEN
                      VOL = U2D_GRID%CELL_VOLUMES(IC)
-                  ELSE IF (DIMS == 3) THEN
+                  ELSE
                      VOL = U3D_GRID%CELL_VOLUMES(IC)
                   END IF
                   NP_INIT = RANDINT(DT*VOLUME_INJECT_TASKS(ITASK)%NRHODOT/(FNUM*SPECIES(S_ID)%SPWT)*VOL* &
                               MIXTURES(VOLUME_INJECT_TASKS(ITASK)%MIX_ID)%COMPONENTS(i)%MOLFRAC/N_MPI_THREADS)
                   IF (NP_INIT == 0) CYCLE
 
-                  IF (DIMS == 1) THEN
-                     V1 = U1D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(1,IC))
-                     V2 = U1D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(2,IC))
-                     V3 = 0
-                     V4 = 0
-                  ELSE IF (DIMS == 2) THEN
+                  IF (DIMS == 2) THEN
                      V1 = U2D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(1,IC))
                      V2 = U2D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(2,IC))
                      V3 = U2D_GRID%NODE_COORDS(:,U2D_GRID%CELL_NODES(3,IC))
                      V4 = 0
-                  ELSE IF (DIMS == 3) THEN
+                  ELSE
                      V1 = U3D_GRID%NODE_COORDS(:,U3D_GRID%CELL_NODES(1,IC))
                      V2 = U3D_GRID%NODE_COORDS(:,U3D_GRID%CELL_NODES(2,IC))
                      V3 = U3D_GRID%NODE_COORDS(:,U3D_GRID%CELL_NODES(3,IC))
@@ -621,11 +569,7 @@ MODULE timecycle
                         S = 1-S; T = 1-T
                      END IF
 
-                     IF (DIMS == 1) THEN
-                        XP = V1(1) + (V2(1)-V1(1))*S
-                        YP = YMIN + (YMAX-YMIN)*T
-                        ZP = ZMIN + (ZMAX-ZMIN)*U
-                     ELSE IF (DIMS == 2) THEN
+                     IF (DIMS == 2) THEN
                         XP = V1(1) + (V2(1)-V1(1))*S + (V3(1)-V1(1))*T
                         YP = V1(2) + (V2(2)-V1(2))*S + (V3(2)-V1(2))*T
                         IF (AXI) THEN
@@ -633,7 +577,7 @@ MODULE timecycle
                         ELSE
                            ZP = ZMIN + (ZMAX-ZMIN)*U
                         END IF
-                     ELSE IF (DIMS == 3) THEN
+                     ELSE
                         ! http://vcg.isti.cnr.it/publications/papers/rndtetra_a.pdf
 
                         IF (S+T+U <= 1) THEN
@@ -1064,8 +1008,6 @@ MODULE timecycle
 
       REAL(KIND=8) :: VXPRE, VYPRE, VZPRE
 
-      
-      REAL(KIND=8) :: TOL = 1.0d-15
 
       E = [0.d0, 0.d0, 0.d0]
       B = [0.d0, 0.d0, 0.d0]
@@ -1089,7 +1031,7 @@ MODULE timecycle
 
       FIELD_POWER = 0
 
-      ! OPEN(66341, FILE='washboarddump', POSITION='append', STATUS='unknown', ACTION='write')
+      !OPEN(66341, FILE='washboarddump', POSITION='append', STATUS='unknown', ACTION='write')
 
 
       DO IP = 1, NP_PROC
@@ -1107,7 +1049,7 @@ MODULE timecycle
             !EBAR_FIELD = 0.d0
             CALL APPLY_E_FIELD(IP, E)
             B = 0
-            IF (N_SOLENOIDS > 0 .OR. N_MAGNETS > 0) CALL APPLY_B_FIELD(IP, B)
+            IF (N_SOLENOIDS > 0) CALL APPLY_B_FIELD(IP, B)
             B = B + EXTERNAL_B_FIELD
             ! CALL APPLY_RF_EB_FIELD(particles, IP, E, B)
             
@@ -1172,6 +1114,7 @@ MODULE timecycle
                   
                IF (AXI) THEN
                   DO I = 1, 3
+                     !!!! DBDBDBDBDDBBDBDBDBDBDBDBDBDBDBDDB work on this. To be adapted to the three sides of the cell.
                      ! We are axisymmetric
                      CANDIDATE_DTCOLL = DTCOLL
                      ! Compute auxiliary parameters
@@ -1200,8 +1143,8 @@ MODULE timecycle
                            ! Compute the solutions, check if they are any good and, in case, order them to be checked further.
                            SOL1 = (-COEFB - SQRT(DELTA))/COEFA
                            SOL2 = (-COEFB + SQRT(DELTA))/COEFA
-                           IF (SOL1 >= -TOL .AND. SOL1 < DTCOLL .AND. BETA+ALPHA*particles(IP)%VX*SOL1+EDGE_Y1 >= 0) THEN
-                              IF (SOL2 >= -TOL .AND. SOL2 < DTCOLL .AND. BETA+ALPHA*particles(IP)%VX*SOL2+EDGE_Y1 >= 0) THEN
+                           IF (SOL1 >= 0 .AND. SOL1 < DTCOLL .AND. BETA+ALPHA*particles(IP)%VX*SOL1+EDGE_Y1 >= 0) THEN
+                              IF (SOL2 >= 0 .AND. SOL2 < DTCOLL .AND. BETA+ALPHA*particles(IP)%VX*SOL2+EDGE_Y1 >= 0) THEN
                                  GOODSOL = 2
                                  IF (SOL1 <= SOL2) THEN
                                     TEST(1) = SOL1
@@ -1215,7 +1158,7 @@ MODULE timecycle
                                  TEST(1) = SOL1
                               ENDIF
                            ELSE
-                              IF (SOL2 >= -TOL .AND. SOL2 < DTCOLL .AND. BETA+ALPHA*particles(IP)%VX*SOL2+EDGE_Y1 >= 0) THEN
+                              IF (SOL2 >= 0 .AND. SOL2 < DTCOLL .AND. BETA+ALPHA*particles(IP)%VX*SOL2+EDGE_Y1 >= 0) THEN
                                  GOODSOL = 1
                                  TEST(1) = SOL2
                               ELSE
@@ -1253,35 +1196,21 @@ MODULE timecycle
                   END DO
                ELSE
                   ! We are not axisymmetric (valid also for simplified axisymmetric procedure)
-               
-                  IF (DIMS == 1) THEN
-                     DO I = 1, 2
-                        VN = particles(IP)%VX * U1D_GRID%EDGE_NORMAL(1,I,IC)
-                        ! Compute the distance from the boundary
-                        DX = (U1D_GRID%NODE_COORDS(1,U1D_GRID%CELL_NODES(I,IC)) - particles(IP)%X) * U1D_GRID%EDGE_NORMAL(1,I,IC)
-
-                        ! Check if a collision happens (sooner than previously calculated)
-                        IF (VN .GE. 0. .AND. VN * DTCOLL .GE. DX) THEN
-                           DTCOLL = DX/VN
-                           BOUNDCOLL = I
-                           TOTDTCOLL = TOTDTCOLL + DTCOLL  
-                           HASCOLLIDED = .TRUE.     
-                        END IF
-                     END DO
-                  ELSE IF (DIMS == 2) THEN
+                  IF (DIMS == 2) THEN
                      DO I = 1, 3
                         VN = particles(IP)%VX * U2D_GRID%EDGE_NORMAL(1,I,IC) &
                            + particles(IP)%VY * U2D_GRID%EDGE_NORMAL(2,I,IC)
                         ! Compute the distance from the boundary
                         DX = (U2D_GRID%NODE_COORDS(1,U2D_GRID%CELL_NODES(I,IC)) - particles(IP)%X) * U2D_GRID%EDGE_NORMAL(1,I,IC) &
                            + (U2D_GRID%NODE_COORDS(2,U2D_GRID%CELL_NODES(I,IC)) - particles(IP)%Y) * U2D_GRID%EDGE_NORMAL(2,I,IC)
-
                         ! Check if a collision happens (sooner than previously calculated)
                         IF (VN .GE. 0. .AND. VN * DTCOLL .GE. DX) THEN
+
                            DTCOLL = DX/VN
                            BOUNDCOLL = I
                            TOTDTCOLL = TOTDTCOLL + DTCOLL  
                            HASCOLLIDED = .TRUE.     
+
                         END IF
                      END DO
                   ELSE IF (DIMS == 3) THEN
@@ -1293,13 +1222,14 @@ MODULE timecycle
                         DX = (U3D_GRID%NODE_COORDS(1,U3D_GRID%CELL_NODES(I,IC)) - particles(IP)%X) * U3D_GRID%FACE_NORMAL(1,I,IC) &
                            + (U3D_GRID%NODE_COORDS(2,U3D_GRID%CELL_NODES(I,IC)) - particles(IP)%Y) * U3D_GRID%FACE_NORMAL(2,I,IC) &
                            + (U3D_GRID%NODE_COORDS(3,U3D_GRID%CELL_NODES(I,IC)) - particles(IP)%Z) * U3D_GRID%FACE_NORMAL(3,I,IC)
-
                         ! Check if a collision happens (sooner than previously calculated)
                         IF (VN .GE. 0. .AND. VN * DTCOLL .GE. DX) THEN
+
                            DTCOLL = DX/VN
                            BOUNDCOLL = I
                            TOTDTCOLL = TOTDTCOLL + DTCOLL  
                            HASCOLLIDED = .TRUE.     
+
                         END IF
                      END DO
                   END IF
@@ -1312,22 +1242,7 @@ MODULE timecycle
                   particles(IP)%DTRIM = particles(IP)%DTRIM - DTCOLL
 
                   FLUIDBOUNDARY = .FALSE.
-                  IF (DIMS == 1) THEN
-                     NEIGHBOR = U1D_GRID%CELL_NEIGHBORS(BOUNDCOLL, IC)
-                     IF (NEIGHBOR == -1) THEN
-                        FLUIDBOUNDARY = .TRUE.
-                     ELSE
-                        NEIGHBORPG = U1D_GRID%CELL_PG(NEIGHBOR)
-                        IF (NEIGHBORPG .NE. -1) THEN
-                           IF (GRID_BC(NEIGHBORPG)%VOLUME_BC == SOLID) FLUIDBOUNDARY = .TRUE.
-                        END IF
-                     END IF
-
-                     FACE_PG = U1D_GRID%CELL_EDGES_PG(BOUNDCOLL, IC)
-                     FACE_NORMAL = -U1D_GRID%EDGE_NORMAL(:,BOUNDCOLL,IC)
-                     FACE_TANG1 = [0.d0, FACE_NORMAL(1), 0.d0]
-                     FACE_TANG2 = [0.d0, 0.d0, 1.d0]
-                  ELSE IF (DIMS == 2) THEN
+                  IF (DIMS == 2) THEN
                      NEIGHBOR = U2D_GRID%CELL_NEIGHBORS(BOUNDCOLL, IC)
                      IF (NEIGHBOR == -1) THEN
                         FLUIDBOUNDARY = .TRUE.
@@ -1380,9 +1295,7 @@ MODULE timecycle
                         !!!! TODO: IMPLEMENT DRAG FORCES ON INDIVIDUAL PHYSICAL GROUPS
                         IF (GRID_BC(FACE_PG)%DUMP_FORCE_BC .AND. (tID .GE. DUMP_FORCE_START)) THEN
                            K = FNUM*SPECIES(particles(IP)%S_ID)%MOLECULAR_MASS                    
-                           IF (DIMS == 1) THEN
-                              FORCE_DIRECT(1) = FORCE_DIRECT(1) + K*particles(IP)%VX/DT
-                           ELSE IF (DIMS == 2) THEN
+                           IF (DIMS == 2) THEN
                               IF (AXI) THEN
                                  FORCE_DIRECT(1) = FORCE_DIRECT(1) + K*particles(IP)%VX/DT*2*PI/(ZMAX-ZMIN)
                               ELSE
@@ -1399,15 +1312,7 @@ MODULE timecycle
                         CHARGE = SPECIES(particles(IP)%S_ID)%CHARGE
                         IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. ABS(CHARGE) .GE. 1.d-6) THEN
                            K = QE/(EPS0*EPS_SCALING**2)
-                           IF (DIMS == 1) THEN
-                              RHO_Q = K*CHARGE*FNUM/(YMAX-YMIN)/(ZMAX-ZMIN)
-                              DO I = 1, 2
-                                 VP = U1D_GRID%CELL_NODES(I,IC)
-                                 PSIP = U1D_GRID%BASIS_COEFFS(1,I,IC)*particles(IP)%X &
-                                      + U1D_GRID%BASIS_COEFFS(3,I,IC)
-                                 SURFACE_CHARGE(VP) = SURFACE_CHARGE(VP) + RHO_Q*PSIP
-                              END DO
-                           ELSE IF (DIMS == 2) THEN
+                           IF (DIMS == 2) THEN
                               RHO_Q = K*CHARGE*FNUM/(ZMAX-ZMIN)
                               DO I = 1, 3
                                  VP = U2D_GRID%CELL_NODES(I,IC)
@@ -1446,10 +1351,6 @@ MODULE timecycle
                            IF (GRID_BC(FACE_PG)%REACT) THEN
                               CALL WALL_REACT(particles, IP, REMOVE_PART(IP))
                            END IF
-                           
-                           VXPRE = particles(IP)%VX
-                           VYPRE = particles(IP)%VY
-                           VZPRE = particles(IP)%VZ
 
                            S_ID = particles(IP)%S_ID
                            WALL_TEMP = GRID_BC(FACE_PG)%WALL_TEMP
@@ -1475,12 +1376,6 @@ MODULE timecycle
                            
                            particles(IP)%EROT = EROT
                            particles(IP)%EVIB = EVIB
-
-                           ! IF (rf() < 0.01) THEN
-                           !    WRITE(66341,*) VXPRE, ',', VYPRE, ',', VZPRE, ',', &
-                           !    particles(IP)%VX, ',', particles(IP)%VY, ',', particles(IP)%VZ, ',',&
-                           !    FACE_NORMAL(1), ',', FACE_NORMAL(2), ',', FACE_NORMAL(3)
-                           ! END IF
 
                         ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == CLL) THEN
                            IF (GRID_BC(FACE_PG)%REACT) THEN
@@ -1602,11 +1497,8 @@ MODULE timecycle
                            particles(IP)%EROT = EROT
                            particles(IP)%EVIB = EVIB
 
-                           ! IF (rf() < 0.01) THEN
-                           !    WRITE(66341,*) VXPRE, ',', VYPRE, ',', VZPRE, ',', &
-                           !    particles(IP)%VX, ',', particles(IP)%VY, ',', particles(IP)%VZ, ',',&
-                           !    FACE_NORMAL(1), ',', FACE_NORMAL(2), ',', FACE_NORMAL(3)
-                           ! END IF
+                           !WRITE(66341,*) VXPRE, ', ', VYPRE, ', ', VZPRE, ', ', &
+                           !particles(IP)%VX, ', ', particles(IP)%VY, ', ', particles(IP)%VZ
                            
                         ELSE
                            REMOVE_PART(IP) = .TRUE.
@@ -1625,17 +1517,15 @@ MODULE timecycle
                         !!!! TODO: IMPLEMENT DRAG FORCES ON INDIVIDUAL PHYSICAL GROUPS
                         IF (GRID_BC(FACE_PG)%DUMP_FORCE_BC .AND. (tID .GE. DUMP_FORCE_START)) THEN
                            IF (REMOVE_PART(IP)) CYCLE ! IF PARTICLE IS ABSORBED, CYCLE
-                           K = FNUM*SPECIES(particles(IP)%S_ID)%MOLECULAR_MASS
-                           IF (DIMS == 1) THEN
-                              FORCE_DIRECT(1) = FORCE_DIRECT(1) - K*particles(IP)%VX/DT
-                           ELSE IF (DIMS == 2) THEN
+                           K = FNUM*SPECIES(particles(IP)%S_ID)%MOLECULAR_MASS                           
+                           IF (DIMS == 2) THEN
                               IF (AXI) THEN
                                  FORCE_DIRECT(1) = FORCE_DIRECT(1) - K*particles(IP)%VX/DT*2*PI/(ZMAX-ZMIN)
                               ELSE
                                  FORCE_DIRECT(1) = FORCE_DIRECT(1) - K*particles(IP)%VX/DT
                                  FORCE_DIRECT(2) = FORCE_DIRECT(2) - K*particles(IP)%VY/DT
                               END IF
-                           ELSE IF (DIMS == 3) THEN
+                           ELSE IF (DIMS ==3) THEN
                               FORCE_DIRECT(1) = FORCE_DIRECT(1) - K*particles(IP)%VX/DT
                               FORCE_DIRECT(2) = FORCE_DIRECT(2) - K*particles(IP)%VY/DT
                               FORCE_DIRECT(3) = FORCE_DIRECT(3) - K*particles(IP)%VZ/DT
@@ -2157,32 +2047,11 @@ MODULE timecycle
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       !!!!!! INDIRECT FORCE CALC + SAVE DATA !!!!
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      IF ((tID .GT. DUMP_FORCE_START) .AND. (tID .NE. RESTART_TIMESTEP) .AND. GRID_TYPE == UNSTRUCTURED) THEN
-         IF (DIMS == 1) THEN
-            DO IC = 1, NCELLS
-               IF (CELL_PROCS(IC) == PROC_ID) THEN
-                  DO IP = 1, 2
-                     ! NEIGHBOR = U2D_GRID%CELL_NEIGHBORS(IP, IC)
-                     ! IF (NEIGHBOR == -1) CYCLE
-                     ! NEIGHBORPG = U2D_GRID%CELL_PG(NEIGHBOR)
-                     FACE_PG =  U1D_GRID%CELL_EDGES_PG(IP, IC)
-                     IF (FACE_PG .NE. -1 .AND. U1D_GRID%CELL_PG(IC) .NE. -1) THEN
-                        IF (GRID_BC(FACE_PG)%DUMP_FORCE_BC .AND. (GRID_BC(U1D_GRID%CELL_PG(IC))%VOLUME_BC == FLUID)) THEN
-                           AREA = (YMAX-YMIN)
-                           E_MAG2 = E_FIELD(1,1,IC)*E_FIELD(1,1,IC)
-
-                           FORCE_INDIRECT(1) = FORCE_INDIRECT(1) + EPS0*AREA*(ZMAX-ZMIN)*&
-                                             ( 0.5*E_MAG2*U1D_GRID%EDGE_NORMAL(1,IP,IC) )
-
-                        END IF
-                     END IF
-                  END DO
-               END IF
-            END DO
-         ELSE IF (DIMS == 2) THEN
-            DO IC = 1, NCELLS
-               IF (CELL_PROCS(IC) == PROC_ID) THEN
-                  DO IP = 1, 3
+      IF ((tID .GT. DUMP_FORCE_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
+         IF (DIMS==2) THEN
+            DO IC=1, NCELLS
+               IF (CELL_PROCS(IC)==PROC_ID) THEN
+                  DO IP=1, 3
                      ! NEIGHBOR = U2D_GRID%CELL_NEIGHBORS(IP, IC)
                      ! IF (NEIGHBOR == -1) CYCLE
                      ! NEIGHBORPG = U2D_GRID%CELL_PG(NEIGHBOR)
@@ -2223,10 +2092,10 @@ MODULE timecycle
                   END DO
                END IF
             END DO
-         ELSE IF (DIMS == 3) THEN
-            DO IC = 1, NCELLS
-               IF (CELL_PROCS(IC) == PROC_ID) THEN
-                  DO IP = 1, 4
+         ELSE IF (DIMS==3) THEN
+            DO IC=1, NCELLS
+               IF (CELL_PROCS(IC)==PROC_ID) THEN
+                  DO IP=1, 4
                      ! NEIGHBOR = U3D_GRID%CELL_NEIGHBORS(IP, IC)
                      ! IF (NEIGHBOR == -1) CYCLE
                      ! NEIGHBORPG = U3D_GRID%CELL_PG(NEIGHBOR)
@@ -2257,13 +2126,13 @@ MODULE timecycle
             END DO
          END IF
 
-         ! CALL DUMP_FORCE_FILE(tID)
+         CALL DUMP_FORCE_FILE(tID)
          FORCE_DIRECT = 0.d0
          FORCE_INDIRECT = 0.d0
       END IF
 
 
-      ! CLOSE(66341)
+      CLOSE(66341)
 
    END SUBROUTINE ADVECT
 

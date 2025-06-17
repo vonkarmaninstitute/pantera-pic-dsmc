@@ -1,21 +1,3 @@
-! Copyright (C) 2025 von Karman Institute for Fluid Dynamics (VKI)
-!
-! This file is part of PANTERA PIC-DSMC, a software for the simulation
-! of rarefied gases and plasmas using particles.
-!
-! This program is free software: you can redistribute it and/or modify
-! it under the terms of the GNU General Public License as published by
-! the Free Software Foundation, either version 3 of the License, or
-! (at your option) any later version.
-
-! This program is distributed in the hope that it will be useful,
-! but WITHOUT ANY WARRANTY; without even the implied warranty of
-! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-! GNU General Public License for more details.
-
-! You should have received a copy of the GNU General Public License
-! along with this program.  If not, see <https://www.gnu.org/licenses/>.PANTERA PIC-DSMC
-
 ! This module holds global variables
 
 MODULE global
@@ -112,32 +94,33 @@ MODULE global
 
    LOGICAL :: LOAD_BALANCE = .FALSE.
    INTEGER :: LOAD_BALANCE_EVERY = 0
-
+   
    TYPE UNSTRUCTURED_0D_GRID_DATA_STRUCTURE
       INTEGER :: NUM_NODES, NUM_POINTS
       REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: NODE_COORDS
       INTEGER, DIMENSION(:), ALLOCATABLE        :: POINT_PG
       INTEGER, DIMENSION(:,:), ALLOCATABLE      :: PG_NODES
-      INTEGER, DIMENSION(:), ALLOCATABLE      :: POINT_NODES
-      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: VERTEX_AREAS
+      INTEGER, DIMENSION(:), ALLOCATABLE        :: POINT_NODES
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE   :: VERTEX_AREAS
    END TYPE UNSTRUCTURED_0D_GRID_DATA_STRUCTURE
 
    TYPE(UNSTRUCTURED_0D_GRID_DATA_STRUCTURE) :: U0D_GRID
 
 
    TYPE UNSTRUCTURED_1D_GRID_DATA_STRUCTURE
-      INTEGER :: NUM_NODES, NUM_CELLS
+      INTEGER :: NUM_NODES, NUM_SEGMENTS, NUM_CELLS
       REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: NODE_COORDS
+      INTEGER, DIMENSION(:,:), ALLOCATABLE      :: SEGMENT_NODES
       INTEGER, DIMENSION(:,:), ALLOCATABLE      :: CELL_NODES
-      INTEGER, DIMENSION(:,:), ALLOCATABLE      :: CELL_NEIGHBORS
-      REAL(KIND=8), DIMENSION(:,:,:), ALLOCATABLE :: EDGE_NORMAL
-      INTEGER, DIMENSION(:), ALLOCATABLE        :: CELL_PG
-      INTEGER, DIMENSION(:,:), ALLOCATABLE      :: CELL_EDGES_PG
-      INTEGER, DIMENSION(:,:), ALLOCATABLE      :: PG_NODES
-      REAL(KIND=8), DIMENSION(:,:,:), ALLOCATABLE :: BASIS_COEFFS
-      INTEGER, DIMENSION(:), ALLOCATABLE        :: PERIODIC_RELATED_NODE
-      INTEGER, DIMENSION(:,:), ALLOCATABLE      :: SEGMENT_NODES_BOUNDARY_INDEX
+      INTEGER, DIMENSION(:,:), ALLOCATABLE      :: SEGMENT_NEIGHBORS
+      REAL(KIND=8), DIMENSION(:,:,:), ALLOCATABLE :: SEGMENT_NORMAL
+      INTEGER, DIMENSION(:), ALLOCATABLE        :: SEGMENT_PG
       INTEGER, DIMENSION(:), ALLOCATABLE        :: NODES_BOUNDARY_INDEX
+      INTEGER, DIMENSION(:,:), ALLOCATABLE      :: PG_NODES
+      INTEGER, DIMENSION(:,:), ALLOCATABLE      :: SEGMENT_NODES_BOUNDARY_INDEX
+      REAL(KIND=8), DIMENSION(:,:,:), ALLOCATABLE :: BASIS_COEFFS
+      INTEGER, DIMENSION(:), ALLOCATABLE        :: CELL_PG
+      INTEGER, DIMENSION(:), ALLOCATABLE        :: PERIODIC_RELATED_NODE
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CELL_VOLUMES
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: SEGMENT_AREAS
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: SEGMENT_LENGTHS
@@ -147,7 +130,7 @@ MODULE global
 
 
    TYPE UNSTRUCTURED_2D_GRID_DATA_STRUCTURE
-      INTEGER :: NUM_NODES, NUM_CELLS, NUM_LINES
+      INTEGER :: NUM_NODES, NUM_CELLS, NUM_LINES, NUM_POINTS
       REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: NODE_COORDS
       INTEGER, DIMENSION(:,:), ALLOCATABLE      :: CELL_NODES
       INTEGER, DIMENSION(:,:), ALLOCATABLE      :: LINE_NODES
@@ -258,6 +241,7 @@ MODULE global
       REAL(KIND=8) :: NRHO
       REAL(KIND=8) :: UX, UY, UZ
       REAL(KIND=8) :: TTRA, TROT, TVIB
+      REAL(KIND=8) :: VAPCOEF
       REAL(KIND=8) :: U_NORM
       INTEGER      :: MIX_ID
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: NFS
@@ -336,15 +320,6 @@ MODULE global
 
    TYPE(SOLENOID), DIMENSION(:), ALLOCATABLE :: SOLENOIDS
 
-   INTEGER         :: N_MAGNETS = 0
-
-   TYPE MAGNET
-      REAL(KIND=8) :: X1, Y1, X2, Y2
-      REAL(KIND=8) :: STRENGTH
-   END TYPE MAGNET
-
-   TYPE(MAGNET), DIMENSION(:), ALLOCATABLE :: MAGNETS
-
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Numerical settings !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -389,7 +364,7 @@ MODULE global
 
    REAL(KIND=8)      :: MCC_BG_DENS, MCC_BG_TTRA
    INTEGER           :: MCC_BG_MIX
-   REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: MCC_BG_CELL_NRHO
+   REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: MCC_BG_CELL_NRHO, MCC_BG_CELL_VEL_X, MCC_BG_CELL_VEL_Y, MCC_BG_CELL_VEL_Z
    LOGICAL           :: BOOL_BG_DENSITY_FILE = .FALSE.
    INTEGER           :: DSMC_COLL_MIX
    INTEGER           :: TIMESTEP_COLL
@@ -405,8 +380,18 @@ MODULE global
 
    INTEGER           :: BGK_MODEL_TYPE_INT = 0
    REAL(KIND=8)      :: BGK_BG_DENS, BGK_SIGMA, BGK_BG_MASS
+  
+   TYPE COLLISION_DATA_STRUCTURE 
+      INTEGER, DIMENSION(:), ALLOCATABLE      :: SPECIES_COLLISIONS
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: SPECIES_COLLISIONS_ENERGY
+      INTEGER      :: TOT_SPECIES_COLLISIONS
+      REAL(KIND=8) :: TOT_SPECIES_COLLISIONS_ENERGY
+   END TYPE COLLISION_DATA_STRUCTURE
 
-
+   TYPE(COLLISION_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: collision
+   INTEGER PAIR_POSSIBILITIES
+   INTEGER DSMC_COLL_PAIR_LENGTH
+   CHARACTER*64 :: COLLISION_TYPE_STRING   
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Particles injection from boundaries !!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -476,6 +461,13 @@ MODULE global
    END TYPE WALL
 
    TYPE(WALL), DIMENSION(:), ALLOCATABLE :: WALLS
+
+   
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!! MPI parallelization !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+   INTEGER      :: N_BLOCKS_X, N_BLOCKS_Y ! Used for "block" partitioning
 
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -609,6 +601,13 @@ MODULE global
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_PHI
 
    INTEGER                                 :: BOUNDARY_AVG_CUMULATED
+
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_SPECIES_COLLISIONS
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_SPECIES_COLLISIONS_ENERGY
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_TOT_SPECIES_COLLISIONS
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: AVG_TOT_SPECIES_COLLISIONS_ENERGY
+
+
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Average boundary !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

@@ -1,21 +1,3 @@
-! Copyright (C) 2025 von Karman Institute for Fluid Dynamics (VKI)
-!
-! This file is part of PANTERA PIC-DSMC, a software for the simulation
-! of rarefied gases and plasmas using particles.
-!
-! This program is free software: you can redistribute it and/or modify
-! it under the terms of the GNU General Public License as published by
-! the Free Software Foundation, either version 3 of the License, or
-! (at your option) any later version.
-
-! This program is distributed in the hope that it will be useful,
-! but WITHOUT ANY WARRANTY; without even the implied warranty of
-! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-! GNU General Public License for more details.
-
-! You should have received a copy of the GNU General Public License
-! along with this program.  If not, see <https://www.gnu.org/licenses/>.PANTERA PIC-DSMC
-
 ! Contains subroutines related to particle collisions
 
 MODULE collisions
@@ -46,17 +28,30 @@ MODULE collisions
       ! --->  I am gonna try and in case revert back.
       ! IOF => index (for IND) of first particle in a cell (an offset in IND)
       
-      INTEGER, DIMENSION(:,:), ALLOCATABLE :: NPC, IOF
-      INTEGER, DIMENSION(:), ALLOCATABLE :: NPCALL, IOFALL
-      INTEGER, DIMENSION(:), ALLOCATABLE :: IND, INDALL
-      INTEGER                            :: JP, JS, JC, IDX, IDXALL
+      INTEGER,      DIMENSION(:,:), ALLOCATABLE :: NPC, IOF
+      INTEGER,      DIMENSION(:),   ALLOCATABLE :: NPCALL, IOFALL
+      INTEGER,      DIMENSION(:),   ALLOCATABLE :: IND, INDALL
+      INTEGER                            :: JP, JS, JC, IDX, IDXALL, I, J, INDEX
       INTEGER                            :: NCOLLREAL
-
+      INTEGER,      DIMENSION(:,:),   ALLOCATABLE :: PER_CELL_SPECIES_COLLISIONS
+      REAL(KIND=8), DIMENSION(:,:),   ALLOCATABLE :: PER_CELL_SPECIES_COLLISIONS_ENERGY
+ 
       ALLOCATE(NPC(N_SPECIES,NCELLS))
       ALLOCATE(IOF(N_SPECIES,NCELLS))
 
       ALLOCATE(NPCALL(NCELLS))
       ALLOCATE(IOFALL(NCELLS))
+   
+
+      IF (ALLOCATED(PER_CELL_SPECIES_COLLISIONS)) DEALLOCATE(PER_CELL_SPECIES_COLLISIONS)
+      ALLOCATE(PER_CELL_SPECIES_COLLISIONS(DSMC_COLL_PAIR_LENGTH, DSMC_COLL_PAIR_LENGTH))
+      
+      IF (ALLOCATED(PER_CELL_SPECIES_COLLISIONS_ENERGY)) DEALLOCATE(PER_CELL_SPECIES_COLLISIONS_ENERGY)
+      ALLOCATE(PER_CELL_SPECIES_COLLISIONS_ENERGY(DSMC_COLL_PAIR_LENGTH, DSMC_COLL_PAIR_LENGTH))
+      
+      IF (ALLOCATED(collision)) DEALLOCATE(collision)
+      ALLOCATE(collision(NCELLS))
+     
       ! Count the number of particles in each cell of each species, to allocate arrays later
       NPC = 0
       NPCALL = 0
@@ -66,6 +61,8 @@ MODULE collisions
          NPC(JS,JC) = NPC(JS,JC) + 1
          NPCALL(JC) = NPCALL(JC) + 1
       END DO
+
+   
 
       ! Fill the array of offsets (IOF). IOF(IS,IC) is the the index in IND of the first
       ! particle in cell IC of species IS
@@ -123,21 +120,46 @@ MODULE collisions
       ! Compute collisions between particles
       TIMESTEP_COLL = 0
       TIMESTEP_REAC = 0
+      
       DO JC = 1, NCELLS
-         IF (SUM(NPC(:,JC)) .GT. 1) THEN
+
+         IF (ALLOCATED(collision(JC)%SPECIES_COLLISIONS)) DEALLOCATE(collision(JC)%SPECIES_COLLISIONS)
+         IF (ALLOCATED(collision(JC)%SPECIES_COLLISIONS_ENERGY)) DEALLOCATE(collision(JC)%SPECIES_COLLISIONS_ENERGY)
+
+         ALLOCATE(collision(JC)%SPECIES_COLLISIONS(PAIR_POSSIBILITIES))
+         ALLOCATE(collision(JC)%SPECIES_COLLISIONS_ENERGY(PAIR_POSSIBILITIES))
+        
+         collision(JC)%SPECIES_COLLISIONS = 0 
+         collision(JC)%SPECIES_COLLISIONS_ENERGY = 0 
+         collision(JC)%TOT_SPECIES_COLLISIONS = 0 
+         collision(JC)%TOT_SPECIES_COLLISIONS_ENERGY = 0 
+   
+        IF (SUM(NPC(:,JC)) .GT. 1) THEN
             ! For cells where there is at least two particles, call the collision procedure.
             IF (COLLISION_TYPE == DSMC) THEN
                ! DSMC temporarily broken because now arrays are per-species.
-               CALL VSS_COLLIS(JC, NPCALL, IOFALL, INDALL, NCOLLREAL)
+               CALL VSS_COLLIS(JC, NPCALL, IOFALL, INDALL, NCOLLREAL, PER_CELL_SPECIES_COLLISIONS,&
+               PER_CELL_SPECIES_COLLISIONS_ENERGY)
             ELSE IF (COLLISION_TYPE == DSMC_VAHEDI) THEN
-               CALL VAHEDI_COLLIS(JC, NPC, IOF, IND, NCOLLREAL)
+               CALL VAHEDI_COLLIS(JC, NPC, IOF, IND, NCOLLREAL, PER_CELL_SPECIES_COLLISIONS,&
+               PER_CELL_SPECIES_COLLISIONS_ENERGY)
             END IF
             ! Add to the total number of collisions for this process
             TIMESTEP_COLL = TIMESTEP_COLL + NCOLLREAL
+            INDEX = 1
+            DO I = 1, DSMC_COLL_PAIR_LENGTH
+               DO J = I, DSMC_COLL_PAIR_LENGTH
+                  collision(JC)%SPECIES_COLLISIONS(INDEX) = PER_CELL_SPECIES_COLLISIONS(I,J) 
+                  collision(JC)%SPECIES_COLLISIONS_ENERGY(INDEX) = PER_CELL_SPECIES_COLLISIONS_ENERGY(I,J)  
+                  INDEX = INDEX + 1
+               END DO 
+            END DO 
+            collision(JC)%TOT_SPECIES_COLLISIONS = SUM(collision(JC)%SPECIES_COLLISIONS) 
+            collision(JC)%TOT_SPECIES_COLLISIONS_ENERGY = SUM(collision(JC)%SPECIES_COLLISIONS_ENERGY) 
          END IF
       END DO
-   
-      !WRITE(*,*) 'Number of real collisions: ', TIMESTEP_COLL
+     
+      
       DEALLOCATE(NPC)
       DEALLOCATE(IOF)
       DEALLOCATE(IND)
@@ -152,7 +174,7 @@ MODULE collisions
    ! SUBROUTINE VSS_COLLIS -> Compute collisions with VSS model !!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-   SUBROUTINE VSS_COLLIS(JC,NPC,IOF,IND, NCOLLREAL)
+   SUBROUTINE VSS_COLLIS(JC,NPC,IOF,IND, NCOLLREAL, PER_CELL_SPECIES_COLLISIONS, PER_CELL_SPECIES_COLLISIONS_ENERGY)
 
       ! Computes the collisions using the VSS (or VHS, HS, depending on parameters)
       ! in cell JC. Needs the particles to be sorted by cell. This is done by the calling
@@ -164,6 +186,9 @@ MODULE collisions
       INTEGER, DIMENSION(:), INTENT(IN) :: NPC, IOF
       INTEGER, DIMENSION(:), INTENT(IN) :: IND
       INTEGER, INTENT(OUT) :: NCOLLREAL
+      INTEGER, DIMENSION(:,:), ALLOCATABLE :: PER_CELL_SPECIES_COLLISIONS  
+      REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: PER_CELL_SPECIES_COLLISIONS_ENERGY  
+     
 
 
       INTEGER      :: IOFJ,IOLJ,NPCJ,JP1,JP2,JCOL, JP, INDJ, I, JR
@@ -183,6 +208,7 @@ MODULE collisions
       LOGICAL      :: SKIP
 
       TYPE(PARTICLE_DATA_STRUCTURE) :: NEWparticle
+      INTEGER      :: PAIR_POSITION
 
       PI2  = 2.*PI
 
@@ -253,7 +279,9 @@ MODULE collisions
       FCORR = NCOLLMAX/NCOLL
       !WRITE(*,*) 'Ncollmax_int', NCOLLMAX_INT, 'ncoll:', NCOLL, 'fcorr:', FCORR
       NCOLLREAL = 0
-
+      PER_CELL_SPECIES_COLLISIONS = 0
+      PER_CELL_SPECIES_COLLISIONS_ENERGY = 0 
+      
       ! Step 3. Perform the collision => actual probability correct via FCORR
 
       DO JCOL = 1, NCOLL
@@ -325,8 +353,31 @@ MODULE collisions
             END IF
 
             NCOLLREAL = NCOLLREAL + 1
-
-
+            
+           
+            IF (particles(JP1)%S_ID .EQ. particles(JP2)%S_ID) THEN            
+               PER_CELL_SPECIES_COLLISIONS(particles(JP1)%S_ID, particles(JP2)%S_ID) = &
+               PER_CELL_SPECIES_COLLISIONS(particles(JP1)%S_ID, particles(JP2)%S_ID) + 1
+               
+               PER_CELL_SPECIES_COLLISIONS_ENERGY(particles(JP1)%S_ID, particles(JP2)%S_ID) = &
+               PER_CELL_SPECIES_COLLISIONS_ENERGY(particles(JP1)%S_ID, particles(JP2)%S_ID) + ETR
+            
+            ELSEIF (particles(JP1)%S_ID .LT. particles(JP2)%S_ID) THEN            
+               PER_CELL_SPECIES_COLLISIONS(particles(JP1)%S_ID, particles(JP2)%S_ID) = &
+               PER_CELL_SPECIES_COLLISIONS(particles(JP1)%S_ID, particles(JP2)%S_ID) + 1  
+               
+               PER_CELL_SPECIES_COLLISIONS_ENERGY(particles(JP1)%S_ID, particles(JP2)%S_ID) = &
+               PER_CELL_SPECIES_COLLISIONS_ENERGY(particles(JP1)%S_ID, particles(JP2)%S_ID) + ETR  
+           
+            ELSE             
+               PER_CELL_SPECIES_COLLISIONS(particles(JP2)%S_ID, particles(JP1)%S_ID) = &
+               PER_CELL_SPECIES_COLLISIONS(particles(JP2)%S_ID, particles(JP1)%S_ID) + 1  
+            
+               PER_CELL_SPECIES_COLLISIONS_ENERGY(particles(JP2)%S_ID, particles(JP1)%S_ID) = &
+               PER_CELL_SPECIES_COLLISIONS_ENERGY(particles(JP2)%S_ID, particles(JP1)%S_ID) + ETR  
+            
+            END IF
+            
             ! Test for chemical reaction with TCE model
             ECOLL = ETR + particles(JP1)%EROT + particles(JP2)%EROT + &
             particles(JP1)%EVIB + particles(JP2)%EVIB
@@ -547,7 +598,6 @@ MODULE collisions
             
 
          END IF
-
       END DO  
 
       !WRITE(*,*) 'Actually performed:', NCOLLREAL
@@ -563,7 +613,7 @@ MODULE collisions
    ! with Vahedi's algorithm and tabluated cross-sections             !!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-   SUBROUTINE VAHEDI_COLLIS(JC,NPC,IOF,IND, NCOLLREAL)
+   SUBROUTINE VAHEDI_COLLIS(JC,NPC,IOF,IND, NCOLLREAL, PER_CELL_SPECIES_COLLISIONS, PER_CELL_SPECIES_COLLISIONS_ENERGY)
 
       ! Computes the collisions using the VSS (or VHS, HS, depending on parameters)
       ! in cell JC. Needs the particles to be sorted by cell. This is done by the calling
@@ -575,6 +625,11 @@ MODULE collisions
       INTEGER, DIMENSION(:,:), INTENT(IN) :: NPC, IOF
       INTEGER, DIMENSION(:), INTENT(IN) :: IND
       INTEGER, INTENT(OUT) :: NCOLLREAL
+      REAL(KIND=8) :: TOT_COLL_ENERGY
+      INTEGER, DIMENSION(:,:), ALLOCATABLE :: PER_CELL_SPECIES_COLLISIONS  
+      REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: PER_CELL_SPECIES_COLLISIONS_ENERGY  
+
+
 
 
       INTEGER      :: JP1,JP2,JCOL, JP, INDJ, JR,IND1,IND2
@@ -613,7 +668,7 @@ MODULE collisions
          SP_ID2 = REACTIONS(JR)%R2_SP_ID
 
          ! Test if there are enough particles of reactants
-         IF ( (NPC(SP_ID1,JC) .LT. 1) .OR. (NPC(SP_ID2,JC) .LT. 1) ) CYCLE
+         IF ( (NPC(SP_ID1,JC) .LT. 1) .OR. (NPC(SP_ID2,JC) .LT. 1) ) EXIT
 
          ! Step 1. Compute the number of pairs to test for collision
 
@@ -690,7 +745,7 @@ MODULE collisions
          FCORR = NCOLLMAX/NCOLL
          !WRITE(*,*) 'Ncollmax_int', NCOLLMAX_INT, 'ncoll:', NCOLL, 'fcorr:', FCORR
          NCOLLREAL = 0
-
+         TOT_COLL_ENERGY = 0.0
          ! Step 3. Perform the collision => actual probability correct via FCORR
          WRITE(*,*) 'Testing ', NCOLL, ' collision pairs for reaction ', JR, ' with correction ', FCORR
 
@@ -755,12 +810,33 @@ MODULE collisions
                CYCLE
             END IF
 
-            IF (P_REACT > 1.d0) WRITE(*,*) 'Warning! This was a bad DSMC collision, with P > 1.'
-
             ! Try the reaction
             IF (rf() < P_REACT) THEN ! Collision happens
 
                TIMESTEP_COLL = TIMESTEP_COLL + 1
+           
+               IF (particles(JP1)%S_ID .EQ. particles(JP2)%S_ID) THEN            
+                  PER_CELL_SPECIES_COLLISIONS(particles(JP1)%S_ID, particles(JP2)%S_ID) = &
+                  PER_CELL_SPECIES_COLLISIONS(particles(JP1)%S_ID, particles(JP2)%S_ID) + 1
+               
+                  PER_CELL_SPECIES_COLLISIONS_ENERGY(particles(JP1)%S_ID, particles(JP2)%S_ID) = &
+                  PER_CELL_SPECIES_COLLISIONS_ENERGY(particles(JP1)%S_ID, particles(JP2)%S_ID) + ETR
+            
+               ELSEIF (particles(JP1)%S_ID .LT. particles(JP2)%S_ID) THEN            
+                  PER_CELL_SPECIES_COLLISIONS(particles(JP1)%S_ID, particles(JP2)%S_ID) = &
+                  PER_CELL_SPECIES_COLLISIONS(particles(JP1)%S_ID, particles(JP2)%S_ID) + 1  
+               
+                  PER_CELL_SPECIES_COLLISIONS_ENERGY(particles(JP1)%S_ID, particles(JP2)%S_ID) = &
+                  PER_CELL_SPECIES_COLLISIONS_ENERGY(particles(JP1)%S_ID, particles(JP2)%S_ID) + ETR  
+               ELSE             
+                  PER_CELL_SPECIES_COLLISIONS(particles(JP2)%S_ID, particles(JP1)%S_ID) = &
+                  PER_CELL_SPECIES_COLLISIONS(particles(JP2)%S_ID, particles(JP1)%S_ID) + 1  
+            
+                  PER_CELL_SPECIES_COLLISIONS_ENERGY(particles(JP2)%S_ID, particles(JP1)%S_ID) = &
+                  PER_CELL_SPECIES_COLLISIONS_ENERGY(particles(JP2)%S_ID, particles(JP1)%S_ID) + ETR  
+               END IF
+            
+    
                REACTIONS(JR)%COUNTS = REACTIONS(JR)%COUNTS + 1
                HAS_REACTED(IND1) = .TRUE.
                HAS_REACTED(IND2) = .TRUE.
@@ -871,7 +947,7 @@ MODULE collisions
                END IF
 
             END IF
-
+         TOT_COLL_ENERGY = ECOLL + TOT_COLL_ENERGY
          END DO
 
       END DO
@@ -1269,8 +1345,8 @@ MODULE collisions
 
       IMPLICIT NONE
 
-      INTEGER      :: JP1, JP2, JR, I, J, SP_ID1, SP_ID2, P1_SP_ID, P2_SP_ID, P3_SP_ID, NP_PROC_INITIAL
-      REAL(KIND=8) :: P_COLL, PTCE, rfp, BG_NRHO
+      INTEGER      :: JP1, JP2, JR, I, J, SP_ID1, SP_ID2, P1_SP_ID, P2_SP_ID, P3_SP_ID, NP_PROC_INITIAL, INDEX, SP_CELL, J_CELL
+      REAL(KIND=8) :: P_COLL, PTCE, rfp, BG_NRHO, BG_VX, BG_VY, BG_VZ
       REAL(KIND=8) :: SIGMA, OMEGA, CREF, ALPHA, FRAC, SIGMA_R
       REAL(KIND=8) :: PI2
       REAL(KIND=8), DIMENSION(3) :: C1, C2, GREL, W
@@ -1287,17 +1363,45 @@ MODULE collisions
       TIMESTEP_REAC = 0
 
       NP_PROC_INITIAL = NP_PROC
-      DO JP1 = 1,NP_PROC_INITIAL
+
+      IF (ALLOCATED(collision)) DEALLOCATE(collision)
+          ALLOCATE(collision(NCELLS))
+
+      DO J_CELL = 1, NCELLS
+         
+         IF (ALLOCATED(collision(J_CELL)%SPECIES_COLLISIONS)) DEALLOCATE(collision(J_CELL)%SPECIES_COLLISIONS)
+         IF (ALLOCATED(collision(J_CELL)%SPECIES_COLLISIONS_ENERGY)) DEALLOCATE(collision(J_CELL)%SPECIES_COLLISIONS_ENERGY)
+
+         ALLOCATE(collision(J_CELL)%SPECIES_COLLISIONS(PAIR_POSSIBILITIES))
+         ALLOCATE(collision(J_CELL)%SPECIES_COLLISIONS_ENERGY(PAIR_POSSIBILITIES))
+
+         collision(J_CELL)%SPECIES_COLLISIONS = 0
+         collision(J_CELL)%SPECIES_COLLISIONS_ENERGY = 0.0
+         collision(J_CELL)%TOT_SPECIES_COLLISIONS = 0
+         collision(J_CELL)%TOT_SPECIES_COLLISIONS_ENERGY = 0.0
+
+      END DO 
+
+
+     DO JP1 = 1,NP_PROC_INITIAL
          SP_ID1 = particles(JP1)%S_ID
+         SP_CELL = particles(JP1)%IC
 
          DO J = 1, MIXTURES(MCC_BG_MIX)%N_COMPONENTS
             SP_ID2 = MIXTURES(MCC_BG_MIX)%COMPONENTS(J)%ID
 
             IF (BOOL_BG_DENSITY_FILE) THEN
                BG_NRHO = MCC_BG_CELL_NRHO(SP_ID2, particles(JP1)%IC)
+               BG_VX   = MCC_BG_CELL_VEL_X(SP_ID2, particles(JP1)%IC)
+               BG_VY   = MCC_BG_CELL_VEL_Y(SP_ID2, particles(JP1)%IC)
+               BG_VZ   = MCC_BG_CELL_VEL_Z(SP_ID2, particles(JP1)%IC)
             ELSE
                FRAC = MIXTURES(MCC_BG_MIX)%COMPONENTS(J)%MOLFRAC
                BG_NRHO = FRAC*MCC_BG_DENS
+               BG_VX   = 0.0
+               BG_VY   = 0.0
+               BG_VZ   = 0.0
+
             END IF
             IF (BG_NRHO == 0) CYCLE
             
@@ -1311,7 +1415,7 @@ MODULE collisions
             
             ! Sample the velocity of second collision partner, that would be in the MCC backgorund
             ! This may bias collisions towards higher temperatures of particle 2!
-            CALL MAXWELL(0.d0, 0.d0, 0.d0, &
+            CALL MAXWELL(BG_VX, BG_VY, BG_VZ, &
             MCC_BG_TTRA, MCC_BG_TTRA, MCC_BG_TTRA, &
             C2(1), C2(2), C2(3), SPECIES(SP_ID2)%MOLECULAR_MASS)
 
@@ -1356,6 +1460,12 @@ MODULE collisions
       
                ETR = 0.5*MRED*VR2
 
+               collision(SP_CELL)%SPECIES_COLLISIONS = & 
+                  collision(SP_CELL)%SPECIES_COLLISIONS + 1 
+          
+               collision(SP_CELL)%SPECIES_COLLISIONS_ENERGY = & 
+                  collision(SP_CELL)%SPECIES_COLLISIONS_ENERGY + ETR 
+      
                ! Test for chemical reaction with TCE model
                ECOLL = ETR + particles(JP1)%EROT + particles(JP2)%EROT + &
                particles(JP1)%EVIB + particles(JP2)%EVIB
@@ -1592,6 +1702,7 @@ MODULE collisions
          END DO
       END DO
 
+
    END SUBROUTINE MCC_COLLISIONS
 
 
@@ -1614,8 +1725,9 @@ MODULE collisions
 
       IMPLICIT NONE
 
-      INTEGER      :: JP1, JP2, JP3, JR, J, SP_ID1, SP_ID2, P1_SP_ID, P2_SP_ID, P3_SP_ID, P4_SP_ID, NP_PROC_INITIAL
-      REAL(KIND=8) :: BG_NRHO
+      INTEGER      :: JP1, JP2, JP3, JR, J, SP_ID1, SP_ID2, P1_SP_ID, P2_SP_ID, P3_SP_ID, P4_SP_ID, NP_PROC_INITIAL, INDEX, & 
+                      SP_CELL, J_CELL, I
+      REAL(KIND=8) :: BG_NRHO, BG_VX, BG_VY, BG_VZ
       REAL(KIND=8) :: FRAC, SIGMA_R
       REAL(KIND=8) :: PI2
       REAL(KIND=8), DIMENSION(3) :: C1, C2
@@ -1624,6 +1736,8 @@ MODULE collisions
       TYPE(PARTICLE_DATA_STRUCTURE) :: NEWparticle
       REAL(KIND=8) :: NULL_COLL_FREQ, P_NULL, R_SELECT, P_CUMULATED
       LOGICAL :: HAS_REACTED
+      INTEGER,      DIMENSION(:), ALLOCATABLE :: PER_CELL_SPECIES_COLLISIONS
+      REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: PER_CELL_SPECIES_COLLISIONS_ENERGY
 
       PI2 = 2*PI
 
@@ -1644,14 +1758,34 @@ MODULE collisions
       END IF
 
       NP_PROC_INITIAL = NP_PROC
-      DO JP1 = 1, NP_PROC_INITIAL
+ 
+      IF (ALLOCATED(collision)) DEALLOCATE(collision)
+          ALLOCATE(collision(NCELLS))
+
+      DO J_CELL = 1, NCELLS
+         
+         IF (ALLOCATED(collision(J_CELL)%SPECIES_COLLISIONS)) DEALLOCATE(collision(J_CELL)%SPECIES_COLLISIONS)
+         IF (ALLOCATED(collision(J_CELL)%SPECIES_COLLISIONS_ENERGY)) DEALLOCATE(collision(J_CELL)%SPECIES_COLLISIONS_ENERGY)
+
+         ALLOCATE(collision(J_CELL)%SPECIES_COLLISIONS(PAIR_POSSIBILITIES))
+         ALLOCATE(collision(J_CELL)%SPECIES_COLLISIONS_ENERGY(PAIR_POSSIBILITIES))
+
+         collision(J_CELL)%SPECIES_COLLISIONS = 0
+         collision(J_CELL)%SPECIES_COLLISIONS_ENERGY = 0.0
+         collision(J_CELL)%TOT_SPECIES_COLLISIONS = 0
+         collision(J_CELL)%TOT_SPECIES_COLLISIONS_ENERGY = 0.0
+
+      END DO 
+
+     DO JP1 = 1, NP_PROC_INITIAL
          HAS_REACTED = .FALSE.
          IF (rf() > P_NULL) CYCLE
          TIMESTEP_COLL = TIMESTEP_COLL + 1
 
          SP_ID1 = particles(JP1)%S_ID
-
-         DO J = 1, MIXTURES(MCC_BG_MIX)%N_COMPONENTS
+         SP_CELL = particles(JP1)%IC
+      
+           DO J = 1, MIXTURES(MCC_BG_MIX)%N_COMPONENTS
             SP_ID2 = MIXTURES(MCC_BG_MIX)%COMPONENTS(J)%ID
 
             FRAC = MIXTURES(MCC_BG_MIX)%COMPONENTS(J)%MOLFRAC
@@ -1686,7 +1820,13 @@ MODULE collisions
    
             ! Compute the kinetic energy in the center-of-mass frame (aka collision energy)
             ETR = 0.5*MRED*VR2
-
+      
+            collision(SP_CELL)%SPECIES_COLLISIONS = & 
+               collision(SP_CELL)%SPECIES_COLLISIONS + 1 
+          
+            collision(SP_CELL)%SPECIES_COLLISIONS_ENERGY = & 
+               collision(SP_CELL)%SPECIES_COLLISIONS_ENERGY + ETR 
+      
             P_CUMULATED = 0
 
             DO JR = 1, N_REACTIONS

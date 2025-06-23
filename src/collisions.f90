@@ -1648,7 +1648,7 @@ MODULE collisions
          REACTIONS(JR)%COUNTS = 0
       END DO
 
-      NULL_COLL_FREQ = MCC_BG_DENS*1e-12
+      NULL_COLL_FREQ = MCC_BG_DENS*2e-13
       P_NULL = 1 - EXP(-DT*NULL_COLL_FREQ)
       !P_NULL = DT*NULL_COLL_FREQ
       IF (P_NULL > 1) THEN
@@ -1802,7 +1802,11 @@ MODULE collisions
                            + SPECIES(P4_SP_ID)%MOLECULAR_MASS
                      END IF
                      TOTDOF = TOTDOF - 3.
-                     EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, 3)
+                     IF (REACTIONS(JR)%N_PROD == 3) THEN
+                        EI = COLL_INTERNAL_ENERGY_EQUAL(ECOLL, TOTDOF, 3)
+                     ELSE
+                        EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, 3)
+                     END IF
                      CALL HS_SCATTER(EI, M1, M2, C1, C2)
                      ECOLL = ECOLL - EI
       

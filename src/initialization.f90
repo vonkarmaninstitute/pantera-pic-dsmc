@@ -159,6 +159,7 @@ MODULE initialization
          IF (line=='Perform_checks:')          READ(in1,*) PERFORM_CHECKS
          IF (line=='Checks_every:')            READ(in1,*) CHECKS_EVERY
          IF (line=='Stats_every:')             READ(in1,*) STATS_EVERY
+         IF (line=='Timing_stats_every:')      READ(in1,*) TIMING_STATS_EVERY
          IF (line=='Epsilon_scaling:')         READ(in1,*) EPS_SCALING
          IF (line=='PIC_type:') THEN
             READ(in1,*) PIC_TYPE_STRING

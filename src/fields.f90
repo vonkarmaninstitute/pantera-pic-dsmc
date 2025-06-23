@@ -1284,7 +1284,7 @@ MODULE fields
       CALL KSPSolve(ksp,bvec,xvec,ierr)
       
       CALL KSPGetConvergedReason(ksp,reason,ierr)
-      IF (PROC_ID == 0) WRITE(*,*) 'KSPConvergedReason = ', reason
+      IF (MOD(tID, STATS_EVERY) .EQ. 0 .AND. PROC_ID == 0) WRITE(*,*) 'KSPConvergedReason = ', reason
       
       CALL VecScatterCreateToAll(xvec,ctx,X_SEQ,ierr)
       CALL VecScatterBegin(ctx,xvec,X_SEQ,INSERT_VALUES,SCATTER_FORWARD,ierr)
@@ -1592,7 +1592,7 @@ MODULE fields
 
       CALL SNESSolve(snes,PETSC_NULL_VEC,solvec,ierr)
       CALL SNESGetConvergedReason(snes,snesreason,ierr)
-      IF (PROC_ID == 0) WRITE(*,*) 'SNESConvergedReason = ', snesreason
+      IF (MOD(tID, STATS_EVERY) .EQ. 0 .AND. PROC_ID == 0)  WRITE(*,*) 'SNESConvergedReason = ', snesreason
       !CALL VecView(solvec,PETSC_VIEWER_STDOUT_WORLD,ierr)
       !IF (PROC_ID == 0) WRITE(*,*) 'PHI_FIELD was: ', PHI_FIELD
 
@@ -4387,7 +4387,7 @@ MODULE fields
       ! ------ SOLVE ------
       CALL SNESSolve(snes,PETSC_NULL_VEC,solvec,ierr)
       CALL SNESGetConvergedReason(snes,snesreason,ierr)
-      IF (PROC_ID == 0) WRITE(*,*) 'SNESConvergedReason = ', snesreason
+      IF (MOD(tID, STATS_EVERY) .EQ. 0 .AND. PROC_ID == 0) WRITE(*,*) 'SNESConvergedReason = ', snesreason
 
       
       CALL VecScatterCreateToAll(solvec,ctx,solvec_seq,ierr)
@@ -4954,6 +4954,24 @@ MODULE fields
 
                      SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + CHARGE*(POT1)
 
+                  ELSE IF (GRID_BC(FACE_PG)%FIELD_BC == SPICE_NODE_BC & 
+                     .AND. GRID_BC(U1D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
+
+                        V1 = U1D_GRID%CELL_NODES(IP,IC)
+                        AREA = (YMAX-YMIN)*(ZMAX-ZMIN)
+   
+                        CHARGE = -QE*BOLTZ_N0*SQRT(KB*BOLTZ_TE/(2*PI*ME))*AREA
+                        POT1 = EXP(QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+   
+                        IF (BOOL_KAPPA_FLUID) THEN
+                           FACTOR = SQRT(KAPPA_FLUID_C-3./2.)*GAMMA(KAPPA_FLUID_C+1.)&
+                           /GAMMA(KAPPA_FLUID_C-1./2.)/(KAPPA_FLUID_C*(KAPPA_FLUID_C-1.))
+                           POT1 = FACTOR*(1-QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
+                           **(-KAPPA_FLUID_C+1.)
+                        END IF
+
+                        GRID_BC(FACE_PG)%SPICE_NODE_CURRENT = GRID_BC(FACE_PG)%SPICE_NODE_CURRENT + CHARGE*POT1
+
                   END IF
                END DO
             END IF
@@ -5012,6 +5030,33 @@ MODULE fields
                         SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + CHARGE*(POT1/3. + POT2/6.)
                         SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) + CHARGE*(POT2/3. + POT1/6.)
                      END IF
+
+                  ELSE IF (GRID_BC(FACE_PG)%FIELD_BC == SPICE_NODE_BC & 
+                     .AND. GRID_BC(U2D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
+
+                     IF (IP == 1) THEN
+                        VV1 = 1
+                        VV2 = 2
+                     ELSE IF (IP == 2) THEN
+                        VV1 = 2
+                        VV2 = 3
+                     ELSE IF (IP == 3) THEN
+                        VV1 = 3
+                        VV2 = 1
+                     END IF
+                     V1 = U2D_GRID%CELL_NODES(VV1,IC)
+                     V2 = U2D_GRID%CELL_NODES(VV2,IC)
+                     Y1 = U2D_GRID%NODE_COORDS(2, V1)
+                     Y2 = U2D_GRID%NODE_COORDS(2, V2)
+                     AREA = U2D_GRID%CELL_EDGES_LEN(IP,IC)*(ZMAX-ZMIN)
+                     IF (AXI) AREA = AREA*(Y1+Y2)/2.
+
+                     CHARGE = -QE*BOLTZ_N0*SQRT(KB*BOLTZ_TE/(2*PI*ME))*AREA
+                     POT1 = EXP(QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                     POT2 = EXP(QE*(PHI_FIELD(V2)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+
+                     GRID_BC(FACE_PG)%SPICE_NODE_CURRENT = GRID_BC(FACE_PG)%SPICE_NODE_CURRENT + CHARGE*(POT1+POT2)/2.
+
                   END IF
                END DO
             END IF
@@ -5087,6 +5132,51 @@ MODULE fields
                      !    SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) + FACTOR/3
                      !    SURFACE_CHARGE(V3) = SURFACE_CHARGE(V3) + FACTOR/3
                      ! END IF
+
+                  ELSE IF (GRID_BC(FACE_PG)%FIELD_BC == SPICE_NODE_BC &
+                     .AND. GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
+
+                     IF (IP == 1) THEN
+                        VV1 = 1
+                        VV2 = 3
+                        VV3 = 2
+                     ELSE IF (IP == 2) THEN
+                        VV1 = 1
+                        VV2 = 2
+                        VV3 = 4
+                     ELSE IF (IP == 3) THEN
+                        VV1 = 2
+                        VV2 = 3
+                        VV3 = 4
+                     ELSE IF (IP == 4) THEN
+                        VV1 = 1
+                        VV2 = 4
+                        VV3 = 3
+                     END IF
+
+                     V1 = U3D_GRID%CELL_NODES(VV1,IC)
+                     V2 = U3D_GRID%CELL_NODES(VV2,IC)
+                     V3 = U3D_GRID%CELL_NODES(VV3,IC)    
+                     AREA = U3D_GRID%FACE_AREA(IP,IC)
+
+                     CHARGE = -QE*BOLTZ_N0*SQRT(KB*BOLTZ_TE/(2*PI*ME))*AREA
+                     POT1 = EXP(QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                     POT2 = EXP(QE*(PHI_FIELD(V2)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                     POT3 = EXP(QE*(PHI_FIELD(V3)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+
+                     IF (BOOL_KAPPA_FLUID) THEN
+                        FACTOR = SQRT(KAPPA_FLUID_C-3./2.)*GAMMA(KAPPA_FLUID_C+1.)&
+                        /GAMMA(KAPPA_FLUID_C-1./2.)/(KAPPA_FLUID_C*(KAPPA_FLUID_C-1.))
+                        POT1 = FACTOR*(1-QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
+                        **(-KAPPA_FLUID_C+1.)
+                        POT2 = FACTOR*(1-QE*(PHI_FIELD(V2)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
+                        **(-KAPPA_FLUID_C+1.)
+                        POT3 = FACTOR*(1-QE*(PHI_FIELD(V3)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
+                        **(-KAPPA_FLUID_C+1.)
+                     END IF
+
+                     GRID_BC(FACE_PG)%SPICE_NODE_CURRENT = GRID_BC(FACE_PG)%SPICE_NODE_CURRENT + CHARGE*(POT1+POT2+POT3)/3.
+
                   END IF
                END DO
             END IF
@@ -5187,7 +5277,7 @@ MODULE fields
       CALL KSPSolve(ksp,bvec,xvec,ierr)
 
       CALL KSPGetConvergedReason(ksp,reason,ierr)
-      IF (PROC_ID == 0) WRITE(*,*) 'KSPConvergedReason = ', reason
+      IF (MOD(tID, STATS_EVERY) .EQ. 0 .AND. PROC_ID == 0)  WRITE(*,*) 'KSPConvergedReason = ', reason
 
       CALL VecScatterCreateToAll(xvec,ctx,xvec_seq,ierr)
       CALL VecScatterBegin(ctx,xvec,xvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)

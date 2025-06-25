@@ -70,7 +70,6 @@ MODULE global
    REAL(KIND=8) :: KAPPA_FLUID_C  = 4.d0
 
    LOGICAL :: BOOL_CONDUCTIVE_BC = .FALSE.
-   REAL(KIND=8) :: WALL_METAL_POTENTIAL
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Geometry, domain and grid !!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -227,6 +226,10 @@ MODULE global
       REAL(KIND=8) :: WALL_EFIELD
       REAL(KIND=8) :: ACC_N
       REAL(KIND=8) :: ACC_T
+
+      ! Some values used for calculation of floating metal potential (each for group)
+      REAL(KIND=8) :: BOTTOM_FACTOR = 0.d0
+      REAL(KIND=8) :: TOP_FACTOR = 0.d0
 
       REAL(KIND=8) :: EPS_REL
 

@@ -77,6 +77,7 @@ MODULE postprocess
       LENGTH = NCELLS * N_SPECIES
       COLL_LENGTH = NCELLS * PAIR_POSSIBILITIES
 
+
       ALLOCATE(TIMESTEP_NP(LENGTH))
 
       ALLOCATE(TIMESTEP_VX(LENGTH))
@@ -354,9 +355,7 @@ MODULE postprocess
       END IF
 
  
-      Write(*,*) "Timestep species size", SIZE(TIMESTEP_SPECIES_COLLISIONS)
-
-      ! Collect data from all the processes
+           ! Collect data from all the processes
       IF (PROC_ID .EQ. 0) THEN
          CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_NP, NCELLS*N_SPECIES, MPI_INTEGER,          MPI_SUM, 0, MPI_COMM_WORLD, ierr)
          CALL MPI_REDUCE(MPI_IN_PLACE,  TIMESTEP_VX,  NCELLS*N_SPECIES, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
@@ -433,11 +432,7 @@ MODULE postprocess
           COLLISION_TYPE_STRING .EQ.  "MCC"        .OR. &
           COLLISION_TYPE_STRING .EQ. "VAHEDI_MCC") THEN
      
-          Write(*,*) "Timestep species size", SIZE(TIMESTEP_SPECIES_COLLISIONS)
-          WRITE(*,*) 'ALLOCATED(AVG_SPECIES_COLLISIONS:', allocated(AVG_SPECIES_COLLISIONS)
-          WRITE(*,*) 'ALLOCATED(TIMESTEP_SPECIES_COLLISIONS:', allocated(TIMESTEP_SPECIES_COLLISIONS)
-        
-      
+              
       AVG_SPECIES_COLLISIONS = (AVG_SPECIES_COLLISIONS*DBLE_AVG_CUMULATED + TIMESTEP_SPECIES_COLLISIONS)/(AVG_CUMULATED +1.0) 
       AVG_SPECIES_COLLISIONS_ENERGY = (AVG_SPECIES_COLLISIONS_ENERGY*DBLE_AVG_CUMULATED + TIMESTEP_SPECIES_COLLISIONS_ENERGY)/ & 
                                       (AVG_CUMULATED +1.0) 
@@ -711,8 +706,7 @@ MODULE postprocess
                      INDEX = INDEX + 1                  
                   END DO 
                END DO 
-               WRITE(*,*) "COLL_PAIR_NAMES", COLLISION_PAIR_NAMES
-               WRITE(*,*) "SPECIES_NAMES", MIXTURES(DSMC_COLL_MIX)%COMPONENTS%NAME
+            
                DO JS = 1, PAIR_POSSIBILITIES
                   FIRST = 1 + (JS-1)*NCELLS
                   LAST  = JS*NCELLS
@@ -737,13 +731,19 @@ MODULE postprocess
  
             IF(COLLISION_TYPE_STRING .EQ.  "MCC"        .OR. &
                COLLISION_TYPE_STRING .EQ. "VAHEDI_MCC") THEN
+              
+               WRITE(*,*) "PAIRS: ", PAIR_POSSIBILITIES
+               WRITE(*,*) "SIZE: ", NCELLS*PAIR_POSSIBILITIES
+               WRITE(*,*) "COLL RATE SIZE: ", SIZE(AVG_SPECIES_COLLISIONS)
+
                WRITE(string, *) 'Coll_Rate'
-               WRITE(54321) string//' '//ITOA(1)//' '//ITOA(NCELLS*PAIR_POSSIBILITIES)//' double'//ACHAR(10)
+               WRITE(54321) string//' '//ITOA(1)//' '//ITOA(NCELLS)//' double'//ACHAR(10)
                WRITE(54321) AVG_SPECIES_COLLISIONS(:), ACHAR(10)
                
                WRITE(string, *) 'Coll_Energy'
-               WRITE(54321) string//' '//ITOA(1)//' '//ITOA(NCELLS*PAIR_POSSIBILITIES)//' double'//ACHAR(10)
+               WRITE(54321) string//' '//ITOA(1)//' '//ITOA(NCELLS)//' double'//ACHAR(10)
                WRITE(54321) AVG_SPECIES_COLLISIONS_ENERGY(:), ACHAR(10)
+            
             END IF 
  
 

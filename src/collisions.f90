@@ -1415,6 +1415,8 @@ MODULE collisions
             
             ! Sample the velocity of second collision partner, that would be in the MCC backgorund
             ! This may bias collisions towards higher temperatures of particle 2!
+            
+        
             CALL MAXWELL(BG_VX, BG_VY, BG_VZ, &
             MCC_BG_TTRA, MCC_BG_TTRA, MCC_BG_TTRA, &
             C2(1), C2(2), C2(3), SPECIES(SP_ID2)%MOLECULAR_MASS)

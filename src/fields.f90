@@ -4954,6 +4954,10 @@ MODULE fields
 
                      SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + CHARGE*(POT1)
 
+                     IF(GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
+                        GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE = GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE + CHARGE*POT1
+                     END IF
+
                   ELSE IF (GRID_BC(FACE_PG)%FIELD_BC == SPICE_NODE_BC & 
                      .AND. GRID_BC(U1D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
 
@@ -5029,6 +5033,12 @@ MODULE fields
                      ELSE
                         SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + CHARGE*(POT1/3. + POT2/6.)
                         SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) + CHARGE*(POT2/3. + POT1/6.)
+                     END IF
+
+                     IF(GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
+                        IF (AXI) AREA = AREA*(Y1+Y2)/2.
+                        CHARGE = -QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*SQRT(KB*BOLTZ_TE/(2*PI*ME))*AREA*DT
+                        GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE = GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE + CHARGE*(POT1+POT2)/2.
                      END IF
 
                   ELSE IF (GRID_BC(FACE_PG)%FIELD_BC == SPICE_NODE_BC & 
@@ -5132,6 +5142,10 @@ MODULE fields
                      !    SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) + FACTOR/3
                      !    SURFACE_CHARGE(V3) = SURFACE_CHARGE(V3) + FACTOR/3
                      ! END IF
+
+                     IF(GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
+                        GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE = GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE + CHARGE*(POT1+POT2+POT3)/3.
+                     END IF
 
                   ELSE IF (GRID_BC(FACE_PG)%FIELD_BC == SPICE_NODE_BC &
                      .AND. GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
@@ -5733,13 +5747,13 @@ MODULE fields
             END IF
             CALL COMPUTE_FLOATING_POTENTIAL_FOR_CONDUCTIVE_SURFACE
 
-            TOTAL_CHARGE = SUM(SURFACE_CHARGE)
-            IF (PROC_ID .EQ. 0) THEN
-               CALL MPI_REDUCE(MPI_IN_PLACE, TOTAL_CHARGE, 1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-            ELSE
-               CALL MPI_REDUCE(TOTAL_CHARGE, TOTAL_CHARGE, 1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-            END IF
-            CALL MPI_BCAST(TOTAL_CHARGE, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            ! TOTAL_CHARGE = SUM(SURFACE_CHARGE)
+            ! IF (PROC_ID .EQ. 0) THEN
+            !    CALL MPI_REDUCE(MPI_IN_PLACE, TOTAL_CHARGE, 1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+            ! ELSE
+            !    CALL MPI_REDUCE(TOTAL_CHARGE, TOTAL_CHARGE, 1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+            ! END IF
+            ! CALL MPI_BCAST(TOTAL_CHARGE, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
          END IF
 
          IF (DIMS == 1) THEN
@@ -5766,7 +5780,8 @@ MODULE fields
                            POTENTIAL = GRID_BC(EDGE_PG)%WALL_POTENTIAL &
                                      + 0.5*GRID_BC(EDGE_PG)%WALL_RF_POTENTIAL*COS(2*PI*GRID_BC(EDGE_PG)%RF_FREQUENCY*tID*DT)
                         ELSE IF (GRID_BC(EDGE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
-                           POTENTIAL = -(TOTAL_CHARGE + GRID_BC(EDGE_PG)%TOP_FACTOR)/GRID_BC(EDGE_PG)%BOTTOM_FACTOR
+                           POTENTIAL = -(GRID_BC(EDGE_PG)%METAL_TOTAL_CHARGE + GRID_BC(EDGE_PG)%TOP_FACTOR)&
+                                       /GRID_BC(EDGE_PG)%BOTTOM_FACTOR
                         ELSE IF (GRID_BC(EDGE_PG)%FIELD_BC == SPICE_NODE_BC) THEN
                            POTENTIAL = GRID_BC(EDGE_PG)%SPICE_NODE_POTENTIAL
                         END IF

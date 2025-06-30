@@ -230,6 +230,7 @@ MODULE global
       ! Some values used for calculation of floating metal potential (each for group)
       REAL(KIND=8) :: BOTTOM_FACTOR = 0.d0
       REAL(KIND=8) :: TOP_FACTOR = 0.d0
+      REAL(KIND=8) :: METAL_TOTAL_CHARGE = 0.d0
 
       REAL(KIND=8) :: EPS_REL
 

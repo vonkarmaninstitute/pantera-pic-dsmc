@@ -4952,8 +4952,9 @@ MODULE fields
                         **(-KAPPA_FLUID_C+1.)
                      END IF
 
-                     SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + CHARGE*(POT1)
-
+                     IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC) THEN
+                        SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + CHARGE*(POT1)
+                     END IF
                      IF(GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
                         GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE = GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE + CHARGE*POT1
                      END IF
@@ -5025,14 +5026,16 @@ MODULE fields
                         **(-KAPPA_FLUID_C+1.)
                      END IF
 
-                     IF (AXI) THEN
-                        SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) +&
-                        CHARGE*(POT1*(3.*Y1+Y2) + POT2*(Y1+Y2))/12.
-                        SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) +&
-                        CHARGE*(POT1*(Y1+Y2) + POT2*(Y1+3.*Y2))/12.
-                     ELSE
-                        SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + CHARGE*(POT1/3. + POT2/6.)
-                        SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) + CHARGE*(POT2/3. + POT1/6.)
+                     IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC) THEN
+                        IF (AXI) THEN
+                           SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) +&
+                           CHARGE*(POT1*(3.*Y1+Y2) + POT2*(Y1+Y2))/12.
+                           SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) +&
+                           CHARGE*(POT1*(Y1+Y2) + POT2*(Y1+3.*Y2))/12.
+                        ELSE
+                           SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + CHARGE*(POT1/3. + POT2/6.)
+                           SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) + CHARGE*(POT2/3. + POT1/6.)
+                        END IF
                      END IF
 
                      IF(GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
@@ -5121,9 +5124,11 @@ MODULE fields
                         **(-KAPPA_FLUID_C+1.)
                      END IF
 
-                     SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + CHARGE*(POT1/6. + POT2/12. + POT3/12.)
-                     SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) + CHARGE*(POT1/12. + POT2/6. + POT3/12.)
-                     SURFACE_CHARGE(V3) = SURFACE_CHARGE(V3) + CHARGE*(POT1/12. + POT2/12. + POT3/6.)
+                     IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC) THEN
+                        SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + CHARGE*(POT1/6. + POT2/12. + POT3/12.)
+                        SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) + CHARGE*(POT1/12. + POT2/6. + POT3/12.)
+                        SURFACE_CHARGE(V3) = SURFACE_CHARGE(V3) + CHARGE*(POT1/12. + POT2/12. + POT3/6.)
+                     END IF
 
                      ! Aurora flux test
                      ! REAL(KIND=8), DIMENSION(3) :: U_VECTOR
@@ -5754,6 +5759,17 @@ MODULE fields
             !    CALL MPI_REDUCE(TOTAL_CHARGE, TOTAL_CHARGE, 1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
             ! END IF
             ! CALL MPI_BCAST(TOTAL_CHARGE, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+
+            DO I = 1, N_GRID_BC
+               IF (PROC_ID .EQ. 0) THEN
+                  CALL MPI_REDUCE(MPI_IN_PLACE, GRID_BC(I)%METAL_TOTAL_CHARGE, &
+                                 1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+               ELSE
+                  CALL MPI_REDUCE(GRID_BC(I)%METAL_TOTAL_CHARGE , GRID_BC(I)%METAL_TOTAL_CHARGE, &
+                                 1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+               END IF
+               CALL MPI_BCAST(GRID_BC(I)%METAL_TOTAL_CHARGE , 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+            END DO
          END IF
 
          IF (DIMS == 1) THEN

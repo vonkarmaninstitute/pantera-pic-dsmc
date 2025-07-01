@@ -1387,8 +1387,7 @@ MODULE timecycle
 
                         
                         CHARGE = SPECIES(particles(IP)%S_ID)%CHARGE
-                        IF ( (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC &
-                           .OR.GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC) .AND. ABS(CHARGE) .GE. 1.d-6) THEN
+                        IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. ABS(CHARGE) .GE. 1.d-6) THEN
                            K = QE/(EPS0*EPS_SCALING**2)
                            IF (DIMS == 1) THEN
                               RHO_Q = K*CHARGE*FNUM/(YMAX-YMIN)/(ZMAX-ZMIN)
@@ -1399,9 +1398,6 @@ MODULE timecycle
                                  SURFACE_CHARGE(VP) = SURFACE_CHARGE(VP) + RHO_Q*PSIP
                               END DO
 
-                              IF(GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
-                                 GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE = GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE + RHO_Q
-                              END IF
                            ELSE IF (DIMS == 2) THEN
                               RHO_Q = K*CHARGE*FNUM/(ZMAX-ZMIN)
                               DO I = 1, 3
@@ -1412,9 +1408,6 @@ MODULE timecycle
                                  SURFACE_CHARGE(VP) = SURFACE_CHARGE(VP) + RHO_Q*PSIP
                               END DO
                               
-                              IF(GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
-                                 GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE = GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE + RHO_Q
-                              END IF
                            ELSE IF (DIMS == 3) THEN
                               RHO_Q = K*CHARGE*FNUM
                               DO I = 1, 4
@@ -1425,13 +1418,21 @@ MODULE timecycle
                                       + U3D_GRID%BASIS_COEFFS(4,I,IC)
                                  SURFACE_CHARGE(VP) = SURFACE_CHARGE(VP) + RHO_Q*PSIP
                               END DO
-
-                              IF(GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
-                                 GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE = GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE + RHO_Q
-                              END IF
                            END IF
                         ELSE IF (GRID_BC(FACE_PG)%FIELD_BC == SPICE_NODE_BC .AND. ABS(CHARGE) .GE. 1.d-6) THEN
                            GRID_BC(FACE_PG)%SPICE_NODE_CURRENT = GRID_BC(FACE_PG)%SPICE_NODE_CURRENT + QE*FNUM*CHARGE/DT
+
+                        ELSE IF(GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC .AND. ABS(CHARGE) .GE. 1.d-6) THEN
+                           K = QE/(EPS0*EPS_SCALING**2)
+                           IF (DIMS == 1) THEN
+                              RHO_Q = K*CHARGE*FNUM/(YMAX-YMIN)/(ZMAX-ZMIN)
+                           ELSE IF (DIMS == 2) THEN
+                              RHO_Q = K*CHARGE*FNUM/(ZMAX-ZMIN)
+                           ELSE IF (DIMS == 3) THEN
+                              RHO_Q = K*CHARGE*FNUM
+                           END IF
+
+                           GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE = GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE + RHO_Q
                         END IF
 
                         ! Apply particle boundary condition

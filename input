@@ -28,7 +28,7 @@ Domain_diffuse:
     .FALSE.    .FALSE.    .FALSE.    .FALSE.
 
 Mesh_file_SU2:
-    '/students/2024/kirk/Pantera/retry/pantera-pic-dsmc/mesh_feb_20.su2'
+    'mesh_feb_20.su2'
 
 Boundary_temperature:
     300.0
@@ -38,22 +38,8 @@ Bool_dump_moments:
 Bool_dump_fluxes:
     .FALSE.
 
- !! '/students/2024/kirk/Pantera/pantera-pic-dsmc/dumps/'
- !! '/nobackup/phd/kirk/dumps/'
-!!Flowfield_output:
-!!'/nobackup/phd/kirk/dumps/'
-
-!!Particle_dump_output:
-!!'/nobackup/phd/kirk/dumps/'
-
-!!Fluxes_dump_output:
-!!'/nobackup/phd/kirk/dumps/'
-
-!!Checks_output:
-!!'/nobackup/phd/kirk/dumps/'
-
 All_output_path:
- '/students/2024/kirk/Pantera/retry/pantera-pic-dsmc/dumps/'
+ './dumps/'
 
 
 ! ========= Numerical parameters =============================
@@ -84,28 +70,37 @@ Perform_checks:
 ! ========= Species and mixtures ==============================
 
 Species_file:
-    Si_N5.species
+    Si_N2.species
 Def_mixture:
-Evapo N2 0.5 Si 0.5
+    Evapo N2 0.5 Si 0.5
 Def_mixture: 
     Silicon Si 1.0
 Def_mixture: 
     Nitrogen N2 1.0
+!Def_mixture: 
+!    Magnesium Mg 1.0
 ! ========= Collisions ========================================
 
 Collision_type: ! [MCC / DSMC / NONE]
-  DSMC
+  MCC
 
-MCC_background_dens:
-  1.0e20
-MCC_cross_section:  
-  1.0e-18
+!MCC_background_dens:
+!  1.0e20
 
-DSMC_collisions_mixture:
-Evapo
+MCC_background_mixture:
+   Nitrogen 
+
+Remove_particles_in_mixture: 
+   Nitrogen
+
+MCC_background_file: 
+  'dsmc_flowfield_90000.vtk'
+
+!DSMC_collisions_mixture:
+!   Evapo
 
 VSS_parameters_binary_file: 
-    Si_N5.hsbin
+   Si_N2.vssbin
 !VSS_parameters_file: 
 !     test.vss
 
@@ -137,27 +132,27 @@ Initial_particles_Tvib:
 Initial_particles_mixture:
     Nitrogen
 Initial_particles_mixture:
-    Silicon
+    Silicon   
 
 ! ========== Particle Injection ==================
 !   |Name| |Mix| |Dens|  |Vel -> x,y,z| |Temp -> x,y,z| |Vaporization Coefficient|
 
-Boundary_emit: 
-    inlet  Nitrogen  6.3e19 21520.0 0.0 0.0 200.0 200.0 200.0 1.0  
-Boundary_emit: 
-    outlet Nitrogen  6.3e19 21520.0 0.0 0.0 200.0 200.0 200.0 1.0  
-Boundary_emit: 
-    top    Nitrogen  6.3e19 21520.0 0.0 0.0 200.0 200.0 200.0 1.0   
-Boundary_emit: 
-    bottom Nitrogen  6.3e19 21520.0 0.0 0.0 200.0 200.0 200.0 1.0   
+!Boundary_emit: 
+!    inlet  Nitrogen  6.3e19 21520.0 0.0 0.0 200.0 200.0 200.0 1.0  
+!Boundary_emit: 
+!    outlet Nitrogen  6.3e19 21520.0 0.0 0.0 200.0 200.0 200.0 1.0  
+!Boundary_emit: 
+!    top    Nitrogen  6.3e19 21520.0 0.0 0.0 200.0 200.0 200.0 1.0   
+!Boundary_emit: 
+!    bottom Nitrogen  6.3e19 21520.0 0.0 0.0 200.0 200.0 200.0 1.0   
 
 !   |Name|     |Class| |Temp|
 Boundary_condition:
     sphere      diffuse 3896.3
 Boundary_emit:
     sphere Silicon 1.59e23 0.0 0.0 0.0 3896.3 3896.3 3896.3 0.5  
-!Boundary_condition: 
-!    sphere react  
+Boundary_condition: 
+    sphere react  
 
      
 ! ========= MPI parallelization =====================

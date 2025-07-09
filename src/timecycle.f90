@@ -395,7 +395,7 @@ MODULE timecycle
 
          IF (DIMS == 1) THEN
             X1 = U1D_GRID%NODE_COORDS(1, EMIT_TASK%IV1)
-            X2 = U1D_GRID%NODE_COORDS(1, EMIT_TASK%IV2)
+            ! X2 = U1D_GRID%NODE_COORDS(1, EMIT_TASK%IV2)
 
             FACE_NORMAL = U1D_GRID%EDGE_NORMAL(:,EMIT_TASK%IFACE,IC)
             FACE_TANG1 = [0.d0, FACE_NORMAL(1), 0.d0]
@@ -471,7 +471,7 @@ MODULE timecycle
                IF (DIMS == 1) THEN
                   R = rf()
 
-                  X = X1 + R*(X2-X1)
+                  X = X1 ! + R*(X2-X1)
                   Y = YMIN + (YMAX-YMIN)*rf()
                   Z = ZMIN + (ZMAX-ZMIN)*rf()
                ELSE IF (DIMS == 2) THEN
@@ -1068,6 +1068,7 @@ MODULE timecycle
       INTEGER :: VP
 
       REAL(KIND=8) :: VXPRE, VYPRE, VZPRE
+      REAL(KIND=8) :: XI_PRE, XI_POST, P_REINJECTION
 
       
       REAL(KIND=8) :: TOL = 1.0d-15
@@ -1447,6 +1448,41 @@ MODULE timecycle
                            particles(IP)%VX = particles(IP)%VX - 2.*VDOTN*FACE_NORMAL(1)
                            particles(IP)%VY = particles(IP)%VY - 2.*VDOTN*FACE_NORMAL(2)
                            particles(IP)%VZ = particles(IP)%VZ - 2.*VDOTN*FACE_NORMAL(3)
+
+                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == PISTON) THEN
+                           IF (GRID_BC(FACE_PG)%REACT) THEN
+                              CALL WALL_REACT(particles, IP, REMOVE_PART(IP))
+                           END IF
+
+                           XI_PRE = particles(IP)%VX*FACE_NORMAL(1) &
+                                 + particles(IP)%VY*FACE_NORMAL(2) &
+                                 + particles(IP)%VZ*FACE_NORMAL(3)
+                           
+                           ! WRITE(*,*) 'PRE', particles(IP)%VX, FACE_NORMAL(1)
+                           VDOTN = (particles(IP)%VX-GRID_BC(FACE_PG)%U_PISTON(1))*FACE_NORMAL(1) &
+                                 + (particles(IP)%VY-GRID_BC(FACE_PG)%U_PISTON(2))*FACE_NORMAL(2) &
+                                 + (particles(IP)%VZ-GRID_BC(FACE_PG)%U_PISTON(3))*FACE_NORMAL(3)
+                           particles(IP)%VX = particles(IP)%VX - 2.*VDOTN*FACE_NORMAL(1)
+                           particles(IP)%VY = particles(IP)%VY - 2.*VDOTN*FACE_NORMAL(2)
+                           particles(IP)%VZ = particles(IP)%VZ - 2.*VDOTN*FACE_NORMAL(3)
+
+                           XI_POST = particles(IP)%VX*FACE_NORMAL(1) &
+                                 + particles(IP)%VY*FACE_NORMAL(2) &
+                                 + particles(IP)%VZ*FACE_NORMAL(3)
+
+                           ! WRITE(*,*) 'POST+++', particles(IP)%VX, FACE_NORMAL(1)
+
+                           IF (XI_POST < 0) THEN
+                              REMOVE_PART(IP) = .TRUE.
+                              particles(IP)%DTRIM = 0.d0
+                           ELSE 
+                              P_REINJECTION = -XI_POST/XI_PRE
+                              ! WRITE(*,*) 'PROB:', P_REINJECTION
+                              IF (rf() > P_REINJECTION) THEN
+                                 REMOVE_PART(IP) = .TRUE.
+                                 particles(IP)%DTRIM = 0.d0
+                              END IF
+                           END IF
 
                         ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == DIFFUSE) THEN
                            IF (GRID_BC(FACE_PG)%REACT) THEN

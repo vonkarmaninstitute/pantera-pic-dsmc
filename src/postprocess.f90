@@ -1188,7 +1188,7 @@ MODULE postprocess
                      INDEX = U1D_GRID%SEGMENT_NODES_BOUNDARY_INDEX(IP, IC)
 
                      TIMESTEP_PXEM(INDEX) = TIMESTEP_PXEM(INDEX) - EPS0*&
-                     (E_FIELD(1,1,IC)*E_FIELD(1,1,IC) - 0.5*E_MAG2)*U2D_GRID%EDGE_NORMAL(1,IP,IC)
+                     (E_FIELD(1,1,IC)*E_FIELD(1,1,IC) - 0.5*E_MAG2)*U1D_GRID%EDGE_NORMAL(1,IP,IC)
                   END IF
                END DO
             ELSE IF (DIMS == 2) THEN

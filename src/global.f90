@@ -35,6 +35,7 @@ MODULE global
    REAL(KIND=8) :: QE   = 1.602176634d-19                ! https://physics.nist.gov/cgi-bin/cuu/Value?e
    REAL(KIND=8) :: NA   = 6.02214076e23                  ! https://physics.nist.gov/cgi-bin/cuu/Value?na
    REAL(KIND=8) :: ME   = 9.1093837139d-31               ! https://physics.nist.gov/cgi-bin/cuu/Value?me
+   REAL(KIND=8) :: HP   = 6.62607015d-34                 ! https://physics.nist.gov/cgi-bin/cuu/Value?h
 
    REAL(KIND=8) :: EPS_SCALING = 1.d0
       
@@ -263,7 +264,14 @@ MODULE global
 
 
 
+   ENUM, BIND(C)  
+      ENUMERATOR UNIFORM, THERMIONIC, THERMIONIC_ENHANCED, FIELD
+   END ENUM
+
    TYPE EMIT_TASK_DATA_STRUCTURE
+
+      INTEGER(KIND(UNIFORM)) :: TYPE = UNIFORM
+
       REAL(KIND=8) :: NRHO
       REAL(KIND=8) :: UX, UY, UZ
       REAL(KIND=8) :: TTRA, TROT, TVIB
@@ -274,6 +282,11 @@ MODULE global
       INTEGER      :: IV1, IV2
       INTEGER      :: IFACE
       CLASS(VELOCITY_DISTRIBUTION_STRUCTURE), POINTER :: VDF
+
+      REAL(KIND=8) :: T_SURFACE
+      REAL(KIND=8) :: WORK_FUNCTION ! in eV !
+      REAL(KIND=8) :: CORRECTION
+
    END TYPE EMIT_TASK_DATA_STRUCTURE
 
    TYPE(EMIT_TASK_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: EMIT_TASKS

@@ -375,14 +375,14 @@ MODULE timecycle
   
       IMPLICIT NONE
    
-      INTEGER      :: IP, IC, IS, NFS, ITASK
+      INTEGER      :: IP, IC, IS, NFS, ITASK, FACE_PG
       REAL(KIND=8) :: DTFRAC, Vdummy, V_NORM, V_TANG1, V_TANG2, BETA, BETA_E, X1, X2, Y1, Y2, R, P, Q, S, T
       REAL(KIND=8) :: X, Y, Z, VX, VY, VZ, EROT, EVIB 
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
       REAL(KIND=8), DIMENSION(3) :: FACE_NORMAL, FACE_TANG1, FACE_TANG2, V1, V2, V3
    
       INTEGER :: S_ID, ELECTRON_S_ID
-      REAL(KIND=8) :: M
+      REAL(KIND=8) :: M, CHARGE
 
       TYPE(EMIT_TASK_DATA_STRUCTURE) :: EMIT_TASK
 
@@ -400,6 +400,7 @@ MODULE timecycle
             FACE_NORMAL = U1D_GRID%EDGE_NORMAL(:,EMIT_TASK%IFACE,IC)
             FACE_TANG1 = [0.d0, FACE_NORMAL(1), 0.d0]
             FACE_TANG2 = [0.d0, 0.d0, 1.d0]
+            FACE_PG = U1D_GRID%CELL_EDGES_PG(EMIT_TASK%IFACE,IC)
          ELSE IF (DIMS == 2) THEN
             X1 = U2D_GRID%NODE_COORDS(1, EMIT_TASK%IV1)
             Y1 = U2D_GRID%NODE_COORDS(2, EMIT_TASK%IV1)
@@ -409,6 +410,7 @@ MODULE timecycle
             FACE_NORMAL = U2D_GRID%EDGE_NORMAL(:,EMIT_TASK%IFACE,IC)
             FACE_TANG1 = [-FACE_NORMAL(2), FACE_NORMAL(1), 0.d0]
             FACE_TANG2 = [0.d0, 0.d0, 1.d0]
+            FACE_PG = U2D_GRID%CELL_EDGES_PG(EMIT_TASK%IFACE,IC)
          ELSE IF (DIMS == 3) THEN
             FACE_NORMAL = U3D_GRID%FACE_NORMAL(:,EMIT_TASK%IFACE,IC)
             FACE_TANG1 = U3D_GRID%FACE_TANG1(:,EMIT_TASK%IFACE,IC)
@@ -417,6 +419,7 @@ MODULE timecycle
             V1 = U3D_GRID%NODE_COORDS(:,U3D_GRID%FACE_NODES(1,EMIT_TASK%IFACE,IC))
             V2 = U3D_GRID%NODE_COORDS(:,U3D_GRID%FACE_NODES(2,EMIT_TASK%IFACE,IC))
             V3 = U3D_GRID%NODE_COORDS(:,U3D_GRID%FACE_NODES(3,EMIT_TASK%IFACE,IC))
+            FACE_PG = U3D_GRID%CELL_FACES_PG(EMIT_TASK%IFACE,IC)
          END IF
 
          DO IS = 1, MIXTURES(EMIT_TASK%MIX_ID)%N_COMPONENTS ! Loop on mixture components
@@ -443,27 +446,47 @@ MODULE timecycle
                            EMIT_TASK%TTRA, EMIT_TASK%TTRA, EMIT_TASK%TTRA, &
                            Vdummy, V_TANG1, V_TANG2, M)
 
-               CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, EMIT_TASK%TROT, EROT)
-               CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, EMIT_TASK%TVIB, EVIB)
+               IF (EMIT_TASK%TYPE == UNIFORM) THEN
+                  CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, EMIT_TASK%TROT, EROT)
+                  CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, EMIT_TASK%TVIB, EVIB)
 
-               IF (EMIT_TASK%TTRA == 0) THEN
-                  V_NORM = 0
-               ELSE
-                  V_NORM = EMIT_TASK%VDF%SAMPLE_NORMAL(EMIT_TASK%U_NORM*BETA, EMIT_TASK%TTRA, M)
+                  IF (EMIT_TASK%TTRA == 0) THEN
+                     V_NORM = 0
+                  ELSE
+                     V_NORM = EMIT_TASK%VDF%SAMPLE_NORMAL(EMIT_TASK%U_NORM*BETA, EMIT_TASK%TTRA, M)
+                  END IF
+
+                  VX = EMIT_TASK%UX &
+                     - V_NORM*FACE_NORMAL(1) &
+                     - V_TANG1*FACE_TANG1(1) &
+                     - V_TANG2*FACE_TANG2(1)
+                  VY = EMIT_TASK%UY &
+                     - V_NORM*FACE_NORMAL(2) &
+                     - V_TANG1*FACE_TANG1(2) &
+                     - V_TANG2*FACE_TANG2(2)
+                  VZ = EMIT_TASK%UZ &
+                     - V_NORM*FACE_NORMAL(3) &
+                     - V_TANG1*FACE_TANG1(3) &
+                     - V_TANG2*FACE_TANG2(3)
+
+               ELSE IF (EMIT_TASK%TYPE == THERMIONIC) THEN
+                  V_NORM = EMIT_TASK%VDF%SAMPLE_NORMAL(0.d0, EMIT_TASK%T_SURFACE, M)
+
+                  VX = - V_NORM*FACE_NORMAL(1) &
+                     - V_TANG1*FACE_TANG1(1) &
+                     - V_TANG2*FACE_TANG2(1)
+                  VY = - V_NORM*FACE_NORMAL(2) &
+                     - V_TANG1*FACE_TANG1(2) &
+                     - V_TANG2*FACE_TANG2(2)
+                  VZ = - V_NORM*FACE_NORMAL(3) &
+                     - V_TANG1*FACE_TANG1(3) &
+                     - V_TANG2*FACE_TANG2(3)
+
+                  CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, 0.d0, EROT)
+                  CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, 0.d0, EVIB)
+                  ! WRITE(*,*) '+++++++++++++++', M
                END IF
 
-               VX = EMIT_TASK%UX &
-                  - V_NORM*FACE_NORMAL(1) &
-                  - V_TANG1*FACE_TANG1(1) &
-                  - V_TANG2*FACE_TANG2(1)
-               VY = EMIT_TASK%UY &
-                  - V_NORM*FACE_NORMAL(2) &
-                  - V_TANG1*FACE_TANG1(2) &
-                  - V_TANG2*FACE_TANG2(2)
-               VZ = EMIT_TASK%UZ &
-                  - V_NORM*FACE_NORMAL(3) &
-                  - V_TANG1*FACE_TANG1(3) &
-                  - V_TANG2*FACE_TANG2(3)
 
                DTFRAC = rf()*DT
 
@@ -515,6 +538,19 @@ MODULE timecycle
                ! Init a particle object and assign it to the local vector of particles
                CALL INIT_PARTICLE(X,Y,Z,VX,VY,VZ,EROT,EVIB,S_ID,IC,DTFRAC,  particleNOW)
                CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles)
+
+               ! Save emitted particle on boundary going OUT
+               IF ((tID .GE. DUMP_GRID_START) .AND. (tID .NE. RESTART_TIMESTEP)) THEN
+                  IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_AVG_EVERY) .EQ. 0) THEN
+                     CALL TALLY_PARTICLE_TO_BOUNDARY(.TRUE., particleNOW, EMIT_TASK%IC, EMIT_TASK%IFACE)
+                  END IF
+               END IF
+
+               CHARGE = SPECIES(particles(IP)%S_ID)%CHARGE
+               IF (GRID_BC(FACE_PG)%FIELD_BC == SPICE_NODE_BC .AND. ABS(CHARGE) .GE. 1.d-6) THEN
+                  GRID_BC(FACE_PG)%SPICE_NODE_CURRENT = GRID_BC(FACE_PG)%SPICE_NODE_CURRENT - QE*FNUM*CHARGE/DT
+               END IF
+
 
                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                ! Modification to inject electrons colocated with ions.
@@ -1395,7 +1431,7 @@ MODULE timecycle
                               DO I = 1, 2
                                  VP = U1D_GRID%CELL_NODES(I,IC)
                                  PSIP = U1D_GRID%BASIS_COEFFS(1,I,IC)*particles(IP)%X &
-                                      + U1D_GRID%BASIS_COEFFS(3,I,IC)
+                                      + U1D_GRID%BASIS_COEFFS(2,I,IC)
                                  SURFACE_CHARGE(VP) = SURFACE_CHARGE(VP) + RHO_Q*PSIP
                               END DO
 

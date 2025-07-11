@@ -375,14 +375,14 @@ MODULE timecycle
   
       IMPLICIT NONE
    
-      INTEGER      :: IP, IC, IS, NFS, ITASK, FACE_PG
+      INTEGER      :: IP, IC, IS, NFS, ITASK, FACE_PG, VP, I
       REAL(KIND=8) :: DTFRAC, Vdummy, V_NORM, V_TANG1, V_TANG2, BETA, BETA_E, X1, X2, Y1, Y2, R, P, Q, S, T
       REAL(KIND=8) :: X, Y, Z, VX, VY, VZ, EROT, EVIB 
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
       REAL(KIND=8), DIMENSION(3) :: FACE_NORMAL, FACE_TANG1, FACE_TANG2, V1, V2, V3
    
       INTEGER :: S_ID, ELECTRON_S_ID
-      REAL(KIND=8) :: M, CHARGE
+      REAL(KIND=8) :: M, CHARGE, RHO_Q, K, PSIP
 
       TYPE(EMIT_TASK_DATA_STRUCTURE) :: EMIT_TASK
 
@@ -442,11 +442,11 @@ MODULE timecycle
 
             DO IP = 1, NFS ! Loop on particles to be injected
 
-               CALL EMIT_TASK%VDF%SAMPLE_VELOCITY(0.d0, 0.d0, 0.d0, &
-                           EMIT_TASK%TTRA, EMIT_TASK%TTRA, EMIT_TASK%TTRA, &
-                           Vdummy, V_TANG1, V_TANG2, M)
-
                IF (EMIT_TASK%TYPE == UNIFORM) THEN
+                  CALL EMIT_TASK%VDF%SAMPLE_VELOCITY(0.d0, 0.d0, 0.d0, &
+                  EMIT_TASK%TTRA, EMIT_TASK%TTRA, EMIT_TASK%TTRA, &
+                  Vdummy, V_TANG1, V_TANG2, M)
+
                   CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, EMIT_TASK%TROT, EROT)
                   CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, EMIT_TASK%TVIB, EVIB)
 
@@ -470,6 +470,11 @@ MODULE timecycle
                      - V_TANG2*FACE_TANG2(3)
 
                ELSE IF (EMIT_TASK%TYPE == THERMIONIC) THEN
+
+                  CALL EMIT_TASK%VDF%SAMPLE_VELOCITY(0.d0, 0.d0, 0.d0, &
+                  EMIT_TASK%T_SURFACE, EMIT_TASK%T_SURFACE, EMIT_TASK%T_SURFACE, &
+                  Vdummy, V_TANG1, V_TANG2, M)
+
                   V_NORM = EMIT_TASK%VDF%SAMPLE_NORMAL(0.d0, EMIT_TASK%T_SURFACE, M)
 
                   VX = - V_NORM*FACE_NORMAL(1) &
@@ -482,8 +487,8 @@ MODULE timecycle
                      - V_TANG1*FACE_TANG1(3) &
                      - V_TANG2*FACE_TANG2(3)
 
-                  CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, 0.d0, EROT)
-                  CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, 0.d0, EVIB)
+                  CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, EMIT_TASK%T_SURFACE, EROT)
+                  CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, EMIT_TASK%T_SURFACE, EVIB)
                   ! WRITE(*,*) '+++++++++++++++', M
                END IF
 
@@ -546,11 +551,55 @@ MODULE timecycle
                   END IF
                END IF
 
-               CHARGE = SPECIES(particles(IP)%S_ID)%CHARGE
-               IF (GRID_BC(FACE_PG)%FIELD_BC == SPICE_NODE_BC .AND. ABS(CHARGE) .GE. 1.d-6) THEN
-                  GRID_BC(FACE_PG)%SPICE_NODE_CURRENT = GRID_BC(FACE_PG)%SPICE_NODE_CURRENT - QE*FNUM*CHARGE/DT
-               END IF
+               ! Charge leaving from a dielectric/conductive/ngspice surface               
+               CHARGE = SPECIES(particleNOW%S_ID)%CHARGE
+               IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. ABS(CHARGE) .GE. 1.d-6) THEN
+                  K = QE/(EPS0*EPS_SCALING**2)
+                  IF (DIMS == 1) THEN
+                     RHO_Q = K*CHARGE*FNUM/(YMAX-YMIN)/(ZMAX-ZMIN)
+                     DO I = 1, 2
+                        VP = U1D_GRID%CELL_NODES(I,IC)
+                        PSIP = U1D_GRID%BASIS_COEFFS(1,I,IC)*particleNOW%X &
+                              + U1D_GRID%BASIS_COEFFS(2,I,IC)
+                        SURFACE_CHARGE(VP) = SURFACE_CHARGE(VP) - RHO_Q*PSIP
+                     END DO
 
+                  ELSE IF (DIMS == 2) THEN
+                     RHO_Q = K*CHARGE*FNUM/(ZMAX-ZMIN)
+                     DO I = 1, 3
+                        VP = U2D_GRID%CELL_NODES(I,IC)
+                        PSIP = U2D_GRID%BASIS_COEFFS(1,I,IC)*particleNOW%X &
+                              + U2D_GRID%BASIS_COEFFS(2,I,IC)*particleNOW%Y &
+                              + U2D_GRID%BASIS_COEFFS(3,I,IC)
+                        SURFACE_CHARGE(VP) = SURFACE_CHARGE(VP) - RHO_Q*PSIP
+                     END DO
+                     
+                  ELSE IF (DIMS == 3) THEN
+                     RHO_Q = K*CHARGE*FNUM
+                     DO I = 1, 4
+                        VP = U3D_GRID%CELL_NODES(I,IC)
+                        PSIP = U3D_GRID%BASIS_COEFFS(1,I,IC)*particleNOW%X &
+                              + U3D_GRID%BASIS_COEFFS(2,I,IC)*particleNOW%Y &
+                              + U3D_GRID%BASIS_COEFFS(3,I,IC)*particleNOW%Z &
+                              + U3D_GRID%BASIS_COEFFS(4,I,IC)
+                        SURFACE_CHARGE(VP) = SURFACE_CHARGE(VP) - RHO_Q*PSIP
+                     END DO
+                  END IF
+               ELSE IF (GRID_BC(FACE_PG)%FIELD_BC == SPICE_NODE_BC .AND. ABS(CHARGE) .GE. 1.d-6) THEN
+                  GRID_BC(FACE_PG)%SPICE_NODE_CURRENT = GRID_BC(FACE_PG)%SPICE_NODE_CURRENT - QE*FNUM*CHARGE/DT
+
+               ELSE IF(GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC .AND. ABS(CHARGE) .GE. 1.d-6) THEN
+                  K = QE/(EPS0*EPS_SCALING**2)
+                  IF (DIMS == 1) THEN
+                     RHO_Q = K*CHARGE*FNUM/(YMAX-YMIN)/(ZMAX-ZMIN)
+                  ELSE IF (DIMS == 2) THEN
+                     RHO_Q = K*CHARGE*FNUM/(ZMAX-ZMIN)
+                  ELSE IF (DIMS == 3) THEN
+                     RHO_Q = K*CHARGE*FNUM
+                  END IF
+
+                  GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE = GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE - RHO_Q
+               END IF
 
                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                ! Modification to inject electrons colocated with ions.

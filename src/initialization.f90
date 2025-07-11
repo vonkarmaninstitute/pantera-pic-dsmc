@@ -2546,7 +2546,7 @@ MODULE initialization
 
       IMPLICIT NONE
 
-      REAL(KIND=8) :: BETA, FLUXBOUND, NtotINJECT, Snow
+      REAL(KIND=8) :: BETA, FLUXBOUND, FLUXSOURCE, NtotINJECT, Snow
       REAL(KIND=8) :: U_NORM, S_NORM, FLUXLINESOURCE, LINELENGTH, NORMX, NORMY, NORMZ, AREA
       REAL(KIND=8) :: PI2  
       REAL(KIND=8) :: T_SURFACE, WORK_FUNCTION, A0
@@ -2771,6 +2771,7 @@ MODULE initialization
             AREA = U3D_GRID%FACE_AREA(EMIT_TASKS(ITASK)%IFACE, EMIT_TASKS(ITASK)%IC)
          END IF
 
+         ! Calculate number of injected particles based on EMIT_TASK type
          IF (EMIT_TASKS(ITASK)%TYPE == UNIFORM) THEN
             DO IS = 1, N_COMP ! Loop on mixture components
                ! The species ID of the component
@@ -2780,7 +2781,6 @@ MODULE initialization
                IF (EMIT_TASKS(ITASK)%TTRA == 0) THEN
                   BETA = 0
                ELSE
-                  ! BETA = 1./SQRT(2.*KB/M*EMIT_TASKS(ITASK)%TTRA) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
                   BETA = EMIT_TASKS(ITASK)%VDF%BETA(EMIT_TASKS(ITASK)%TTRA,M)
                END IF
 
@@ -2789,14 +2789,12 @@ MODULE initialization
                S_NORM = U_NORM*BETA
 
                IF (EMIT_TASKS(ITASK)%TTRA == 0) THEN
-                  FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC*U_NORM      ! Tot number flux emitted
+                  FLUXSOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC*U_NORM      ! Tot number flux emitted
                ELSE
-                  ! FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-S_NORM**2) &
-                  !                + SQRT(PI)*S_NORM*(1.+ERF1(S_NORM)))      ! Tot number flux emitted
-                  FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC*EMIT_TASKS(ITASK)%VDF%FLUX_DISTR(BETA,S_NORM)
+                  FLUXSOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC*EMIT_TASKS(ITASK)%VDF%FLUX_DISTR(BETA,S_NORM)
                END IF
 
-               NtotINJECT = FLUXLINESOURCE*AREA*DT/FNUM         ! Tot num of particles to be injected
+               NtotINJECT = FLUXSOURCE*AREA*DT/FNUM         ! Tot num of particles to be injected
 
                TASK_NFS(IS) = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
                
@@ -2816,14 +2814,13 @@ MODULE initialization
 
                T_SURFACE = EMIT_TASKS(ITASK)%T_SURFACE
                WORK_FUNCTION = EMIT_TASKS(ITASK)%WORK_FUNCTION
-               A0 = 4*PI*M*KB**2/HP**3  ! CONSTANT FOR EMISSION
+               A0 = 4*PI*M*KB**2/HP**3  ! (RICHARDSON) CONSTANT FOR EMISSION
                
-               FLUXLINESOURCE = FRAC*EMIT_TASKS(ITASK)%CORRECTION*A0*T_SURFACE**2*EXP(-QE*WORK_FUNCTION/(KB*T_SURFACE))
+               FLUXSOURCE = FRAC*EMIT_TASKS(ITASK)%CORRECTION*A0*T_SURFACE**2*EXP(-QE*WORK_FUNCTION/(KB*T_SURFACE))
 
-               NtotINJECT = FLUXLINESOURCE*AREA*DT/FNUM         ! Tot num of particles to be injected
+               NtotINJECT = FLUXSOURCE*AREA*DT/FNUM         ! Tot num of particles to be injected
 
                TASK_NFS(IS) = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
-               WRITE(*,*) '+++++++++', NtotINJECT
             END DO
          END IF
          !WRITE(*,*) 'Task NFS', TASK_NFS

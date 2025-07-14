@@ -1648,7 +1648,7 @@ MODULE collisions
          REACTIONS(JR)%COUNTS = 0
       END DO
 
-      NULL_COLL_FREQ = MCC_BG_DENS*2e-13
+      NULL_COLL_FREQ = MCC_BG_DENS*1e-11
       P_NULL = 1 - EXP(-DT*NULL_COLL_FREQ)
       !P_NULL = DT*NULL_COLL_FREQ
       IF (P_NULL > 1) THEN
@@ -1661,7 +1661,6 @@ MODULE collisions
       DO JP1 = 1, NP_PROC_INITIAL
          HAS_REACTED = .FALSE.
          IF (rf() > P_NULL) CYCLE
-         TIMESTEP_COLL = TIMESTEP_COLL + 1
 
          SP_ID1 = particles(JP1)%S_ID
 
@@ -1725,6 +1724,7 @@ MODULE collisions
                ! Try the reaction
                IF (R_SELECT < P_CUMULATED) THEN ! Collision happens
                   REACTIONS(JR)%COUNTS = REACTIONS(JR)%COUNTS + 1
+                  TIMESTEP_COLL = TIMESTEP_COLL + 1
 
                   ! Actually create the second collision partner
                   CALL INTERNAL_ENERGY(SPECIES(SP_ID2)%ROTDOF, MCC_BG_TTRA, EROT)

@@ -382,7 +382,7 @@ MODULE timecycle
       REAL(KIND=8), DIMENSION(3) :: FACE_NORMAL, FACE_TANG1, FACE_TANG2, V1, V2, V3
    
       INTEGER :: S_ID, ELECTRON_S_ID
-      REAL(KIND=8) :: M, CHARGE, RHO_Q, K, PSIP
+      REAL(KIND=8) :: M, CHARGE, RHO_Q, K, PSIP, E_FIELD_NORM
 
       TYPE(EMIT_TASK_DATA_STRUCTURE) :: EMIT_TASK
 
@@ -428,6 +428,16 @@ MODULE timecycle
 
             M = SPECIES(S_ID)%MOLECULAR_MASS
             NFS = FLOOR(EMIT_TASK%NFS(IS))
+
+            IF (EMIT_TASK%TYPE == THERMIONIC) THEN
+               E_FIELD_NORM = -DOT(E_FIELD,FACE_NORMAL)
+
+               IF (E_FIELD_NORM .GE. 0) THEN
+                  NFS = NFS*EXP(SQRT(QE**3*E_FIELD_NORM/(4*PI*EPS0))/(KB*EMIT_TASK%T_SURFACE))
+               END IF
+            END IF
+               
+
             IF (EMIT_TASK%NFS(IS)-REAL(NFS, KIND=8) .GE. rf()) THEN ! Same as SPARTA's perspeciess
                NFS = NFS + 1
             END IF

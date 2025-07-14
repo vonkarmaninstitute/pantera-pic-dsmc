@@ -260,9 +260,9 @@ MODULE initialization
                COLLISION_TYPE = DSMC
             ELSE IF (COLLISION_TYPE_STRING == "MCC") THEN
                COLLISION_TYPE = MCC
-            ELSE IF (COLLISION_TYPE_STRING == "VAHEDI_MCC") THEN
+            ELSE IF (COLLISION_TYPE_STRING == "MCC_VAHEDI") THEN
                COLLISION_TYPE = MCC_VAHEDI
-            ELSE IF (COLLISION_TYPE_STRING == "VAHEDI_DSMC") THEN
+            ELSE IF (COLLISION_TYPE_STRING == "DSMC_VAHEDI") THEN
                COLLISION_TYPE = DSMC_VAHEDI
             ELSE IF (COLLISION_TYPE_STRING == "BGK") THEN
                COLLISION_TYPE = BGK
@@ -453,7 +453,7 @@ MODULE initialization
          string = 'Collision type:'
          WRITE(*,'(A5,A50,I8)') '     ', string, COLLISION_TYPE
 
-         IF (COLLISION_TYPE == MCC) THEN  ! Only print this if MCC collisions are ON
+         IF (COLLISION_TYPE == MCC .OR. COLLISION_TYPE == MCC_VAHEDI) THEN  ! Only print this if MCC collisions are ON
 
             string = 'Background number density [1/m^3]:'
             WRITE(*,'(A5,A50,ES14.3)') '     ', string, MCC_BG_DENS

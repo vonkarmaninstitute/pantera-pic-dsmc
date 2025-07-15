@@ -2648,7 +2648,11 @@ MODULE initialization
       ALLOCATE(MCC_BG_CELL_VEL_Y(N_SPECIES, NCELLS))
       ALLOCATE(MCC_BG_CELL_VEL_Z(N_SPECIES, NCELLS))
 
+      ALLOCATE(MCC_BG_CELL_TEMP_X(N_SPECIES, NCELLS))
+      ALLOCATE(MCC_BG_CELL_TEMP_Y(N_SPECIES, NCELLS))
+      ALLOCATE(MCC_BG_CELL_TEMP_Z(N_SPECIES, NCELLS))
 
+ 
 
 
       ! ++++++++ Read until the end of file ++++++++
@@ -2726,9 +2730,67 @@ MODULE initialization
             READ(in5, IOSTAT=ReasonEOF) MCC_BG_CELL_VEL_Z(SP_ID, :)
             IF (ReasonEOF < 0) EXIT ! End of file reached
          END DO ! Loop :ufor reading input file
+       
+         REWIND(in5)       
+       
+         DO
+            CALL SKIP_TO(in5, 'Ttrx_mean_', STAT)
+         
+            READ(in5, IOSTAT=ReasonEOF) line ! Read line
+           
+            IF (ReasonEOF < 0) EXIT ! End of file reached
+         
+            SP_ID = SPECIES_NAME_TO_ID(line)
+            IF (SP_ID == -1) CALL ERROR_ABORT('Error! Species in MCC background vtk file not found.')
+
+            WRITE(*,*) 'Found data for species ', SP_ID
+            CALL SKIP_TO(in5, ACHAR(10), STAT)
+
+            READ(in5, IOSTAT=ReasonEOF) MCC_BG_CELL_TEMP_X(SP_ID, :)
+            IF (ReasonEOF < 0) EXIT ! End of file reached
+         END DO ! Loop :ufor reading input file
+       
+         REWIND(in5)       
+
+         DO
+            CALL SKIP_TO(in5, 'Ttry_mean_', STAT)
+         
+            READ(in5, IOSTAT=ReasonEOF) line ! Read line
+           
+            IF (ReasonEOF < 0) EXIT ! End of file reached
+         
+            SP_ID = SPECIES_NAME_TO_ID(line)
+            IF (SP_ID == -1) CALL ERROR_ABORT('Error! Species in MCC background vtk file not found.')
+
+            WRITE(*,*) 'Found data for species ', SP_ID
+            CALL SKIP_TO(in5, ACHAR(10), STAT)
+
+            READ(in5, IOSTAT=ReasonEOF) MCC_BG_CELL_TEMP_Y(SP_ID, :)
+            IF (ReasonEOF < 0) EXIT ! End of file reached
+         END DO ! Loop :ufor reading input file
+       
+         REWIND(in5)       
+         
+         DO
+            CALL SKIP_TO(in5, 'Ttrz_mean_', STAT)
+         
+            READ(in5, IOSTAT=ReasonEOF) line ! Read line
+           
+            IF (ReasonEOF < 0) EXIT ! End of file reached
+         
+            SP_ID = SPECIES_NAME_TO_ID(line)
+            IF (SP_ID == -1) CALL ERROR_ABORT('Error! Species in MCC background vtk file not found.')
+
+            WRITE(*,*) 'Found data for species ', SP_ID
+            CALL SKIP_TO(in5, ACHAR(10), STAT)
+
+            READ(in5, IOSTAT=ReasonEOF) MCC_BG_CELL_TEMP_Z(SP_ID, :)
+            IF (ReasonEOF < 0) EXIT ! End of file reached
+         END DO ! Loop :ufor reading input file
+
 
       ELSE
-         
+                 
          DO
             READ(in5, IOSTAT=ReasonEOF) line ! Read line
             CALL SPLIT_STR(line, ' ', STRARRAY, N_STR)
@@ -2786,7 +2848,56 @@ MODULE initialization
                IF (ReasonEOF < 0) EXIT ! End of file reached
             END IF
          END DO
-     END IF
+         
+         REWIND(in5)
+
+         DO
+            READ(in5, IOSTAT=ReasonEOF) line ! Read line
+            CALL SPLIT_STR(line, ' ', STRARRAY, N_STR)
+            IF (STRARRAY(1)(1:10) == 'Ttrx_mean_') THEN
+               SP_ID = SPECIES_NAME_TO_ID(STRARRAY(1)(11:))
+               IF (SP_ID == -1) CALL ERROR_ABORT('Error! Species in MCC background vtk file not found.')
+
+               WRITE(*,*) 'Found data for species ', SP_ID
+               READ(in5, IOSTAT=ReasonEOF) MCC_BG_CELL_TEMP_X(SP_ID, :)
+               IF (ReasonEOF < 0) EXIT ! End of file reached
+            END IF
+         END DO
+  
+         REWIND(in5)
+
+         DO
+            READ(in5, IOSTAT=ReasonEOF) line ! Read line
+            CALL SPLIT_STR(line, ' ', STRARRAY, N_STR)
+            IF (STRARRAY(1)(1:10) == 'Ttry_mean_') THEN
+               SP_ID = SPECIES_NAME_TO_ID(STRARRAY(1)(11:))
+               IF (SP_ID == -1) CALL ERROR_ABORT('Error! Species in MCC background vtk file not found.')
+
+               WRITE(*,*) 'Found data for species ', SP_ID
+               READ(in5, IOSTAT=ReasonEOF) MCC_BG_CELL_TEMP_Y(SP_ID, :)
+               IF (ReasonEOF < 0) EXIT ! End of file reached
+            END IF
+         END DO
+  
+         REWIND(in5)
+
+         DO
+            READ(in5, IOSTAT=ReasonEOF) line ! Read line
+            CALL SPLIT_STR(line, ' ', STRARRAY, N_STR)
+            IF (STRARRAY(1)(1:10) == 'Ttrz_mean_') THEN
+               SP_ID = SPECIES_NAME_TO_ID(STRARRAY(1)(11:))
+               IF (SP_ID == -1) CALL ERROR_ABORT('Error! Species in MCC background vtk file not found.')
+
+               WRITE(*,*) 'Found data for species ', SP_ID
+               READ(in5, IOSTAT=ReasonEOF) MCC_BG_CELL_TEMP_Z(SP_ID, :)
+               IF (ReasonEOF < 0) EXIT ! End of file reached
+            END IF
+         END DO
+  
+
+
+
+      END IF
 
       CLOSE(in5) ! Close input file
 

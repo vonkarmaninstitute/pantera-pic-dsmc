@@ -1346,7 +1346,7 @@ MODULE collisions
       IMPLICIT NONE
 
       INTEGER      :: JP1, JP2, JR, I, J, SP_ID1, SP_ID2, P1_SP_ID, P2_SP_ID, P3_SP_ID, NP_PROC_INITIAL, INDEX, SP_CELL, J_CELL
-      REAL(KIND=8) :: P_COLL, PTCE, rfp, BG_NRHO, BG_VX, BG_VY, BG_VZ
+      REAL(KIND=8) :: P_COLL, PTCE, rfp, BG_NRHO, BG_VX, BG_VY, BG_VZ, BG_TX, BG_TY, BG_TZ, BG_TEMP
       REAL(KIND=8) :: SIGMA, OMEGA, CREF, ALPHA, FRAC, SIGMA_R
       REAL(KIND=8) :: PI2
       REAL(KIND=8), DIMENSION(3) :: C1, C2, GREL, W
@@ -1395,12 +1395,19 @@ MODULE collisions
                BG_VX   = MCC_BG_CELL_VEL_X(SP_ID2, particles(JP1)%IC)
                BG_VY   = MCC_BG_CELL_VEL_Y(SP_ID2, particles(JP1)%IC)
                BG_VZ   = MCC_BG_CELL_VEL_Z(SP_ID2, particles(JP1)%IC)
+               BG_TX   = MCC_BG_CELL_TEMP_X(SP_ID2, particles(JP1)%IC)
+               BG_TY   = MCC_BG_CELL_TEMP_Y(SP_ID2, particles(JP1)%IC)
+               BG_TZ   = MCC_BG_CELL_TEMP_Z(SP_ID2, particles(JP1)%IC)
+       
             ELSE
                FRAC = MIXTURES(MCC_BG_MIX)%COMPONENTS(J)%MOLFRAC
                BG_NRHO = FRAC*MCC_BG_DENS
                BG_VX   = 0.0
                BG_VY   = 0.0
                BG_VZ   = 0.0
+               BG_TX   = MCC_BG_TTRA
+               BG_TY   = MCC_BG_TTRA
+               BG_TZ   = MCC_BG_TTRA
 
             END IF
             IF (BG_NRHO == 0) CYCLE
@@ -1418,7 +1425,7 @@ MODULE collisions
             
         
             CALL MAXWELL(BG_VX, BG_VY, BG_VZ, &
-            MCC_BG_TTRA, MCC_BG_TTRA, MCC_BG_TTRA, &
+            BG_TX, BG_TY, BG_TZ, &
             C2(1), C2(2), C2(3), SPECIES(SP_ID2)%MOLECULAR_MASS)
 
             ! Compute the real relative velocity
@@ -1428,6 +1435,7 @@ MODULE collisions
 
             VR = SQRT(VR2)
             
+            BG_TEMP = SQRT(BG_TX**2 + BG_TY**2 + BG_TZ**2)
 
             ! Compute collision probability
             P_COLL = 1 - exp(-DT*BG_NRHO*VR*SIGMA*(VR/CREF)**(1.-2.*OMEGA))
@@ -1447,8 +1455,8 @@ MODULE collisions
                C1(3) = particles(JP1)%VZ
 
                ! Actually create the second collision partner
-               CALL INTERNAL_ENERGY(SPECIES(SP_ID2)%ROTDOF, MCC_BG_TTRA, EROT)
-               CALL INTERNAL_ENERGY(SPECIES(SP_ID2)%VIBDOF, MCC_BG_TTRA, EVIB)
+               CALL INTERNAL_ENERGY(SPECIES(SP_ID2)%ROTDOF, BG_TEMP, EROT)
+               CALL INTERNAL_ENERGY(SPECIES(SP_ID2)%VIBDOF, BG_TEMP, EVIB)
                CALL INIT_PARTICLE(particles(JP1)%X,particles(JP1)%Y,particles(JP1)%Z, &
                C2(1),C2(2),C2(3),EROT,EVIB,SP_ID2,particles(JP1)%IC,DT, NEWparticle)
                !WRITE(*,*) 'Should be adding particle!'

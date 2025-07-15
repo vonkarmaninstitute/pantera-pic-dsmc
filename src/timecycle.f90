@@ -430,10 +430,11 @@ MODULE timecycle
             NFS = FLOOR(EMIT_TASK%NFS(IS))
 
             IF (EMIT_TASK%TYPE == THERMIONIC) THEN
-               E_FIELD_NORM = -DOT(E_FIELD,FACE_NORMAL)
+               E_FIELD_NORM = DOT(E_FIELD,FACE_NORMAL)
+               WRITE(*,*) E_FIELD_NORM
 
                IF (E_FIELD_NORM .GE. 0) THEN
-                  NFS = NFS*EXP(SQRT(QE**3*E_FIELD_NORM/(4*PI*EPS0))/(KB*EMIT_TASK%T_SURFACE))
+                  NFS = FLOOR(NFS*EXP(QE*SQRT(QE*E_FIELD_NORM/(4*PI*EPS0))/(KB*EMIT_TASK%T_SURFACE)))
                END IF
             END IF
                

@@ -49,7 +49,7 @@ Fnum:  ! Ratio of real-to-simulated particles
 Timestep:
     2.50e-10
 Number_of_timesteps:
-    100000
+    20000
 Stats_every:
     1
 RNG_seed:
@@ -82,22 +82,22 @@ Def_mixture:
 ! ========= Collisions ========================================
 
 Collision_type: ! [MCC / DSMC / NONE]
-  MCC
+  DSMC
 
 !MCC_background_dens:
 !  1.0e20
 
-MCC_background_mixture:
-   Nitrogen 
+!MCC_background_mixture:
+!   Nitrogen 
 
-Remove_particles_in_mixture: 
-   Nitrogen
+!Remove_particles_in_mixture: 
+!   Nitrogen
 
-MCC_background_file: 
-  'dsmc_flowfield_90000.vtk'
+!MCC_background_file: 
+!  'dsmc_flowfield_90000.vtk'
 
-!DSMC_collisions_mixture:
-!   Evapo
+DSMC_collisions_mixture:
+   Evapo
 
 VSS_parameters_binary_file: 
    Si_N2.vssbin
@@ -137,14 +137,14 @@ Initial_particles_mixture:
 ! ========== Particle Injection ==================
 !   |Name| |Mix| |Dens|  |Vel -> x,y,z| |Temp -> x,y,z| |Vaporization Coefficient|
 
-!Boundary_emit: 
-!    inlet  Nitrogen  6.3e19 21520.0 0.0 0.0 200.0 200.0 200.0 1.0  
-!Boundary_emit: 
-!    outlet Nitrogen  6.3e19 21520.0 0.0 0.0 200.0 200.0 200.0 1.0  
-!Boundary_emit: 
-!    top    Nitrogen  6.3e19 21520.0 0.0 0.0 200.0 200.0 200.0 1.0   
-!Boundary_emit: 
-!    bottom Nitrogen  6.3e19 21520.0 0.0 0.0 200.0 200.0 200.0 1.0   
+Boundary_emit: 
+    inlet  Nitrogen  6.3e19 21520.0 0.0 0.0 200.0 200.0 200.0 1.0  
+Boundary_emit: 
+    outlet Nitrogen  6.3e19 21520.0 0.0 0.0 200.0 200.0 200.0 1.0  
+Boundary_emit: 
+    top    Nitrogen  6.3e19 21520.0 0.0 0.0 200.0 200.0 200.0 1.0   
+Boundary_emit: 
+    bottom Nitrogen  6.3e19 21520.0 0.0 0.0 200.0 200.0 200.0 1.0   
 
 !   |Name|     |Class| |Temp|
 Boundary_condition:

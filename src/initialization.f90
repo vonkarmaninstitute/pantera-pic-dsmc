@@ -223,6 +223,7 @@ MODULE initialization
          IF (line=='Dump_part_every:')         READ(in1,*) DUMP_PART_EVERY
          IF (line=='Dump_part_start:')         READ(in1,*) DUMP_PART_START
          IF (line=='Dump_part_fracsample:')    READ(in1,*) PARTDUMP_FRACSAMPLE
+         IF (line=='Load_part_fracsample:')    READ(in1,*) PARTLOAD_FRACSAMPLE
          IF (line=='Dump_part_bound_every:')   READ(in1,*) DUMP_PART_BOUND_EVERY
          IF (line=='Dump_part_bound_start:')   READ(in1,*) DUMP_PART_BOUND_START
          IF (line=='Dump_bound_avgevery:')     READ(in1,*) DUMP_BOUND_AVG_EVERY

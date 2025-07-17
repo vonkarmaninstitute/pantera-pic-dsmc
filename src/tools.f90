@@ -434,6 +434,9 @@ CONTAINS
             READ(1010, IOSTAT=ios) XP, YP, ZP, VX, VY, VZ, EROT, EVIB, S_ID, IC, DTRIM
 
             IF (ios < 0) EXIT
+            IF (PARTLOAD_FRACSAMPLE < 1) THEN
+               IF (rf() > PARTLOAD_FRACSAMPLE) CYCLE
+            END IF
             CALL INIT_PARTICLE(XP,YP,ZP,VX,VY,VZ,EROT,EVIB,S_ID,IC,DT, particleNOW) ! Save in particle
             CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
          END DO
@@ -449,6 +452,9 @@ CONTAINS
          DO
             READ(1010,*,IOSTAT=ios) XP, YP, ZP, VX, VY, VZ, EROT, EVIB, S_ID, IC, DTRIM
             IF (ios < 0) EXIT
+            IF (PARTLOAD_FRACSAMPLE < 1) THEN
+               IF (rf() > PARTLOAD_FRACSAMPLE) CYCLE
+            END IF
             CALL INIT_PARTICLE(XP,YP,ZP,VX,VY,VZ,EROT,EVIB,S_ID,IC,DT, particleNOW) ! Save in particle
             CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
          END DO

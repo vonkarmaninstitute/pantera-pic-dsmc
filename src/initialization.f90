@@ -131,6 +131,11 @@ MODULE initialization
             CALL DEF_THERMIONIC_EMIT(BC_DEFINITION)
          END IF
 
+         IF (line=='Evaporation_emit:') THEN
+            READ(in1,'(A)') BC_DEFINITION
+            CALL DEF_EVAPORATION_EMIT(BC_DEFINITION)
+         END IF
+
          IF (line=='Solenoid_field:') THEN
             READ(in1,'(A)') SOLENOID_DEFINITION
             CALL DEF_SOLENOID(SOLENOID_DEFINITION)
@@ -1588,6 +1593,136 @@ MODULE initialization
    END SUBROUTINE DEF_THERMIONIC_EMIT
 
 
+   SUBROUTINE DEF_EVAPORATION_EMIT(DEFINITION)
+
+      IMPLICIT NONE
+
+      CHARACTER(LEN=*), INTENT(IN) :: DEFINITION
+
+      INTEGER :: N_STR
+      CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
+
+      CHARACTER*64 :: MIX_NAME
+      INTEGER      :: MIX_ID, I, IC, IPG
+      TYPE(EMIT_TASK_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: TEMP_EMIT_TASKS
+      CLASS(VELOCITY_DISTRIBUTION_STRUCTURE), ALLOCATABLE :: TEMP_VDF
+
+      REAL(KIND=8) :: T_SURFACE, A_COEFF, B_COEFF
+
+      CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
+
+      IPG = -1
+      DO I = 1, N_GRID_BC
+         IF (GRID_BC(I)%PHYSICAL_GROUP_NAME == STRARRAY(1)) IPG = I
+      END DO
+      IF (IPG == -1) CALL ERROR_ABORT('Error in boundary emit definition. Group name not found.')
+
+      READ(STRARRAY(2),'(A10)') MIX_NAME
+      READ(STRARRAY(3), '(ES14.0)') T_SURFACE
+      READ(STRARRAY(4), '(ES14.0)') A_COEFF
+      READ(STRARRAY(5), '(ES14.0)') B_COEFF
+
+      CALL ASSIGN_VDF(TEMP_VDF, 'Maxwell')
+
+      ! MIX_ID = SPECIES_NAME_TO_ID('e')
+      MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
+
+      IF (DIMS == 1) THEN 
+         DO IC = 1, NCELLS
+            DO I = 1, 2
+               IF (U1D_GRID%CELL_EDGES_PG(I,IC) == IPG) THEN
+                  
+                  IF (ALLOCATED(EMIT_TASKS)) THEN
+                     ALLOCATE(TEMP_EMIT_TASKS(N_EMIT_TASKS+1)) ! Append the mixture to the list
+                     TEMP_EMIT_TASKS(1:N_EMIT_TASKS) = EMIT_TASKS(1:N_EMIT_TASKS)
+                     CALL MOVE_ALLOC(TEMP_EMIT_TASKS, EMIT_TASKS)
+                  ELSE
+                     ALLOCATE(EMIT_TASKS(1))
+                  END IF
+                  N_EMIT_TASKS = N_EMIT_TASKS + 1
+   
+                  EMIT_TASKS(N_EMIT_TASKS)%T_SURFACE = T_SURFACE
+                  EMIT_TASKS(N_EMIT_TASKS)%A_COEFF = A_COEFF
+                  EMIT_TASKS(N_EMIT_TASKS)%B_COEFF = B_COEFF
+                  EMIT_TASKS(N_EMIT_TASKS)%MIX_ID = MIX_ID
+                  EMIT_TASKS(N_EMIT_TASKS)%IC = IC
+                  EMIT_TASKS(N_EMIT_TASKS)%IFACE = I
+                  ALLOCATE(EMIT_TASKS(N_EMIT_TASKS)%VDF, SOURCE=TEMP_VDF)
+   
+                  EMIT_TASKS(N_EMIT_TASKS)%IV1 = U1D_GRID%CELL_NODES(I,IC)
+                  
+                  EMIT_TASKS(N_EMIT_TASKS)%TYPE = EVAPORATION
+                  ! NFS WILL BE INITIALIZED LATER.
+               END IF
+            END DO
+         END DO
+      ELSE IF (DIMS == 2) THEN
+         DO IC = 1, NCELLS
+            DO I = 1, 3
+               IF (U2D_GRID%CELL_EDGES_PG(I,IC) == IPG) THEN
+                  
+                  IF (ALLOCATED(EMIT_TASKS)) THEN
+                     ALLOCATE(TEMP_EMIT_TASKS(N_EMIT_TASKS+1)) ! Append the mixture to the list
+                     TEMP_EMIT_TASKS(1:N_EMIT_TASKS) = EMIT_TASKS(1:N_EMIT_TASKS)
+                     CALL MOVE_ALLOC(TEMP_EMIT_TASKS, EMIT_TASKS)
+                  ELSE
+                     ALLOCATE(EMIT_TASKS(1))
+                  END IF
+                  N_EMIT_TASKS = N_EMIT_TASKS + 1
+   
+                  EMIT_TASKS(N_EMIT_TASKS)%T_SURFACE = T_SURFACE
+                  EMIT_TASKS(N_EMIT_TASKS)%A_COEFF = A_COEFF
+                  EMIT_TASKS(N_EMIT_TASKS)%B_COEFF = B_COEFF
+                  EMIT_TASKS(N_EMIT_TASKS)%MIX_ID = MIX_ID
+                  EMIT_TASKS(N_EMIT_TASKS)%IC = IC
+                  EMIT_TASKS(N_EMIT_TASKS)%IFACE = I
+                  ALLOCATE(EMIT_TASKS(N_EMIT_TASKS)%VDF, SOURCE=TEMP_VDF)
+                  
+                  IF (I == 1) THEN
+                     EMIT_TASKS(N_EMIT_TASKS)%IV1 = U2D_GRID%CELL_NODES(1,IC)
+                     EMIT_TASKS(N_EMIT_TASKS)%IV2 = U2D_GRID%CELL_NODES(2,IC)
+                  ELSE IF (I == 2) THEN
+                     EMIT_TASKS(N_EMIT_TASKS)%IV1 = U2D_GRID%CELL_NODES(2,IC)
+                     EMIT_TASKS(N_EMIT_TASKS)%IV2 = U2D_GRID%CELL_NODES(3,IC)
+                  ELSE
+                     EMIT_TASKS(N_EMIT_TASKS)%IV1 = U2D_GRID%CELL_NODES(3,IC)
+                     EMIT_TASKS(N_EMIT_TASKS)%IV2 = U2D_GRID%CELL_NODES(1,IC)
+                  END IF
+   
+                  EMIT_TASKS(N_EMIT_TASKS)%TYPE = EVAPORATION
+                  ! NFS WILL BE INITIALIZED LATER.
+               END IF
+            END DO
+         END DO
+      ELSE IF (DIMS == 3) THEN
+         DO IC = 1, NCELLS
+            DO I = 1, 4
+               IF (U3D_GRID%CELL_FACES_PG(I,IC) == IPG) THEN
+                  IF (ALLOCATED(EMIT_TASKS)) THEN
+                     ALLOCATE(TEMP_EMIT_TASKS(N_EMIT_TASKS+1)) ! Append the mixture to the list
+                     TEMP_EMIT_TASKS(1:N_EMIT_TASKS) = EMIT_TASKS(1:N_EMIT_TASKS)
+                     CALL MOVE_ALLOC(TEMP_EMIT_TASKS, EMIT_TASKS)
+                  ELSE
+                     ALLOCATE(EMIT_TASKS(1))
+                  END IF
+                  N_EMIT_TASKS = N_EMIT_TASKS + 1
+   
+                  EMIT_TASKS(N_EMIT_TASKS)%T_SURFACE = T_SURFACE
+                  EMIT_TASKS(N_EMIT_TASKS)%A_COEFF = A_COEFF
+                  EMIT_TASKS(N_EMIT_TASKS)%B_COEFF = B_COEFF
+                  EMIT_TASKS(N_EMIT_TASKS)%MIX_ID = MIX_ID
+                  EMIT_TASKS(N_EMIT_TASKS)%IC = IC
+                  EMIT_TASKS(N_EMIT_TASKS)%IFACE = I
+                  ALLOCATE(EMIT_TASKS(N_EMIT_TASKS)%VDF, SOURCE=TEMP_VDF)
+   
+                  EMIT_TASKS(N_EMIT_TASKS)%TYPE = EVAPORATION
+                  ! NFS WILL BE INITIALIZED LATER.
+               END IF
+            END DO
+         END DO
+      END IF
+
+   END SUBROUTINE DEF_EVAPORATION_EMIT
 
 
 
@@ -2550,6 +2685,7 @@ MODULE initialization
       REAL(KIND=8) :: U_NORM, S_NORM, FLUXLINESOURCE, LINELENGTH, NORMX, NORMY, NORMZ, AREA
       REAL(KIND=8) :: PI2  
       REAL(KIND=8) :: T_SURFACE, WORK_FUNCTION, A0
+      REAL(KIND=8) :: VAPOR_PRESSURE, A_COEFF, B_COEFF, RHO_VAPOR
 
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: nfs_LINE
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TASK_NFS
@@ -2772,6 +2908,8 @@ MODULE initialization
          END IF
 
          ! Calculate number of injected particles based on EMIT_TASK type
+
+         !!! UNIFORM !!!
          IF (EMIT_TASKS(ITASK)%TYPE == UNIFORM) THEN
             DO IS = 1, N_COMP ! Loop on mixture components
                ! The species ID of the component
@@ -2805,7 +2943,8 @@ MODULE initialization
                END IF
             END DO
 
-          ELSE IF (EMIT_TASKS(ITASK)%TYPE == THERMIONIC) THEN
+         !!! THERMIONIC !!!
+         ELSE IF (EMIT_TASKS(ITASK)%TYPE == THERMIONIC) THEN
             DO IS = 1, N_COMP ! Loop on mixture components
                ! The species ID of the component
                S_ID = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%COMPONENTS(IS)%ID
@@ -2818,11 +2957,37 @@ MODULE initialization
                
                FLUXSOURCE = FRAC*EMIT_TASKS(ITASK)%CORRECTION*A0*T_SURFACE**2*EXP(-QE*WORK_FUNCTION/(KB*T_SURFACE))
 
-               NtotINJECT = FLUXSOURCE*AREA*DT/FNUM         ! Tot num of particles to be injected
+               NtotINJECT = FLUXSOURCE*AREA*DT/FNUM ! Tot num of particles to be injected
 
                TASK_NFS(IS) = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
             END DO
+         
+         !!! EVAPORATION !!!
+         ELSE IF (EMIT_TASKS(ITASK)%TYPE == EVAPORATION) THEN
+            DO IS = 1, N_COMP ! Loop on mixture components
+               ! The species ID of the component
+               S_ID = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%COMPONENTS(IS)%ID
+               M = SPECIES(S_ID)%MOLECULAR_MASS
+               FRAC = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%COMPONENTS(IS)%MOLFRAC
+
+               T_SURFACE = EMIT_TASKS(ITASK)%T_SURFACE
+               A_COEFF = EMIT_TASKS(ITASK)%A_COEFF
+               B_COEFF = EMIT_TASKS(ITASK)%B_COEFF
+
+               ! Calculate vapor pressure from Hertz-Knudsen equation
+               VAPOR_PRESSURE = EXP(A_COEFF-B_COEFF/T_SURFACE)
+               RHO_VAPOR = VAPOR_PRESSURE/(KB*T_SURFACE) 
+               FLUXSOURCE = FRAC*RHO_VAPOR*SQRT(KB*T_SURFACE/(2*PI*M))
+
+               NtotINJECT = FLUXSOURCE*AREA*DT/FNUM ! Tot num of particles to be injected       
+
+               EMIT_TASKS(ITASK)%VAPOR_PRESSURE = VAPOR_PRESSURE
+               TASK_NFS(IS) = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
+            END DO
          END IF
+
+
+
          !WRITE(*,*) 'Task NFS', TASK_NFS
          CALL MOVE_ALLOC(TASK_NFS, EMIT_TASKS(ITASK)%NFS)
 

@@ -432,7 +432,7 @@ MODULE timecycle
             IF (EMIT_TASK%TYPE == THERMIONIC) THEN
                E_FIELD_NORM = DOT(E_FIELD,FACE_NORMAL)
 
-               IF (E_FIELD_NORM .GE. 0) THEN
+               IF (SPECIES(S_ID)%CHARGE*E_FIELD_NORM .LE. 0) THEN
                   NFS = FLOOR(NFS*EXP(QE*SQRT(QE*E_FIELD_NORM/(4*PI*EPS0))/(KB*EMIT_TASK%T_SURFACE)))
                END IF
             END IF
@@ -499,7 +499,29 @@ MODULE timecycle
 
                   CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, EMIT_TASK%T_SURFACE, EROT)
                   CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, EMIT_TASK%T_SURFACE, EVIB)
-                  ! WRITE(*,*) '+++++++++++++++', M
+
+
+               ELSE IF (EMIT_TASK%TYPE == EVAPORATION) THEN
+
+                  CALL EMIT_TASK%VDF%SAMPLE_VELOCITY(0.d0, 0.d0, 0.d0, &
+                  EMIT_TASK%T_SURFACE, EMIT_TASK%T_SURFACE, EMIT_TASK%T_SURFACE, &
+                  Vdummy, V_TANG1, V_TANG2, M)
+
+                  V_NORM = EMIT_TASK%VDF%SAMPLE_NORMAL(0.d0, EMIT_TASK%T_SURFACE, M)
+
+                  VX = - V_NORM*FACE_NORMAL(1) &
+                     - V_TANG1*FACE_TANG1(1) &
+                     - V_TANG2*FACE_TANG2(1)
+                  VY = - V_NORM*FACE_NORMAL(2) &
+                     - V_TANG1*FACE_TANG1(2) &
+                     - V_TANG2*FACE_TANG2(2)
+                  VZ = - V_NORM*FACE_NORMAL(3) &
+                     - V_TANG1*FACE_TANG1(3) &
+                     - V_TANG2*FACE_TANG2(3)
+
+                  CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, EMIT_TASK%T_SURFACE, EROT)
+                  CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, EMIT_TASK%T_SURFACE, EVIB)
+
                END IF
 
 

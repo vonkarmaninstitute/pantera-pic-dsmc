@@ -1723,8 +1723,13 @@ MODULE collisions
 
                ! Try the reaction
                IF (R_SELECT < P_CUMULATED) THEN ! Collision happens
-                  REACTIONS(JR)%COUNTS = REACTIONS(JR)%COUNTS + 1
+
                   TIMESTEP_COLL = TIMESTEP_COLL + 1
+                  IF (EA .GE. QE*1e-5) THEN
+                     REACTIONS(JR)%COUNTS = REACTIONS(JR)%COUNTS + 1
+                     TIMESTEP_REAC = TIMESTEP_REAC + 1
+                  END IF
+                  
 
                   ! Actually create the second collision partner
                   CALL INTERNAL_ENERGY(SPECIES(SP_ID2)%ROTDOF, MCC_BG_TTRA, EROT)
@@ -1737,7 +1742,6 @@ MODULE collisions
                   JP2 = NP_PROC
 
 
-                  TIMESTEP_REAC = TIMESTEP_REAC + 1
 
                   ! Rimuovere commento per avere avviso
                   IF (P_CUMULATED .GT. 1.) THEN

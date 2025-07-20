@@ -5698,11 +5698,11 @@ MODULE fields
             ELSE
                !WRITE(SUBCOMMAND,'(A,ES0.7,A,ES0.7,A,ES0.7)') ' -D ti=', (tID-1)*DT, ' -D tf=', tID*DT, ' -D dt=', DT*0.01
                !WRITE(SUBCOMMAND,'(A,ES0.7,A,ES0.7,A,ES0.7)') ' -D ti=', 0.d0, ' -D tf=', DT, ' -D dt=', DT*0.01
-               IF (MOD(tID, STATS_EVERY) .EQ. 0 .AND. PROC_ID == 0) WRITE(SUBCOMMAND,'(A,ES0.7)') ' -D tf=', (tID-1)*DT
+               WRITE(SUBCOMMAND,'(A,ES0.7)') ' -D tf=', (tID-1)*DT
                COMMAND = TRIM(COMMAND)//SUBCOMMAND
                COMMAND = TRIM(COMMAND)//' update.cir >/dev/null 2>&1'
             END IF
-            IF (MOD(tID, STATS_EVERY) .EQ. 0 .AND. PROC_ID == 0) WRITE(*,*) TRIM(COMMAND)
+            IF (MOD(tID, STATS_EVERY) .EQ. 0) WRITE(*,*) TRIM(COMMAND)
             CALL SYSTEM(TRIM(COMMAND), STATUS = EXIT_CODE)
 
             ! Open results file for reading
@@ -5728,8 +5728,8 @@ MODULE fields
                   IF (GRID_BC(I)%PHYSICAL_GROUP_NAME == NODE_NAME) THEN
                      IF (GRID_BC(I)%FIELD_BC == SPICE_NODE_BC) THEN
                         GRID_BC(I)%SPICE_NODE_POTENTIAL = POTENTIAL
-                        IF (MOD(tID, STATS_EVERY) .EQ. 0 .AND. PROC_ID == 0) WRITE(*,*) 'Set node ', TRIM(NODE_NAME),&
-                                                                                        ' to ', POTENTIAL, ' V.'
+                        IF (MOD(tID, STATS_EVERY) .EQ. 0) WRITE(*,*) 'Set node ', TRIM(NODE_NAME),&
+                                                                     ' to ', POTENTIAL, ' V.'
 
                         !OPEN(66342, FILE='voltagedump', POSITION='append', STATUS='unknown', ACTION='write')
                         !WRITE(66342,*) POTENTIAL

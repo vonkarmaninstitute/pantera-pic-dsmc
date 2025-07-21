@@ -4429,7 +4429,7 @@ MODULE fields
       INTEGER :: P, Q, VP, VQ
       REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD, KE, LENGTH
 
-      CALL ONLYMASTERPRINT1(PROC_ID, 'FormFunctionBoltz Called')
+      IF (MOD(tID, STATS_EVERY) .EQ. 0) CALL ONLYMASTERPRINT1(PROC_ID, 'FormFunctionBoltz Called')
       
       CALL VecScatterCreateToAll(x,ctx,x_seq,ierr)
       CALL VecScatterBegin(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
@@ -4650,7 +4650,7 @@ MODULE fields
       CALL VecNorm(f,NORM_2,norm,ierr)
 
       IF (PROC_ID == 0) THEN
-         WRITE(*,*) '||RESIDUAL|| = ', norm
+         IF (MOD(tID, STATS_EVERY) .EQ. 0) WRITE(*,*) '||RESIDUAL|| = ', norm
          WRITE(filename, "(A,A)") TRIM(ADJUSTL(RESIDUAL_SAVE_PATH)), "residuals" ! Compose filename   
          OPEN(66331, FILE=filename, POSITION='append', STATUS='unknown', ACTION='write')
          WRITE(66331,*) tID, norm
@@ -4681,7 +4681,7 @@ MODULE fields
       REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD, FACTOR, AREA, LENGTH
 
 
-      CALL ONLYMASTERPRINT1(PROC_ID, 'FormJacobianBoltz Called')
+      IF (MOD(tID, STATS_EVERY) .EQ. 0) CALL ONLYMASTERPRINT1(PROC_ID, 'FormJacobianBoltz Called')
 
       CALL MatMPIAIJSetPreallocation(jac,100,PETSC_NULL_INTEGER,100,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
       CALL MatSetFromOptions(jac,ierr)

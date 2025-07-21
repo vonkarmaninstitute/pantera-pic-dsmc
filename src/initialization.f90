@@ -278,6 +278,7 @@ MODULE initialization
          END IF
          IF (line=='MCC_background_dens:')     READ(in1,*) MCC_BG_DENS
          IF (line=='MCC_background_Ttra:')     READ(in1,*) MCC_BG_TTRA
+         IF (line=='MCC_create_particles_from_bg') READ(in1,*) MCC_CREATE_PARTICLES_FROM_BG
          IF (line=='MCC_background_mixture:') THEN
             READ(in1,*) MCC_BG_MIX_NAME
             MCC_BG_MIX = MIXTURE_NAME_TO_ID(MCC_BG_MIX_NAME)

@@ -3581,7 +3581,7 @@ MODULE fields
                         END IF
 
                         ! Apply particle boundary condition
-                        IF (GRID_BC(FACE_PG)%PARTICLE_BC == SPECULAR) THEN
+                        IF (GRID_BC(FACE_PG)%PARTICLE_BC(part_adv(IP)%S_ID) == SPECULAR) THEN
                            IF (GRID_BC(FACE_PG)%REACT) THEN
                               CALL WALL_REACT(part_adv, IP, REMOVE_PART(IP))
                            END IF
@@ -3592,7 +3592,7 @@ MODULE fields
                            part_adv(IP)%VX = part_adv(IP)%VX - 2.*VDOTN*FACE_NORMAL(1)
                            part_adv(IP)%VY = part_adv(IP)%VY - 2.*VDOTN*FACE_NORMAL(2)
                            part_adv(IP)%VZ = part_adv(IP)%VZ - 2.*VDOTN*FACE_NORMAL(3)
-                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == DIFFUSE) THEN
+                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC(part_adv(IP)%S_ID) == DIFFUSE) THEN
                            IF (GRID_BC(FACE_PG)%REACT) THEN
                               CALL WALL_REACT(part_adv, IP, REMOVE_PART(IP))
                            END IF
@@ -3622,7 +3622,7 @@ MODULE fields
                            part_adv(IP)%EROT = EROT
                            part_adv(IP)%EVIB = EVIB
 
-                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == CLL) THEN
+                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC(part_adv(IP)%S_ID) == CLL) THEN
                            IF (GRID_BC(FACE_PG)%REACT) THEN
                               CALL WALL_REACT(part_adv, IP, REMOVE_PART(IP))
                            END IF
@@ -6469,7 +6469,7 @@ MODULE fields
                         END IF
 
                         ! Apply particle boundary condition
-                        IF (GRID_BC(FACE_PG)%PARTICLE_BC == SPECULAR) THEN
+                        IF (GRID_BC(FACE_PG)%PARTICLE_BC(part_adv(IP)%S_ID) == SPECULAR) THEN
                            IF (GRID_BC(FACE_PG)%REACT) THEN
                               CALL WALL_REACT(part_adv, IP, REMOVE_PART(IP))
                            END IF
@@ -6480,7 +6480,7 @@ MODULE fields
                            part_adv(IP)%VX = part_adv(IP)%VX - 2.*VDOTN*FACE_NORMAL(1)
                            part_adv(IP)%VY = part_adv(IP)%VY - 2.*VDOTN*FACE_NORMAL(2)
                            part_adv(IP)%VZ = part_adv(IP)%VZ - 2.*VDOTN*FACE_NORMAL(3)
-                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == DIFFUSE) THEN
+                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC(part_adv(IP)%S_ID) == DIFFUSE) THEN
                            IF (GRID_BC(FACE_PG)%REACT) THEN
                               CALL WALL_REACT(part_adv, IP, REMOVE_PART(IP))
                            END IF
@@ -6510,7 +6510,7 @@ MODULE fields
                            part_adv(IP)%EROT = EROT
                            part_adv(IP)%EVIB = EVIB
 
-                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == CLL) THEN
+                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC(part_adv(IP)%S_ID) == CLL) THEN
                            IF (GRID_BC(FACE_PG)%REACT) THEN
                               CALL WALL_REACT(part_adv, IP, REMOVE_PART(IP))
                            END IF

@@ -116,6 +116,11 @@ MODULE initialization
             CALL DEF_BOUNDARY_CONDITION(BC_DEFINITION)
          END IF
 
+         IF (line=='Boundary_condition_species:') THEN
+            READ(in1,'(A)') BC_DEFINITION
+            CALL DEF_BOUNDARY_CONDITION_SPECIES(BC_DEFINITION)
+         END IF
+
          IF (line=='Domain_type:') THEN
             READ(in1,'(A)') BC_DEFINITION
             CALL DEF_DOMAIN_TYPE(BC_DEFINITION)
@@ -1160,6 +1165,75 @@ MODULE initialization
 
 
    END SUBROUTINE DEF_BOUNDARY_CONDITION
+
+
+   SUBROUTINE DEF_BOUNDARY_CONDITION_SPECIES(DEFINITION)
+
+      IMPLICIT NONE
+
+      CHARACTER(LEN=*), INTENT(IN) :: DEFINITION
+
+      INTEGER :: N_STR, I, IPG, ISP
+      CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
+
+
+      CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
+
+      ! phys_group type parameters
+      IPG = -1
+      DO I = 1, N_GRID_BC
+         IF (GRID_BC(I)%PHYSICAL_GROUP_NAME == STRARRAY(1)) IPG = I
+      END DO
+      IF (IPG == -1) THEN
+         WRITE(*,*) 'Group ', STRARRAY(1), ' not found.'
+         CALL ERROR_ABORT('Error in boundary condition definition. Group name not found.')
+      END IF
+
+      ISP = SPECIES_NAME_TO_ID(STRARRAY(2))
+      IF (ISP == -1) THEN
+         WRITE(*,*) 'Species ', STRARRAY(2), ' not found.'
+         CALL ERROR_ABORT('Error in boundary condition definition. Species name not found.')
+      END IF
+      
+      IF (STRARRAY(3) == 'vacuum') THEN
+         GRID_BC(IPG)%PARTICLE_BC(ISP) = VACUUM
+      ELSE IF (STRARRAY(3) == 'specular') THEN
+         GRID_BC(IPG)%PARTICLE_BC(ISP) = SPECULAR
+      ELSE IF (STRARRAY(3) == 'piston') THEN
+         GRID_BC(IPG)%PARTICLE_BC(ISP) = PISTON
+         READ(STRARRAY(4), '(ES14.0)') GRID_BC(IPG)%U_PISTON(1)
+         READ(STRARRAY(5), '(ES14.0)') GRID_BC(IPG)%U_PISTON(2)
+         READ(STRARRAY(6), '(ES14.0)') GRID_BC(IPG)%U_PISTON(3)
+      ELSE IF (STRARRAY(3) == 'diffuse') THEN
+         GRID_BC(IPG)%PARTICLE_BC(ISP) = DIFFUSE
+         READ(STRARRAY(4), '(ES14.0)') GRID_BC(IPG)%WALL_TEMP
+      ELSE IF (STRARRAY(3) == 'cll') THEN
+         GRID_BC(IPG)%PARTICLE_BC(ISP) = CLL
+         READ(STRARRAY(4), '(ES14.0)') GRID_BC(IPG)%WALL_TEMP
+         READ(STRARRAY(5), '(ES14.0)') GRID_BC(IPG)%ACC_N
+         READ(STRARRAY(6), '(ES14.0)') GRID_BC(IPG)%ACC_T
+      ELSE IF (STRARRAY(3) == 'react') THEN
+         GRID_BC(IPG)%REACT = .TRUE.
+      ELSE IF (STRARRAY(3) == 'washboard') THEN
+         GRID_BC(IPG)%PARTICLE_BC(ISP) = WB_BC
+         READ(STRARRAY(4), '(ES14.0)') GRID_BC(IPG)%A
+         READ(STRARRAY(5), '(ES14.0)') GRID_BC(IPG)%B
+         READ(STRARRAY(6), '(ES14.0)') GRID_BC(IPG)%W
+         READ(STRARRAY(7), '(ES14.0)') GRID_BC(IPG)%WALL_TEMP
+         READ(STRARRAY(8), '(ES14.0)') GRID_BC(IPG)%ACC_N
+         GRID_BC(IPG)%ACC_T = 0
+         CALL READ_WASHBOARD_TABLES(IPG)
+      ELSE IF (STRARRAY(3) == 'axis') THEN
+         GRID_BC(IPG)%PARTICLE_BC(ISP) = AXIS
+         ! Needs more info
+      ELSE IF (STRARRAY(3) == 'emit') THEN
+         GRID_BC(IPG)%PARTICLE_BC(ISP) = EMIT
+         ! Needs more info
+      ELSE
+         CALL ERROR_ABORT('Error in boundary condition definition.')
+      END IF
+
+   END SUBROUTINE DEF_BOUNDARY_CONDITION_SPECIES
 
 
    SUBROUTINE READ_WASHBOARD_TABLES(IPG)

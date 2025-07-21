@@ -1532,7 +1532,7 @@ MODULE timecycle
                         END IF
 
                         ! Apply particle boundary condition
-                        IF (GRID_BC(FACE_PG)%PARTICLE_BC == SPECULAR) THEN
+                        IF (GRID_BC(FACE_PG)%PARTICLE_BC(particles(IP)%S_ID) == SPECULAR) THEN
                            IF (GRID_BC(FACE_PG)%REACT) THEN
                               CALL WALL_REACT(particles, IP, REMOVE_PART(IP))
                            END IF
@@ -1544,7 +1544,7 @@ MODULE timecycle
                            particles(IP)%VY = particles(IP)%VY - 2.*VDOTN*FACE_NORMAL(2)
                            particles(IP)%VZ = particles(IP)%VZ - 2.*VDOTN*FACE_NORMAL(3)
 
-                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == PISTON) THEN
+                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC(particles(IP)%S_ID) == PISTON) THEN
                            IF (GRID_BC(FACE_PG)%REACT) THEN
                               CALL WALL_REACT(particles, IP, REMOVE_PART(IP))
                            END IF
@@ -1579,7 +1579,7 @@ MODULE timecycle
                               END IF
                            END IF
 
-                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == DIFFUSE) THEN
+                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC(particles(IP)%S_ID) == DIFFUSE) THEN
                            IF (GRID_BC(FACE_PG)%REACT) THEN
                               CALL WALL_REACT(particles, IP, REMOVE_PART(IP))
                            END IF
@@ -1619,7 +1619,7 @@ MODULE timecycle
                            !    FACE_NORMAL(1), ',', FACE_NORMAL(2), ',', FACE_NORMAL(3)
                            ! END IF
 
-                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == CLL) THEN
+                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC(particles(IP)%S_ID) == CLL) THEN
                            IF (GRID_BC(FACE_PG)%REACT) THEN
                               CALL WALL_REACT(particles, IP, REMOVE_PART(IP))
                            END IF
@@ -1690,7 +1690,7 @@ MODULE timecycle
                            !WRITE(66341,*) VXPRE, ', ', VYPRE, ', ', VZPRE, ', ', &
                            !particles(IP)%VX, ', ', particles(IP)%VY, ', ', particles(IP)%VZ
                            !CLOSE(66341)
-                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC == WB_BC) THEN
+                        ELSE IF (GRID_BC(FACE_PG)%PARTICLE_BC(particles(IP)%S_ID) == WB_BC) THEN
                            IF (GRID_BC(FACE_PG)%REACT) THEN
                               CALL WALL_REACT(particles, IP, REMOVE_PART(IP))
                            END IF

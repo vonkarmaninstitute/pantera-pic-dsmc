@@ -2090,7 +2090,11 @@ MODULE initialization
 
          READ(in3,'(A)', IOSTAT=ReasonEOF) DEFINITION ! Read reaction parameters line
          CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
-         IF (STRARRAY(1) == 'tce') THEN
+         IF (STRARRAY(1) == 'constant') THEN
+            READ(STRARRAY(2), *) NEW_REACTION%EA
+            READ(STRARRAY(3), *) NEW_REACTION%CONSTANT_CS
+            SIGMAMAX = NEW_REACTION%CONSTANT_CS
+         ELSE IF (STRARRAY(1) == 'tce') THEN
             NEW_REACTION%TYPE = TCE
             IF (NEW_REACTION%IS_CEX) THEN
                NEW_REACTION%EA = 0.d0

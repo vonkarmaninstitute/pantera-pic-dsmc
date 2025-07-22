@@ -348,7 +348,10 @@ MODULE collisions
 
                EA = REACTIONS(JR)%EA
 
-               IF (REACTIONS(JR)%TYPE == TCE) THEN
+               IF (REACTIONS(JR)%TYPE == FIXED_RATE) THEN
+                  SIGMA_R = REACTIONS(JR)%CONSTANT_CS
+                  PTCE = SIGMA_R / (SIGMA*(VR/CREF)**(1.-2.*OMEGA))
+               ELSE IF (REACTIONS(JR)%TYPE == TCE) THEN
                   IF (ECOLL .LE. EA) CYCLE
                   PTCE = REACTIONS(JR)%C1 * (ECOLL-EA)**REACTIONS(JR)%C2 * (1.-EA/ECOLL)**REACTIONS(JR)%C3
                ELSE IF (REACTIONS(JR)%TYPE == LXCAT) THEN
@@ -762,7 +765,10 @@ MODULE collisions
             EA = REACTIONS(JR)%EA
             IF (ETR .LE. EA) CYCLE
 
-            IF (REACTIONS(JR)%TYPE == LXCAT) THEN
+            IF (REACTIONS(JR)%TYPE == FIXED_RATE) THEN
+               SIGMA_R = REACTIONS(JR)%CONSTANT_CS
+               P_REACT = FCORR/(MAX_SIGMA*VRMAX)*VR*SIGMA_R
+            ELSE IF (REACTIONS(JR)%TYPE == LXCAT) THEN
                SIGMA_R = INTERP_CS(ETR, REACTIONS(JR)%TABLE_ENERGY, REACTIONS(JR)%TABLE_CS)
                P_REACT = FCORR/(MAX_SIGMA*VRMAX)*VR*SIGMA_R
             ELSE
@@ -1390,7 +1396,10 @@ MODULE collisions
                   EA = REACTIONS(JR)%EA
                   IF (ECOLL .LE. EA) CYCLE
 
-                  IF (REACTIONS(JR)%TYPE == TCE) THEN
+                  IF (REACTIONS(JR)%TYPE == FIXED_RATE) THEN
+                     SIGMA_R = REACTIONS(JR)%CONSTANT_CS
+                     PTCE = SIGMA_R / (SIGMA*(VR/CREF)**(1.-2.*OMEGA))
+                  ELSE IF (REACTIONS(JR)%TYPE == TCE) THEN
                      IF (ECOLL .LE. EA) CYCLE
                      PTCE = REACTIONS(JR)%C1 * (ECOLL-EA)**REACTIONS(JR)%C2 * (1.-EA/ECOLL)**REACTIONS(JR)%C3
                   ELSE IF (REACTIONS(JR)%TYPE == LXCAT) THEN
@@ -1710,7 +1719,10 @@ MODULE collisions
                EA = REACTIONS(JR)%EA
                IF (ETR .LE. EA) CYCLE
 
-               IF (REACTIONS(JR)%TYPE == LXCAT) THEN
+               IF (REACTIONS(JR)%TYPE == FIXED_RATE) THEN
+                  SIGMA_R = REACTIONS(JR)%CONSTANT_CS
+                  P_CUMULATED = P_CUMULATED + BG_NRHO*SIGMA_R*VR / NULL_COLL_FREQ
+               ELSE IF (REACTIONS(JR)%TYPE == LXCAT) THEN
                   SIGMA_R = INTERP_CS(ETR, REACTIONS(JR)%TABLE_ENERGY, REACTIONS(JR)%TABLE_CS)
                   P_CUMULATED = P_CUMULATED + BG_NRHO*SIGMA_R*VR / NULL_COLL_FREQ
                   !P_CUMULATED = P_CUMULATED + (1. -EXP(-BG_NRHO*SIGMA_R*VR*DT)) / P_NULL

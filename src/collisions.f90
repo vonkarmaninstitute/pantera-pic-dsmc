@@ -1717,7 +1717,6 @@ MODULE collisions
                   SIGMA_R = INTERP_CS(ETR, REACTIONS(JR)%TABLE_ENERGY, REACTIONS(JR)%TABLE_CS)
                   P_CUMULATED = P_CUMULATED + BG_NRHO*SIGMA_R*VR / NULL_COLL_FREQ
                   !P_CUMULATED = P_CUMULATED + (1. -EXP(-BG_NRHO*SIGMA_R*VR*DT)) / P_NULL
-                  WRITE(*,*) 'Caution! P_CUMULATED is greater than 1! P_CUMULATED = ', P_CUMULATED
                ELSE
                   CYCLE
                END IF
@@ -1726,7 +1725,7 @@ MODULE collisions
                IF (R_SELECT < P_CUMULATED) THEN ! Collision happens
 
                   TIMESTEP_COLL = TIMESTEP_COLL + 1
-                  IF (EA .GE. QE*1e-5) THEN
+                  IF (EA == 0.d0) THEN
                      REACTIONS(JR)%COUNTS = REACTIONS(JR)%COUNTS + 1
                      TIMESTEP_REAC = TIMESTEP_REAC + 1
                   END IF

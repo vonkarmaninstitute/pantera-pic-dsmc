@@ -769,21 +769,18 @@ MODULE collisions
                CYCLE
             END IF
 
-            IF (P_REACT > 1.d0) WRITE(*,*) 'Warning! This was a bad DSMC collision, with P > 1.'
+            IF (P_REACT > 1.d0) WRITE(*,*) 'Warning! This was a bad DSMC collision, with P > 1 being P_REACT = ', P_REACT
 
             ! Try the reaction
             IF (rf() < P_REACT) THEN ! Collision happens
 
                TIMESTEP_COLL = TIMESTEP_COLL + 1
-               REACTIONS(JR)%COUNTS = REACTIONS(JR)%COUNTS + 1
-               HAS_REACTED(IND1) = .TRUE.
-               HAS_REACTED(IND2) = .TRUE.
-
-               ! Rimuovere commento per avere avviso
-               IF (P_REACT .GT. 1.) THEN
-                  !WRITE(*,*) 'Attention => this was a bad MCC collision! P_REACT = ', P_REACT
+               IF (EA .NE. 0.d0) THEN
+                  REACTIONS(JR)%COUNTS = REACTIONS(JR)%COUNTS + 1
                   TIMESTEP_REAC = TIMESTEP_REAC + 1
                END IF
+               HAS_REACTED(IND1) = .TRUE.
+               HAS_REACTED(IND2) = .TRUE.
 
 
                !WRITE(*,*) 'Reacting!'
@@ -1648,7 +1645,7 @@ MODULE collisions
          REACTIONS(JR)%COUNTS = 0
       END DO
 
-      NULL_COLL_FREQ = MCC_BG_DENS*1e-12
+      NULL_COLL_FREQ = MCC_BG_DENS*MCC_NULL_RATE
       !P_NULL = 1 - EXP(-DT*NULL_COLL_FREQ)
       P_NULL = DT*NULL_COLL_FREQ
       IF (P_NULL > 1) THEN
@@ -1725,7 +1722,7 @@ MODULE collisions
                IF (R_SELECT < P_CUMULATED) THEN ! Collision happens
 
                   TIMESTEP_COLL = TIMESTEP_COLL + 1
-                  IF (EA == 0.d0) THEN
+                  IF (EA .NE. 0.d0) THEN
                      REACTIONS(JR)%COUNTS = REACTIONS(JR)%COUNTS + 1
                      TIMESTEP_REAC = TIMESTEP_REAC + 1
                   END IF

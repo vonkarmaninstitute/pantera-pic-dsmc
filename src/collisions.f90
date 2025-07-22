@@ -1717,6 +1717,7 @@ MODULE collisions
                   SIGMA_R = INTERP_CS(ETR, REACTIONS(JR)%TABLE_ENERGY, REACTIONS(JR)%TABLE_CS)
                   P_CUMULATED = P_CUMULATED + BG_NRHO*SIGMA_R*VR / NULL_COLL_FREQ
                   !P_CUMULATED = P_CUMULATED + (1. -EXP(-BG_NRHO*SIGMA_R*VR*DT)) / P_NULL
+                  WRITE(*,*) 'Caution! P_CUMULATED is greater than 1! P_CUMULATED = ', P_CUMULATED
                ELSE
                   CYCLE
                END IF

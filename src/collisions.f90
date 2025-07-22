@@ -1648,7 +1648,7 @@ MODULE collisions
          REACTIONS(JR)%COUNTS = 0
       END DO
 
-      NULL_COLL_FREQ = MCC_BG_DENS*1e-11
+      NULL_COLL_FREQ = MCC_BG_DENS*1e-13
       !P_NULL = 1 - EXP(-DT*NULL_COLL_FREQ)
       P_NULL = DT*NULL_COLL_FREQ
       IF (P_NULL > 1) THEN

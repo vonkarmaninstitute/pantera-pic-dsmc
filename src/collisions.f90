@@ -51,7 +51,7 @@ MODULE collisions
       INTEGER, DIMENSION(:), ALLOCATABLE :: IND, INDALL
       INTEGER                            :: JP, JS, JC, IDX, IDXALL, IP
       INTEGER                            :: NCOLLREAL
-      LOGICAL, DIMENSION(:), ALLOCATABLE :: REMOVE_PART
+      LOGICAL, DIMENSION(:), ALLOCATABLE :: REMOVE_PART, HAS_REACTED
 
       ALLOCATE(NPC(N_SPECIES,NCELLS))
       ALLOCATE(IOF(N_SPECIES,NCELLS))
@@ -127,6 +127,8 @@ MODULE collisions
 
       ALLOCATE(REMOVE_PART(3*NP_PROC))
       REMOVE_PART = .FALSE.
+      ALLOCATE(HAS_REACTED(NP_PROC))
+      HAS_REACTED = .FALSE.
 
       DO JC = 1, NCELLS
          IF (SUM(NPC(:,JC)) .GT. 1) THEN
@@ -135,7 +137,7 @@ MODULE collisions
                ! DSMC temporarily broken because now arrays are per-species.
                CALL VSS_COLLIS(JC, NPCALL, IOFALL, INDALL, NCOLLREAL)
             ELSE IF (COLLISION_TYPE == DSMC_VAHEDI) THEN
-               CALL VAHEDI_COLLIS(JC, NPC, IOF, IND, NCOLLREAL, REMOVE_PART)
+               CALL VAHEDI_COLLIS(JC, NPC, IOF, IND, NCOLLREAL, HAS_REACTED, REMOVE_PART)
             END IF
             ! Add to the total number of collisions for this process
             TIMESTEP_COLL = TIMESTEP_COLL + NCOLLREAL
@@ -149,6 +151,7 @@ MODULE collisions
       END DO
 
       DEALLOCATE(REMOVE_PART)
+      DEALLOCATE(HAS_REACTED)
    
       !WRITE(*,*) 'Number of real collisions: ', TIMESTEP_COLL
       DEALLOCATE(NPC)
@@ -581,7 +584,7 @@ MODULE collisions
    ! with Vahedi's algorithm and tabluated cross-sections             !!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-   SUBROUTINE VAHEDI_COLLIS(JC,NPC,IOF,IND, NCOLLREAL, REMOVE_PART)
+   SUBROUTINE VAHEDI_COLLIS(JC,NPC,IOF,IND, NCOLLREAL, HAS_REACTED, REMOVE_PART)
 
       ! Computes the collisions using the VSS (or VHS, HS, depending on parameters)
       ! in cell JC. Needs the particles to be sorted by cell. This is done by the calling
@@ -594,7 +597,7 @@ MODULE collisions
       INTEGER, DIMENSION(:), INTENT(IN) :: IND
       INTEGER, INTENT(OUT) :: NCOLLREAL
       LOGICAL, DIMENSION(:), INTENT(INOUT) :: REMOVE_PART
-
+      LOGICAL, DIMENSION(:), INTENT(INOUT) :: HAS_REACTED
 
       INTEGER      :: JP1, JP2, JCOL, JP, INDJ, JR, IND1, IND2, IP1, IP2, IP3
       INTEGER      :: SP_ID1, SP_ID2, P1_SP_ID, P2_SP_ID, P3_SP_ID
@@ -609,8 +612,7 @@ MODULE collisions
       REAL(KIND=8) :: M1, M2
       REAL(KIND=8) :: CFNUM, VOL, SPWTR1, SPWTR2, MINWTR, MAXWTR, SPWTP1, SPWTP2, SPWTP3
       REAL(KIND=8) :: P_REACT, FACTOR
-      LOGICAL, DIMENSION(:), ALLOCATABLE :: HAS_REACTED
-
+      
 
       TYPE(PARTICLE_DATA_STRUCTURE) :: NEWparticle
 
@@ -622,8 +624,6 @@ MODULE collisions
          CFNUM = FNUM
       END IF
 
-      ALLOCATE(HAS_REACTED(SUM(NPC(:,JC))))
-      HAS_REACTED = .FALSE.
 
       DO JR = 1, N_REACTIONS
 
@@ -748,13 +748,13 @@ MODULE collisions
             DO
                IND1 = IOF(SP_ID1,JC) + INT(NPC(SP_ID1,JC)*rf())
                JP1 = IND(IND1)
-               IF (.NOT. HAS_REACTED(IND1)) EXIT
+               IF (.NOT. HAS_REACTED(JP1)) EXIT
             END DO
             ! Select second collision partner randomly (shouldn't be JP1)
             DO
                IND2 = IOF(SP_ID2,JC) + INT(NPC(SP_ID2,JC)*rf())
                JP2 = IND(IND2)
-               IF ( (.NOT. HAS_REACTED(IND2)) .AND. (JP2 .NE. JP1)) EXIT
+               IF ( (.NOT. HAS_REACTED(JP2)) .AND. (JP2 .NE. JP1)) EXIT
             END DO
             !!!!!!!!!!!!!!!!!!!!
 
@@ -805,8 +805,8 @@ MODULE collisions
                   REACTIONS(JR)%COUNTS = REACTIONS(JR)%COUNTS + 1
                   TIMESTEP_REAC = TIMESTEP_REAC + 1
                END IF
-               HAS_REACTED(IND1) = .TRUE.
-               HAS_REACTED(IND2) = .TRUE.
+               HAS_REACTED(JP1) = .TRUE.
+               HAS_REACTED(JP2) = .TRUE.
 
 
                IF (rf() > (SPWTR1-MINWTR)/SPWTR1) REMOVE_PART(JP1) = .TRUE.
@@ -938,7 +938,7 @@ MODULE collisions
       !WRITE(*,*) 'Actually performed:', NCOLLREAL
       !WRITE(*,*) NCOLL/(DT*NPC(JC))/MCRVHS, NCOLLREAL/(DT*NPC(JC))/MCRVHS 
 
-      DEALLOCATE(HAS_REACTED)
+      
          
    END SUBROUTINE VAHEDI_COLLIS
 

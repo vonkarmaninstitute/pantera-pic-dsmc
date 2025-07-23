@@ -447,6 +447,8 @@ MODULE postprocess
 
       INTEGER, DIMENSION(:), ALLOCATABLE :: CELL_PROC_ID
 
+      REAL(KIND=8) :: SPWT
+
 
       MOMENT_STRING = ['rho_   ', &
                         'Ux_    ', 'Uy_    ', 'Uz_    ', &

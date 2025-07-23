@@ -841,7 +841,7 @@ MODULE collisions
                CALL ADD_PARTICLE_ARRAY(NEWparticle, NP_PROC, particles)
                IP2 = NP_PROC
 
-               IF (rf() > MINWTR/SPWTP1) REMOVE_PART(IP1) = .TRUE.
+               IF (rf() > MINWTR/SPWTP2) REMOVE_PART(IP2) = .TRUE.
 
                IF (.NOT. REACTIONS(JR)%IS_CEX) THEN
                   

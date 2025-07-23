@@ -1155,7 +1155,7 @@ MODULE fields
 
       INTEGER :: JP, IC
 
-      REAL(KIND=8) :: CHARGE
+      REAL(KIND=8) :: CHARGE, SPWT
       REAL(KIND=8) :: AREA
       INTEGER :: V1, V2, V3, SIZE, SIZEC, P, VP
       REAL(KIND=8) :: DPSI1DX, DPSI2DX, DPSI3DX, DPSI1DY, DPSI2DY, DPSI3DY
@@ -1175,6 +1175,7 @@ MODULE fields
 
       DO JP = 1, NP_PROC
          CHARGE = SPECIES(particles(JP)%S_ID)%CHARGE
+         SPWT = SPECIES(particles(JP)%S_ID)%SPWT
          IF (ABS(CHARGE) .LT. 1.d-6) CYCLE
 
          IF (GRID_TYPE == UNSTRUCTURED) THEN
@@ -1189,11 +1190,11 @@ MODULE fields
                DPSI2DX = U1D_GRID%BASIS_COEFFS(1,2,IC)
                
                J_FIELD(V1-1) = J_FIELD(V1-1) &
-               + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI1DX)/(YMAX-YMIN)/(ZMAX-ZMIN)*particles(JP)%DTRIM
+               + FNUM*SPWT*QE*CHARGE*(particles(JP)%VX*DPSI1DX)/(YMAX-YMIN)/(ZMAX-ZMIN)*particles(JP)%DTRIM
                J_FIELD(V2-1) = J_FIELD(V2-1) &
-               + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI2DX)/(YMAX-YMIN)/(ZMAX-ZMIN)*particles(JP)%DTRIM
+               + FNUM*SPWT*QE*CHARGE*(particles(JP)%VX*DPSI2DX)/(YMAX-YMIN)/(ZMAX-ZMIN)*particles(JP)%DTRIM
               
-               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/U1D_GRID%CELL_VOLUMES(IC)*FNUM &
+               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/U1D_GRID%CELL_VOLUMES(IC)*FNUM*SPWT &
                                  * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
 
             ELSE IF (DIMS == 2) THEN
@@ -1213,23 +1214,23 @@ MODULE fields
                
                IF (AXI) THEN
                   J_FIELD(V1-1) = J_FIELD(V1-1) &
-                  + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI1DX + particles(JP)%VY*DPSI1DY)/(ZMAX-ZMIN)*particles(JP)%DTRIM
+                  + FNUM*SPWT*QE*CHARGE*(particles(JP)%VX*DPSI1DX + particles(JP)%VY*DPSI1DY)/(ZMAX-ZMIN)*particles(JP)%DTRIM
                   J_FIELD(V2-1) = J_FIELD(V2-1) &
-                  + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI2DX + particles(JP)%VY*DPSI2DY)/(ZMAX-ZMIN)*particles(JP)%DTRIM
+                  + FNUM*SPWT*QE*CHARGE*(particles(JP)%VX*DPSI2DX + particles(JP)%VY*DPSI2DY)/(ZMAX-ZMIN)*particles(JP)%DTRIM
                   J_FIELD(V3-1) = J_FIELD(V3-1) &
-                  + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI3DX + particles(JP)%VY*DPSI3DY)/(ZMAX-ZMIN)*particles(JP)%DTRIM
+                  + FNUM*SPWT*QE*CHARGE*(particles(JP)%VX*DPSI3DX + particles(JP)%VY*DPSI3DY)/(ZMAX-ZMIN)*particles(JP)%DTRIM
 
-                  MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/AREA/(ZMAX-ZMIN)*FNUM &
+                  MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/AREA/(ZMAX-ZMIN)*FNUM*SPWT &
                                     * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
                ELSE
                   J_FIELD(V1-1) = J_FIELD(V1-1) &
-                  + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI1DX + particles(JP)%VY*DPSI1DY)/(ZMAX-ZMIN)*particles(JP)%DTRIM
+                  + FNUM*SPWT*QE*CHARGE*(particles(JP)%VX*DPSI1DX + particles(JP)%VY*DPSI1DY)/(ZMAX-ZMIN)*particles(JP)%DTRIM
                   J_FIELD(V2-1) = J_FIELD(V2-1) &
-                  + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI2DX + particles(JP)%VY*DPSI2DY)/(ZMAX-ZMIN)*particles(JP)%DTRIM
+                  + FNUM*SPWT*QE*CHARGE*(particles(JP)%VX*DPSI2DX + particles(JP)%VY*DPSI2DY)/(ZMAX-ZMIN)*particles(JP)%DTRIM
                   J_FIELD(V3-1) = J_FIELD(V3-1) &
-                  + FNUM*QE*CHARGE*(particles(JP)%VX*DPSI3DX + particles(JP)%VY*DPSI3DY)/(ZMAX-ZMIN)*particles(JP)%DTRIM
+                  + FNUM*SPWT*QE*CHARGE*(particles(JP)%VX*DPSI3DX + particles(JP)%VY*DPSI3DY)/(ZMAX-ZMIN)*particles(JP)%DTRIM
 
-                  MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/AREA/(ZMAX-ZMIN)*FNUM &
+                  MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/AREA/(ZMAX-ZMIN)*FNUM*SPWT &
                                     * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
                END IF
 
@@ -1237,11 +1238,12 @@ MODULE fields
                
                DO P = 1, 4
                   VP = U3D_GRID%CELL_NODES(P,IC) - 1
-                  J_FIELD(VP) = J_FIELD(VP) + FNUM*QE*CHARGE*(particles(JP)%VX*U3D_GRID%BASIS_COEFFS(1,P,IC) &
-                                                            + particles(JP)%VY*U3D_GRID%BASIS_COEFFS(2,P,IC) &
-                                                            + particles(JP)%VZ*U3D_GRID%BASIS_COEFFS(3,P,IC))*particles(JP)%DTRIM
+                  J_FIELD(VP) = J_FIELD(VP) + FNUM*SPWT*QE*CHARGE*(particles(JP)%VX*U3D_GRID%BASIS_COEFFS(1,P,IC) &
+                                                                 + particles(JP)%VY*U3D_GRID%BASIS_COEFFS(2,P,IC) &
+                                                                 + particles(JP)%VZ*U3D_GRID%BASIS_COEFFS(3,P,IC)) &
+                                                                 * particles(JP)%DTRIM
                END DO
-               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/U3D_GRID%CELL_VOLUMES(IC)*FNUM &
+               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*particles(JP)%DTRIM/EPS0/U3D_GRID%CELL_VOLUMES(IC)*FNUM*SPWT &
                                     * (QE*CHARGE)**2/SPECIES(particles(JP)%S_ID)%MOLECULAR_MASS
 
             END IF
@@ -2627,7 +2629,7 @@ MODULE fields
       TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE, INTENT(IN) :: part_to_deposit
       INTEGER :: JP, IC
 
-      REAL(KIND=8) :: CHARGE
+      REAL(KIND=8) :: CHARGE, SPWT
       INTEGER :: SIZEC
 
 
@@ -2643,6 +2645,7 @@ MODULE fields
 
       DO JP = 1, NP_PROC
          CHARGE = SPECIES(part_to_deposit(JP)%S_ID)%CHARGE
+         SPWT = SPECIES(part_to_deposit(JP)%S_ID)%SPWT
          IF (ABS(CHARGE) .LT. 1.d-6) CYCLE
 
          IF (GRID_TYPE == UNSTRUCTURED) THEN
@@ -2651,16 +2654,16 @@ MODULE fields
             IF (DIMS == 1) THEN
                
                MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*part_to_deposit(JP)%DTRIM/EPS0/U1D_GRID%SEGMENT_LENGTHS(IC)/(YMAX-YMIN) &
-                                 /(ZMAX-ZMIN)*FNUM * (QE*CHARGE)**2/SPECIES(part_to_deposit(JP)%S_ID)%MOLECULAR_MASS
+                                 /(ZMAX-ZMIN)*FNUM*SPWT * (QE*CHARGE)**2/SPECIES(part_to_deposit(JP)%S_ID)%MOLECULAR_MASS
 
             ELSE IF (DIMS == 2) THEN
                
                MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*part_to_deposit(JP)%DTRIM/EPS0/U2D_GRID%CELL_AREAS(IC)/(ZMAX-ZMIN)*FNUM &
-                                 * (QE*CHARGE)**2/SPECIES(part_to_deposit(JP)%S_ID)%MOLECULAR_MASS
+                                 *SPWT * (QE*CHARGE)**2/SPECIES(part_to_deposit(JP)%S_ID)%MOLECULAR_MASS
 
             ELSE IF (DIMS == 3) THEN
 
-               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*part_to_deposit(JP)%DTRIM/EPS0/U3D_GRID%CELL_VOLUMES(IC)*FNUM &
+               MASS_MATRIX(IC) = MASS_MATRIX(IC) + 0.25*DT*part_to_deposit(JP)%DTRIM/EPS0/U3D_GRID%CELL_VOLUMES(IC)*FNUM*SPWT &
                                  * (QE*CHARGE)**2/SPECIES(part_to_deposit(JP)%S_ID)%MOLECULAR_MASS
 
             END IF
@@ -2705,10 +2708,11 @@ MODULE fields
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_TTRZ
       
       INTEGER :: JP, IC, ELECTRON_S_ID
-      REAL(KIND=8) :: ME, NUMPART
+      REAL(KIND=8) :: ME, NUMPART, SPWT
 
       ELECTRON_S_ID = SPECIES_NAME_TO_ID('e')
       ME = SPECIES(ELECTRON_S_ID)%MOLECULAR_MASS
+      SPWT = SPECIES(ELECTRON_S_ID)%SPWT
 
       IF (.NOT. GRID_TYPE == UNSTRUCTURED) CALL ERROR_ABORT('Not implemented.')
 
@@ -2788,11 +2792,11 @@ MODULE fields
          END DO
    
          IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 1) THEN
-            CELL_NE = TIMESTEP_NP*FNUM / U1D_GRID%CELL_VOLUMES
+            CELL_NE = TIMESTEP_NP*FNUM*SPWT / U1D_GRID%CELL_VOLUMES
          ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
-            CELL_NE = TIMESTEP_NP*FNUM / U2D_GRID%CELL_VOLUMES
+            CELL_NE = TIMESTEP_NP*FNUM*SPWT / U2D_GRID%CELL_VOLUMES
          ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
-            CELL_NE = TIMESTEP_NP*FNUM / U3D_GRID%CELL_VOLUMES
+            CELL_NE = TIMESTEP_NP*FNUM*SPWT / U3D_GRID%CELL_VOLUMES
          END IF
          CELL_TE = (TIMESTEP_TTRX + TIMESTEP_TTRY + TIMESTEP_TTRZ) / 3.
 
@@ -2902,7 +2906,7 @@ MODULE fields
 
       LOGICAL :: FLUIDBOUNDARY
       INTEGER :: NEIGHBORPG
-      REAL(KIND=8) :: CHARGE, K, PSIP, RHO_Q
+      REAL(KIND=8) :: CHARGE, K, PSIP, RHO_Q, SPWT
       INTEGER :: VP
 
       !REAL(KIND=8) :: CHECKVALUE
@@ -3000,6 +3004,7 @@ MODULE fields
       LOCAL_WALL_COLL_COUNT = 0
 
       DO IP = 1, NP_PROC
+         SPWT = SPECIES(part_adv(IP)%S_ID)%SPWT
          NCROSSINGS = 0
          REMOVE_PART(IP) = .FALSE.
          IC = part_adv(IP)%IC
@@ -3551,7 +3556,7 @@ MODULE fields
                         IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. ABS(CHARGE) .GE. 1.d-6 .AND. FINAL) THEN
                            K = QE/(EPS0*EPS_SCALING**2)
                            IF (DIMS == 1) THEN
-                              RHO_Q = K*CHARGE*FNUM/(ZMAX-ZMIN)
+                              RHO_Q = K*CHARGE*FNUM*SPWT/(ZMAX-ZMIN)
                               DO I = 1, 2
                                  VP = U1D_GRID%CELL_NODES(I,IC)
                                  PSIP = U1D_GRID%BASIS_COEFFS(1,I,IC)*part_adv(IP)%X &
@@ -3559,7 +3564,7 @@ MODULE fields
                                  SURFACE_CHARGE(VP) = SURFACE_CHARGE(VP) + RHO_Q*PSIP
                               END DO
                            ELSE IF (DIMS == 2) THEN
-                              RHO_Q = K*CHARGE*FNUM/(ZMAX-ZMIN)
+                              RHO_Q = K*CHARGE*FNUM*SPWT/(ZMAX-ZMIN)
                               DO I = 1, 3
                                  VP = U2D_GRID%CELL_NODES(I,IC)
                                  PSIP = U2D_GRID%BASIS_COEFFS(1,I,IC)*part_adv(IP)%X &
@@ -3568,7 +3573,7 @@ MODULE fields
                                  SURFACE_CHARGE(VP) = SURFACE_CHARGE(VP) + RHO_Q*PSIP
                               END DO
                            ELSE IF (DIMS == 3) THEN
-                              RHO_Q = K*CHARGE*FNUM
+                              RHO_Q = K*CHARGE*FNUM*SPWT
                               DO I = 1, 4
                                  VP = U3D_GRID%CELL_NODES(I,IC)
                                  PSIP = U3D_GRID%BASIS_COEFFS(1,I,IC)*part_adv(IP)%X &
@@ -3871,10 +3876,10 @@ MODULE fields
                   DPSJ2DY = U2D_GRID%BASIS_COEFFS(2,2,J+1)
                   DPSJ3DY = U2D_GRID%BASIS_COEFFS(2,3,J+1)
    
-                  VALXX = - DXDEXV(JJ)/EPS0/(ZMAX-ZMIN)*FNUM
-                  VALXY = - DXDEYV(JJ)/EPS0/(ZMAX-ZMIN)*FNUM
-                  VALYX = - DYDEXV(JJ)/EPS0/(ZMAX-ZMIN)*FNUM
-                  VALYY = - DYDEYV(JJ)/EPS0/(ZMAX-ZMIN)*FNUM
+                  VALXX = - DXDEXV(JJ)/EPS0/(ZMAX-ZMIN)*FNUM*SPWT
+                  VALXY = - DXDEYV(JJ)/EPS0/(ZMAX-ZMIN)*FNUM*SPWT
+                  VALYX = - DYDEXV(JJ)/EPS0/(ZMAX-ZMIN)*FNUM*SPWT
+                  VALYY = - DYDEYV(JJ)/EPS0/(ZMAX-ZMIN)*FNUM*SPWT
 
                   IF (.NOT. IS_DIRICHLET(V1I-1)) THEN
                      CALL MatSetValue(jac,V1I-1,V1J-1,VALXX*DPSI1DX*DPSJ1DX + VALXY*DPSI1DX*DPSJ1DY + &
@@ -3947,7 +3952,7 @@ MODULE fields
                DO JJ = 1, ncols
                   J = cols(JJ)
 
-                  VAL = - vals(JJ)/EPS0/(YMAX-YMIN)/(ZMAX-ZMIN)*FNUM
+                  VAL = - vals(JJ)/EPS0/(YMAX-YMIN)/(ZMAX-ZMIN)*FNUM*SPWT
                   DO NI = 1, 2
                      VNI = U1D_GRID%CELL_NODES(NI,I+1)
                      IF (.NOT. IS_DIRICHLET(VNI - 1)) THEN
@@ -3971,7 +3976,7 @@ MODULE fields
                DO JJ = 1, ncols
                   J = cols(JJ)
 
-                  VAL = - vals(JJ)/EPS0/(ZMAX-ZMIN)*FNUM
+                  VAL = - vals(JJ)/EPS0/(ZMAX-ZMIN)*FNUM*SPWT
                   DO NI = 1, 3
                      VNI = U2D_GRID%CELL_NODES(NI,I+1)
                      IF (.NOT. IS_DIRICHLET(VNI - 1)) THEN
@@ -3996,7 +4001,7 @@ MODULE fields
                DO JJ = 1, ncols
                   J = cols(JJ)
 
-                  VAL = - vals(JJ)/EPS0*FNUM
+                  VAL = - vals(JJ)/EPS0*FNUM*SPWT
                   DO NI = 1, 4
                      VNI = U3D_GRID%CELL_NODES(NI,I+1)
                      IF (.NOT. IS_DIRICHLET(VNI - 1)) THEN
@@ -4224,7 +4229,7 @@ MODULE fields
 
       REAL(KIND=8) :: RF_XMIN, RF_XMAX, RF_YMAX
       REAL(KIND=8) :: RF_FREQ, NOVERL, EMAG, RP
-      REAL(KIND=8) :: PARTICLE_CHARGE
+      REAL(KIND=8) :: PARTICLE_CHARGE, SPWT
 
       RF_XMIN = -0.08d0
       RF_XMAX = -0.055d0
@@ -4234,13 +4239,14 @@ MODULE fields
       NOVERL = 250.d0 ! Number of coil turns per meter
 
       PARTICLE_CHARGE = QE*SPECIES(part_adv(JP)%S_ID)%CHARGE
+      SPWT = SPECIES(part_adv(JP)%S_ID)%SPWT
 
       IF (DIMS == 2) THEN
          IF (part_adv(JP)%X > RF_XMIN .AND. part_adv(JP)%X < RF_XMAX .AND. part_adv(JP)%Y < RF_YMAX) THEN
             EMAG = MU0*PI*RF_FREQ*NOVERL*COIL_CURRENT * part_adv(JP)%Y * COS(2*PI*RF_FREQ*tID*DT)
             E(3) = E(3) - EMAG
 
-            FIELD_POWER = FIELD_POWER + FNUM * PARTICLE_CHARGE * (part_adv(JP)%VZ*EMAG)
+            FIELD_POWER = FIELD_POWER + FNUM*SPWT * PARTICLE_CHARGE * (part_adv(JP)%VZ*EMAG)
 
             B(1) = B(1) + MU0*NOVERL*COIL_CURRENT * SIN(2*PI*RF_FREQ*tID*DT)
          END IF
@@ -4251,7 +4257,7 @@ MODULE fields
             E(2) = E(2) -part_adv(JP)%Z/RP * EMAG
             E(3) = E(3) +part_adv(JP)%Y/RP * EMAG
 
-            FIELD_POWER = FIELD_POWER + FNUM * PARTICLE_CHARGE * &
+            FIELD_POWER = FIELD_POWER + FNUM*SPWT * PARTICLE_CHARGE * &
             (-part_adv(JP)%Z/RP * EMAG * part_adv(JP)%VY &
             + part_adv(JP)%Y/RP * EMAG * part_adv(JP)%VZ)
 
@@ -5533,7 +5539,7 @@ MODULE fields
       INTEGER :: JP, I, IC
 
       REAL(KIND=8) :: K, RHO_Q, CHARGE
-      REAL(KIND=8) :: VOL, CFNUM
+      REAL(KIND=8) :: VOL, CFNUM, SPWT
       REAL(KIND=8), DIMENSION(4) :: WEIGHTS
       INTEGER, DIMENSION(4) :: INDICES, INDI, INDJ
       INTEGER :: SIZE, P, VP
@@ -5546,11 +5552,12 @@ MODULE fields
       DO JP = 1, NP_PROC
          CHARGE = SPECIES(part_adv(JP)%S_ID)%CHARGE
          IF (ABS(CHARGE) .LT. 1.d-6) CYCLE
+         SPWT = SPECIES(part_adv(JP)%S_ID)%SPWT
 
          IF (GRID_TYPE == UNSTRUCTURED) THEN 
             IC = part_adv(JP)%IC
             IF (DIMS == 1) THEN
-               RHO_Q = K*CHARGE*FNUM/(YMAX-YMIN)/(ZMAX-ZMIN)
+               RHO_Q = K*CHARGE*FNUM*SPWT/(YMAX-YMIN)/(ZMAX-ZMIN)
                DO P = 1, 2
                   VP = U1D_GRID%CELL_NODES(P,IC) - 1
                   PSIP = U1D_GRID%BASIS_COEFFS(1,P,IC)*part_adv(JP)%X &
@@ -5558,7 +5565,7 @@ MODULE fields
                   RHS(VP) = RHS(VP) + RHO_Q*PSIP
                END DO
             ELSE IF (DIMS == 2) THEN
-               RHO_Q = K*CHARGE*FNUM/(ZMAX-ZMIN)
+               RHO_Q = K*CHARGE*FNUM*SPWT/(ZMAX-ZMIN)
                DO P = 1, 3
                   VP = U2D_GRID%CELL_NODES(P,IC) - 1
                   PSIP = U2D_GRID%BASIS_COEFFS(1,P,IC)*part_adv(JP)%X &
@@ -5567,7 +5574,7 @@ MODULE fields
                   RHS(VP) = RHS(VP) + RHO_Q*PSIP
                END DO
             ELSE IF (DIMS == 3) THEN
-               RHO_Q = K*CHARGE*FNUM
+               RHO_Q = K*CHARGE*FNUM*SPWT
                DO P = 1, 4
                   VP = U3D_GRID%CELL_NODES(P,IC) - 1
                   PSIP = U3D_GRID%BASIS_COEFFS(1,P,IC)*part_adv(JP)%X &
@@ -5596,7 +5603,7 @@ MODULE fields
             CFNUM = FNUM
             IF (BOOL_RADIAL_WEIGHTING) CFNUM = CELL_FNUM(part_adv(JP)%IC)         
 
-            RHO_Q = -K*CHARGE*CFNUM/VOL
+            RHO_Q = -K*CHARGE*CFNUM*SPWT/VOL
 
             IF (DIMS == 2) THEN
                RHS(INDICES(1)) = RHS(INDICES(1)) + RHO_Q * WEIGHTS(1)
@@ -6003,6 +6010,7 @@ MODULE fields
       INTEGER :: NI, NJ, VNI, VNJ
       REAL(KIND=8), DIMENSION(3) :: DIRB, VOLD, AMOVER, VMOVER
       REAL(KIND=8) :: QOM, NORMB, A, MAG
+      REAL(KIND=8) :: SPWT
 
       INTEGER :: NCROSSINGS
 
@@ -6436,10 +6444,11 @@ MODULE fields
                         END IF
 
                         CHARGE = SPECIES(part_adv(IP)%S_ID)%CHARGE
+                        SPWT = SPECIES(part_adv(IP)%S_ID)%SPWT
                         IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. ABS(CHARGE) .GE. 1.d-6 .AND. FINAL) THEN
                            K = QE/(EPS0*EPS_SCALING**2)
                            IF (DIMS == 1) THEN
-                              RHO_Q = K*CHARGE*FNUM/(ZMAX-ZMIN)
+                              RHO_Q = K*CHARGE*FNUM*SPWT/(ZMAX-ZMIN)
                               DO I = 1, 2
                                  VP = U1D_GRID%CELL_NODES(I,IC)
                                  PSIP = U1D_GRID%BASIS_COEFFS(1,I,IC)*part_adv(IP)%X &
@@ -6447,7 +6456,7 @@ MODULE fields
                                  SURFACE_CHARGE(VP) = SURFACE_CHARGE(VP) + RHO_Q*PSIP
                               END DO
                            ELSE IF (DIMS == 2) THEN
-                              RHO_Q = K*CHARGE*FNUM/(ZMAX-ZMIN)
+                              RHO_Q = K*CHARGE*FNUM*SPWT/(ZMAX-ZMIN)
                               DO I = 1, 3
                                  VP = U2D_GRID%CELL_NODES(I,IC)
                                  PSIP = U2D_GRID%BASIS_COEFFS(1,I,IC)*part_adv(IP)%X &
@@ -6456,7 +6465,7 @@ MODULE fields
                                  SURFACE_CHARGE(VP) = SURFACE_CHARGE(VP) + RHO_Q*PSIP
                               END DO
                            ELSE IF (DIMS == 3) THEN
-                              RHO_Q = K*CHARGE*FNUM
+                              RHO_Q = K*CHARGE*FNUM*SPWT
                               DO I = 1, 4
                                  VP = U3D_GRID%CELL_NODES(I,IC)
                                  PSIP = U3D_GRID%BASIS_COEFFS(1,I,IC)*part_adv(IP)%X &

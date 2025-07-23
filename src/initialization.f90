@@ -3013,7 +3013,7 @@ MODULE initialization
                   FLUXSOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC*EMIT_TASKS(ITASK)%VDF%FLUX_DISTR(BETA,S_NORM)
                END IF
 
-               NtotINJECT = FLUXSOURCE*AREA*DT/FNUM         ! Tot num of particles to be injected
+               NtotINJECT = FLUXSOURCE*AREA*DT/FNUM/SPECIES(S_ID)%SPWT/SPECIES(S_ID)%MOLECULAR_MASS ! Tot num of particles to be injected
 
                TASK_NFS(IS) = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
                
@@ -3038,7 +3038,7 @@ MODULE initialization
                
                FLUXSOURCE = FRAC*EMIT_TASKS(ITASK)%CORRECTION*A0*T_SURFACE**2*EXP(-QE*WORK_FUNCTION/(KB*T_SURFACE))
 
-               NtotINJECT = FLUXSOURCE*AREA*DT/FNUM ! Tot num of particles to be injected
+               NtotINJECT = FLUXSOURCE*AREA*DT/FNUM/SPECIES(S_ID)%SPWT ! Tot num of particles to be injected
 
                TASK_NFS(IS) = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
             END DO
@@ -3060,7 +3060,7 @@ MODULE initialization
                RHO_VAPOR = VAPOR_PRESSURE/(KB*T_SURFACE) 
                FLUXSOURCE = FRAC*RHO_VAPOR*SQRT(KB*T_SURFACE/(2*PI*M))
 
-               NtotINJECT = FLUXSOURCE*AREA*DT/FNUM ! Tot num of particles to be injected       
+               NtotINJECT = FLUXSOURCE*AREA*DT/FNUM/SPECIES(S_ID)%SPWT ! Tot num of particles to be injected       
 
                EMIT_TASKS(ITASK)%VAPOR_PRESSURE = VAPOR_PRESSURE
                TASK_NFS(IS) = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc

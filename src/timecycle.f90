@@ -382,7 +382,7 @@ MODULE timecycle
       REAL(KIND=8), DIMENSION(3) :: FACE_NORMAL, FACE_TANG1, FACE_TANG2, V1, V2, V3
    
       INTEGER :: S_ID, ELECTRON_S_ID
-      REAL(KIND=8) :: M, CHARGE, RHO_Q, K, PSIP, E_FIELD_NORM
+      REAL(KIND=8) :: M, CHARGE, RHO_Q, K, PSIP, E_FIELD_NORM, SPWT
 
       TYPE(EMIT_TASK_DATA_STRUCTURE) :: EMIT_TASK
 
@@ -563,10 +563,11 @@ MODULE timecycle
 
                ! Charge leaving from a dielectric/conductive/ngspice surface               
                CHARGE = SPECIES(particleNOW%S_ID)%CHARGE
+               SPWT = SPECIES(particleNOW%S_ID)%SPWT
                IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. ABS(CHARGE) .GE. 1.d-6) THEN
                   K = QE/(EPS0*EPS_SCALING**2)
                   IF (DIMS == 1) THEN
-                     RHO_Q = K*CHARGE*FNUM/(YMAX-YMIN)/(ZMAX-ZMIN)
+                     RHO_Q = K*CHARGE*FNUM*SPWT/(YMAX-YMIN)/(ZMAX-ZMIN)
                      DO I = 1, 2
                         VP = U1D_GRID%CELL_NODES(I,IC)
                         PSIP = U1D_GRID%BASIS_COEFFS(1,I,IC)*particleNOW%X &
@@ -575,7 +576,7 @@ MODULE timecycle
                      END DO
 
                   ELSE IF (DIMS == 2) THEN
-                     RHO_Q = K*CHARGE*FNUM/(ZMAX-ZMIN)
+                     RHO_Q = K*CHARGE*FNUM*SPWT/(ZMAX-ZMIN)
                      DO I = 1, 3
                         VP = U2D_GRID%CELL_NODES(I,IC)
                         PSIP = U2D_GRID%BASIS_COEFFS(1,I,IC)*particleNOW%X &
@@ -585,7 +586,7 @@ MODULE timecycle
                      END DO
                      
                   ELSE IF (DIMS == 3) THEN
-                     RHO_Q = K*CHARGE*FNUM
+                     RHO_Q = K*CHARGE*FNUM*SPWT
                      DO I = 1, 4
                         VP = U3D_GRID%CELL_NODES(I,IC)
                         PSIP = U3D_GRID%BASIS_COEFFS(1,I,IC)*particleNOW%X &
@@ -601,11 +602,11 @@ MODULE timecycle
                ELSE IF(GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC .AND. ABS(CHARGE) .GE. 1.d-6) THEN
                   K = QE/(EPS0*EPS_SCALING**2)
                   IF (DIMS == 1) THEN
-                     RHO_Q = K*CHARGE*FNUM/(YMAX-YMIN)/(ZMAX-ZMIN)
+                     RHO_Q = K*CHARGE*FNUM*SPWT/(YMAX-YMIN)/(ZMAX-ZMIN)
                   ELSE IF (DIMS == 2) THEN
-                     RHO_Q = K*CHARGE*FNUM/(ZMAX-ZMIN)
+                     RHO_Q = K*CHARGE*FNUM*SPWT/(ZMAX-ZMIN)
                   ELSE IF (DIMS == 3) THEN
-                     RHO_Q = K*CHARGE*FNUM
+                     RHO_Q = K*CHARGE*FNUM*SPWT
                   END IF
 
                   GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE = GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE - RHO_Q
@@ -1159,7 +1160,7 @@ MODULE timecycle
       TYPE(PARTICLE_DATA_STRUCTURE) :: NEWparticle, particleNOW
       LOGICAL :: FLUIDBOUNDARY
       INTEGER :: NEIGHBORPG
-      REAL(KIND=8) :: CHARGE, K, PSIP, RHO_Q
+      REAL(KIND=8) :: CHARGE, K, PSIP, RHO_Q, SPWT
       INTEGER :: VP
 
       REAL(KIND=8) :: VXPRE, VYPRE, VZPRE
@@ -1483,10 +1484,11 @@ MODULE timecycle
 
                         
                         CHARGE = SPECIES(particles(IP)%S_ID)%CHARGE
+                        SPWT = SPECIES(particles(IP)%S_ID)%SPWT
                         IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. ABS(CHARGE) .GE. 1.d-6) THEN
                            K = QE/(EPS0*EPS_SCALING**2)
                            IF (DIMS == 1) THEN
-                              RHO_Q = K*CHARGE*FNUM/(YMAX-YMIN)/(ZMAX-ZMIN)
+                              RHO_Q = K*CHARGE*FNUM*SPWT/(YMAX-YMIN)/(ZMAX-ZMIN)
                               DO I = 1, 2
                                  VP = U1D_GRID%CELL_NODES(I,IC)
                                  PSIP = U1D_GRID%BASIS_COEFFS(1,I,IC)*particles(IP)%X &
@@ -1495,7 +1497,7 @@ MODULE timecycle
                               END DO
 
                            ELSE IF (DIMS == 2) THEN
-                              RHO_Q = K*CHARGE*FNUM/(ZMAX-ZMIN)
+                              RHO_Q = K*CHARGE*FNUM*SPWT/(ZMAX-ZMIN)
                               DO I = 1, 3
                                  VP = U2D_GRID%CELL_NODES(I,IC)
                                  PSIP = U2D_GRID%BASIS_COEFFS(1,I,IC)*particles(IP)%X &
@@ -1505,7 +1507,7 @@ MODULE timecycle
                               END DO
                               
                            ELSE IF (DIMS == 3) THEN
-                              RHO_Q = K*CHARGE*FNUM
+                              RHO_Q = K*CHARGE*FNUM*SPWT
                               DO I = 1, 4
                                  VP = U3D_GRID%CELL_NODES(I,IC)
                                  PSIP = U3D_GRID%BASIS_COEFFS(1,I,IC)*particles(IP)%X &
@@ -1521,11 +1523,11 @@ MODULE timecycle
                         ELSE IF(GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC .AND. ABS(CHARGE) .GE. 1.d-6) THEN
                            K = QE/(EPS0*EPS_SCALING**2)
                            IF (DIMS == 1) THEN
-                              RHO_Q = K*CHARGE*FNUM/(YMAX-YMIN)/(ZMAX-ZMIN)
+                              RHO_Q = K*CHARGE*FNUM*SPWT/(YMAX-YMIN)/(ZMAX-ZMIN)
                            ELSE IF (DIMS == 2) THEN
-                              RHO_Q = K*CHARGE*FNUM/(ZMAX-ZMIN)
+                              RHO_Q = K*CHARGE*FNUM*SPWT/(ZMAX-ZMIN)
                            ELSE IF (DIMS == 3) THEN
-                              RHO_Q = K*CHARGE*FNUM
+                              RHO_Q = K*CHARGE*FNUM*SPWT
                            END IF
 
                            GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE = GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE + RHO_Q
@@ -1760,8 +1762,9 @@ MODULE timecycle
                            END IF
 
                            CHARGE = SPECIES(particles(IP)%S_ID)%CHARGE
+                           SPWT = SPECIES(particles(IP)%S_ID)%SPWT
                            IF (GRID_BC(FACE_PG)%FIELD_BC == SPICE_NODE_BC .AND. ABS(CHARGE) .GE. 1.d-6) THEN
-                              GRID_BC(FACE_PG)%SPICE_NODE_CURRENT = GRID_BC(FACE_PG)%SPICE_NODE_CURRENT - QE*FNUM*CHARGE/DT
+                              GRID_BC(FACE_PG)%SPICE_NODE_CURRENT = GRID_BC(FACE_PG)%SPICE_NODE_CURRENT - QE*FNUM*SPWT*CHARGE/DT
                            END IF
                         END IF
                      ELSE

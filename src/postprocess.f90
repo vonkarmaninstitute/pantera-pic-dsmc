@@ -1864,7 +1864,7 @@ MODULE postprocess
 
          !HX = (XMAX-XMIN)/DBLE(NX)
          !HY = (YMAX-YMIN)/DBLE(NY)
-         !TOT_EE = -HX*HY*8.8541878128E-12*SUM( RHS*PACK(PHI_FIELD, .TRUE.) )/FNUM/*SPWT
+         !TOT_EE = -HX*HY*8.8541878128E-12*SUM( RHS*PACK(PHI_FIELD, .TRUE.) )/FNUM/SPWT
 
          ! WRITE(*,*) ' '
          ! WRITE(*,*) 'Conservation checks:'

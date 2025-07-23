@@ -2091,6 +2091,7 @@ MODULE initialization
          READ(in3,'(A)', IOSTAT=ReasonEOF) DEFINITION ! Read reaction parameters line
          CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
          IF (STRARRAY(1) == 'constant') THEN
+            NEW_REACTION%TYPE = FIXED_RATE
             READ(STRARRAY(2), *) NEW_REACTION%EA
             READ(STRARRAY(3), *) NEW_REACTION%CONSTANT_CS
             SIGMAMAX = NEW_REACTION%CONSTANT_CS

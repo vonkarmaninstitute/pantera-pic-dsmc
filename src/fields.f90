@@ -4314,6 +4314,11 @@ MODULE fields
                   part_adv(IP)%VX = part_adv(IP)%VX*VEL_SCALE
                   part_adv(IP)%VY = part_adv(IP)%VY*VEL_SCALE
                   part_adv(IP)%VZ = part_adv(IP)%VZ*VEL_SCALE
+
+                  IF (rf() > SPECIES(JS)%SPWT/SPECIES(JP)%SPWT) THEN
+                     REMOVE = .TRUE.
+                     part_adv(IP)%DTRIM = 0.
+                  END IF
                ELSE
                   CALL ERROR_ABORT('Number of products in wall reaction not supported.')
                END IF

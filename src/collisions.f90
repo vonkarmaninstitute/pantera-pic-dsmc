@@ -601,12 +601,11 @@ MODULE collisions
 
       INTEGER      :: JP1, JP2, JCOL, JP, INDJ, JR, IND1, IND2, IP1, IP2, IP3
       INTEGER      :: SP_ID1, SP_ID2, P1_SP_ID, P2_SP_ID, P3_SP_ID
-      INTEGER      :: NCOLL,NCOLLMAX_INT
-      REAL(KIND=8) :: NCOLLMAX,FCORR,VR,VR2,SIGMA_R,MAX_SIGMA
+      INTEGER      :: NCOLL, NCOLLMAX_INT, AVAIL1, AVAIL2
+      REAL(KIND=8) :: NCOLLMAX, FCORR, VR, VR2, SIGMA_R, MAX_SIGMA
       REAL(KIND=8) :: MRED
       REAL(KIND=8) :: EI, ETR, ECOLL, TOTDOF, EA, EROT, EVIB
-      !REAL(KIND=8) :: B,C,EINT,ETOT,ETR,PHI,SITETA,VRX,VRY,VRZ
-      REAL(KIND=8) :: VXMAX,VXMIN,VYMAX,VYMIN,VZMAX,VZMIN,VRMAX
+      REAL(KIND=8) :: VXMAX, VXMIN, VYMAX, VYMIN, VZMAX, VZMIN, VRMAX
       REAL(KIND=8) :: PI2
       REAL(KIND=8), DIMENSION(3) :: C1, C2
       REAL(KIND=8) :: M1, M2
@@ -640,6 +639,8 @@ MODULE collisions
          ! Test if there are enough particles of reactants
          IF ( (NPC(SP_ID1,JC) .LT. 1) .OR. (NPC(SP_ID2,JC) .LT. 1) ) CYCLE
 
+
+
          ! Step 1. Compute the number of pairs to test for collision
 
          VXMAX = -1.D+38
@@ -647,7 +648,10 @@ MODULE collisions
          VYMAX = -1.D+38
          VYMIN =  1.D+38
          VZMAX = -1.D+38
-         VZMIN =  1.D+38 
+         VZMIN =  1.D+38
+
+         AVAIL1 = 0
+         AVAIL2 = 0
 
          DO JP = IOF(SP_ID1,JC), IOF(SP_ID1,JC)+NPC(SP_ID1,JC)-1 ! Find velocity envelope
             INDJ = IND(JP)
@@ -657,6 +661,7 @@ MODULE collisions
             VYMAX = DMAX1(VYMAX,particles(INDJ)%VY)
             VZMIN = DMIN1(VZMIN,particles(INDJ)%VZ)
             VZMAX = DMAX1(VZMAX,particles(INDJ)%VZ)
+            IF (.NOT. HAS_REACTED(INDJ)) AVAIL1 = AVAIL1 + 1
          END DO
 
          DO JP = IOF(SP_ID2,JC), IOF(SP_ID2,JC)+NPC(SP_ID2,JC)-1 ! Find velocity envelope
@@ -667,7 +672,13 @@ MODULE collisions
             VYMAX = DMAX1(VYMAX,particles(INDJ)%VY)
             VZMIN = DMIN1(VZMIN,particles(INDJ)%VZ)
             VZMAX = DMAX1(VZMAX,particles(INDJ)%VZ)
+            IF (.NOT. HAS_REACTED(INDJ)) AVAIL2 = AVAIL2 + 1
          END DO
+
+         ! Test if there are enough particles of reactants
+         IF ( (AVAIL1 .LT. 1) .OR. (AVAIL2 .LT. 1) ) CYCLE
+         IF ( (SP_ID1 == SP_ID2) .AND. (AVAIL1 .LT. 2) ) CYCLE
+
 
 
          ! Find the maximum cross section of all the species involved in the collisions
@@ -698,9 +709,9 @@ MODULE collisions
          END IF
 
          IF (SP_ID1 == SP_ID2) THEN
-            NCOLLMAX = FACTOR*NPC(SP_ID1,JC)*(NPC(SP_ID2,JC)-1)*MAX_SIGMA*VRMAX*CFNUM*MAXWTR*DT/VOL
+            NCOLLMAX = FACTOR*AVAIL1*(AVAIL2-1)*MAX_SIGMA*VRMAX*CFNUM*MAXWTR*DT/VOL
          ELSE
-            NCOLLMAX = FACTOR*NPC(SP_ID1,JC)*NPC(SP_ID2,JC)*MAX_SIGMA*VRMAX*CFNUM*MAXWTR*DT/VOL
+            NCOLLMAX = FACTOR*AVAIL1*AVAIL2*MAX_SIGMA*VRMAX*CFNUM*MAXWTR*DT/VOL
          END IF
          NCOLLMAX_INT = FLOOR(NCOLLMAX+0.5)
 
@@ -709,10 +720,10 @@ MODULE collisions
 
          IF (NCOLLMAX_INT .LT. 1) THEN
             NCOLL = 1
-         ELSE IF (NCOLLMAX_INT .GT. FLOOR(FACTOR*NPC(SP_ID1,JC))) THEN
-            NCOLL = FLOOR(0.5*NPC(SP_ID1,JC))
-         ELSE IF (NCOLLMAX_INT .GT. FLOOR(FACTOR*NPC(SP_ID2,JC))) THEN
-            NCOLL = FLOOR(0.5*NPC(SP_ID2,JC))
+         ELSE IF (NCOLLMAX_INT .GT. FLOOR(FACTOR*AVAIL1)) THEN
+            NCOLL = FLOOR(0.5*AVAIL1)
+         ELSE IF (NCOLLMAX_INT .GT. FLOOR(FACTOR*AVAIL2)) THEN
+            NCOLL = FLOOR(0.5*AVAIL2)
          ELSE 
             NCOLL = NCOLLMAX_INT
          END IF

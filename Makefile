@@ -45,7 +45,7 @@ all: pantera.exe
 
 debug: CMP += -g
 debug: LNK += -g
-debug: OPTF += -O0 -Wall -Wextra -fbacktrace -fcheck=all -ffpe-trap=invalid,zero,overflow
+debug: OPTF = -O0 -fimplicit-none -Wall -Wextra -fbacktrace -fcheck=all -ffpe-trap=invalid,zero,overflow
 debug: pantera.exe
 
 # Executable generation by the linker

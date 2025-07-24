@@ -264,8 +264,6 @@ MODULE initialization
          IF (line=='DSMC_collisions_mixture:') THEN
             READ(in1,*) DSMC_COLL_MIX_NAME
             DSMC_COLL_MIX = MIXTURE_NAME_TO_ID(DSMC_COLL_MIX_NAME)
-            PAIR_POSSIBILITIES = (MIXTURES(DSMC_COLL_MIX)%N_COMPONENTS)*(MIXTURES(DSMC_COLL_MIX)%N_COMPONENTS + 1) / 2
-            DSMC_COLL_PAIR_LENGTH = MIXTURES(DSMC_COLL_MIX)%N_COMPONENTS   
          END IF
          IF (line=='BGK_sigma:')     READ(in1,*) BGK_SIGMA
          

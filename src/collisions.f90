@@ -51,7 +51,10 @@ MODULE collisions
       
       IF (ALLOCATED(collision)) DEALLOCATE(collision)
       ALLOCATE(collision(NCELLS))
-     
+    
+      PAIR_POSSIBILITIES = (MIXTURES(DSMC_COLL_MIX)%N_COMPONENTS)*(MIXTURES(DSMC_COLL_MIX)%N_COMPONENTS + 1) / 2
+      DSMC_COLL_PAIR_LENGTH = MIXTURES(DSMC_COLL_MIX)%N_COMPONENTS
+
       ! Count the number of particles in each cell of each species, to allocate arrays later
       NPC = 0
       NPCALL = 0

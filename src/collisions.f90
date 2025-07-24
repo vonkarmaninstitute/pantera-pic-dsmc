@@ -795,7 +795,8 @@ MODULE collisions
                CYCLE
             END IF
 
-            IF (P_REACT > 1.d0) WRITE(*,*) 'Warning! Bad DSMC collision for process ', JR, 'P_REACT = ', P_REACT
+            IF (P_REACT > 1.d0) WRITE(*,*) 'Warning! Bad DSMC collision for process ', JR, 'P_REACT = ', P_REACT, &
+            ' VR = ', VR, ' VRMAX = ', VRMAX, ' SIGMA_R = ', SIGMA_R, ' MAX_SIGMA = ', MAX_SIGMA
 
             ! Try the reaction
             IF (rf() < P_REACT) THEN ! Collision happens

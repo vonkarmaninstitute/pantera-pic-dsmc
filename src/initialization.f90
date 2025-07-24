@@ -1590,6 +1590,7 @@ MODULE initialization
                   N_EMIT_TASKS = N_EMIT_TASKS + 1
    
                   EMIT_TASKS(N_EMIT_TASKS)%T_SURFACE = T_SURFACE
+                  EMIT_TASKS(N_EMIT_TASKS)%TTRA = T_SURFACE
                   EMIT_TASKS(N_EMIT_TASKS)%WORK_FUNCTION = WORK_FUNCTION
                   EMIT_TASKS(N_EMIT_TASKS)%CORRECTION = CORRECTION
                   EMIT_TASKS(N_EMIT_TASKS)%MIX_ID = MIX_ID

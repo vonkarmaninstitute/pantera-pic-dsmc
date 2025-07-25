@@ -718,7 +718,7 @@ MODULE collisions
 
          ! Step 2. Compute the number of pairs (real+artificial) => add constraints (min/max) 
 
-         NCOLL = MAX(NCOLLMAX_INT, FLOOR(FACTOR*AVAIL1), FLOOR(FACTOR*AVAIL2))
+         NCOLL = MIN(NCOLLMAX_INT, FLOOR(FACTOR*AVAIL1), FLOOR(FACTOR*AVAIL2))
          IF (NCOLL .LT. 1) NCOLL = 1
 
          FCORR = NCOLLMAX/NCOLL

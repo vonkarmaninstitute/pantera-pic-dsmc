@@ -353,6 +353,7 @@ MODULE global
 
 
    REAL(KIND=8), DIMENSION(3) :: EXTERNAL_B_FIELD = 0
+   REAL(KIND=8), DIMENSION(3) :: EXTERNAL_E_FIELD = 0
    ! This is used for defining static magnetic fields from solenoids.
    INTEGER         :: N_SOLENOIDS = 0
 

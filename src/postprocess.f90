@@ -442,6 +442,7 @@ MODULE postprocess
 
       REAL(KIND=8), DIMENSION(NX+1)      :: XNODES
       REAL(KIND=8), DIMENSION(NY+1)      :: YNODES
+      REAL(KIND=8), DIMENSION(NZ+1)      :: ZNODES
 
       INTEGER                            :: I, JS, FIRST, LAST, JPROC, MOM
 
@@ -463,13 +464,20 @@ MODULE postprocess
          IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
             XNODES = 0
             DO I = 0, NX
-               XNODES(i+1) = XMIN + (XMAX-XMIN)/NX*i 
+               XNODES(i+1) = XMIN + (XMAX-XMIN)/NX*I
             END DO
 
             YNODES = 0
             DO I = 0, NY
-               YNODES(i+1) = YMIN + (YMAX-YMIN)/NY*i
+               YNODES(i+1) = YMIN + (YMAX-YMIN)/NY*I
             END DO
+
+            IF (DIMS == 0) THEN
+               ZNODES = 0
+               DO I = 0, NZ
+                  ZNODES(I+1) = ZMIN + (ZMAX-ZMIN)/NZ*I
+               END DO
+            END IF
          ELSE IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) THEN
             XNODES = XCOORD
             YNODES = YCOORD
@@ -545,6 +553,19 @@ MODULE postprocess
                DO I = 1, U3D_GRID%NUM_CELLS
                   WRITE(54321) 10
                END DO
+            ELSE IF (DIMS == 0) THEN
+               WRITE(54321) 'DATASET RECTILINEAR_GRID'//ACHAR(10)
+               
+               WRITE(54321) 'DIMENSIONS '//ITOA(NX+1)//' '//ITOA(NY+1)//' '//ITOA(NZ+1)//ACHAR(10)
+
+               WRITE(54321) 'X_COORDINATES '//ITOA(NX+1)//' double'//ACHAR(10)
+               WRITE(54321) XNODES, ACHAR(10)
+
+               WRITE(54321) 'Y_COORDINATES '//ITOA(NY+1)//' double'//ACHAR(10)
+               WRITE(54321) YNODES, ACHAR(10)
+
+               WRITE(54321) 'Z_COORDINATES '//ITOA(NZ+1)//' double'//ACHAR(10)
+               WRITE(54321) ZNODES, ACHAR(10)
             ELSE IF (DIMS == 1) THEN
                WRITE(54321) 'DATASET RECTILINEAR_GRID'//ACHAR(10)
                
@@ -811,6 +832,20 @@ MODULE postprocess
                DO I = 1, U3D_GRID%NUM_CELLS
                   WRITE(54321,*) 10
                END DO
+
+            ELSE IF (DIMS == 0) THEN
+               WRITE(54321,'(A)') 'DATASET RECTILINEAR_GRID'
+               
+               WRITE(54321,'(A,I10,I10,I10)') 'DIMENSIONS', NX+1, NY+1, NZ+1
+
+               WRITE(54321,'(A,I10,A7)') 'X_COORDINATES', NX+1, 'double'
+               WRITE(54321,*) XNODES
+
+               WRITE(54321,'(A,I10,A7)') 'Y_COORDINATES', NY+1, 'double'
+               WRITE(54321,*) YNODES
+
+               WRITE(54321,'(A,I10,A7)') 'Z_COORDINATES', NZ+1, 'double'
+               WRITE(54321,*) ZNODES
             ELSE IF (DIMS == 1) THEN
                WRITE(54321,'(A)') 'DATASET RECTILINEAR_GRID'
                

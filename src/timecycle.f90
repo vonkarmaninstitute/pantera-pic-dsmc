@@ -1204,7 +1204,7 @@ MODULE timecycle
          V_NEW(2) = particles(IP)%VY
          V_NEW(3) = particles(IP)%VZ
 
-         IF (PIC_TYPE .NE. NONE) THEN
+         IF ((PIC_TYPE .NE. NONE) .OR. (DIMS == 0)) THEN
             !PHIBAR_FIELD = 0.d0
             !EBAR_FIELD = 0.d0
             CALL APPLY_E_FIELD(IP, E)
@@ -1213,6 +1213,7 @@ MODULE timecycle
             IF (BOOL_MAGNETIC_DIPOLE) CALL APPLY_B_DIPOLE_FIELD(IP, B)
 
             B = B + EXTERNAL_B_FIELD
+            E = E + EXTERNAL_E_FIELD
             ! CALL APPLY_RF_EB_FIELD(particles, IP, E, B)
             
 
@@ -2192,6 +2193,29 @@ MODULE timecycle
             END DO
       
          END IF 
+
+         IF (DIMS == 0) THEN
+            DO WHILE (particles(IP)%X .GT. XMAX)
+               particles(IP)%X = XMIN + (particles(IP)%X - XMAX)
+            END DO
+            DO WHILE (particles(IP)%X .LT. XMIN) 
+               particles(IP)%X = XMAX + (particles(IP)%X - XMIN)
+            END DO
+
+            DO WHILE (particles(IP)%Y .GT. YMAX)
+               particles(IP)%Y = YMIN + (particles(IP)%Y - YMAX)
+            END DO
+            DO WHILE (particles(IP)%Y .LT. YMIN) 
+               particles(IP)%Y = YMAX + (particles(IP)%Y - YMIN)
+            END DO
+
+            DO WHILE (particles(IP)%Z .GT. ZMAX)
+               particles(IP)%Z = ZMIN + (particles(IP)%Z - ZMAX)
+            END DO
+            DO WHILE (particles(IP)%Z .LT. ZMIN) 
+               particles(IP)%Z = ZMAX + (particles(IP)%Z - ZMIN)
+            END DO
+         END IF
 
          particles(IP)%DTRIM = DT ! For the next timestep.
 

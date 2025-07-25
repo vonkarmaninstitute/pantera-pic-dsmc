@@ -698,7 +698,7 @@ MODULE collisions
          FACTOR = 1
          IF (SP_ID1 == SP_ID2) FACTOR = 0.5
 
-         IF (GRID_TYPE == RECTILINEAR_UNIFORM .AND. DIMS == 2) THEN
+         IF (GRID_TYPE == RECTILINEAR_UNIFORM .AND. ((DIMS == 2) .OR. (DIMS == 0))) THEN
             VOL = CELL_VOL
          ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 1) THEN
             VOL = U1D_GRID%CELL_VOLUMES(JC)

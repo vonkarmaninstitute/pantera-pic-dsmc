@@ -155,6 +155,7 @@ MODULE initialization
          END IF
 
          IF (line=='External_B_field:') READ(in1,*) EXTERNAL_B_FIELD(1), EXTERNAL_B_FIELD(2), EXTERNAL_B_FIELD(3)
+         IF (line=='External_E_field:') READ(in1,*) EXTERNAL_E_FIELD(1), EXTERNAL_E_FIELD(2), EXTERNAL_E_FIELD(3)
 
          IF (line=='Magnetic_dipole:') THEN
             BOOL_MAGNETIC_DIPOLE = .TRUE.
@@ -2614,6 +2615,19 @@ MODULE initialization
    SUBROUTINE INPUT_DATA_SANITY_CHECK
 
       IMPLICIT NONE
+
+      ! ------------ Check for various values for 0D simulation ------------
+      IF (DIMS == 0 .AND. ((NX /= 1) .OR. (NY /= 1) .OR. (NZ /= 1))) THEN
+         CALL ERROR_ABORT('ERROR! Number of cells along all directions must be 1 for 0d simulation. ABORTING!')
+      END IF
+
+      IF (DIMS == 0 .AND. ((.NOT. BOOL_X_PERIODIC) .OR. (.NOT. BOOL_Y_PERIODIC) .OR. (.NOT. BOOL_Z_PERIODIC))) THEN
+         CALL ERROR_ABORT('ERROR! All boundaries must be set to periodic for 0d simulation. ABORTING!')
+      END IF
+
+      IF (DIMS == 0 .AND. (PIC_TYPE /= NONE)) THEN
+         CALL ERROR_ABORT('ERROR! None PIC type needs to be selected for 0d simulation. ABORTING!')
+      END IF
  
       ! ------------ Check values for number of cells ------------
       IF ( GRID_TYPE .NE. UNSTRUCTURED .AND. ((NX < 1) .OR. (NY < 1)) ) THEN

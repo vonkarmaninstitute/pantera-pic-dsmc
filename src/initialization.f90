@@ -3033,7 +3033,7 @@ MODULE initialization
                   FLUXSOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC*EMIT_TASKS(ITASK)%VDF%FLUX_DISTR(BETA,S_NORM)
                END IF
 
-               NtotINJECT = FLUXSOURCE*AREA*DT/FNUM/SPECIES(S_ID)%SPWT/SPECIES(S_ID)%MOLECULAR_MASS ! Tot num of particles to be injected
+               NtotINJECT = FLUXSOURCE*AREA*DT/FNUM/SPECIES(S_ID)%SPWT ! Tot num of particles to be injected
 
                TASK_NFS(IS) = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
                

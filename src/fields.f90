@@ -4498,7 +4498,7 @@ MODULE fields
                            VALUETOADD = VALUETOADD/6.
                         END IF
                         IF (GRID_BC(U1D_GRID%CELL_PG(I))%VOLUME_BC .NE. SOLID) THEN
-                           RHS_NEW(VP-1) = RHS_NEW(VP-1) + VALUETOADD*BOLTZ_SOLID_NODES(VQ)
+                           RHS_NEW(VP-1) = RHS_NEW(VP-1) + VALUETOADD
                         END IF
                      END DO
                   END IF
@@ -4583,7 +4583,6 @@ MODULE fields
 
                         IF (GRID_BC(U2D_GRID%CELL_PG(I))%VOLUME_BC .NE. SOLID) THEN
                            RHS_NEW(VP-1) = RHS_NEW(VP-1) + VALUETOADD
-
                         END IF
                      END DO
                   END IF
@@ -4634,7 +4633,6 @@ MODULE fields
 
                      IF (GRID_BC(U3D_GRID%CELL_PG(I))%VOLUME_BC .NE. SOLID) THEN
                         RHS_NEW(VP-1) = RHS_NEW(VP-1) + VALUETOADD
-
                      END IF
                   END DO
                END IF
@@ -4761,8 +4759,7 @@ MODULE fields
                            VALUETOADD = VALUETOADD/6.
                         END IF
                         IF (GRID_BC(U1D_GRID%CELL_PG(I))%VOLUME_BC .NE. SOLID) THEN
-
-                           CALL MatSetValue(jac,VP-1,VQ-1,VALUETOADD*BOLTZ_SOLID_NODES(VQ),ADD_VALUES,ierr)
+                           CALL MatSetValue(jac,VP-1,VQ-1,VALUETOADD,ADD_VALUES,ierr)
                         END IF
                      END DO
                   END IF

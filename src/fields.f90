@@ -6814,11 +6814,12 @@ MODULE fields
 
       IMPLICIT NONE
 
-      INTEGER :: I, IC, IP, FACE_PG
+      INTEGER :: I, IC, IP, IG, FACE_PG
       INTEGER :: V1, V2, V3, VV1, VV2, VV3, VE, VVE
       REAL(KIND=8) :: Y1, Y2, AREA
 
       REAL(KIND=8) :: GRAD_H, H_DOT
+      REAL(KIND=8) :: TOTAL_CHARGE
 
       IF (DIMS==2) THEN
          DO IC=1, NCELLS
@@ -6874,7 +6875,8 @@ MODULE fields
             DO IP=1, 4
                FACE_PG = U3D_GRID%CELL_FACES_PG(IP, IC)
                IF (FACE_PG == -1) CYCLE
-               IF (GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC .AND. GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
+               IF ((GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC .OR. GRID_BC(FACE_PG)%FIELD_BC == THIN_DIELECTRIC_LAYER_BC) &
+               .AND. GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
                   IF (IP == 1) THEN
                      VV1 = 1
                      VV2 = 3
@@ -6921,36 +6923,72 @@ MODULE fields
                         + DOT(U3D_GRID%BASIS_COEFFS(:,VV2,IC),U3D_GRID%FACE_NORMAL(:,IP,IC))&
                         + DOT(U3D_GRID%BASIS_COEFFS(:,VV3,IC),U3D_GRID%FACE_NORMAL(:,IP,IC))
 
-                  GRID_BC(FACE_PG)%TOP_FACTOR = GRID_BC(FACE_PG)%TOP_FACTOR + PHI_FIELD(VE)*GRAD_H*AREA
-                  GRID_BC(FACE_PG)%BOTTOM_FACTOR = GRID_BC(FACE_PG)%BOTTOM_FACTOR - H_DOT*AREA
+                  IF (GRID_BC(FACE_PG)%FIELD_BC == THIN_DIELECTRIC_LAYER_BC) THEN
+                     GRID_BC(FACE_PG)%TOP_FACTOR = GRID_BC(FACE_PG)%TOP_FACTOR + PHI_FIELD(VE)*GRAD_H*AREA*GRID_BC(FACE_PG)%EPS_REL
+                     GRID_BC(FACE_PG)%BOTTOM_FACTOR = GRID_BC(FACE_PG)%BOTTOM_FACTOR - H_DOT*AREA*GRID_BC(FACE_PG)%EPS_REL
+                  ELSE
+                     GRID_BC(FACE_PG)%TOP_FACTOR = GRID_BC(FACE_PG)%TOP_FACTOR + PHI_FIELD(VE)*GRAD_H*AREA
+                     GRID_BC(FACE_PG)%BOTTOM_FACTOR = GRID_BC(FACE_PG)%BOTTOM_FACTOR - H_DOT*AREA
+                  END IF
                END IF
             END DO
          END DO
       END IF
 
+      DO I = 1, N_CONNECTED_COND_SURFACES
+         CONNECTED_COND_SURFACES(I)%SUM_METAL_CHARGE = 0.d0
+         CONNECTED_COND_SURFACES(I)%SUM_TOP_FACTOR = 0.d0
+         CONNECTED_COND_SURFACES(I)%SUM_BOTTOM_FACTOR = 0.d0
+         DO IG = 1, CONNECTED_COND_SURFACES(I)%N_GROUPS
+            CONNECTED_COND_SURFACES(I)%SUM_METAL_CHARGE  = CONNECTED_COND_SURFACES(I)%SUM_METAL_CHARGE + &
+                                                           GRID_BC(CONNECTED_COND_SURFACES(I)%GROUP_ID(IG))%METAL_TOTAL_CHARGE
+            CONNECTED_COND_SURFACES(I)%SUM_TOP_FACTOR    = CONNECTED_COND_SURFACES(I)%SUM_TOP_FACTOR + &
+                                                           GRID_BC(CONNECTED_COND_SURFACES(I)%GROUP_ID(IG))%TOP_FACTOR
+            CONNECTED_COND_SURFACES(I)%SUM_BOTTOM_FACTOR = CONNECTED_COND_SURFACES(I)%SUM_BOTTOM_FACTOR + &
+                                                           GRID_BC(CONNECTED_COND_SURFACES(I)%GROUP_ID(IG))%BOTTOM_FACTOR
+         END DO
+
+         IF (PROC_ID .EQ. 0) THEN
+            CALL MPI_REDUCE(MPI_IN_PLACE, CONNECTED_COND_SURFACES(I)%SUM_METAL_CHARGE, &
+                           1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         ELSE
+            CALL MPI_REDUCE(CONNECTED_COND_SURFACES(I)%SUM_METAL_CHARGE , CONNECTED_COND_SURFACES(I)%SUM_METAL_CHARGE, &
+                           1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+         END IF
+      END DO
+
       DO I = 1, N_GRID_BC
          IF (GRID_BC(I)%FIELD_BC == CONDUCTIVE_BC) THEN
+            TOTAL_CHARGE = GRID_BC(I)%METAL_TOTAL_CHARGE
             IF (PROC_ID .EQ. 0) THEN
-               CALL MPI_REDUCE(MPI_IN_PLACE, GRID_BC(I)%METAL_TOTAL_CHARGE, &
+               CALL MPI_REDUCE(MPI_IN_PLACE, TOTAL_CHARGE, &
                               1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
             ELSE
-               CALL MPI_REDUCE(GRID_BC(I)%METAL_TOTAL_CHARGE , GRID_BC(I)%METAL_TOTAL_CHARGE, &
+               CALL MPI_REDUCE(TOTAL_CHARGE , TOTAL_CHARGE, &
                               1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-               GRID_BC(I)%METAL_TOTAL_CHARGE = 0.d0
             END IF
 
-            GRID_BC(I)%WALL_POTENTIAL = -(GRID_BC(I)%METAL_TOTAL_CHARGE + GRID_BC(I)%TOP_FACTOR)&
+            DO IG = 1, N_CONNECTED_COND_SURFACES
+               IF (ANY(CONNECTED_COND_SURFACES(IG)%GROUP_ID == I)) THEN      
+                  TOTAL_CHARGE = CONNECTED_COND_SURFACES(IG)%SUM_METAL_CHARGE
+                  GRID_BC(I)%TOP_FACTOR = CONNECTED_COND_SURFACES(IG)%SUM_TOP_FACTOR
+                  GRID_BC(I)%BOTTOM_FACTOR = CONNECTED_COND_SURFACES(IG)%SUM_BOTTOM_FACTOR
+               END IF
+            END DO
+            
+            CALL MPI_BCAST(TOTAL_CHARGE , 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+
+            GRID_BC(I)%WALL_POTENTIAL = -(TOTAL_CHARGE + GRID_BC(I)%TOP_FACTOR)&
                                        /GRID_BC(I)%BOTTOM_FACTOR
-            CALL MPI_BCAST(GRID_BC(I)%WALL_POTENTIAL , 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr) ! Share floating potential between processors
             GRID_BC(I)%TOP_FACTOR = 0.d0
             GRID_BC(I)%BOTTOM_FACTOR = 0.d0
 
 
             ! IF (PROC_ID == 0) THEN
             !    IF ((GRID_BC(I)%WALL_POTENTIAL .NE. 0) .OR. (GRID_BC(I)%METAL_TOTAL_CHARGE .NE. 0)) THEN
-               ! WRITE(*,*) 'Capacitance: ', GRID_BC(I)%METAL_TOTAL_CHARGE/GRID_BC(I)%WALL_POTENTIAL
-               ! WRITE(*,*) 'Potential: ', GRID_BC(I)%WALL_POTENTIAL
-               ! WRITE(*,*) 'Charge: ', GRID_BC(I)%METAL_TOTAL_CHARGE
+            !    WRITE(*,*) 'Capacitance: ', GRID_BC(I)%METAL_TOTAL_CHARGE/GRID_BC(I)%WALL_POTENTIAL
+            !    WRITE(*,*) 'Potential: ', GRID_BC(I)%WALL_POTENTIAL
+            !    WRITE(*,*) 'Charge: ', GRID_BC(I)%METAL_TOTAL_CHARGE
             !    WRITE(*,*) 'Bottom factor: ', GRID_BC(I)%BOTTOM_FACTOR
             !    WRITE(*,*) "------------"
             !    END IF

@@ -564,7 +564,8 @@ MODULE timecycle
                ! Charge leaving from a dielectric/conductive/ngspice surface               
                CHARGE = SPECIES(particleNOW%S_ID)%CHARGE
                SPWT = SPECIES(particleNOW%S_ID)%SPWT
-               IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. ABS(CHARGE) .GE. 1.d-6) THEN
+               IF ((GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .OR. GRID_BC(FACE_PG)%FIELD_BC==THIN_DIELECTRIC_LAYER_BC) &
+                .AND. ABS(CHARGE) .GE. 1.d-6) THEN
                   K = QE/(EPS0*EPS_SCALING**2)
                   IF (DIMS == 1) THEN
                      RHO_Q = K*CHARGE*FNUM*SPWT/(YMAX-YMIN)/(ZMAX-ZMIN)
@@ -1486,7 +1487,8 @@ MODULE timecycle
                         
                         CHARGE = SPECIES(particles(IP)%S_ID)%CHARGE
                         SPWT = SPECIES(particles(IP)%S_ID)%SPWT
-                        IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .AND. ABS(CHARGE) .GE. 1.d-6) THEN
+                        IF ( (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC .OR. GRID_BC(FACE_PG)%FIELD_BC==THIN_DIELECTRIC_LAYER_BC) &
+                         .AND. ABS(CHARGE) .GE. 1.d-6) THEN
                            K = QE/(EPS0*EPS_SCALING**2)
                            IF (DIMS == 1) THEN
                               RHO_Q = K*CHARGE*FNUM*SPWT/(YMAX-YMIN)/(ZMAX-ZMIN)

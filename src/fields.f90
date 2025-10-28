@@ -4436,7 +4436,7 @@ MODULE fields
       CHARACTER(LEN=512)  :: filename
 
       REAL(KIND=8) :: Y1, Y2, Y3, AREA, EPS_REL
-      INTEGER :: V1, V2, V3, I
+      INTEGER :: V1, V2, V3, I, FACE_PG
       INTEGER :: P, Q, VP, VQ
       REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD, KE, LENGTH
 
@@ -4635,6 +4635,32 @@ MODULE fields
                         RHS_NEW(VP-1) = RHS_NEW(VP-1) + VALUETOADD
                      END IF
                   END DO
+
+                  FACE_PG = U3D_GRID%CELL_FACES_PG(P,I)
+                  AREA = U3D_GRID%FACE_AREA(P,I)
+                  IF (FACE_PG .NE. -1) THEN
+                     IF (GRID_BC(FACE_PG)%FIELD_BC == THIN_DIELECTRIC_LAYER_BC) THEN
+                        IF (P == 1) THEN
+                           V2 = U3D_GRID%CELL_NODES(2,I)
+                           V3 = U3D_GRID%CELL_NODES(3,I)
+                        ELSE IF (P == 2) THEN
+                           V2 = U3D_GRID%CELL_NODES(1,I)
+                           V3 = U3D_GRID%CELL_NODES(4,I)
+                        ELSE IF (P == 3) THEN
+                           V2 = U3D_GRID%CELL_NODES(2,I)
+                           V3 = U3D_GRID%CELL_NODES(4,I)
+                        ELSE IF (P == 4) THEN
+                           V2 = U3D_GRID%CELL_NODES(1,I)
+                           V3 = U3D_GRID%CELL_NODES(3,I)
+                        END IF
+
+                        VALUETOADD = GRID_BC(FACE_PG)%EPS_REL/GRID_BC(FACE_PG)%LAYER_THICKNESS*AREA
+
+                        RHS_NEW(VP-1) = RHS_NEW(VP-1) + VALUETOADD*(PHI_FIELD_NEW(VP)/6. &
+                                       + PHI_FIELD_NEW(V2)/12. + PHI_FIELD_NEW(V3)/12.)
+                        
+                     END IF
+                  END IF
                END IF
             END DO
          END DO 
@@ -4681,11 +4707,11 @@ MODULE fields
       PetscBool      flg
       PetscScalar    mat_value
       INTEGER dummy(*)
-      INTEGER I, IC
+      INTEGER I, IC, FACE_PG
 
       REAL(KIND=8) :: Y1, Y2, Y3, EPS_REL
 
-      INTEGER :: V1, V2, V3
+      INTEGER :: IP, IQ, V1, V2, V3
       INTEGER :: P, Q, VP, VQ
       REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD, FACTOR, AREA, LENGTH
 
@@ -4897,6 +4923,34 @@ MODULE fields
                         END IF
                      END DO
                   END IF
+
+
+                  FACE_PG = U3D_GRID%CELL_FACES_PG(P,I)
+                  AREA = U3D_GRID%FACE_AREA(P,I)
+                  IF (FACE_PG .NE. -1) THEN
+                     IF (GRID_BC(FACE_PG)%FIELD_BC == THIN_DIELECTRIC_LAYER_BC) THEN
+                        IF (P == 1) THEN
+                           V2 = U3D_GRID%CELL_NODES(2,I)
+                           V3 = U3D_GRID%CELL_NODES(3,I)
+                        ELSE IF (P == 2) THEN
+                           V2 = U3D_GRID%CELL_NODES(1,I)
+                           V3 = U3D_GRID%CELL_NODES(4,I)
+                        ELSE IF (P == 3) THEN
+                           V2 = U3D_GRID%CELL_NODES(2,I)
+                           V3 = U3D_GRID%CELL_NODES(4,I)
+                        ELSE IF (P == 4) THEN
+                           V2 = U3D_GRID%CELL_NODES(1,I)
+                           V3 = U3D_GRID%CELL_NODES(3,I)
+                        END IF
+
+                        VALUETOADD = GRID_BC(FACE_PG)%EPS_REL/GRID_BC(FACE_PG)%LAYER_THICKNESS*AREA
+
+                        CALL MatSetValue(jac,VP-1,VP-1,VALUETOADD/6.,ADD_VALUES,ierr)
+                        CALL MatSetValue(jac,VP-1,V2-1,VALUETOADD/12.,ADD_VALUES,ierr)
+                        CALL MatSetValue(jac,VP-1,V3-1,VALUETOADD/12.,ADD_VALUES,ierr)
+                        
+                     END IF
+                  END IF
                END IF
             END DO
          END DO
@@ -5046,7 +5100,7 @@ MODULE fields
                         END IF
                      END IF
 
-                     IF(GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
+                     IF (GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
                         IF (AXI) THEN
                            GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE = GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE &
                            + CHARGE*(POT1*(4*Y1 + 2*Y2)+POT2*(2*Y1 + 4*Y2))/12.
@@ -5664,7 +5718,7 @@ MODULE fields
    SUBROUTINE SET_WALL_POTENTIAL ! Call this before deposit_charge!
 
       IMPLICIT NONE
-      INTEGER :: V1, V2, V3, V4, I, J, EDGE_PG
+      INTEGER :: V1, V2, V3, V4, I, J, IG, EDGE_PG
       REAL(KIND=8) :: POTENTIAL, TOTAL_CHARGE
 
       LOGICAL :: USE_SPICE = .FALSE.
@@ -5916,6 +5970,35 @@ MODULE fields
                            IS_DIRICHLET(V4-1) = .TRUE.
                            IS_DIRICHLET(V3-1) = .TRUE.
                         END IF
+                     END IF
+
+                     IF (GRID_BC(EDGE_PG)%FIELD_BC == THIN_DIELECTRIC_LAYER_BC) THEN
+
+                        DO IG = 1, N_CONNECTED_COND_SURFACES
+                           IF (ANY(CONNECTED_COND_SURFACES(IG)%GROUP_ID == EDGE_PG)) THEN      
+                              POTENTIAL = CONNECTED_COND_SURFACES(IG)%SURFACE_POTENTIAL
+                              EXIT
+                           END IF
+                        END DO
+
+                        IF (J==1) THEN
+                           RHS(V1-1) = RHS(V1-1) + POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS
+                           RHS(V3-1) = RHS(V3-1) + POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS
+                           RHS(V2-1) = RHS(V2-1) + POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS
+                        ELSE IF (J==2) THEN
+                           RHS(V1-1) = RHS(V1-1) + POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS
+                           RHS(V2-1) = RHS(V2-1) + POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS
+                           RHS(V4-1) = RHS(V4-1) + POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS
+                        ELSE IF (J == 3) THEN
+                           RHS(V2-1) = RHS(V2-1) + POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS
+                           RHS(V3-1) = RHS(V3-1) + POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS
+                           RHS(V4-1) = RHS(V4-1) + POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS
+                        ELSE
+                           RHS(V1-1) = RHS(V1-1) + POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS
+                           RHS(V4-1) = RHS(V4-1) + POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS
+                           RHS(V3-1) = RHS(V3-1) + POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS
+                        END IF
+
                      END IF
                   END IF
                END DO
@@ -6982,6 +7065,13 @@ MODULE fields
                                        /GRID_BC(I)%BOTTOM_FACTOR
             GRID_BC(I)%TOP_FACTOR = 0.d0
             GRID_BC(I)%BOTTOM_FACTOR = 0.d0
+
+            DO IG = 1, N_CONNECTED_COND_SURFACES
+               IF (ANY(CONNECTED_COND_SURFACES(IG)%GROUP_ID == I)) THEN      
+                  CONNECTED_COND_SURFACES(IG)%SURFACE_POTENTIAL = GRID_BC(I)%WALL_POTENTIAL
+                  CYCLE
+               END IF
+            END DO
 
 
             ! IF (PROC_ID == 0) THEN

@@ -1288,7 +1288,7 @@ MODULE initialization
          IF (IPG == -1) THEN 
             WRITE(*,*) 'Group ', STRARRAY(I), ' not found.'
             CALL ERROR_ABORT('Error in boundary definition. Group name not found.')
-         ELSE IF ((GRID_BC(IPG)%FIELD_BC .NE. CONDUCTIVE_BC) .OR. (GRID_BC(IPG)%FIELD_BC .NE. THIN_DIELECTRIC_LAYER_BC)) THEN
+         ELSE IF ((GRID_BC(IPG)%FIELD_BC .NE. CONDUCTIVE_BC) .AND. (GRID_BC(IPG)%FIELD_BC .NE. THIN_DIELECTRIC_LAYER_BC)) THEN
             WRITE(*,*) 'Group ', STRARRAY(I), ' is not conductive.'
             CALL ERROR_ABORT('Error in boundary definition. Group must be conductive.')
          ELSE

@@ -4436,8 +4436,8 @@ MODULE fields
       CHARACTER(LEN=512)  :: filename
 
       REAL(KIND=8) :: Y1, Y2, Y3, AREA, EPS_REL
-      INTEGER :: V1, V2, V3, I, FACE_PG
-      INTEGER :: P, Q, VP, VQ
+      INTEGER :: V1, V2, V3, I, FACE_PG, VV1, VV2, VV3
+      INTEGER :: IP, P, Q, VP, VQ
       REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD, KE, LENGTH
 
       IF (MOD(tID, STATS_EVERY) .EQ. 0) CALL ONLYMASTERPRINT1(PROC_ID, 'FormFunctionBoltz Called')
@@ -4635,31 +4635,52 @@ MODULE fields
                         RHS_NEW(VP-1) = RHS_NEW(VP-1) + VALUETOADD
                      END IF
                   END DO
+               END IF
+            END DO
 
-                  FACE_PG = U3D_GRID%CELL_FACES_PG(P,I)
-                  AREA = U3D_GRID%FACE_AREA(P,I)
-                  IF (FACE_PG .NE. -1) THEN
-                     IF (GRID_BC(FACE_PG)%FIELD_BC == THIN_DIELECTRIC_LAYER_BC) THEN
-                        IF (P == 1) THEN
-                           V2 = U3D_GRID%CELL_NODES(2,I)
-                           V3 = U3D_GRID%CELL_NODES(3,I)
-                        ELSE IF (P == 2) THEN
-                           V2 = U3D_GRID%CELL_NODES(1,I)
-                           V3 = U3D_GRID%CELL_NODES(4,I)
-                        ELSE IF (P == 3) THEN
-                           V2 = U3D_GRID%CELL_NODES(2,I)
-                           V3 = U3D_GRID%CELL_NODES(4,I)
-                        ELSE IF (P == 4) THEN
-                           V2 = U3D_GRID%CELL_NODES(1,I)
-                           V3 = U3D_GRID%CELL_NODES(3,I)
-                        END IF
+            DO IP = 1, 4
 
-                        VALUETOADD = GRID_BC(FACE_PG)%EPS_REL/GRID_BC(FACE_PG)%LAYER_THICKNESS*AREA
-
-                        RHS_NEW(VP-1) = RHS_NEW(VP-1) + VALUETOADD*(PHI_FIELD_NEW(VP)/6. &
-                                       + PHI_FIELD_NEW(V2)/12. + PHI_FIELD_NEW(V3)/12.)
-                        
+               FACE_PG = U3D_GRID%CELL_FACES_PG(IP,I)
+               AREA = U3D_GRID%FACE_AREA(IP,I)
+               IF (FACE_PG .NE. -1) THEN
+                  IF (GRID_BC(FACE_PG)%FIELD_BC == THIN_DIELECTRIC_LAYER_BC) THEN
+                     IF (IP == 1) THEN
+                        VV1 = 1
+                        VV2 = 3
+                        VV3 = 2
+                     ELSE IF (IP == 2) THEN
+                        VV1 = 1
+                        VV2 = 2
+                        VV3 = 4
+                     ELSE IF (IP == 3) THEN
+                        VV1 = 2
+                        VV2 = 3
+                        VV3 = 4
+                     ELSE IF (IP == 4) THEN
+                        VV1 = 1
+                        VV2 = 4
+                        VV3 = 3
                      END IF
+
+                     V1 = U3D_GRID%CELL_NODES(VV1,I)
+                     V2 = U3D_GRID%CELL_NODES(VV2,I)
+                     V3 = U3D_GRID%CELL_NODES(VV3,I) 
+
+                     VALUETOADD = GRID_BC(FACE_PG)%EPS_REL/GRID_BC(FACE_PG)%LAYER_THICKNESS*AREA
+
+                     IF (V1-1 >= Istart .AND. V1-1 < Iend) THEN
+                        RHS_NEW(V1-1) = RHS_NEW(V1-1) + VALUETOADD*(PHI_FIELD_NEW(V1)/6. &
+                                    + PHI_FIELD_NEW(V2)/12. + PHI_FIELD_NEW(V3)/12.)
+                     END IF
+                     IF (V2-1 >= Istart .AND. V2-1 < Iend) THEN
+                        RHS_NEW(V2-1) = RHS_NEW(V2-1) + VALUETOADD*(PHI_FIELD_NEW(V2)/6. &
+                                    + PHI_FIELD_NEW(V1)/12. + PHI_FIELD_NEW(V3)/12.)
+                     END IF
+                     IF (V3-1 >= Istart .AND. V3-1 < Iend) THEN
+                        RHS_NEW(V3-1) = RHS_NEW(V3-1) + VALUETOADD*(PHI_FIELD_NEW(V3)/6. &
+                                    + PHI_FIELD_NEW(V2)/12. + PHI_FIELD_NEW(V1)/12.)
+                     END IF
+                     
                   END IF
                END IF
             END DO
@@ -4711,7 +4732,7 @@ MODULE fields
 
       REAL(KIND=8) :: Y1, Y2, Y3, EPS_REL
 
-      INTEGER :: IP, IQ, V1, V2, V3
+      INTEGER :: IP, IQ, V1, V2, V3, VV1, VV2, VV3
       INTEGER :: P, Q, VP, VQ
       REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD, FACTOR, AREA, LENGTH
 
@@ -4924,32 +4945,55 @@ MODULE fields
                      END DO
                   END IF
 
+               END IF
+            END DO
 
-                  FACE_PG = U3D_GRID%CELL_FACES_PG(P,I)
-                  AREA = U3D_GRID%FACE_AREA(P,I)
-                  IF (FACE_PG .NE. -1) THEN
-                     IF (GRID_BC(FACE_PG)%FIELD_BC == THIN_DIELECTRIC_LAYER_BC) THEN
-                        IF (P == 1) THEN
-                           V2 = U3D_GRID%CELL_NODES(2,I)
-                           V3 = U3D_GRID%CELL_NODES(3,I)
-                        ELSE IF (P == 2) THEN
-                           V2 = U3D_GRID%CELL_NODES(1,I)
-                           V3 = U3D_GRID%CELL_NODES(4,I)
-                        ELSE IF (P == 3) THEN
-                           V2 = U3D_GRID%CELL_NODES(2,I)
-                           V3 = U3D_GRID%CELL_NODES(4,I)
-                        ELSE IF (P == 4) THEN
-                           V2 = U3D_GRID%CELL_NODES(1,I)
-                           V3 = U3D_GRID%CELL_NODES(3,I)
-                        END IF
+            DO IP = 1, 4
 
-                        VALUETOADD = GRID_BC(FACE_PG)%EPS_REL/GRID_BC(FACE_PG)%LAYER_THICKNESS*AREA
-
-                        CALL MatSetValue(jac,VP-1,VP-1,VALUETOADD/6.,ADD_VALUES,ierr)
-                        CALL MatSetValue(jac,VP-1,V2-1,VALUETOADD/12.,ADD_VALUES,ierr)
-                        CALL MatSetValue(jac,VP-1,V3-1,VALUETOADD/12.,ADD_VALUES,ierr)
-                        
+               FACE_PG = U3D_GRID%CELL_FACES_PG(IP,I)
+               AREA = U3D_GRID%FACE_AREA(IP,I)
+               IF (FACE_PG .NE. -1) THEN
+                  IF (GRID_BC(FACE_PG)%FIELD_BC == THIN_DIELECTRIC_LAYER_BC) THEN
+                     IF (IP == 1) THEN
+                        VV1 = 1
+                        VV2 = 3
+                        VV3 = 2
+                     ELSE IF (IP == 2) THEN
+                        VV1 = 1
+                        VV2 = 2
+                        VV3 = 4
+                     ELSE IF (IP == 3) THEN
+                        VV1 = 2
+                        VV2 = 3
+                        VV3 = 4
+                     ELSE IF (IP == 4) THEN
+                        VV1 = 1
+                        VV2 = 4
+                        VV3 = 3
                      END IF
+
+                     V1 = U3D_GRID%CELL_NODES(VV1,I)
+                     V2 = U3D_GRID%CELL_NODES(VV2,I)
+                     V3 = U3D_GRID%CELL_NODES(VV3,I) 
+
+                     VALUETOADD = GRID_BC(FACE_PG)%EPS_REL/GRID_BC(FACE_PG)%LAYER_THICKNESS*AREA
+
+                     IF (V1-1 >= Istart .AND. V1-1 < Iend) THEN
+                        CALL MatSetValue(jac,V1-1,V1-1,VALUETOADD/6.,ADD_VALUES,ierr)
+                        CALL MatSetValue(jac,V1-1,V2-1,VALUETOADD/12.,ADD_VALUES,ierr)
+                        CALL MatSetValue(jac,V1-1,V3-1,VALUETOADD/12.,ADD_VALUES,ierr)
+                     END IF
+                     IF (V2-1 >= Istart .AND. V2-1 < Iend) THEN
+                        CALL MatSetValue(jac,V2-1,V2-1,VALUETOADD/6.,ADD_VALUES,ierr)
+                        CALL MatSetValue(jac,V2-1,V1-1,VALUETOADD/12.,ADD_VALUES,ierr)
+                        CALL MatSetValue(jac,V2-1,V3-1,VALUETOADD/12.,ADD_VALUES,ierr)
+                     END IF
+                     IF (V3-1 >= Istart .AND. V3-1 < Iend) THEN
+                        CALL MatSetValue(jac,V3-1,V3-1,VALUETOADD/6.,ADD_VALUES,ierr)
+                        CALL MatSetValue(jac,V3-1,V2-1,VALUETOADD/12.,ADD_VALUES,ierr)
+                        CALL MatSetValue(jac,V3-1,V1-1,VALUETOADD/12.,ADD_VALUES,ierr)
+                     END IF
+                     
                   END IF
                END IF
             END DO
@@ -5711,7 +5755,7 @@ MODULE fields
                      END IF
                   END DO
 
-                  AREA = U3D_GRID%CELL_FACES_PG(J, I)
+                  AREA = U3D_GRID%FACE_AREA(J, I)
 
                   IF (J==1) THEN
                      RHS(V1-1) = RHS(V1-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.

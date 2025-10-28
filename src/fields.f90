@@ -5596,6 +5596,9 @@ MODULE fields
       TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), INTENT(IN) :: part_adv
       INTEGER :: JP, I, IC
 
+      INTEGER :: J, EDGE_PG, V1, V2, V3, V4, IG
+      REAL(KIND=8) :: AREA, POTENTIAL
+
       REAL(KIND=8) :: K, RHO_Q, CHARGE
       REAL(KIND=8) :: VOL, CFNUM, SPWT
       REAL(KIND=8), DIMENSION(4) :: WEIGHTS
@@ -5687,6 +5690,51 @@ MODULE fields
       END IF
 
       CALL MPI_BCAST(RHS, SIZE, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+
+      DO I = 1, NCELLS
+
+         V1 = U3D_GRID%CELL_NODES(1,I)
+         V2 = U3D_GRID%CELL_NODES(2,I)
+         V3 = U3D_GRID%CELL_NODES(3,I)
+         V4 = U3D_GRID%CELL_NODES(4,I)
+
+         DO J = 1, 4
+            EDGE_PG = U3D_GRID%CELL_FACES_PG(J, I)
+
+            IF (EDGE_PG .NE. -1) THEN
+               IF (GRID_BC(EDGE_PG)%FIELD_BC == THIN_DIELECTRIC_LAYER_BC) THEN
+
+                  DO IG = 1, N_CONNECTED_COND_SURFACES
+                     IF (ANY(CONNECTED_COND_SURFACES(IG)%GROUP_ID == EDGE_PG)) THEN      
+                        POTENTIAL = CONNECTED_COND_SURFACES(IG)%SURFACE_POTENTIAL
+                        EXIT
+                     END IF
+                  END DO
+
+                  AREA = U3D_GRID%CELL_FACES_PG(J, I)
+
+                  IF (J==1) THEN
+                     RHS(V1-1) = RHS(V1-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
+                     RHS(V3-1) = RHS(V3-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
+                     RHS(V2-1) = RHS(V2-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
+                  ELSE IF (J==2) THEN
+                     RHS(V1-1) = RHS(V1-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
+                     RHS(V2-1) = RHS(V2-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
+                     RHS(V4-1) = RHS(V4-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
+                  ELSE IF (J == 3) THEN
+                     RHS(V2-1) = RHS(V2-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
+                     RHS(V3-1) = RHS(V3-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
+                     RHS(V4-1) = RHS(V4-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
+                  ELSE
+                     RHS(V1-1) = RHS(V1-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
+                     RHS(V4-1) = RHS(V4-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
+                     RHS(V3-1) = RHS(V3-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
+                  END IF
+
+               END IF
+            END IF
+         END DO
+      END DO
 
 
       DO I = Istart, Iend-1
@@ -5972,37 +6020,6 @@ MODULE fields
                            IS_DIRICHLET(V4-1) = .TRUE.
                            IS_DIRICHLET(V3-1) = .TRUE.
                         END IF
-                     END IF
-
-                     IF (GRID_BC(EDGE_PG)%FIELD_BC == THIN_DIELECTRIC_LAYER_BC) THEN
-
-                        DO IG = 1, N_CONNECTED_COND_SURFACES
-                           IF (ANY(CONNECTED_COND_SURFACES(IG)%GROUP_ID == EDGE_PG)) THEN      
-                              POTENTIAL = CONNECTED_COND_SURFACES(IG)%SURFACE_POTENTIAL
-                              EXIT
-                           END IF
-                        END DO
-
-                        AREA = U3D_GRID%CELL_FACES_PG(J, I)
-
-                        IF (J==1) THEN
-                           RHS(V1-1) = RHS(V1-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
-                           RHS(V3-1) = RHS(V3-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
-                           RHS(V2-1) = RHS(V2-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
-                        ELSE IF (J==2) THEN
-                           RHS(V1-1) = RHS(V1-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
-                           RHS(V2-1) = RHS(V2-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
-                           RHS(V4-1) = RHS(V4-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
-                        ELSE IF (J == 3) THEN
-                           RHS(V2-1) = RHS(V2-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
-                           RHS(V3-1) = RHS(V3-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
-                           RHS(V4-1) = RHS(V4-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
-                        ELSE
-                           RHS(V1-1) = RHS(V1-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
-                           RHS(V4-1) = RHS(V4-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
-                           RHS(V3-1) = RHS(V3-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
-                        END IF
-
                      END IF
                   END IF
                END DO

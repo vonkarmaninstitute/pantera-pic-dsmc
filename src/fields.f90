@@ -4637,53 +4637,6 @@ MODULE fields
                   END DO
                END IF
             END DO
-
-            DO IP = 1, 4
-
-               FACE_PG = U3D_GRID%CELL_FACES_PG(IP,I)
-               AREA = U3D_GRID%FACE_AREA(IP,I)
-               IF (FACE_PG .NE. -1) THEN
-                  IF (GRID_BC(FACE_PG)%FIELD_BC == THIN_DIELECTRIC_LAYER_BC) THEN
-                     IF (IP == 1) THEN
-                        VV1 = 1
-                        VV2 = 3
-                        VV3 = 2
-                     ELSE IF (IP == 2) THEN
-                        VV1 = 1
-                        VV2 = 2
-                        VV3 = 4
-                     ELSE IF (IP == 3) THEN
-                        VV1 = 2
-                        VV2 = 3
-                        VV3 = 4
-                     ELSE IF (IP == 4) THEN
-                        VV1 = 1
-                        VV2 = 4
-                        VV3 = 3
-                     END IF
-
-                     V1 = U3D_GRID%CELL_NODES(VV1,I)
-                     V2 = U3D_GRID%CELL_NODES(VV2,I)
-                     V3 = U3D_GRID%CELL_NODES(VV3,I) 
-
-                     VALUETOADD = GRID_BC(FACE_PG)%EPS_REL/GRID_BC(FACE_PG)%LAYER_THICKNESS*AREA
-
-                     IF (V1-1 >= Istart .AND. V1-1 < Iend) THEN
-                        RHS_NEW(V1-1) = RHS_NEW(V1-1) + VALUETOADD*(PHI_FIELD_NEW(V1)/6. &
-                                    + PHI_FIELD_NEW(V2)/12. + PHI_FIELD_NEW(V3)/12.)
-                     END IF
-                     IF (V2-1 >= Istart .AND. V2-1 < Iend) THEN
-                        RHS_NEW(V2-1) = RHS_NEW(V2-1) + VALUETOADD*(PHI_FIELD_NEW(V2)/6. &
-                                    + PHI_FIELD_NEW(V1)/12. + PHI_FIELD_NEW(V3)/12.)
-                     END IF
-                     IF (V3-1 >= Istart .AND. V3-1 < Iend) THEN
-                        RHS_NEW(V3-1) = RHS_NEW(V3-1) + VALUETOADD*(PHI_FIELD_NEW(V3)/6. &
-                                    + PHI_FIELD_NEW(V2)/12. + PHI_FIELD_NEW(V1)/12.)
-                     END IF
-                     
-                  END IF
-               END IF
-            END DO
          END DO 
       END IF
 
@@ -4947,56 +4900,6 @@ MODULE fields
 
                END IF
             END DO
-
-            DO IP = 1, 4
-
-               FACE_PG = U3D_GRID%CELL_FACES_PG(IP,I)
-               AREA = U3D_GRID%FACE_AREA(IP,I)
-               IF (FACE_PG .NE. -1) THEN
-                  IF (GRID_BC(FACE_PG)%FIELD_BC == THIN_DIELECTRIC_LAYER_BC) THEN
-                     IF (IP == 1) THEN
-                        VV1 = 1
-                        VV2 = 3
-                        VV3 = 2
-                     ELSE IF (IP == 2) THEN
-                        VV1 = 1
-                        VV2 = 2
-                        VV3 = 4
-                     ELSE IF (IP == 3) THEN
-                        VV1 = 2
-                        VV2 = 3
-                        VV3 = 4
-                     ELSE IF (IP == 4) THEN
-                        VV1 = 1
-                        VV2 = 4
-                        VV3 = 3
-                     END IF
-
-                     V1 = U3D_GRID%CELL_NODES(VV1,I)
-                     V2 = U3D_GRID%CELL_NODES(VV2,I)
-                     V3 = U3D_GRID%CELL_NODES(VV3,I) 
-
-                     VALUETOADD = GRID_BC(FACE_PG)%EPS_REL/GRID_BC(FACE_PG)%LAYER_THICKNESS*AREA
-
-                     IF (V1-1 >= Istart .AND. V1-1 < Iend) THEN
-                        CALL MatSetValue(jac,V1-1,V1-1,VALUETOADD/6.,ADD_VALUES,ierr)
-                        CALL MatSetValue(jac,V1-1,V2-1,VALUETOADD/12.,ADD_VALUES,ierr)
-                        CALL MatSetValue(jac,V1-1,V3-1,VALUETOADD/12.,ADD_VALUES,ierr)
-                     END IF
-                     IF (V2-1 >= Istart .AND. V2-1 < Iend) THEN
-                        CALL MatSetValue(jac,V2-1,V2-1,VALUETOADD/6.,ADD_VALUES,ierr)
-                        CALL MatSetValue(jac,V2-1,V1-1,VALUETOADD/12.,ADD_VALUES,ierr)
-                        CALL MatSetValue(jac,V2-1,V3-1,VALUETOADD/12.,ADD_VALUES,ierr)
-                     END IF
-                     IF (V3-1 >= Istart .AND. V3-1 < Iend) THEN
-                        CALL MatSetValue(jac,V3-1,V3-1,VALUETOADD/6.,ADD_VALUES,ierr)
-                        CALL MatSetValue(jac,V3-1,V2-1,VALUETOADD/12.,ADD_VALUES,ierr)
-                        CALL MatSetValue(jac,V3-1,V1-1,VALUETOADD/12.,ADD_VALUES,ierr)
-                     END IF
-                     
-                  END IF
-               END IF
-            END DO
          END DO
       END IF
 
@@ -5192,8 +5095,7 @@ MODULE fields
                   IF (FACE_PG == -1) CYCLE
 
                   IF ((GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC &
-                     .OR. GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC &
-                     .OR. GRID_BC(FACE_PG)%FIELD_BC == THIN_DIELECTRIC_LAYER_BC) &
+                     .OR. GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC) &
                       .AND. GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
                      IF (IP == 1) THEN
                         VV1 = 1
@@ -5234,11 +5136,14 @@ MODULE fields
                         **(-KAPPA_FLUID_C+1.)
                      END IF
 
-                     IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC&
-                        .OR. GRID_BC(FACE_PG)%FIELD_BC == THIN_DIELECTRIC_LAYER_BC) THEN
+                     IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC) THEN
                         SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + CHARGE*(POT1/6. + POT2/12. + POT3/12.)
                         SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) + CHARGE*(POT1/12. + POT2/6. + POT3/12.)
                         SURFACE_CHARGE(V3) = SURFACE_CHARGE(V3) + CHARGE*(POT1/12. + POT2/12. + POT3/6.)
+                     END IF
+
+                     IF(GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
+                        GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE = GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE + CHARGE*(POT1+POT2+POT3)/3.
                      END IF
 
                      ! Aurora flux test
@@ -5259,9 +5164,6 @@ MODULE fields
                      !    SURFACE_CHARGE(V3) = SURFACE_CHARGE(V3) + FACTOR/3
                      ! END IF
 
-                     IF(GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
-                        GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE = GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE + CHARGE*(POT1+POT2+POT3)/3.
-                     END IF
 
                   ELSE IF (GRID_BC(FACE_PG)%FIELD_BC == SPICE_NODE_BC &
                      .AND. GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
@@ -5640,8 +5542,6 @@ MODULE fields
       TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), INTENT(IN) :: part_adv
       INTEGER :: JP, I, IC
 
-      INTEGER :: J, EDGE_PG, V1, V2, V3, V4, IG
-      REAL(KIND=8) :: AREA, POTENTIAL
 
       REAL(KIND=8) :: K, RHO_Q, CHARGE
       REAL(KIND=8) :: VOL, CFNUM, SPWT
@@ -5734,51 +5634,6 @@ MODULE fields
       END IF
 
       CALL MPI_BCAST(RHS, SIZE, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-
-      DO I = 1, NCELLS
-
-         V1 = U3D_GRID%CELL_NODES(1,I)
-         V2 = U3D_GRID%CELL_NODES(2,I)
-         V3 = U3D_GRID%CELL_NODES(3,I)
-         V4 = U3D_GRID%CELL_NODES(4,I)
-
-         DO J = 1, 4
-            EDGE_PG = U3D_GRID%CELL_FACES_PG(J, I)
-
-            IF (EDGE_PG .NE. -1) THEN
-               IF (GRID_BC(EDGE_PG)%FIELD_BC == THIN_DIELECTRIC_LAYER_BC) THEN
-
-                  DO IG = 1, N_CONNECTED_COND_SURFACES
-                     IF (ANY(CONNECTED_COND_SURFACES(IG)%GROUP_ID == EDGE_PG)) THEN      
-                        POTENTIAL = CONNECTED_COND_SURFACES(IG)%SURFACE_POTENTIAL
-                        EXIT
-                     END IF
-                  END DO
-
-                  AREA = U3D_GRID%FACE_AREA(J, I)
-
-                  IF (J==1) THEN
-                     RHS(V1-1) = RHS(V1-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
-                     RHS(V3-1) = RHS(V3-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
-                     RHS(V2-1) = RHS(V2-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
-                  ELSE IF (J==2) THEN
-                     RHS(V1-1) = RHS(V1-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
-                     RHS(V2-1) = RHS(V2-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
-                     RHS(V4-1) = RHS(V4-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
-                  ELSE IF (J == 3) THEN
-                     RHS(V2-1) = RHS(V2-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
-                     RHS(V3-1) = RHS(V3-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
-                     RHS(V4-1) = RHS(V4-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
-                  ELSE
-                     RHS(V1-1) = RHS(V1-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
-                     RHS(V4-1) = RHS(V4-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
-                     RHS(V3-1) = RHS(V3-1) + AREA*POTENTIAL*GRID_BC(EDGE_PG)%EPS_REL/GRID_BC(EDGE_PG)%LAYER_THICKNESS/3.
-                  END IF
-
-               END IF
-            END IF
-         END DO
-      END DO
 
 
       DO I = Istart, Iend-1
@@ -7023,8 +6878,7 @@ MODULE fields
             DO IP=1, 4
                FACE_PG = U3D_GRID%CELL_FACES_PG(IP, IC)
                IF (FACE_PG == -1) CYCLE
-               IF ((GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC .OR. GRID_BC(FACE_PG)%FIELD_BC == THIN_DIELECTRIC_LAYER_BC) &
-               .AND. GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
+               IF (GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC .AND. GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
                   IF (IP == 1) THEN
                      VV1 = 1
                      VV2 = 3
@@ -7071,13 +6925,8 @@ MODULE fields
                         + DOT(U3D_GRID%BASIS_COEFFS(:,VV2,IC),U3D_GRID%FACE_NORMAL(:,IP,IC))&
                         + DOT(U3D_GRID%BASIS_COEFFS(:,VV3,IC),U3D_GRID%FACE_NORMAL(:,IP,IC))
 
-                  IF (GRID_BC(FACE_PG)%FIELD_BC == THIN_DIELECTRIC_LAYER_BC) THEN
-                     GRID_BC(FACE_PG)%TOP_FACTOR = GRID_BC(FACE_PG)%TOP_FACTOR + PHI_FIELD(VE)*GRAD_H*AREA*GRID_BC(FACE_PG)%EPS_REL
-                     GRID_BC(FACE_PG)%BOTTOM_FACTOR = GRID_BC(FACE_PG)%BOTTOM_FACTOR - H_DOT*AREA*GRID_BC(FACE_PG)%EPS_REL
-                  ELSE
-                     GRID_BC(FACE_PG)%TOP_FACTOR = GRID_BC(FACE_PG)%TOP_FACTOR + PHI_FIELD(VE)*GRAD_H*AREA
-                     GRID_BC(FACE_PG)%BOTTOM_FACTOR = GRID_BC(FACE_PG)%BOTTOM_FACTOR - H_DOT*AREA
-                  END IF
+                  GRID_BC(FACE_PG)%TOP_FACTOR = GRID_BC(FACE_PG)%TOP_FACTOR + PHI_FIELD(VE)*GRAD_H*AREA
+                  GRID_BC(FACE_PG)%BOTTOM_FACTOR = GRID_BC(FACE_PG)%BOTTOM_FACTOR - H_DOT*AREA
                END IF
             END DO
          END DO

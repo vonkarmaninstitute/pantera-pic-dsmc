@@ -51,8 +51,11 @@ MODULE fields
    SNESLineSearch linesearch
    PetscViewer viewer
    IS rowperm, colperm
-   MatFactorInfo  info(MAT_FACTORINFO_SIZE)
+   MatFactorInfo  info
    PetscBool flg, matrix_free
+
+   VecScatter :: scatter_ctx
+   Vec :: x_seq_global
 
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: CELL_NE, CELL_TE
 
@@ -118,7 +121,7 @@ MODULE fields
       CALL MatSetSizes( Amat,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
       CALL MatSetType( Amat, MATMPIAIJ, ierr)
       !CALL MatSetOption(Amat,MAT_SPD,PETSC_TRUE,ierr)
-      CALL MatMPIAIJSetPreallocation(Amat,100,PETSC_NULL_INTEGER,100,PETSC_NULL_INTEGER, ierr)
+      CALL MatMPIAIJSetPreallocation(Amat,100,PETSC_NULL_INTEGER_ARRAY,100,PETSC_NULL_INTEGER_ARRAY, ierr)
       CALL MatSetFromOptions( Amat, ierr)
       CALL MatSetUp( Amat, ierr)
       CALL MatGetOwnershipRange( Amat, Istart, Iend, ierr)
@@ -769,7 +772,7 @@ MODULE fields
       CALL MatSetSizes( Amat,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
       CALL MatSetType( Amat, MATMPIAIJ, ierr)
       !CALL MatSetOption(Amat,MAT_SPD,PETSC_TRUE,ierr)
-      CALL MatMPIAIJSetPreallocation(Amat,30,PETSC_NULL_INTEGER,30,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
+      CALL MatMPIAIJSetPreallocation(Amat,30,PETSC_NULL_INTEGER_ARRAY,30,PETSC_NULL_INTEGER_ARRAY, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
       CALL MatSetFromOptions( Amat, ierr)
       CALL MatSetUp( Amat, ierr)
       CALL MatGetOwnershipRange( Amat, Istart, Iend, ierr)
@@ -1292,10 +1295,10 @@ MODULE fields
       CALL VecScatterBegin(ctx,xvec,X_SEQ,INSERT_VALUES,SCATTER_FORWARD,ierr)
       CALL VecScatterEnd(ctx,xvec,X_SEQ,INSERT_VALUES,SCATTER_FORWARD,ierr)
 
-      CALL VecGetArrayReadF90(X_SEQ,PHI_FIELD_TEMP,ierr)
+      CALL VecGetArrayRead(X_SEQ,PHI_FIELD_TEMP,ierr)
       DEALLOCATE(PHIBAR_FIELD)
       ALLOCATE(PHIBAR_FIELD, SOURCE = PHI_FIELD_TEMP)
-      CALL VecRestoreArrayReadF90(X_SEQ,PHI_FIELD_TEMP,ierr)
+      CALL VecRestoreArrayRead(X_SEQ,PHI_FIELD_TEMP,ierr)
 
       PHI_FIELD = 2*PHIBAR_FIELD-PHI_FIELD
 
@@ -1517,7 +1520,7 @@ MODULE fields
 
 
       !CALL MatSetOption(Jmat,MAT_SPD,PETSC_TRUE,ierr)
-      !CALL MatMPIAIJSetPreallocation(Jmat,30,PETSC_NULL_INTEGER,30,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
+      !CALL MatMPIAIJSetPreallocation(Jmat,30,PETSC_NULL_INTEGER_ARRAY,30,PETSC_NULL_INTEGER_ARRAY,ierr) ! DBDBDBDBDBDB Large preallocation!
       !CALL MatSetFromOptions(Jmat,ierr)
       !CALL MatSetUp(Jmat,ierr)
 
@@ -1576,9 +1579,9 @@ MODULE fields
          CALL VecSet(solvec,0.d0,ierr)
       ELSE
          CALL VecGetOwnershipRange(solvec,Istart,Iend,ierr)
-         CALL VecGetArrayF90(solvec,solvec_l,ierr)
+         CALL VecGetArray(solvec,solvec_l,ierr)
          solvec_l = PHI_FIELD(Istart+1:Iend)
-         CALL VecRestoreArrayF90(solvec,solvec_l,ierr)
+         CALL VecRestoreArray(solvec,solvec_l,ierr)
       END IF
       
       ! Test the jacobian
@@ -1603,10 +1606,10 @@ MODULE fields
       CALL VecScatterEnd(ctx,solvec,solvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
       CALL VecScatterDestroy(ctx, ierr)
 
-      CALL VecGetArrayReadF90(solvec_seq,PHI_FIELD_TEMP,ierr)
+      CALL VecGetArrayRead(solvec_seq,PHI_FIELD_TEMP,ierr)
       IF (ALLOCATED(PHIBAR_FIELD)) DEALLOCATE(PHIBAR_FIELD)
       ALLOCATE(PHIBAR_FIELD, SOURCE = PHI_FIELD_TEMP)
-      CALL VecRestoreArrayReadF90(solvec_seq,PHI_FIELD_TEMP,ierr)
+      CALL VecRestoreArrayRead(solvec_seq,PHI_FIELD_TEMP,ierr)
 
       PHI_FIELD = 2.*PHIBAR_FIELD - PHI_FIELD
 
@@ -1791,11 +1794,11 @@ MODULE fields
       CALL VecScatterEnd(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
       CALL VecScatterDestroy(ctx, ierr)
 
-      ! CALL VecGetArrayReadF90(X_SEQ,PHI_FIELD,ierr)
-      CALL VecGetArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
+      ! CALL VecGetArrayRead(X_SEQ,PHI_FIELD,ierr)
+      CALL VecGetArrayRead(x_seq,PHI_FIELD_TEMP,ierr)
       IF (ALLOCATED(PHIBAR_FIELD)) DEALLOCATE(PHIBAR_FIELD)
       ALLOCATE(PHIBAR_FIELD, SOURCE = PHI_FIELD_TEMP)
-      CALL VecRestoreArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
+      CALL VecRestoreArrayRead(x_seq,PHI_FIELD_TEMP,ierr)
       CALL VecDestroy(x_seq,ierr)
 
       ! Compute the RHS corresponding to PHIBAR_FIELD
@@ -1892,10 +1895,10 @@ MODULE fields
       ! Compute the residual
       CALL VecGetOwnershipRange(f,Istart,Iend,ierr)
 
-      CALL VecGetArrayF90(f,RESIDUAL,ierr_l)
+      CALL VecGetArray(f,RESIDUAL,ierr_l)
       RESIDUAL = RHS(Istart:Iend-1) - RHS_NEW(Istart:Iend-1)
       !RESIDUAL = PHI_FIELD(Istart+1:Iend) + PHI_FIELD_OLD(Istart+1:Iend) - 2.*PHIBAR_FIELD(Istart+1:Iend)
-      CALL VecRestoreArrayF90(f,RESIDUAL,ierr_l)
+      CALL VecRestoreArray(f,RESIDUAL,ierr_l)
 
 
       CALL VecNorm(f,NORM_2,norm,ierr)
@@ -1950,7 +1953,7 @@ MODULE fields
          prec = precond
       END IF
 
-      CALL MatMPIAIJSetPreallocation(jac,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
+      CALL MatMPIAIJSetPreallocation(jac,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY,ierr) ! DBDBDBDBDBDB Large preallocation!
       CALL MatSetFromOptions(jac,ierr)
       CALL MatSetUp(jac,ierr)
 
@@ -1974,11 +1977,11 @@ MODULE fields
       CALL VecScatterEnd(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
       CALL VecScatterDestroy(ctx, ierr)
 
-      ! CALL VecGetArrayReadF90(X_SEQ,PHI_FIELD,ierr)
-      CALL VecGetArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
+      ! CALL VecGetArrayRead(X_SEQ,PHI_FIELD,ierr)
+      CALL VecGetArrayRead(x_seq,PHI_FIELD_TEMP,ierr)
       IF (ALLOCATED(PHIBAR_FIELD)) DEALLOCATE(PHIBAR_FIELD)
       ALLOCATE(PHIBAR_FIELD, SOURCE = PHI_FIELD_TEMP)
-      CALL VecRestoreArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
+      CALL VecRestoreArrayRead(x_seq,PHI_FIELD_TEMP,ierr)
       CALL VecDestroy(x_seq,ierr)
 
       CALL COMPUTE_E_FIELD
@@ -2061,14 +2064,14 @@ MODULE fields
          CALL MatCreate(PETSC_COMM_WORLD,Qmat,ierr)
          CALL MatSetSizes(Qmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
          CALL MatSetType(Qmat, MATMPIAIJ, ierr)
-         CALL MatMPIAIJSetPreallocation(Qmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
+         CALL MatMPIAIJSetPreallocation(Qmat,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY,ierr) ! DBDBDBDBDBDB Large preallocation!
          CALL MatSetFromOptions(Qmat,ierr)
          CALL MatSetUp(Qmat,ierr)
 
          CALL MatCreate(PETSC_COMM_WORLD,Rmat,ierr)
          CALL MatSetSizes(Rmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
          CALL MatSetType(Rmat, MATMPIAIJ, ierr)
-         CALL MatMPIAIJSetPreallocation(Rmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
+         CALL MatMPIAIJSetPreallocation(Rmat,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY,ierr) ! DBDBDBDBDBDB Large preallocation!
          CALL MatSetFromOptions(Rmat,ierr)
          CALL MatSetUp(Rmat,ierr)
 
@@ -2298,7 +2301,7 @@ MODULE fields
 
 
 
-      CALL MatMPIAIJSetPreallocation(Jmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
+      CALL MatMPIAIJSetPreallocation(Jmat,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY,ierr) ! DBDBDBDBDBDB Large preallocation!
       CALL MatSetFromOptions(Jmat,ierr)
       CALL MatSetUp(Jmat,ierr)
       CALL MatZeroEntries(Jmat,ierr)
@@ -2312,11 +2315,11 @@ MODULE fields
       CALL VecScatterEnd(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
       CALL VecScatterDestroy(ctx, ierr)
 
-      ! CALL VecGetArrayReadF90(X_SEQ,PHI_FIELD,ierr)
-      CALL VecGetArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
+      ! CALL VecGetArrayRead(X_SEQ,PHI_FIELD,ierr)
+      CALL VecGetArrayRead(x_seq,PHI_FIELD_TEMP,ierr)
       IF (ALLOCATED(PHIBAR_FIELD)) DEALLOCATE(PHIBAR_FIELD)
       ALLOCATE(PHIBAR_FIELD, SOURCE = PHI_FIELD_TEMP)
-      CALL VecRestoreArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
+      CALL VecRestoreArrayRead(x_seq,PHI_FIELD_TEMP,ierr)
       CALL VecDestroy(x_seq,ierr)
 
       ! Compute the RHS corresponding to PHIBAR_FIELD
@@ -2414,10 +2417,10 @@ MODULE fields
       ! Compute the residual
       CALL VecGetOwnershipRange(f,Istart,Iend,ierr)
 
-      CALL VecGetArrayF90(f,RESIDUAL,ierr_l)
+      CALL VecGetArray(f,RESIDUAL,ierr_l)
       RESIDUAL = RHS(Istart:Iend-1) - RHS_NEW(Istart:Iend-1)
       !RESIDUAL = PHI_FIELD(Istart+1:Iend) + PHI_FIELD_OLD(Istart+1:Iend) - 2.*PHIBAR_FIELD(Istart+1:Iend)
-      CALL VecRestoreArrayF90(f,RESIDUAL,ierr_l)
+      CALL VecRestoreArray(f,RESIDUAL,ierr_l)
 
 
       CALL VecNorm(f,NORM_2,norm,ierr)
@@ -2450,14 +2453,14 @@ MODULE fields
          CALL MatCreate(PETSC_COMM_WORLD,Qmat,ierr)
          CALL MatSetSizes(Qmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
          CALL MatSetType(Qmat, MATMPIAIJ, ierr)
-         CALL MatMPIAIJSetPreallocation(Qmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
+         CALL MatMPIAIJSetPreallocation(Qmat,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY,ierr) ! DBDBDBDBDBDB Large preallocation!
          CALL MatSetFromOptions(Qmat,ierr)
          CALL MatSetUp(Qmat,ierr)
 
          CALL MatCreate(PETSC_COMM_WORLD,Rmat,ierr)
          CALL MatSetSizes(Rmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
          CALL MatSetType(Rmat, MATMPIAIJ, ierr)
-         CALL MatMPIAIJSetPreallocation(Rmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
+         CALL MatMPIAIJSetPreallocation(Rmat,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY,ierr) ! DBDBDBDBDBDB Large preallocation!
          CALL MatSetFromOptions(Rmat,ierr)
          CALL MatSetUp(Rmat,ierr)
 
@@ -2853,8 +2856,8 @@ MODULE fields
       Mat dxde, dxdexmat, dxdeymat, dydexmat, dydeymat
       !PetscInt row
       PetscInt ncols
-      PetscInt cols(2000)
-      PetscScalar dxdexvals(2000), dxdeyvals(2000), dydexvals(2000), dydeyvals(2000), vals(2000)
+      PetscInt, pointer :: cols(:)
+      PetscScalar, pointer :: dxdexvals(:), dxdeyvals(:), dydexvals(:), dydeyvals(:), vals(:)
       PetscInt first_row, last_row
 
       !PetscViewer  viewer
@@ -2925,7 +2928,7 @@ MODULE fields
          CALL MatSetSizes(dxde,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
          CALL MatSetType(dxde, MATMPIAIJ, ierr)
          !CALL MatSetOption(dxde,MAT_SPD,PETSC_TRUE,ierr)
-         CALL MatMPIAIJSetPreallocation(dxde,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
+         CALL MatMPIAIJSetPreallocation(dxde,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
          CALL MatSetFromOptions(dxde, ierr)
          CALL MatSetUp(dxde,ierr)
 
@@ -2933,7 +2936,7 @@ MODULE fields
          CALL MatSetSizes(dxdexmat,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
          CALL MatSetType(dxdexmat, MATMPIAIJ, ierr)
          !CALL MatSetOption(dxdexmat,MAT_SPD,PETSC_TRUE,ierr)
-         CALL MatMPIAIJSetPreallocation(dxdexmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
+         CALL MatMPIAIJSetPreallocation(dxdexmat,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
          CALL MatSetFromOptions(dxdexmat, ierr)
          CALL MatSetUp(dxdexmat,ierr)
 
@@ -2941,7 +2944,7 @@ MODULE fields
          CALL MatSetSizes(dxdeymat,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
          CALL MatSetType(dxdeymat, MATMPIAIJ, ierr)
          !CALL MatSetOption(dxdeymat,MAT_SPD,PETSC_TRUE,ierr)
-         CALL MatMPIAIJSetPreallocation(dxdeymat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
+         CALL MatMPIAIJSetPreallocation(dxdeymat,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
          CALL MatSetFromOptions(dxdeymat, ierr)
          CALL MatSetUp(dxdeymat,ierr)
 
@@ -2949,7 +2952,7 @@ MODULE fields
          CALL MatSetSizes(dydexmat,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
          CALL MatSetType(dydexmat, MATMPIAIJ, ierr)
          !CALL MatSetOption(dydexmat,MAT_SPD,PETSC_TRUE,ierr)
-         CALL MatMPIAIJSetPreallocation(dydexmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
+         CALL MatMPIAIJSetPreallocation(dydexmat,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
          CALL MatSetFromOptions(dydexmat, ierr)
          CALL MatSetUp(dydexmat,ierr)
 
@@ -2957,7 +2960,7 @@ MODULE fields
          CALL MatSetSizes(dydeymat,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
          CALL MatSetType(dydeymat, MATMPIAIJ, ierr)
          !CALL MatSetOption(dydeymat,MAT_SPD,PETSC_TRUE,ierr)
-         CALL MatMPIAIJSetPreallocation(dydeymat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
+         CALL MatMPIAIJSetPreallocation(dydeymat,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
          CALL MatSetFromOptions(dydeymat, ierr)
          CALL MatSetUp(dydeymat,ierr)
 
@@ -2967,7 +2970,7 @@ MODULE fields
          CALL MatSetSizes(dxde,PETSC_DECIDE, PETSC_DECIDE, SIZE, SIZE, ierr)
          CALL MatSetType(dxde, MATMPIAIJ, ierr)
          !CALL MatSetOption(dxde,MAT_SPD,PETSC_TRUE,ierr)
-         CALL MatMPIAIJSetPreallocation(dxde,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
+         CALL MatMPIAIJSetPreallocation(dxde,2000,PETSC_NULL_INTEGER_ARRAY,2000,PETSC_NULL_INTEGER_ARRAY, ierr) !! DBDBDBDBDBDBDBDBDDBDB Large preallocation!
          CALL MatSetFromOptions(dxde, ierr)
          CALL MatSetUp(dxde,ierr)
 
@@ -4343,6 +4346,7 @@ MODULE fields
       LOGICAL :: SET_INITIAL
       PetscScalar, POINTER :: solvec_l(:)
       PetscBool :: flg
+      PetscInt :: d_nnz, o_nnz
 
       ! Create SNES environment
       CALL SNESCreate(PETSC_COMM_WORLD,snes,ierr)
@@ -4361,23 +4365,25 @@ MODULE fields
       CALL MatSetSizes(Jmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
       CALL MatSetType(Jmat, MATMPIAIJ, ierr)
 
+      IF (DIMS == 1) THEN
+         d_nnz = 4
+         o_nnz = 2
+      ELSE IF (DIMS == 2) THEN
+         d_nnz = 20
+         o_nnz = 10
+      ELSE IF (DIMS == 3) THEN
+         d_nnz = 40
+         o_nnz = 20
+      END IF
 
-      ! CALL MatMPIAIJSetPreallocation(Jmat,2000,PETSC_NULL_INTEGER,2000,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
-      ! CALL MatSetFromOptions(Jmat,ierr)
-      ! CALL MatSetUp(Jmat,ierr)
-
-      ! CALL MatCreate(PETSC_COMM_WORLD,Pmat,ierr)
-      ! CALL MatSetSizes(Pmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
-      ! CALL MatSetType(Pmat, MATMPIAIJ, ierr)
+      CALL MatMPIAIJSetPreallocation(Jmat,d_nnz,PETSC_NULL_INTEGER_ARRAY,&
+                                    o_nnz,PETSC_NULL_INTEGER_ARRAY,ierr)
+      CALL MatSetOption(Jmat,MAT_NEW_NONZERO_ALLOCATION_ERR,PETSC_FALSE,ierr)
+      CALL MatSetFromOptions(Jmat,ierr)
+      CALL MatSetUp(Jmat,ierr)
 
       ! Jacobian evaluation routine
       CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobianBoltz,0,ierr)
-      ! CALL PetscOptionsHasName(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,"-snes_mf_operator",flg,ierr)
-      ! IF (flg) THEN  ! We want only the preconditioner to be filled. The Jacobian is computed from finite differencing.
-      !    CALL SNESSetJacobian(snes,Jmat,Pmat,FormJacobian,0,ierr) ! The expensive but safe one. Jacobian computed independently.
-      ! ELSE
-      !    CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobian,0,ierr) ! The expensive but safe one. Jacobian computed independently.
-      ! END IF
       
       CALL SNESSetFromOptions(snes,ierr)
 
@@ -4385,41 +4391,44 @@ MODULE fields
          CALL VecSet(solvec,0.d0,ierr)
       ELSE IF (.NOT. ALLOCATED(PHI_FIELD)) THEN
          ALLOCATE(PHI_FIELD(NNODES))
-         PHI_FIELD=0
-
+         PHI_FIELD = 0.d0
+         CALL VecSet(solvec,0.d0,ierr)
       ELSE
          CALL VecGetOwnershipRange(solvec,Istart,Iend,ierr)
-         CALL VecGetArrayF90(solvec,solvec_l,ierr)
+         CALL VecGetArray(solvec,solvec_l,ierr)
          solvec_l = PHI_FIELD(Istart+1:Iend)
-         CALL VecRestoreArrayF90(solvec,solvec_l,ierr)
+         CALL VecRestoreArray(solvec,solvec_l,ierr)
       END IF
 
+      CALL VecScatterCreateToAll(solvec,scatter_ctx,x_seq_global,ierr)
       
+
       ! ------ SOLVE ------
       CALL SNESSolve(snes,PETSC_NULL_VEC,solvec,ierr)
       CALL SNESGetConvergedReason(snes,snesreason,ierr)
-      IF (MOD(tID, STATS_EVERY) .EQ. 0 .AND. PROC_ID == 0) WRITE(*,*) 'SNESConvergedReason = ', snesreason
+      IF (MOD(tID, STATS_EVERY) .EQ. 0 .AND. PROC_ID == 0) &
+         WRITE(*,*) 'SNESConvergedReason = ', snesreason
 
-      
-      CALL VecScatterCreateToAll(solvec,ctx,solvec_seq,ierr)
-      CALL VecScatterBegin(ctx,solvec,solvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
-      CALL VecScatterEnd(ctx,solvec,solvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
-      CALL VecScatterDestroy(ctx, ierr)
+      ! Gather solution
+      CALL VecScatterBegin(scatter_ctx,solvec,x_seq_global,INSERT_VALUES,SCATTER_FORWARD,ierr)
+      CALL VecScatterEnd(scatter_ctx,solvec,x_seq_global,INSERT_VALUES,SCATTER_FORWARD,ierr)
 
-      CALL VecGetArrayReadF90(solvec_seq,PHI_FIELD_TEMP,ierr)
+
+      CALL VecGetArrayRead(x_seq_global,PHI_FIELD_TEMP,ierr)
       IF (ALLOCATED(PHI_FIELD)) DEALLOCATE(PHI_FIELD)
       ALLOCATE(PHI_FIELD, SOURCE = PHI_FIELD_TEMP)
-      CALL VecRestoreArrayReadF90(solvec_seq,PHI_FIELD_TEMP,ierr)
+      CALL VecRestoreArrayRead(x_seq_global,PHI_FIELD_TEMP,ierr)
 
       CALL GET_BOLTZMANN_DENSITY
 
       ! Cleanup.
+      CALL VecScatterDestroy(scatter_ctx, ierr)
+      CALL VecDestroy(x_seq_global,ierr)
       CALL VecDestroy(solvec, ierr)
       CALL VecDestroy(rvec, ierr)
       CALL VecDestroy(solvec_seq,ierr)
       CALL SNESDestroy(snes, ierr)
       CALL MatDestroy(Jmat,ierr)
-      ! CALL MatDestroy(Pmat,ierr)
 
    END SUBROUTINE SOLVE_BOLTZMANN
 
@@ -4442,16 +4451,14 @@ MODULE fields
 
       IF (MOD(tID, STATS_EVERY) .EQ. 0) CALL ONLYMASTERPRINT1(PROC_ID, 'FormFunctionBoltz Called')
       
-      CALL VecScatterCreateToAll(x,ctx,x_seq,ierr)
-      CALL VecScatterBegin(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
-      CALL VecScatterEnd(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
-      CALL VecScatterDestroy(ctx, ierr)
+      CALL VecScatterBegin(scatter_ctx,x,x_seq_global,INSERT_VALUES,SCATTER_FORWARD,ierr)
+      CALL VecScatterEnd(scatter_ctx,x,x_seq_global,INSERT_VALUES,SCATTER_FORWARD,ierr)
+   
       
-      CALL VecGetArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
+      CALL VecGetArrayRead(x_seq_global,PHI_FIELD_TEMP,ierr)
       IF (ALLOCATED(PHI_FIELD_NEW)) DEALLOCATE(PHI_FIELD_NEW)
       ALLOCATE(PHI_FIELD_NEW, SOURCE = PHI_FIELD_TEMP)
-      CALL VecRestoreArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
-      CALL VecDestroy(x_seq,ierr)
+      CALL VecRestoreArrayRead(x_seq_global,PHI_FIELD_TEMP,ierr)
 
       ALLOCATE(RHS_NEW, SOURCE = RHS)
       RHS_NEW = 0.d0
@@ -4651,9 +4658,9 @@ MODULE fields
 
       ! Compute the residual
       CALL VecGetOwnershipRange(f,Istart,Iend,ierr)
-      CALL VecGetArrayF90(f,RESIDUAL,ierr_l)
+      CALL VecGetArray(f,RESIDUAL,ierr_l)
       RESIDUAL = RHS_NEW(Istart:Iend-1) - RHS(Istart:Iend-1)
-      CALL VecRestoreArrayF90(f,RESIDUAL,ierr_l)
+      CALL VecRestoreArray(f,RESIDUAL,ierr_l)
 
 
       CALL VecNorm(f,NORM_2,norm,ierr)
@@ -4692,26 +4699,20 @@ MODULE fields
 
       IF (MOD(tID, STATS_EVERY) .EQ. 0) CALL ONLYMASTERPRINT1(PROC_ID, 'FormJacobianBoltz Called')
 
-      CALL MatMPIAIJSetPreallocation(jac,100,PETSC_NULL_INTEGER,100,PETSC_NULL_INTEGER,ierr) ! DBDBDBDBDBDB Large preallocation!
-      CALL MatSetFromOptions(jac,ierr)
-      CALL MatSetUp(jac,ierr)
-
-      ! CALL MatZeroEntries(jac,ierr)
-      ! CALL MatAssemblyBegin(jac,MAT_FLUSH_ASSEMBLY,ierr)
-      ! CALL MatAssemblyEnd(jac,MAT_FLUSH_ASSEMBLY,ierr)
 
 
-      CALL VecScatterCreateToAll(x,ctx,x_seq,ierr)
-      CALL VecScatterBegin(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
-      CALL VecScatterEnd(ctx,x,x_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
-      CALL VecScatterDestroy(ctx, ierr)
+      CALL MatZeroEntries(jac,ierr)
+      ! CALL MatAssemblyBegin(jac, MAT_FLUSH_ASSEMBLY, ierr)
+      ! CALL MatAssemblyEnd(jac, MAT_FLUSH_ASSEMBLY, ierr)
 
-      ! CALL VecGetArrayReadF90(X_SEQ,PHI_FIELD,ierr)
-      CALL VecGetArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
+      CALL VecScatterBegin(scatter_ctx,x,x_seq_global,INSERT_VALUES,SCATTER_FORWARD,ierr)
+      CALL VecScatterEnd(scatter_ctx,x,x_seq_global,INSERT_VALUES,SCATTER_FORWARD,ierr)
+
+      CALL VecGetArrayRead(x_seq_global,PHI_FIELD_TEMP,ierr)
       IF (ALLOCATED(PHI_FIELD_NEW)) DEALLOCATE(PHI_FIELD_NEW)
       ALLOCATE(PHI_FIELD_NEW, SOURCE = PHI_FIELD_TEMP)
-      CALL VecRestoreArrayReadF90(x_seq,PHI_FIELD_TEMP,ierr)
-      CALL VecDestroy(x_seq,ierr)
+      CALL VecRestoreArrayRead(x_seq_global,PHI_FIELD_TEMP,ierr)
+
 
       CALL MatGetOwnershipRange( jac, Istart, Iend, ierr)
 
@@ -4903,8 +4904,8 @@ MODULE fields
          END DO
       END IF
 
-      CALL MatAssemblyBegin(jac,MAT_FLUSH_ASSEMBLY,ierr)
-      CALL MatAssemblyEnd(jac,MAT_FLUSH_ASSEMBLY,ierr)
+      CALL MatAssemblyBegin(jac, MAT_FLUSH_ASSEMBLY, ierr)
+      CALL MatAssemblyEnd(jac, MAT_FLUSH_ASSEMBLY, ierr)
 
       DO I = Istart, Iend-1
          IF (IS_DIRICHLET(I)) CALL MatSetValue(jac,I,I,1.d0,INSERT_VALUES,ierr)
@@ -5316,17 +5317,17 @@ MODULE fields
       CALL VecScatterEnd(ctx,xvec,xvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
       CALL VecScatterDestroy(ctx, ierr)
 
-      CALL VecGetArrayReadF90(xvec_seq,PHI_FIELD_TEMP,ierr)
+      CALL VecGetArrayRead(xvec_seq,PHI_FIELD_TEMP,ierr)
       IF (ALLOCATED(PHI_FIELD)) DEALLOCATE(PHI_FIELD)
       ALLOCATE(PHI_FIELD, SOURCE = PHI_FIELD_TEMP)
-      CALL VecRestoreArrayReadF90(xvec_seq,PHI_FIELD_TEMP,ierr)
+      CALL VecRestoreArrayRead(xvec_seq,PHI_FIELD_TEMP,ierr)
 
       CALL VecScatterDestroy(ctx,ierr)
       CALL VecDestroy(xvec_seq,ierr)
 
       !!CALL KSPDestroy(ksp,ierr)
 
-      !CALL VecRestoreArrayReadF90(X_SEQ,PHI_FIELD,ierr)
+      !CALL VecRestoreArrayRead(X_SEQ,PHI_FIELD,ierr)
 
       !IF (PROC_ID == 0) WRITE(*,*) 'Max PHI_FIELD= ', MAXVAL(PHI_FIELD), 'Min PHI_FIELD= ', MINVAL(PHI_FIELD)
 
@@ -5971,8 +5972,8 @@ MODULE fields
       Mat dxde, dxdexmat, dxdeymat, dydexmat, dydeymat
       !PetscInt row
       PetscInt ncols
-      PetscInt cols(2000)
-      PetscScalar dxdexvals(2000), dxdeyvals(2000), dydexvals(2000), dydeyvals(2000), vals(2000)
+      PetscInt, pointer :: cols(:)
+      PetscScalar, pointer :: dxdexvals(:), dxdeyvals(:), dydexvals(:), dydeyvals(:), vals(:)
       PetscInt first_row, last_row
 
       !PetscViewer  viewer

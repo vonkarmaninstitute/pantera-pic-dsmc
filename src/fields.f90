@@ -2856,8 +2856,8 @@ MODULE fields
       Mat dxde, dxdexmat, dxdeymat, dydexmat, dydeymat
       !PetscInt row
       PetscInt ncols
-      PetscInt, pointer :: cols(:)
-      PetscScalar, pointer :: dxdexvals(:), dxdeyvals(:), dydexvals(:), dydeyvals(:), vals(:)
+      PetscInt, POINTER :: cols(:)
+      PetscScalar, POINTER :: dxdexvals(:), dxdeyvals(:), dydexvals(:), dydeyvals(:), vals(:)
       PetscInt first_row, last_row
 
       !PetscViewer  viewer

@@ -141,6 +141,10 @@ MODULE grid_and_partition
 
          CELL_PROCS = 0
       
+      ELSE IF (DIMS == 0 .AND. (N_MPI_THREADS .GT. 1)) THEN
+
+         CALL ERROR_ABORT('ERROR! Simulation in 0d can be run only in series.')
+
       ELSE IF (GRID_TYPE == UNSTRUCTURED) THEN
          IF (.NOT. LOAD_BALANCE) THEN
 

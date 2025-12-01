@@ -434,6 +434,9 @@ CONTAINS
             READ(1010, IOSTAT=ios) XP, YP, ZP, VX, VY, VZ, EROT, EVIB, S_ID, IC, DTRIM
 
             IF (ios < 0) EXIT
+            IF (PARTLOAD_FRACSAMPLE < 1) THEN
+               IF (rf() > PARTLOAD_FRACSAMPLE) CYCLE
+            END IF
             CALL INIT_PARTICLE(XP,YP,ZP,VX,VY,VZ,EROT,EVIB,S_ID,IC,DT, particleNOW) ! Save in particle
             CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
          END DO
@@ -449,6 +452,9 @@ CONTAINS
          DO
             READ(1010,*,IOSTAT=ios) XP, YP, ZP, VX, VY, VZ, EROT, EVIB, S_ID, IC, DTRIM
             IF (ios < 0) EXIT
+            IF (PARTLOAD_FRACSAMPLE < 1) THEN
+               IF (rf() > PARTLOAD_FRACSAMPLE) CYCLE
+            END IF
             CALL INIT_PARTICLE(XP,YP,ZP,VX,VY,VZ,EROT,EVIB,S_ID,IC,DT, particleNOW) ! Save in particle
             CALL ADD_PARTICLE_ARRAY(particleNOW, NP_PROC, particles) ! Add particle to local array
          END DO
@@ -1101,7 +1107,6 @@ CONTAINS
       REAL(KIND=8) :: y,fM,BETA, KAPPA, ACCA
 
       BETA = 1./SQRT(2.*KB/M*TINF)
-      ! IF (BOOL_KAPPA_DISTRIBUTION) BETA = 1./SQRT(2.*KB/M*TINF*(KAPPA_C-3./2.))
 
       ACCA = SQRT(SN**2+2.)                              ! Tmp variable
       KAPPA = 2./(SN+ACCA) * EXP(0.5 + 0.5*SN*(SN-ACCA)) ! variable
@@ -1115,7 +1120,6 @@ CONTAINS
 
          R2 = rf()
          fM = KAPPA*(y+sn)*EXP(-y**2)
-         ! IF (BOOL_KAPPA_DISTRIBUTION) fM = KAPPA*(y+sn)*GAMMA(KAPPA_C)/GAMMA(KAPPA_C-1./2.)/(1+y**2)**KAPPA_C
 
          ! Step 3. 
 

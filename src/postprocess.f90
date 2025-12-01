@@ -38,7 +38,7 @@ MODULE postprocess
       INTEGER                            :: JP, JC, JS, INDEX
 
       REAL(KIND=8) :: DBLE_AVG_CUMULATED, NUMPART, SAMPLEDOF
-      REAL(KIND=8) :: CX, CY, CZ, C2, MASS, VOL, CFNUM
+      REAL(KIND=8) :: CX, CY, CZ, C2, MASS, VOL, CFNUM, SPWT
 
    
       INTEGER, DIMENSION(:), ALLOCATABLE      :: TIMESTEP_NP
@@ -240,16 +240,17 @@ MODULE postprocess
             DO JS = 1, N_SPECIES
                INDEX = JC+NCELLS*(JS-1)
                MASS = SPECIES(JS)%MOLECULAR_MASS
+               SPWT = SPECIES(JS)%SPWT
                
 
                ! rho
-               TIMESTEP_MOMENTS(INDEX,1) = MASS*CFNUM/VOL*TIMESTEP_NP(INDEX)
+               TIMESTEP_MOMENTS(INDEX,1) = MASS*CFNUM*SPWT/VOL*TIMESTEP_NP(INDEX)
                ! Ux, Uy, Uz
                TIMESTEP_MOMENTS(INDEX,2) = TIMESTEP_VX(INDEX)
                TIMESTEP_MOMENTS(INDEX,3) = TIMESTEP_VY(INDEX)
                TIMESTEP_MOMENTS(INDEX,4) = TIMESTEP_VZ(INDEX)
                ! Higher order moments
-               TIMESTEP_MOMENTS(INDEX,5:33) = TIMESTEP_MOMENTS(INDEX,5:33)*MASS*CFNUM/VOL
+               TIMESTEP_MOMENTS(INDEX,5:33) = TIMESTEP_MOMENTS(INDEX,5:33)*MASS*CFNUM*SPWT/VOL
             END DO
          END DO
 
@@ -441,10 +442,13 @@ MODULE postprocess
 
       REAL(KIND=8), DIMENSION(NX+1)      :: XNODES
       REAL(KIND=8), DIMENSION(NY+1)      :: YNODES
+      REAL(KIND=8), DIMENSION(NZ+1)      :: ZNODES
 
       INTEGER                            :: I, JS, FIRST, LAST, JPROC, MOM
 
       INTEGER, DIMENSION(:), ALLOCATABLE :: CELL_PROC_ID
+
+      REAL(KIND=8) :: SPWT
 
 
       MOMENT_STRING = ['rho_   ', &
@@ -460,13 +464,20 @@ MODULE postprocess
          IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
             XNODES = 0
             DO I = 0, NX
-               XNODES(i+1) = XMIN + (XMAX-XMIN)/NX*i 
+               XNODES(i+1) = XMIN + (XMAX-XMIN)/NX*I
             END DO
 
             YNODES = 0
             DO I = 0, NY
-               YNODES(i+1) = YMIN + (YMAX-YMIN)/NY*i
+               YNODES(i+1) = YMIN + (YMAX-YMIN)/NY*I
             END DO
+
+            IF (DIMS == 0) THEN
+               ZNODES = 0
+               DO I = 0, NZ
+                  ZNODES(I+1) = ZMIN + (ZMAX-ZMIN)/NZ*I
+               END DO
+            END IF
          ELSE IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) THEN
             XNODES = XCOORD
             YNODES = YCOORD
@@ -542,6 +553,19 @@ MODULE postprocess
                DO I = 1, U3D_GRID%NUM_CELLS
                   WRITE(54321) 10
                END DO
+            ELSE IF (DIMS == 0) THEN
+               WRITE(54321) 'DATASET RECTILINEAR_GRID'//ACHAR(10)
+               
+               WRITE(54321) 'DIMENSIONS '//ITOA(NX+1)//' '//ITOA(NY+1)//' '//ITOA(NZ+1)//ACHAR(10)
+
+               WRITE(54321) 'X_COORDINATES '//ITOA(NX+1)//' double'//ACHAR(10)
+               WRITE(54321) XNODES, ACHAR(10)
+
+               WRITE(54321) 'Y_COORDINATES '//ITOA(NY+1)//' double'//ACHAR(10)
+               WRITE(54321) YNODES, ACHAR(10)
+
+               WRITE(54321) 'Z_COORDINATES '//ITOA(NZ+1)//' double'//ACHAR(10)
+               WRITE(54321) ZNODES, ACHAR(10)
             ELSE IF (DIMS == 1) THEN
                WRITE(54321) 'DATASET RECTILINEAR_GRID'//ACHAR(10)
                
@@ -586,6 +610,7 @@ MODULE postprocess
             DO JS = 1, N_SPECIES
                FIRST = 1 + (JS-1)*NCELLS
                LAST  = JS*NCELLS
+               SPWT = SPECIES(JS)%SPWT
             
                WRITE(string, *) 'number_particles_', SPECIES(JS)%NAME
                WRITE(54321) string//' '//ITOA(1)//' '//ITOA(NCELLS)//' double'//ACHAR(10)
@@ -596,27 +621,27 @@ MODULE postprocess
                IF (GRID_TYPE == RECTILINEAR_NONUNIFORM .OR. GRID_TYPE == UNSTRUCTURED .OR. AXI) THEN
                   IF (BOOL_RADIAL_WEIGHTING) THEN
                      IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) THEN
-                        WRITE(54321) CELL_FNUM*AVG_NP(FIRST:LAST)/CELL_VOLUMES, ACHAR(10)
+                        WRITE(54321) CELL_FNUM*SPWT*AVG_NP(FIRST:LAST)/CELL_VOLUMES, ACHAR(10)
                      ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 1) THEN
-                        WRITE(54321) CELL_FNUM*AVG_NP(FIRST:LAST)/U1D_GRID%CELL_VOLUMES, ACHAR(10)
+                        WRITE(54321) CELL_FNUM*SPWT*AVG_NP(FIRST:LAST)/U1D_GRID%CELL_VOLUMES, ACHAR(10)
                      ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
-                        WRITE(54321) CELL_FNUM*AVG_NP(FIRST:LAST)/U2D_GRID%CELL_VOLUMES, ACHAR(10)
+                        WRITE(54321) CELL_FNUM*SPWT*AVG_NP(FIRST:LAST)/U2D_GRID%CELL_VOLUMES, ACHAR(10)
                      ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
-                        WRITE(54321) CELL_FNUM*AVG_NP(FIRST:LAST)/U3D_GRID%CELL_VOLUMES, ACHAR(10)
+                        WRITE(54321) CELL_FNUM*SPWT*AVG_NP(FIRST:LAST)/U3D_GRID%CELL_VOLUMES, ACHAR(10)
                      END IF
                   ELSE
                      IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) THEN
-                        WRITE(54321) FNUM*AVG_NP(FIRST:LAST)/CELL_VOLUMES, ACHAR(10)
+                        WRITE(54321) FNUM*SPWT*AVG_NP(FIRST:LAST)/CELL_VOLUMES, ACHAR(10)
                      ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 1) THEN
-                        WRITE(54321) FNUM*AVG_NP(FIRST:LAST)/U1D_GRID%CELL_VOLUMES, ACHAR(10)
+                        WRITE(54321) FNUM*SPWT*AVG_NP(FIRST:LAST)/U1D_GRID%CELL_VOLUMES, ACHAR(10)
                      ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
-                        WRITE(54321) FNUM*AVG_NP(FIRST:LAST)/U2D_GRID%CELL_VOLUMES, ACHAR(10)
+                        WRITE(54321) FNUM*SPWT*AVG_NP(FIRST:LAST)/U2D_GRID%CELL_VOLUMES, ACHAR(10)
                      ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
-                        WRITE(54321) FNUM*AVG_NP(FIRST:LAST)/U3D_GRID%CELL_VOLUMES, ACHAR(10)
+                        WRITE(54321) FNUM*SPWT*AVG_NP(FIRST:LAST)/U3D_GRID%CELL_VOLUMES, ACHAR(10)
                      END IF
                   END IF
                ELSE IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
-                  WRITE(54321) FNUM*AVG_NP(FIRST:LAST)/CELL_VOL, ACHAR(10)
+                  WRITE(54321) FNUM*SPWT*AVG_NP(FIRST:LAST)/CELL_VOL, ACHAR(10)
                END IF
 
                WRITE(string, *) 'vx_mean_', SPECIES(JS)%NAME
@@ -807,6 +832,20 @@ MODULE postprocess
                DO I = 1, U3D_GRID%NUM_CELLS
                   WRITE(54321,*) 10
                END DO
+
+            ELSE IF (DIMS == 0) THEN
+               WRITE(54321,'(A)') 'DATASET RECTILINEAR_GRID'
+               
+               WRITE(54321,'(A,I10,I10,I10)') 'DIMENSIONS', NX+1, NY+1, NZ+1
+
+               WRITE(54321,'(A,I10,A7)') 'X_COORDINATES', NX+1, 'double'
+               WRITE(54321,*) XNODES
+
+               WRITE(54321,'(A,I10,A7)') 'Y_COORDINATES', NY+1, 'double'
+               WRITE(54321,*) YNODES
+
+               WRITE(54321,'(A,I10,A7)') 'Z_COORDINATES', NZ+1, 'double'
+               WRITE(54321,*) ZNODES
             ELSE IF (DIMS == 1) THEN
                WRITE(54321,'(A)') 'DATASET RECTILINEAR_GRID'
                
@@ -851,6 +890,7 @@ MODULE postprocess
             DO JS = 1, N_SPECIES
                FIRST = 1 + (JS-1)*NCELLS
                LAST  = JS*NCELLS
+               SPWT = SPECIES(JS)%SPWT
             
                WRITE(string, *) 'number_particles_', SPECIES(JS)%NAME
                WRITE(54321,'(A,I10,I10,A7)') string, 1, NCELLS, 'double'
@@ -861,27 +901,27 @@ MODULE postprocess
                IF (GRID_TYPE == RECTILINEAR_NONUNIFORM .OR. GRID_TYPE == UNSTRUCTURED .OR. AXI) THEN
                   IF (BOOL_RADIAL_WEIGHTING) THEN
                      IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) THEN
-                        WRITE(54321,*) CELL_FNUM*AVG_NP(FIRST:LAST)/CELL_VOLUMES
+                        WRITE(54321,*) CELL_FNUM*SPWT*AVG_NP(FIRST:LAST)/CELL_VOLUMES
                      ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 1) THEN
-                        WRITE(54321,*) CELL_FNUM*AVG_NP(FIRST:LAST)/U1D_GRID%CELL_VOLUMES
+                        WRITE(54321,*) CELL_FNUM*SPWT*AVG_NP(FIRST:LAST)/U1D_GRID%CELL_VOLUMES
                      ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
-                        WRITE(54321,*) CELL_FNUM*AVG_NP(FIRST:LAST)/U2D_GRID%CELL_VOLUMES
+                        WRITE(54321,*) CELL_FNUM*SPWT*AVG_NP(FIRST:LAST)/U2D_GRID%CELL_VOLUMES
                      ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
-                        WRITE(54321,*) CELL_FNUM*AVG_NP(FIRST:LAST)/U3D_GRID%CELL_VOLUMES
+                        WRITE(54321,*) CELL_FNUM*SPWT*AVG_NP(FIRST:LAST)/U3D_GRID%CELL_VOLUMES
                      END IF
                   ELSE
                      IF (GRID_TYPE == RECTILINEAR_NONUNIFORM) THEN
-                        WRITE(54321,*) FNUM*AVG_NP(FIRST:LAST)/CELL_VOLUMES
+                        WRITE(54321,*) FNUM*SPWT*AVG_NP(FIRST:LAST)/CELL_VOLUMES
                      ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 1) THEN
-                        WRITE(54321,*) FNUM*AVG_NP(FIRST:LAST)/U1D_GRID%CELL_VOLUMES
+                        WRITE(54321,*) FNUM*SPWT*AVG_NP(FIRST:LAST)/U1D_GRID%CELL_VOLUMES
                      ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 2) THEN
-                        WRITE(54321,*) FNUM*AVG_NP(FIRST:LAST)/U2D_GRID%CELL_VOLUMES
+                        WRITE(54321,*) FNUM*SPWT*AVG_NP(FIRST:LAST)/U2D_GRID%CELL_VOLUMES
                      ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 3) THEN
-                        WRITE(54321,*) FNUM*AVG_NP(FIRST:LAST)/U3D_GRID%CELL_VOLUMES
+                        WRITE(54321,*) FNUM*SPWT*AVG_NP(FIRST:LAST)/U3D_GRID%CELL_VOLUMES
                      END IF
                   END IF
                ELSE IF (GRID_TYPE == RECTILINEAR_UNIFORM) THEN
-                  WRITE(54321,*) FNUM*AVG_NP(FIRST:LAST)/CELL_VOL
+                  WRITE(54321,*) FNUM*SPWT*AVG_NP(FIRST:LAST)/CELL_VOL
                END IF
 
                WRITE(string, *) 'vx_mean_', SPECIES(JS)%NAME
@@ -1102,10 +1142,11 @@ MODULE postprocess
       LOGICAL, INTENT(IN) :: REFLECTED
       TYPE(PARTICLE_DATA_STRUCTURE), INTENT(IN) :: PART
       INTEGER, INTENT(IN) :: IC, IFACE
-      REAL(KIND=8) :: MOLMASS, K, AREA
+      REAL(KIND=8) :: MOLMASS, K, AREA, SPWT
       INTEGER :: INDEX
 
       MOLMASS = SPECIES(PART%S_ID)%MOLECULAR_MASS
+      SPWT = SPECIES(PART%S_ID)%SPWT
 
       IF (DIMS == 1) THEN
          INDEX = U1D_GRID%SEGMENT_NODES_BOUNDARY_INDEX(IFACE, IC) + (PART%S_ID-1)*NBOUNDCELLS
@@ -1118,10 +1159,10 @@ MODULE postprocess
          AREA = U2D_GRID%CELL_AREAS(U3D_GRID%CELL_FACES_BOUNDARY_INDEX(IFACE, IC))
       END IF
 
-      K = FNUM*MOLMASS/AREA/DT
+      K = FNUM*SPWT*MOLMASS/AREA/DT
 
       IF (REFLECTED) THEN
-         TIMESTEP_NOUT(INDEX) = TIMESTEP_NOUT(INDEX) - FNUM/AREA/DT
+         TIMESTEP_NOUT(INDEX) = TIMESTEP_NOUT(INDEX) - FNUM*SPWT/AREA/DT
          
          TIMESTEP_PXOUT(INDEX) = TIMESTEP_PXOUT(INDEX) - K * PART%VX
          TIMESTEP_PYOUT(INDEX) = TIMESTEP_PYOUT(INDEX) - K * PART%VY
@@ -1132,7 +1173,7 @@ MODULE postprocess
                                  PART%VY * PART%VY + &
                                  PART%VZ * PART%VZ )
       ELSE
-         TIMESTEP_NIN(INDEX) = TIMESTEP_NIN(INDEX) + FNUM/AREA/DT
+         TIMESTEP_NIN(INDEX) = TIMESTEP_NIN(INDEX) + FNUM*SPWT/AREA/DT
          
          TIMESTEP_PXIN(INDEX) = TIMESTEP_PXIN(INDEX) + K * PART%VX
          TIMESTEP_PYIN(INDEX) = TIMESTEP_PYIN(INDEX) + K * PART%VY
@@ -1188,7 +1229,7 @@ MODULE postprocess
                      INDEX = U1D_GRID%SEGMENT_NODES_BOUNDARY_INDEX(IP, IC)
 
                      TIMESTEP_PXEM(INDEX) = TIMESTEP_PXEM(INDEX) - EPS0*&
-                     (E_FIELD(1,1,IC)*E_FIELD(1,1,IC) - 0.5*E_MAG2)*U2D_GRID%EDGE_NORMAL(1,IP,IC)
+                     (E_FIELD(1,1,IC)*E_FIELD(1,1,IC) - 0.5*E_MAG2)*U1D_GRID%EDGE_NORMAL(1,IP,IC)
                   END IF
                END DO
             ELSE IF (DIMS == 2) THEN
@@ -1768,7 +1809,7 @@ MODULE postprocess
 
       REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: TOT_MOMENTUM
       REAL(KIND=8)                       :: TOT_KE, TOT_IE, TOT_FE, TOT_EE_FIELD, PHI, CURRENT_TIME, FIELD_POWER_TOT
-      REAL(KIND=8)                       :: CFNUM, VOL
+      REAL(KIND=8)                       :: CFNUM, VOL, SPWT
 
       CHARACTER*256                      :: file_name
       CHARACTER*2048                     :: HEADER_STRING
@@ -1797,6 +1838,8 @@ MODULE postprocess
 
          JS = particles(JP)%S_ID
 
+         SPWT = SPECIES(JS)%SPWT
+
          TOT_NUM(JS) = TOT_NUM(JS) + 1
 
          IF (BOOL_RADIAL_WEIGHTING) THEN
@@ -1806,22 +1849,22 @@ MODULE postprocess
          END IF
 
          ! Momentum
-         TOT_MOMENTUM(1,JS) = TOT_MOMENTUM(1,JS) + SPECIES(JS)%MOLECULAR_MASS*particles(JP)%VX * CFNUM
-         TOT_MOMENTUM(2,JS) = TOT_MOMENTUM(2,JS) + SPECIES(JS)%MOLECULAR_MASS*particles(JP)%VY * CFNUM
-         TOT_MOMENTUM(3,JS) = TOT_MOMENTUM(3,JS) + SPECIES(JS)%MOLECULAR_MASS*particles(JP)%VZ * CFNUM
+         TOT_MOMENTUM(1,JS) = TOT_MOMENTUM(1,JS) + SPECIES(JS)%MOLECULAR_MASS*particles(JP)%VX * CFNUM*SPWT
+         TOT_MOMENTUM(2,JS) = TOT_MOMENTUM(2,JS) + SPECIES(JS)%MOLECULAR_MASS*particles(JP)%VY * CFNUM*SPWT
+         TOT_MOMENTUM(3,JS) = TOT_MOMENTUM(3,JS) + SPECIES(JS)%MOLECULAR_MASS*particles(JP)%VZ * CFNUM*SPWT
          
 
          ! Kinietic energy
          TOT_KE_PART(JS) = TOT_KE_PART(JS) &
-         + 0.5*SPECIES(JS)%MOLECULAR_MASS*(particles(JP)%VX**2+particles(JP)%VY**2+particles(JP)%VZ**2) * CFNUM
-         TOT_IE = TOT_IE + (particles(JP)%EROT + particles(JP)%EVIB) * CFNUM
+         + 0.5*SPECIES(JS)%MOLECULAR_MASS*(particles(JP)%VX**2+particles(JP)%VY**2+particles(JP)%VZ**2) * CFNUM*SPWT
+         TOT_IE = TOT_IE + (particles(JP)%EROT + particles(JP)%EVIB) * CFNUM*SPWT
 
          !IF (JS == 4) THEN
          !  TOT_FE = TOT_FE + 15.63e-19/2.
          !END IF
          IF (PIC_TYPE .NE. NONE) THEN
             CALL APPLY_POTENTIAL(JP, PHI)
-            TOT_EE_PART(JS)  = TOT_EE_PART(JS) + 0.5*PHI*QE*SPECIES(JS)%CHARGE * CFNUM
+            TOT_EE_PART(JS)  = TOT_EE_PART(JS) + 0.5*PHI*QE*SPECIES(JS)%CHARGE * CFNUM*SPWT
          END IF
 
       END DO
@@ -1858,7 +1901,7 @@ MODULE postprocess
 
          !HX = (XMAX-XMIN)/DBLE(NX)
          !HY = (YMAX-YMIN)/DBLE(NY)
-         !TOT_EE = -HX*HY*8.8541878128E-12*SUM( RHS*PACK(PHI_FIELD, .TRUE.) )/FNUM
+         !TOT_EE = -HX*HY*8.8541878128E-12*SUM( RHS*PACK(PHI_FIELD, .TRUE.) )/FNUM/SPWT
 
          ! WRITE(*,*) ' '
          ! WRITE(*,*) 'Conservation checks:'

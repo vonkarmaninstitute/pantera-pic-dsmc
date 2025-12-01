@@ -49,8 +49,9 @@ MODULE collisions
       INTEGER, DIMENSION(:,:), ALLOCATABLE :: NPC, IOF
       INTEGER, DIMENSION(:), ALLOCATABLE :: NPCALL, IOFALL
       INTEGER, DIMENSION(:), ALLOCATABLE :: IND, INDALL
-      INTEGER                            :: JP, JS, JC, IDX, IDXALL
+      INTEGER                            :: JP, JS, JC, IDX, IDXALL, IP
       INTEGER                            :: NCOLLREAL
+      LOGICAL, DIMENSION(:), ALLOCATABLE :: REMOVE_PART, HAS_REACTED
 
       ALLOCATE(NPC(N_SPECIES,NCELLS))
       ALLOCATE(IOF(N_SPECIES,NCELLS))
@@ -123,6 +124,12 @@ MODULE collisions
       ! Compute collisions between particles
       TIMESTEP_COLL = 0
       TIMESTEP_REAC = 0
+
+      ALLOCATE(REMOVE_PART(3*NP_PROC))
+      REMOVE_PART = .FALSE.
+      ALLOCATE(HAS_REACTED(NP_PROC))
+      HAS_REACTED = .FALSE.
+
       DO JC = 1, NCELLS
          IF (SUM(NPC(:,JC)) .GT. 1) THEN
             ! For cells where there is at least two particles, call the collision procedure.
@@ -130,12 +137,21 @@ MODULE collisions
                ! DSMC temporarily broken because now arrays are per-species.
                CALL VSS_COLLIS(JC, NPCALL, IOFALL, INDALL, NCOLLREAL)
             ELSE IF (COLLISION_TYPE == DSMC_VAHEDI) THEN
-               CALL VAHEDI_COLLIS(JC, NPC, IOF, IND, NCOLLREAL)
+               CALL VAHEDI_COLLIS(JC, NPC, IOF, IND, NCOLLREAL, HAS_REACTED, REMOVE_PART)
             END IF
             ! Add to the total number of collisions for this process
             TIMESTEP_COLL = TIMESTEP_COLL + NCOLLREAL
          END IF
       END DO
+
+      IP = NP_PROC
+      DO WHILE (IP .GE. 1)
+         IF (REMOVE_PART(IP)) CALL REMOVE_PARTICLE_ARRAY(IP, particles, NP_PROC)
+         IP = IP - 1
+      END DO
+
+      DEALLOCATE(REMOVE_PART)
+      DEALLOCATE(HAS_REACTED)
    
       !WRITE(*,*) 'Number of real collisions: ', TIMESTEP_COLL
       DEALLOCATE(NPC)
@@ -348,7 +364,10 @@ MODULE collisions
 
                EA = REACTIONS(JR)%EA
 
-               IF (REACTIONS(JR)%TYPE == TCE) THEN
+               IF (REACTIONS(JR)%TYPE == FIXED_RATE) THEN
+                  SIGMA_R = REACTIONS(JR)%CONSTANT_CS
+                  PTCE = SIGMA_R / (SIGMA*(VR/CREF)**(1.-2.*OMEGA))
+               ELSE IF (REACTIONS(JR)%TYPE == TCE) THEN
                   IF (ECOLL .LE. EA) CYCLE
                   PTCE = REACTIONS(JR)%C1 * (ECOLL-EA)**REACTIONS(JR)%C2 * (1.-EA/ECOLL)**REACTIONS(JR)%C3
                ELSE IF (REACTIONS(JR)%TYPE == LXCAT) THEN
@@ -565,7 +584,7 @@ MODULE collisions
    ! with Vahedi's algorithm and tabluated cross-sections             !!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-   SUBROUTINE VAHEDI_COLLIS(JC,NPC,IOF,IND, NCOLLREAL)
+   SUBROUTINE VAHEDI_COLLIS(JC,NPC,IOF,IND, NCOLLREAL, HAS_REACTED, REMOVE_PART)
 
       ! Computes the collisions using the VSS (or VHS, HS, depending on parameters)
       ! in cell JC. Needs the particles to be sorted by cell. This is done by the calling
@@ -577,22 +596,22 @@ MODULE collisions
       INTEGER, DIMENSION(:,:), INTENT(IN) :: NPC, IOF
       INTEGER, DIMENSION(:), INTENT(IN) :: IND
       INTEGER, INTENT(OUT) :: NCOLLREAL
+      LOGICAL, DIMENSION(:), INTENT(INOUT) :: REMOVE_PART
+      LOGICAL, DIMENSION(:), INTENT(INOUT) :: HAS_REACTED
 
-
-      INTEGER      :: JP1,JP2,JCOL, JP, INDJ, JR,IND1,IND2
+      INTEGER      :: JP1, JP2, JCOL, JP, INDJ, JR, IND1, IND2, IP1, IP2, IP3
       INTEGER      :: SP_ID1, SP_ID2, P1_SP_ID, P2_SP_ID, P3_SP_ID
-      INTEGER      :: NCOLL,NCOLLMAX_INT
-      REAL(KIND=8) :: NCOLLMAX,FCORR,VR,VR2,SIGMA_R,MAX_SIGMA
+      INTEGER      :: NCOLL, NCOLLMAX_INT, AVAIL1, AVAIL2
+      REAL(KIND=8) :: NCOLLMAX, FCORR, VR, VR2, SIGMA_R, MAX_SIGMA
       REAL(KIND=8) :: MRED
       REAL(KIND=8) :: EI, ETR, ECOLL, TOTDOF, EA, EROT, EVIB
-      !REAL(KIND=8) :: B,C,EINT,ETOT,ETR,PHI,SITETA,VRX,VRY,VRZ
-      REAL(KIND=8) :: VXMAX,VXMIN,VYMAX,VYMIN,VZMAX,VZMIN,VRMAX
+      REAL(KIND=8) :: VXMAX, VXMIN, VYMAX, VYMIN, VZMAX, VZMIN, VRMAX
       REAL(KIND=8) :: PI2
       REAL(KIND=8), DIMENSION(3) :: C1, C2
       REAL(KIND=8) :: M1, M2
-      REAL(KIND=8) :: CFNUM, VOL
+      REAL(KIND=8) :: CFNUM, VOL, SPWTR1, SPWTR2, MINWTR, MAXWTR, SPWTP1, SPWTP2, SPWTP3
       REAL(KIND=8) :: P_REACT, FACTOR
-      LOGICAL, DIMENSION(:), ALLOCATABLE :: HAS_REACTED
+      
 
       TYPE(PARTICLE_DATA_STRUCTURE) :: NEWparticle
 
@@ -604,8 +623,6 @@ MODULE collisions
          CFNUM = FNUM
       END IF
 
-      ALLOCATE(HAS_REACTED(SUM(NPC(:,JC))))
-      HAS_REACTED = .FALSE.
 
       DO JR = 1, N_REACTIONS
 
@@ -614,8 +631,15 @@ MODULE collisions
          SP_ID1 = REACTIONS(JR)%R1_SP_ID
          SP_ID2 = REACTIONS(JR)%R2_SP_ID
 
+         SPWTR1 = SPECIES(SP_ID1)%SPWT
+         SPWTR2 = SPECIES(SP_ID2)%SPWT
+         MINWTR = MIN(SPWTR1, SPWTR2)
+         MAXWTR = MAX(SPWTR1, SPWTR2)
+
          ! Test if there are enough particles of reactants
          IF ( (NPC(SP_ID1,JC) .LT. 1) .OR. (NPC(SP_ID2,JC) .LT. 1) ) CYCLE
+
+
 
          ! Step 1. Compute the number of pairs to test for collision
 
@@ -624,7 +648,10 @@ MODULE collisions
          VYMAX = -1.D+38
          VYMIN =  1.D+38
          VZMAX = -1.D+38
-         VZMIN =  1.D+38 
+         VZMIN =  1.D+38
+
+         AVAIL1 = 0
+         AVAIL2 = 0
 
          DO JP = IOF(SP_ID1,JC), IOF(SP_ID1,JC)+NPC(SP_ID1,JC)-1 ! Find velocity envelope
             INDJ = IND(JP)
@@ -634,6 +661,7 @@ MODULE collisions
             VYMAX = DMAX1(VYMAX,particles(INDJ)%VY)
             VZMIN = DMIN1(VZMIN,particles(INDJ)%VZ)
             VZMAX = DMAX1(VZMAX,particles(INDJ)%VZ)
+            IF (.NOT. HAS_REACTED(INDJ)) AVAIL1 = AVAIL1 + 1
          END DO
 
          DO JP = IOF(SP_ID2,JC), IOF(SP_ID2,JC)+NPC(SP_ID2,JC)-1 ! Find velocity envelope
@@ -644,7 +672,13 @@ MODULE collisions
             VYMAX = DMAX1(VYMAX,particles(INDJ)%VY)
             VZMIN = DMIN1(VZMIN,particles(INDJ)%VZ)
             VZMAX = DMAX1(VZMAX,particles(INDJ)%VZ)
+            IF (.NOT. HAS_REACTED(INDJ)) AVAIL2 = AVAIL2 + 1
          END DO
+
+         ! Test if there are enough particles of reactants
+         IF ( (AVAIL1 .LT. 1) .OR. (AVAIL2 .LT. 1) ) CYCLE
+         IF ( (SP_ID1 == SP_ID2) .AND. (AVAIL1 .LT. 2) ) CYCLE
+
 
 
          ! Find the maximum cross section of all the species involved in the collisions
@@ -664,7 +698,7 @@ MODULE collisions
          FACTOR = 1
          IF (SP_ID1 == SP_ID2) FACTOR = 0.5
 
-         IF (GRID_TYPE == RECTILINEAR_UNIFORM .AND. DIMS == 2) THEN
+         IF (GRID_TYPE == RECTILINEAR_UNIFORM .AND. ((DIMS == 2) .OR. (DIMS == 0))) THEN
             VOL = CELL_VOL
          ELSE IF (GRID_TYPE == UNSTRUCTURED .AND. DIMS == 1) THEN
             VOL = U1D_GRID%CELL_VOLUMES(JC)
@@ -675,31 +709,24 @@ MODULE collisions
          END IF
 
          IF (SP_ID1 == SP_ID2) THEN
-            NCOLLMAX = FACTOR*NPC(SP_ID1,JC)*(NPC(SP_ID2,JC)-1)*MAX_SIGMA*VRMAX*CFNUM*DT/VOL
+            NCOLLMAX = FACTOR*AVAIL1*(AVAIL2-1)*MAX_SIGMA*VRMAX*CFNUM*MAXWTR*DT/VOL
          ELSE
-            NCOLLMAX = FACTOR*NPC(SP_ID1,JC)*NPC(SP_ID2,JC)*MAX_SIGMA*VRMAX*CFNUM*DT/VOL
+            NCOLLMAX = FACTOR*AVAIL1*AVAIL2*MAX_SIGMA*VRMAX*CFNUM*MAXWTR*DT/VOL
          END IF
          NCOLLMAX_INT = FLOOR(NCOLLMAX+0.5)
 
 
          ! Step 2. Compute the number of pairs (real+artificial) => add constraints (min/max) 
 
-         IF (NCOLLMAX_INT .LT. 1) THEN
-            NCOLL = 1
-         ELSE IF (NCOLLMAX_INT .GT. FLOOR(FACTOR*NPC(SP_ID1,JC))) THEN
-            NCOLL = FLOOR(0.5*NPC(SP_ID1,JC))
-         ELSE IF (NCOLLMAX_INT .GT. FLOOR(FACTOR*NPC(SP_ID2,JC))) THEN
-            NCOLL = FLOOR(0.5*NPC(SP_ID2,JC))
-         ELSE 
-            NCOLL = NCOLLMAX_INT
-         END IF
+         NCOLL = MIN(NCOLLMAX_INT, FLOOR(FACTOR*AVAIL1), FLOOR(FACTOR*AVAIL2))
+         IF (NCOLL .LT. 1) NCOLL = 1
 
          FCORR = NCOLLMAX/NCOLL
          !WRITE(*,*) 'Ncollmax_int', NCOLLMAX_INT, 'ncoll:', NCOLL, 'fcorr:', FCORR
          NCOLLREAL = 0
 
          ! Step 3. Perform the collision => actual probability correct via FCORR
-         WRITE(*,*) 'Testing ', NCOLL, ' collision pairs for reaction ', JR, ' with correction ', FCORR
+         !WRITE(*,*) 'Testing ', NCOLL, ' collision pairs for reaction ', JR, ' with correction ', FCORR
 
          DO JCOL = 1, NCOLL
 
@@ -725,13 +752,13 @@ MODULE collisions
             DO
                IND1 = IOF(SP_ID1,JC) + INT(NPC(SP_ID1,JC)*rf())
                JP1 = IND(IND1)
-               IF (.NOT. HAS_REACTED(IND1)) EXIT
+               IF (.NOT. HAS_REACTED(JP1)) EXIT
             END DO
             ! Select second collision partner randomly (shouldn't be JP1)
             DO
                IND2 = IOF(SP_ID2,JC) + INT(NPC(SP_ID2,JC)*rf())
                JP2 = IND(IND2)
-               IF ( (.NOT. HAS_REACTED(IND2)) .AND. (JP2 .NE. JP1)) EXIT
+               IF ( (.NOT. HAS_REACTED(JP2)) .AND. (JP2 .NE. JP1)) EXIT
             END DO
             !!!!!!!!!!!!!!!!!!!!
 
@@ -762,29 +789,34 @@ MODULE collisions
             EA = REACTIONS(JR)%EA
             IF (ETR .LE. EA) CYCLE
 
-            IF (REACTIONS(JR)%TYPE == LXCAT) THEN
+            IF (REACTIONS(JR)%TYPE == FIXED_RATE) THEN
+               SIGMA_R = REACTIONS(JR)%CONSTANT_CS
+               P_REACT = FCORR/(MAX_SIGMA*VRMAX)*VR*SIGMA_R
+            ELSE IF (REACTIONS(JR)%TYPE == LXCAT) THEN
                SIGMA_R = INTERP_CS(ETR, REACTIONS(JR)%TABLE_ENERGY, REACTIONS(JR)%TABLE_CS)
                P_REACT = FCORR/(MAX_SIGMA*VRMAX)*VR*SIGMA_R
             ELSE
                CYCLE
             END IF
 
-            IF (P_REACT > 1.d0) WRITE(*,*) 'Warning! This was a bad DSMC collision, with P > 1.'
+            IF (P_REACT > 1.d0) WRITE(*,*) 'Warning! Bad DSMC collision for process ', JR, 'P_REACT = ', P_REACT, &
+            ' VR = ', VR, ' VRMAX = ', VRMAX, ' SIGMA_R = ', SIGMA_R, ' MAX_SIGMA = ', MAX_SIGMA, &
+            ' NCOLLMAX = ', NCOLLMAX, ' NCOLL = ', NCOLL
 
             ! Try the reaction
             IF (rf() < P_REACT) THEN ! Collision happens
 
                TIMESTEP_COLL = TIMESTEP_COLL + 1
-               REACTIONS(JR)%COUNTS = REACTIONS(JR)%COUNTS + 1
-               HAS_REACTED(IND1) = .TRUE.
-               HAS_REACTED(IND2) = .TRUE.
-
-               ! Rimuovere commento per avere avviso
-               IF (P_REACT .GT. 1.) THEN
-                  !WRITE(*,*) 'Attention => this was a bad MCC collision! P_REACT = ', P_REACT
+               IF (EA .NE. 0.d0) THEN
+                  REACTIONS(JR)%COUNTS = REACTIONS(JR)%COUNTS + 1
                   TIMESTEP_REAC = TIMESTEP_REAC + 1
                END IF
+               HAS_REACTED(JP1) = .TRUE.
+               HAS_REACTED(JP2) = .TRUE.
 
+
+               IF (rf() > (SPWTR1-MINWTR)/SPWTR1) REMOVE_PART(JP1) = .TRUE.
+               IF (rf() > (SPWTR2-MINWTR)/SPWTR2) REMOVE_PART(JP2) = .TRUE.
 
                !WRITE(*,*) 'Reacting!'
                ! React
@@ -798,9 +830,24 @@ MODULE collisions
                !WRITE(*,*) 'SP_ID changed from ', particles(JP1)%S_ID, particles(JP2)%S_ID, &
                !' to ', REACTIONS(JR)%P1_SP_ID, REACTIONS(JR)%P2_SP_ID
 
-               particles(JP1)%S_ID = REACTIONS(JR)%P1_SP_ID
-               particles(JP2)%S_ID = REACTIONS(JR)%P2_SP_ID
+               SPWTP1 = SPECIES(P1_SP_ID)%SPWT
+               SPWTP2 = SPECIES(P2_SP_ID)%SPWT
 
+               CALL INIT_PARTICLE(particles(JP1)%X,particles(JP1)%Y,particles(JP1)%Z, &
+               C1(1),C1(2),C1(3),particles(JP1)%EROT,particles(JP1)%EVIB,P1_SP_ID, &
+               particles(JP1)%IC,DT, NEWparticle)
+               CALL ADD_PARTICLE_ARRAY(NEWparticle, NP_PROC, particles)
+               IP1 = NP_PROC
+
+               IF (rf() > MINWTR/SPWTP1) REMOVE_PART(IP1) = .TRUE.
+
+               CALL INIT_PARTICLE(particles(JP2)%X,particles(JP2)%Y,particles(JP2)%Z, &
+               C2(1),C2(2),C2(3),particles(JP2)%EROT,particles(JP2)%EVIB,P2_SP_ID, &
+               particles(JP2)%IC,DT, NEWparticle)
+               CALL ADD_PARTICLE_ARRAY(NEWparticle, NP_PROC, particles)
+               IP2 = NP_PROC
+
+               IF (rf() > MINWTR/SPWTP2) REMOVE_PART(IP2) = .TRUE.
 
                IF (.NOT. REACTIONS(JR)%IS_CEX) THEN
                   
@@ -812,22 +859,22 @@ MODULE collisions
                   END IF
 
                   EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P1_SP_ID)%VIBDOF)
-                  particles(JP1)%EVIB = EI
+                  particles(IP1)%EVIB = EI
                   ECOLL = ECOLL - EI
 
                   TOTDOF = TOTDOF - SPECIES(P1_SP_ID)%ROTDOF
                   EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P1_SP_ID)%ROTDOF)
-                  particles(JP1)%EROT = EI
+                  particles(IP1)%EROT = EI
                   ECOLL = ECOLL - EI
 
                   TOTDOF = TOTDOF - SPECIES(P2_SP_ID)%VIBDOF
                   EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P2_SP_ID)%VIBDOF)
-                  particles(JP2)%EVIB = EI
+                  particles(IP2)%EVIB = EI
                   ECOLL = ECOLL - EI
 
                   TOTDOF = TOTDOF - SPECIES(P2_SP_ID)%ROTDOF
                   EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P2_SP_ID)%ROTDOF)
-                  particles(JP2)%EROT = EI
+                  particles(IP2)%EROT = EI
                   ECOLL = ECOLL - EI
 
                   M1 = SPECIES(P1_SP_ID)%MOLECULAR_MASS
@@ -846,15 +893,15 @@ MODULE collisions
                   !IF (TIMESTEP_COLL < 10) WRITE(*,*) 'Post collision velocities ', C1, ' and ', C2
                   ECOLL = ECOLL - EI
 
-                  particles(JP1)%VX = C1(1)
-                  particles(JP1)%VY = C1(2)
-                  particles(JP1)%VZ = C1(3)
+                  particles(IP1)%VX = C1(1)
+                  particles(IP1)%VY = C1(2)
+                  particles(IP1)%VZ = C1(3)
 
 
                   IF (REACTIONS(JR)%N_PROD == 2) THEN
-                     particles(JP2)%VX = C2(1)
-                     particles(JP2)%VY = C2(2)
-                     particles(JP2)%VZ = C2(3)
+                     particles(IP2)%VX = C2(1)
+                     particles(IP2)%VY = C2(2)
+                     particles(IP2)%VZ = C2(3)
                   ELSE IF (REACTIONS(JR)%N_PROD == 3) THEN
                      TOTDOF = TOTDOF - SPECIES(P3_SP_ID)%VIBDOF
                      EVIB = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, SPECIES(P3_SP_ID)%VIBDOF)
@@ -870,16 +917,20 @@ MODULE collisions
                      
                      CALL HS_SCATTER(ECOLL, M1, M2, C1, C2)
                            
-                     particles(JP2)%VX = C1(1)
-                     particles(JP2)%VY = C1(2)
-                     particles(JP2)%VZ = C1(3)
+                     particles(IP2)%VX = C1(1)
+                     particles(IP2)%VY = C1(2)
+                     particles(IP2)%VZ = C1(3)
 
 
-                     CALL INIT_PARTICLE(particles(JP2)%X,particles(JP2)%Y,particles(JP2)%Z, &
-                     C2(1),C2(2),C2(3),EROT,EVIB,P3_SP_ID,particles(JP2)%IC,DT, NEWparticle)
+                     CALL INIT_PARTICLE(particles(IP2)%X,particles(IP2)%Y,particles(IP2)%Z, &
+                     C2(1),C2(2),C2(3),EROT,EVIB,P3_SP_ID,particles(IP2)%IC,DT, NEWparticle)
                      !WRITE(*,*) 'Should be adding particle!'
                      CALL ADD_PARTICLE_ARRAY(NEWparticle, NP_PROC, particles)
 
+                     IP3 = NP_PROC
+                     SPWTP3 = SPECIES(P3_SP_ID)%SPWT
+
+                     IF (rf() > MINWTR/SPWTP3) REMOVE_PART(IP3) = .TRUE.
 
                   END IF
                END IF
@@ -893,7 +944,7 @@ MODULE collisions
       !WRITE(*,*) 'Actually performed:', NCOLLREAL
       !WRITE(*,*) NCOLL/(DT*NPC(JC))/MCRVHS, NCOLLREAL/(DT*NPC(JC))/MCRVHS 
 
-      DEALLOCATE(HAS_REACTED)
+      
          
    END SUBROUTINE VAHEDI_COLLIS
 
@@ -1393,7 +1444,10 @@ MODULE collisions
                   EA = REACTIONS(JR)%EA
                   IF (ECOLL .LE. EA) CYCLE
 
-                  IF (REACTIONS(JR)%TYPE == TCE) THEN
+                  IF (REACTIONS(JR)%TYPE == FIXED_RATE) THEN
+                     SIGMA_R = REACTIONS(JR)%CONSTANT_CS
+                     PTCE = SIGMA_R / (SIGMA*(VR/CREF)**(1.-2.*OMEGA))
+                  ELSE IF (REACTIONS(JR)%TYPE == TCE) THEN
                      IF (ECOLL .LE. EA) CYCLE
                      PTCE = REACTIONS(JR)%C1 * (ECOLL-EA)**REACTIONS(JR)%C2 * (1.-EA/ECOLL)**REACTIONS(JR)%C3
                   ELSE IF (REACTIONS(JR)%TYPE == LXCAT) THEN
@@ -1648,9 +1702,9 @@ MODULE collisions
          REACTIONS(JR)%COUNTS = 0
       END DO
 
-      NULL_COLL_FREQ = MCC_BG_DENS*2e-13
-      P_NULL = 1 - EXP(-DT*NULL_COLL_FREQ)
-      !P_NULL = DT*NULL_COLL_FREQ
+      NULL_COLL_FREQ = MCC_BG_DENS*MCC_NULL_RATE
+      !P_NULL = 1 - EXP(-DT*NULL_COLL_FREQ)
+      P_NULL = DT*NULL_COLL_FREQ
       IF (P_NULL > 1) THEN
          WRITE(*,*) 'Caution! P_NULL is greater than 1! P_NULL = ', P_NULL, 'Setting it to 1 and adjusting the collision frequency.'
          P_NULL = 1.
@@ -1661,7 +1715,6 @@ MODULE collisions
       DO JP1 = 1, NP_PROC_INITIAL
          HAS_REACTED = .FALSE.
          IF (rf() > P_NULL) CYCLE
-         TIMESTEP_COLL = TIMESTEP_COLL + 1
 
          SP_ID1 = particles(JP1)%S_ID
 
@@ -1714,17 +1767,26 @@ MODULE collisions
                EA = REACTIONS(JR)%EA
                IF (ETR .LE. EA) CYCLE
 
-               IF (REACTIONS(JR)%TYPE == LXCAT) THEN
+               IF (REACTIONS(JR)%TYPE == FIXED_RATE) THEN
+                  SIGMA_R = REACTIONS(JR)%CONSTANT_CS
+                  P_CUMULATED = P_CUMULATED + BG_NRHO*SIGMA_R*VR / NULL_COLL_FREQ
+               ELSE IF (REACTIONS(JR)%TYPE == LXCAT) THEN
                   SIGMA_R = INTERP_CS(ETR, REACTIONS(JR)%TABLE_ENERGY, REACTIONS(JR)%TABLE_CS)
-                  !P_CUMULATED = P_CUMULATED + BG_NRHO*SIGMA_R*VR / NULL_COLL_FREQ
-                  P_CUMULATED = P_CUMULATED + (1. -EXP(-BG_NRHO*SIGMA_R*VR*DT)) / P_NULL
+                  P_CUMULATED = P_CUMULATED + BG_NRHO*SIGMA_R*VR / NULL_COLL_FREQ
+                  !P_CUMULATED = P_CUMULATED + (1. -EXP(-BG_NRHO*SIGMA_R*VR*DT)) / P_NULL
                ELSE
                   CYCLE
                END IF
 
                ! Try the reaction
                IF (R_SELECT < P_CUMULATED) THEN ! Collision happens
-                  REACTIONS(JR)%COUNTS = REACTIONS(JR)%COUNTS + 1
+
+                  TIMESTEP_COLL = TIMESTEP_COLL + 1
+                  IF (EA .NE. 0.d0) THEN
+                     REACTIONS(JR)%COUNTS = REACTIONS(JR)%COUNTS + 1
+                     TIMESTEP_REAC = TIMESTEP_REAC + 1
+                  END IF
+                  
 
                   ! Actually create the second collision partner
                   CALL INTERNAL_ENERGY(SPECIES(SP_ID2)%ROTDOF, MCC_BG_TTRA, EROT)
@@ -1737,7 +1799,6 @@ MODULE collisions
                   JP2 = NP_PROC
 
 
-                  TIMESTEP_REAC = TIMESTEP_REAC + 1
 
                   ! Rimuovere commento per avere avviso
                   IF (P_CUMULATED .GT. 1.) THEN

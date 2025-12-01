@@ -55,7 +55,7 @@ PROGRAM PANTERA
    CALL COMPUTE_B_FIELD_FROM_SOLENOIDS
 
    ! ========= Initial particles seed ======================
-   IF (RESTART_TIMESTEP > 0) THEN
+   IF (RESTART) THEN
       CALL READ_PARTICLES_FILE(RESTART_TIMESTEP)
 
       IF (DIMS == 1) THEN 

@@ -26,6 +26,7 @@ MODULE initialization
    USE tools
    USE grid_and_partition
    USE mt19937_64
+   USE velocity_distribution
 
    IMPLICIT NONE
 
@@ -47,7 +48,8 @@ MODULE initialization
       CHARACTER*512      :: MIXTURE_DEFINITION, VSS_PARAMS_FILENAME, LINESOURCE_DEFINITION, WALL_DEFINITION, MCC_BG_FILENAME
       CHARACTER*512      :: BC_DEFINITION, SOLENOID_DEFINITION, MAGNET_DEFINITION
       CHARACTER*64       :: MIX_BOUNDINJECT_NAME, DSMC_COLL_MIX_NAME, MCC_BG_MIX_NAME, PIC_TYPE_STRING, PARTITION_STYLE_STRING, &
-      COLLISION_TYPE_STRING, REMOVE_MIX_NAME
+      COLLISION_TYPE_STRING, REMOVE_MIX_NAME, MIX_BOUNDINJECT_VDF_NAME
+      CLASS(VELOCITY_DISTRIBUTION_STRUCTURE), ALLOCATABLE :: TEMP_VDF_BOUND
 
       ! Open input file for reading
       OPEN(UNIT=in1,FILE='input', STATUS='old',IOSTAT=ios)
@@ -67,7 +69,10 @@ MODULE initialization
          IF (ReasonEOF < 0) EXIT ! End of file reached
 
          ! ~~~~~~~~~~~~~  Geometry and computational domain  ~~~~~~~~~~~~~~~~~
-         IF (line=='Restart:')                 READ(in1,*) RESTART_TIMESTEP
+         IF (line=='Restart:') THEN
+            READ(in1,*) RESTART_TIMESTEP
+            RESTART = .TRUE.
+         END IF
 
          IF (line=='Axisymmetric:')            READ(in1,*) AXI
          IF (line=='Domain_limits:')           READ(in1,*) XMIN, XMAX, YMIN, YMAX, ZMIN, ZMAX
@@ -114,6 +119,11 @@ MODULE initialization
             CALL DEF_BOUNDARY_CONDITION(BC_DEFINITION)
          END IF
 
+         IF (line=='Boundary_condition_species:') THEN
+            READ(in1,'(A)') BC_DEFINITION
+            CALL DEF_BOUNDARY_CONDITION_SPECIES(BC_DEFINITION)
+         END IF
+
          IF (line=='Domain_type:') THEN
             READ(in1,'(A)') BC_DEFINITION
             CALL DEF_DOMAIN_TYPE(BC_DEFINITION)
@@ -122,6 +132,16 @@ MODULE initialization
          IF (line=='Boundary_emit:') THEN
             READ(in1,'(A)') BC_DEFINITION
             CALL DEF_BOUNDARY_EMIT(BC_DEFINITION)
+         END IF
+
+         IF (line=='Thermionic_emit:') THEN
+            READ(in1,'(A)') BC_DEFINITION
+            CALL DEF_THERMIONIC_EMIT(BC_DEFINITION)
+         END IF
+
+         IF (line=='Evaporation_emit:') THEN
+            READ(in1,'(A)') BC_DEFINITION
+            CALL DEF_EVAPORATION_EMIT(BC_DEFINITION)
          END IF
 
          IF (line=='Solenoid_field:') THEN
@@ -135,6 +155,7 @@ MODULE initialization
          END IF
 
          IF (line=='External_B_field:') READ(in1,*) EXTERNAL_B_FIELD(1), EXTERNAL_B_FIELD(2), EXTERNAL_B_FIELD(3)
+         IF (line=='External_E_field:') READ(in1,*) EXTERNAL_E_FIELD(1), EXTERNAL_E_FIELD(2), EXTERNAL_E_FIELD(3)
 
          IF (line=='Magnetic_dipole:') THEN
             BOOL_MAGNETIC_DIPOLE = .TRUE.
@@ -179,12 +200,8 @@ MODULE initialization
          END IF
          
          ! Fluid electrons setting
-         IF (line=='Fluid_electrons_n0:')      READ(in1,*) BOLTZ_N0
-         IF (line=='Fluid_electrons_phi0:')    READ(in1,*) BOLTZ_PHI0
-         IF (line=='Fluid_electrons_Te:')      READ(in1,*) BOLTZ_TE
-
-         IF (line=='Bool_kappa_fluid:')        READ(in1,*) BOOL_KAPPA_FLUID
-         IF (line=='Kappa_constant_fluid:')    READ(in1,*) KAPPA_FLUID_C
+         IF (line=='Fluid_electrons:')         READ(in1,*) BOLTZ_N0, BOLTZ_PHI0, BOLTZ_TE
+         IF (line=='Kappa_fluid:')             READ(in1,*) BOOL_KAPPA_FLUID, KAPPA_FLUID_C
 
          IF (line=='Jacobian_type:')           READ(in1,*) JACOBIAN_TYPE
          IF (line=='Residual_and_jacobian_combined:') READ(in1,*) RESIDUAL_AND_JACOBIAN_COMBINED
@@ -215,6 +232,7 @@ MODULE initialization
          IF (line=='Dump_part_every:')         READ(in1,*) DUMP_PART_EVERY
          IF (line=='Dump_part_start:')         READ(in1,*) DUMP_PART_START
          IF (line=='Dump_part_fracsample:')    READ(in1,*) PARTDUMP_FRACSAMPLE
+         IF (line=='Load_part_fracsample:')    READ(in1,*) PARTLOAD_FRACSAMPLE
          IF (line=='Dump_part_bound_every:')   READ(in1,*) DUMP_PART_BOUND_EVERY
          IF (line=='Dump_part_bound_start:')   READ(in1,*) DUMP_PART_BOUND_START
          IF (line=='Dump_bound_avgevery:')     READ(in1,*) DUMP_BOUND_AVG_EVERY
@@ -257,9 +275,9 @@ MODULE initialization
                COLLISION_TYPE = DSMC
             ELSE IF (COLLISION_TYPE_STRING == "MCC") THEN
                COLLISION_TYPE = MCC
-            ELSE IF (COLLISION_TYPE_STRING == "VAHEDI_MCC") THEN
+            ELSE IF (COLLISION_TYPE_STRING == "MCC_VAHEDI") THEN
                COLLISION_TYPE = MCC_VAHEDI
-            ELSE IF (COLLISION_TYPE_STRING == "VAHEDI_DSMC") THEN
+            ELSE IF (COLLISION_TYPE_STRING == "DSMC_VAHEDI") THEN
                COLLISION_TYPE = DSMC_VAHEDI
             ELSE IF (COLLISION_TYPE_STRING == "BGK") THEN
                COLLISION_TYPE = BGK
@@ -269,6 +287,8 @@ MODULE initialization
          END IF
          IF (line=='MCC_background_dens:')     READ(in1,*) MCC_BG_DENS
          IF (line=='MCC_background_Ttra:')     READ(in1,*) MCC_BG_TTRA
+         IF (line=='MCC_null_rate:')           READ(in1,*) MCC_NULL_RATE
+         IF (line=='MCC_create_particles_from_bg') READ(in1,*) MCC_CREATE_PARTICLES_FROM_BG
          IF (line=='MCC_background_mixture:') THEN
             READ(in1,*) MCC_BG_MIX_NAME
             MCC_BG_MIX = MIXTURE_NAME_TO_ID(MCC_BG_MIX_NAME)
@@ -331,6 +351,11 @@ MODULE initialization
          IF (line=='Boundaries_inject_mixture:') THEN
             READ(in1,*) MIX_BOUNDINJECT_NAME
             MIX_BOUNDINJECT = MIXTURE_NAME_TO_ID(MIX_BOUNDINJECT_NAME)
+         END IF
+         IF (line=='Boundaries_velocity_distribution:') THEN
+            READ(in1,*) MIX_BOUNDINJECT_VDF_NAME
+            CALL ASSIGN_VDF(TEMP_VDF_BOUND,MIX_BOUNDINJECT_VDF_NAME)
+            ALLOCATE(VDF_BOUND, SOURCE=TEMP_VDF_BOUND)
          END IF
 
          ! ~~~~~~~~~~~~~  Particle injection at line source ~~~~~~~~~~~
@@ -445,7 +470,7 @@ MODULE initialization
          string = 'Collision type:'
          WRITE(*,'(A5,A50,I8)') '     ', string, COLLISION_TYPE
 
-         IF (COLLISION_TYPE == MCC) THEN  ! Only print this if MCC collisions are ON
+         IF (COLLISION_TYPE == MCC .OR. COLLISION_TYPE == MCC_VAHEDI) THEN  ! Only print this if MCC collisions are ON
 
             string = 'Background number density [1/m^3]:'
             WRITE(*,'(A5,A50,ES14.3)') '     ', string, MCC_BG_DENS
@@ -956,9 +981,10 @@ MODULE initialization
       INTEGER :: N_STR
       CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
 
-      CHARACTER*64 :: MIX_NAME
+      CHARACTER*64 :: MIX_NAME, VDF_NAME
       INTEGER      :: MIX_ID
       TYPE(LINESOURCE), DIMENSION(:), ALLOCATABLE :: TEMP_LINESOURCES
+      CLASS(VELOCITY_DISTRIBUTION_STRUCTURE), ALLOCATABLE :: TEMP_VDF
 
       IF (ALLOCATED(LINESOURCES)) THEN
          ALLOCATE(TEMP_LINESOURCES(N_LINESOURCES+1)) ! Append the mixture to the list
@@ -985,10 +1011,15 @@ MODULE initialization
       READ(STRARRAY(10),'(ES14.0)') LINESOURCES(N_LINESOURCES)%TROT
       READ(STRARRAY(10),'(ES14.0)') LINESOURCES(N_LINESOURCES)%TVIB
       READ(STRARRAY(11),'(A10)') MIX_NAME
+      READ(STRARRAY(12),'(A10)') VDF_NAME
+
+      CALL ASSIGN_VDF(TEMP_VDF, VDF_NAME)
+
       ! WRITE(*,*) LINESOURCES(N_LINESOURCES)%UX
       ! WRITE(*,*) LINESOURCES(N_LINESOURCES)%NRHO
       MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
       LINESOURCES(N_LINESOURCES)%MIX_ID = MIX_ID
+      ALLOCATE(LINESOURCES(N_LINESOURCES)%VDF, SOURCE=TEMP_VDF)
 
    END SUBROUTINE DEF_LINESOURCE
 
@@ -1064,6 +1095,11 @@ MODULE initialization
          GRID_BC(IPG)%PARTICLE_BC = VACUUM
       ELSE IF (STRARRAY(2) == 'specular') THEN
          GRID_BC(IPG)%PARTICLE_BC = SPECULAR
+      ELSE IF (STRARRAY(2) == 'piston') THEN
+         GRID_BC(IPG)%PARTICLE_BC = PISTON
+         READ(STRARRAY(3), '(ES14.0)') GRID_BC(IPG)%U_PISTON(1)
+         READ(STRARRAY(4), '(ES14.0)') GRID_BC(IPG)%U_PISTON(2)
+         READ(STRARRAY(5), '(ES14.0)') GRID_BC(IPG)%U_PISTON(3)
       ELSE IF (STRARRAY(2) == 'diffuse') THEN
          GRID_BC(IPG)%PARTICLE_BC = DIFFUSE
          READ(STRARRAY(3), '(ES14.0)') GRID_BC(IPG)%WALL_TEMP
@@ -1101,6 +1137,7 @@ MODULE initialization
       ELSE IF (STRARRAY(2) == 'conductive') THEN
          GRID_BC(IPG)%FIELD_BC = CONDUCTIVE_BC
          BOOL_CONDUCTIVE_BC = .TRUE.
+         CALL DEF_CONDUCTIVE_GROUP(DEFINITION)
       ELSE IF (STRARRAY(2) == 'spicenode') THEN
          GRID_BC(IPG)%FIELD_BC = SPICE_NODE_BC
       !!! BCs for both particles and field
@@ -1134,6 +1171,200 @@ MODULE initialization
 
 
    END SUBROUTINE DEF_BOUNDARY_CONDITION
+
+
+   SUBROUTINE DEF_BOUNDARY_CONDITION_SPECIES(DEFINITION)
+
+      IMPLICIT NONE
+
+      CHARACTER(LEN=*), INTENT(IN) :: DEFINITION
+
+      INTEGER :: N_STR, I, IPG, ISP
+      CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
+
+
+      CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
+
+      ! phys_group type parameters
+      IPG = -1
+      DO I = 1, N_GRID_BC
+         IF (GRID_BC(I)%PHYSICAL_GROUP_NAME == STRARRAY(1)) IPG = I
+      END DO
+      IF (IPG == -1) THEN
+         WRITE(*,*) 'Group ', STRARRAY(1), ' not found.'
+         CALL ERROR_ABORT('Error in boundary condition definition. Group name not found.')
+      END IF
+
+      ISP = SPECIES_NAME_TO_ID(STRARRAY(2))
+      IF (ISP == -1) THEN
+         WRITE(*,*) 'Species ', STRARRAY(2), ' not found.'
+         CALL ERROR_ABORT('Error in boundary condition definition. Species name not found.')
+      END IF
+      
+      IF (STRARRAY(3) == 'vacuum') THEN
+         GRID_BC(IPG)%PARTICLE_BC(ISP) = VACUUM
+      ELSE IF (STRARRAY(3) == 'specular') THEN
+         GRID_BC(IPG)%PARTICLE_BC(ISP) = SPECULAR
+      ELSE IF (STRARRAY(3) == 'piston') THEN
+         GRID_BC(IPG)%PARTICLE_BC(ISP) = PISTON
+         READ(STRARRAY(4), '(ES14.0)') GRID_BC(IPG)%U_PISTON(1)
+         READ(STRARRAY(5), '(ES14.0)') GRID_BC(IPG)%U_PISTON(2)
+         READ(STRARRAY(6), '(ES14.0)') GRID_BC(IPG)%U_PISTON(3)
+      ELSE IF (STRARRAY(3) == 'diffuse') THEN
+         GRID_BC(IPG)%PARTICLE_BC(ISP) = DIFFUSE
+         READ(STRARRAY(4), '(ES14.0)') GRID_BC(IPG)%WALL_TEMP
+      ELSE IF (STRARRAY(3) == 'cll') THEN
+         GRID_BC(IPG)%PARTICLE_BC(ISP) = CLL
+         READ(STRARRAY(4), '(ES14.0)') GRID_BC(IPG)%WALL_TEMP
+         READ(STRARRAY(5), '(ES14.0)') GRID_BC(IPG)%ACC_N
+         READ(STRARRAY(6), '(ES14.0)') GRID_BC(IPG)%ACC_T
+      ELSE IF (STRARRAY(3) == 'react') THEN
+         GRID_BC(IPG)%REACT = .TRUE.
+      ELSE IF (STRARRAY(3) == 'washboard') THEN
+         GRID_BC(IPG)%PARTICLE_BC(ISP) = WB_BC
+         READ(STRARRAY(4), '(ES14.0)') GRID_BC(IPG)%A
+         READ(STRARRAY(5), '(ES14.0)') GRID_BC(IPG)%B
+         READ(STRARRAY(6), '(ES14.0)') GRID_BC(IPG)%W
+         READ(STRARRAY(7), '(ES14.0)') GRID_BC(IPG)%WALL_TEMP
+         READ(STRARRAY(8), '(ES14.0)') GRID_BC(IPG)%ACC_N
+         GRID_BC(IPG)%ACC_T = 0
+         CALL READ_WASHBOARD_TABLES(IPG)
+      ELSE IF (STRARRAY(3) == 'axis') THEN
+         GRID_BC(IPG)%PARTICLE_BC(ISP) = AXIS
+         ! Needs more info
+      ELSE IF (STRARRAY(3) == 'emit') THEN
+         GRID_BC(IPG)%PARTICLE_BC(ISP) = EMIT
+         ! Needs more info
+      ELSE
+         CALL ERROR_ABORT('Error in boundary condition definition.')
+      END IF
+
+   END SUBROUTINE DEF_BOUNDARY_CONDITION_SPECIES
+
+
+   SUBROUTINE DEF_CONDUCTIVE_GROUP(DEFINITION)
+
+      IMPLICIT NONE
+
+      CHARACTER(LEN=*), INTENT(IN) :: DEFINITION
+
+      INTEGER :: N_STR, N_GROUPS, FOUND_GROUP, PART_INDEX
+      CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
+
+      INTEGER :: I, IG, IPG
+      TYPE(CONNECTED_COND_SURFACE), DIMENSION(:), ALLOCATABLE :: TEMP_CONNECTED_COND_SURFACES
+
+      CHARACTER(LEN=256), DIMENSION(:), ALLOCATABLE :: TEMP_GROUP_NAMES
+      INTEGER, DIMENSION(:), ALLOCATABLE :: TEMP_GROUP_ID
+
+
+      CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
+      
+      ! Assign conductive BC to a grouped part that are connected electrically together
+      ! 2 cases:
+      !     - No conductive part specified (N_STR == 2)
+      !     - Conductive part specified (N_STR == 3)
+      
+      ! Find the physical group
+      IPG = -1
+      DO IG = 1, N_GRID_BC
+         IF (GRID_BC(IG)%PHYSICAL_GROUP_NAME == STRARRAY(1)) THEN
+            IPG = IG
+            EXIT
+         END IF
+      END DO
+      
+      IF (IPG == -1) THEN
+         WRITE(*,*) 'Group ', STRARRAY(1), ' not found.'
+         RETURN
+      END IF
+      
+      IF (N_STR == 2) THEN
+         ! Conductive group name not specified - create a new single-group part
+
+         IF (ALLOCATED(CONNECTED_COND_SURFACES)) THEN
+            ALLOCATE(TEMP_CONNECTED_COND_SURFACES(N_CONNECTED_COND_SURFACES+1))
+            TEMP_CONNECTED_COND_SURFACES(1:N_CONNECTED_COND_SURFACES) = CONNECTED_COND_SURFACES(1:N_CONNECTED_COND_SURFACES)
+            CALL MOVE_ALLOC(TEMP_CONNECTED_COND_SURFACES, CONNECTED_COND_SURFACES)
+         ELSE
+            ALLOCATE(CONNECTED_COND_SURFACES(1))
+         END IF
+         N_CONNECTED_COND_SURFACES = N_CONNECTED_COND_SURFACES + 1
+
+         ! Assign a name and an id to the conductive part
+         WRITE(CONNECTED_COND_SURFACES(N_CONNECTED_COND_SURFACES)%CONDUCTIVE_PART_NAME, '(A,I0)') &
+               'Part', N_CONNECTED_COND_SURFACES
+         CONNECTED_COND_SURFACES(N_CONNECTED_COND_SURFACES)%CONDUCTIVE_PART_ID = N_CONNECTED_COND_SURFACES
+
+         ! Include groups in the conductive part
+         CONNECTED_COND_SURFACES(N_CONNECTED_COND_SURFACES)%N_GROUPS = 1
+         ALLOCATE(CONNECTED_COND_SURFACES(N_CONNECTED_COND_SURFACES)%GROUP_NAMES(1))
+         ALLOCATE(CONNECTED_COND_SURFACES(N_CONNECTED_COND_SURFACES)%GROUP_ID(1))
+
+         CONNECTED_COND_SURFACES(N_CONNECTED_COND_SURFACES)%GROUP_NAMES(1) = STRARRAY(1)
+         CONNECTED_COND_SURFACES(N_CONNECTED_COND_SURFACES)%GROUP_ID(1) = IPG
+         GRID_BC(IPG)%CONDUCTIVE_PART_ID = N_CONNECTED_COND_SURFACES
+
+      ELSE IF (N_STR == 3) THEN
+         ! Conductive part name specified
+         ! Search for existing part or create a new one
+
+         FOUND_GROUP = 0
+         PART_INDEX = 0
+
+         IF (ALLOCATED(CONNECTED_COND_SURFACES)) THEN
+            DO I = 1, N_CONNECTED_COND_SURFACES
+               IF (CONNECTED_COND_SURFACES(I)%CONDUCTIVE_PART_NAME == STRARRAY(3)) THEN
+                  FOUND_GROUP = 1
+                  PART_INDEX = I
+                  EXIT
+               END IF
+            END DO
+         END IF
+
+         IF (FOUND_GROUP == 0) THEN
+            ! Part not found - create a new conductive group
+            IF (ALLOCATED(CONNECTED_COND_SURFACES)) THEN
+               ALLOCATE(TEMP_CONNECTED_COND_SURFACES(N_CONNECTED_COND_SURFACES+1))
+               TEMP_CONNECTED_COND_SURFACES(1:N_CONNECTED_COND_SURFACES) = CONNECTED_COND_SURFACES(1:N_CONNECTED_COND_SURFACES)
+               CALL MOVE_ALLOC(TEMP_CONNECTED_COND_SURFACES, CONNECTED_COND_SURFACES)
+            ELSE
+               ALLOCATE(CONNECTED_COND_SURFACES(1))
+            END IF
+            N_CONNECTED_COND_SURFACES = N_CONNECTED_COND_SURFACES + 1
+            PART_INDEX = N_CONNECTED_COND_SURFACES
+
+            CONNECTED_COND_SURFACES(PART_INDEX)%CONDUCTIVE_PART_NAME = STRARRAY(3)
+            CONNECTED_COND_SURFACES(PART_INDEX)%CONDUCTIVE_PART_ID = PART_INDEX
+            CONNECTED_COND_SURFACES(PART_INDEX)%N_GROUPS = 1
+            ALLOCATE(CONNECTED_COND_SURFACES(PART_INDEX)%GROUP_NAMES(1))
+            ALLOCATE(CONNECTED_COND_SURFACES(PART_INDEX)%GROUP_ID(1))
+         ELSE
+            ! Part found - add this group to existing part
+            N_GROUPS = CONNECTED_COND_SURFACES(PART_INDEX)%N_GROUPS
+            ALLOCATE(TEMP_GROUP_NAMES(N_GROUPS+1))
+            ALLOCATE(TEMP_GROUP_ID(N_GROUPS+1))
+
+            TEMP_GROUP_NAMES(1:N_GROUPS) = CONNECTED_COND_SURFACES(PART_INDEX)%GROUP_NAMES(1:N_GROUPS)
+            TEMP_GROUP_ID(1:N_GROUPS)    = CONNECTED_COND_SURFACES(PART_INDEX)%GROUP_ID(1:N_GROUPS)
+
+            CALL MOVE_ALLOC(TEMP_GROUP_NAMES, CONNECTED_COND_SURFACES(PART_INDEX)%GROUP_NAMES)
+            CALL MOVE_ALLOC(TEMP_GROUP_ID, CONNECTED_COND_SURFACES(PART_INDEX)%GROUP_ID)
+
+            CONNECTED_COND_SURFACES(PART_INDEX)%N_GROUPS = N_GROUPS + 1
+         END IF
+
+         ! Assign group to the conductive part
+         CONNECTED_COND_SURFACES(PART_INDEX)%GROUP_NAMES(CONNECTED_COND_SURFACES(PART_INDEX)%N_GROUPS) = STRARRAY(1)
+         CONNECTED_COND_SURFACES(PART_INDEX)%GROUP_ID(CONNECTED_COND_SURFACES(PART_INDEX)%N_GROUPS) = IPG
+         GRID_BC(IPG)%CONDUCTIVE_PART_ID = PART_INDEX
+
+      ELSE
+         CALL ERROR_ABORT('Error in conductive boundary definition.')
+      END IF
+
+   END SUBROUTINE DEF_CONDUCTIVE_GROUP
+
 
 
    SUBROUTINE READ_WASHBOARD_TABLES(IPG)
@@ -1291,9 +1522,10 @@ MODULE initialization
       INTEGER :: N_STR
       CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
 
-      CHARACTER*64 :: MIX_NAME
+      CHARACTER*64 :: MIX_NAME, VDF_NAME
       INTEGER      :: MIX_ID, I, IC, IPG
       TYPE(EMIT_TASK_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: TEMP_EMIT_TASKS
+      CLASS(VELOCITY_DISTRIBUTION_STRUCTURE), ALLOCATABLE :: TEMP_VDF
 
       REAL(KIND=8) :: NRHO, UX, UY, UZ, TTRA, TROT, TVIB
 
@@ -1314,6 +1546,9 @@ MODULE initialization
       READ(STRARRAY(7), '(ES14.0)') TTRA
       READ(STRARRAY(8),'(ES14.0)') TROT
       READ(STRARRAY(9),'(ES14.0)') TVIB
+      READ(STRARRAY(10),'(A10)') VDF_NAME
+
+      CALL ASSIGN_VDF(TEMP_VDF, VDF_NAME)
 
 
       MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
@@ -1344,9 +1579,11 @@ MODULE initialization
                   EMIT_TASKS(N_EMIT_TASKS)%MIX_ID = MIX_ID
                   EMIT_TASKS(N_EMIT_TASKS)%IC = IC
                   EMIT_TASKS(N_EMIT_TASKS)%IFACE = I
+                  ALLOCATE(EMIT_TASKS(N_EMIT_TASKS)%VDF, SOURCE=TEMP_VDF)
    
                   EMIT_TASKS(N_EMIT_TASKS)%IV1 = U1D_GRID%CELL_NODES(I,IC)
-   
+
+                  EMIT_TASKS(N_EMIT_TASKS)%TYPE = UNIFORM
                   ! NFS WILL BE INITIALIZED LATER.
                END IF
             END DO
@@ -1375,6 +1612,7 @@ MODULE initialization
                   EMIT_TASKS(N_EMIT_TASKS)%MIX_ID = MIX_ID
                   EMIT_TASKS(N_EMIT_TASKS)%IC = IC
                   EMIT_TASKS(N_EMIT_TASKS)%IFACE = I
+                  ALLOCATE(EMIT_TASKS(N_EMIT_TASKS)%VDF, SOURCE=TEMP_VDF)
    
                   
                   IF (I == 1) THEN
@@ -1387,7 +1625,8 @@ MODULE initialization
                      EMIT_TASKS(N_EMIT_TASKS)%IV1 = U2D_GRID%CELL_NODES(3,IC)
                      EMIT_TASKS(N_EMIT_TASKS)%IV2 = U2D_GRID%CELL_NODES(1,IC)
                   END IF
-   
+                  
+                  EMIT_TASKS(N_EMIT_TASKS)%TYPE = UNIFORM
                   ! NFS WILL BE INITIALIZED LATER.
                END IF
             END DO
@@ -1415,7 +1654,9 @@ MODULE initialization
                   EMIT_TASKS(N_EMIT_TASKS)%MIX_ID = MIX_ID
                   EMIT_TASKS(N_EMIT_TASKS)%IC = IC
                   EMIT_TASKS(N_EMIT_TASKS)%IFACE = I
+                  ALLOCATE(EMIT_TASKS(N_EMIT_TASKS)%VDF, SOURCE=TEMP_VDF)
    
+                  EMIT_TASKS(N_EMIT_TASKS)%TYPE = UNIFORM
                   ! NFS WILL BE INITIALIZED LATER.
                END IF
             END DO
@@ -1427,7 +1668,269 @@ MODULE initialization
 
    END SUBROUTINE DEF_BOUNDARY_EMIT
 
+   SUBROUTINE DEF_THERMIONIC_EMIT(DEFINITION)
 
+      IMPLICIT NONE
+
+      CHARACTER(LEN=*), INTENT(IN) :: DEFINITION
+
+      INTEGER :: N_STR
+      CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
+
+      CHARACTER*64 :: MIX_NAME
+      INTEGER      :: MIX_ID, I, IC, IPG
+      TYPE(EMIT_TASK_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: TEMP_EMIT_TASKS
+      CLASS(VELOCITY_DISTRIBUTION_STRUCTURE), ALLOCATABLE :: TEMP_VDF
+
+      REAL(KIND=8) :: T_SURFACE, WORK_FUNCTION, CORRECTION
+
+      CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
+
+      IPG = -1
+      DO I = 1, N_GRID_BC
+         IF (GRID_BC(I)%PHYSICAL_GROUP_NAME == STRARRAY(1)) IPG = I
+      END DO
+      IF (IPG == -1) CALL ERROR_ABORT('Error in boundary emit definition. Group name not found.')
+
+      READ(STRARRAY(2),'(A10)') MIX_NAME
+      READ(STRARRAY(3), '(ES14.0)') T_SURFACE
+      READ(STRARRAY(4), '(ES14.0)') WORK_FUNCTION
+      READ(STRARRAY(5), '(ES14.0)') CORRECTION
+
+      CALL ASSIGN_VDF(TEMP_VDF, 'Maxwell')
+
+      ! MIX_ID = SPECIES_NAME_TO_ID('e')
+      MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
+
+      IF (DIMS == 1) THEN 
+         DO IC = 1, NCELLS
+            DO I = 1, 2
+               IF (U1D_GRID%CELL_EDGES_PG(I,IC) == IPG) THEN
+                  
+                  IF (ALLOCATED(EMIT_TASKS)) THEN
+                     ALLOCATE(TEMP_EMIT_TASKS(N_EMIT_TASKS+1)) ! Append the mixture to the list
+                     TEMP_EMIT_TASKS(1:N_EMIT_TASKS) = EMIT_TASKS(1:N_EMIT_TASKS)
+                     CALL MOVE_ALLOC(TEMP_EMIT_TASKS, EMIT_TASKS)
+                  ELSE
+                     ALLOCATE(EMIT_TASKS(1))
+                  END IF
+                  N_EMIT_TASKS = N_EMIT_TASKS + 1
+   
+                  EMIT_TASKS(N_EMIT_TASKS)%T_SURFACE = T_SURFACE
+                  EMIT_TASKS(N_EMIT_TASKS)%TTRA = T_SURFACE
+                  EMIT_TASKS(N_EMIT_TASKS)%WORK_FUNCTION = WORK_FUNCTION
+                  EMIT_TASKS(N_EMIT_TASKS)%CORRECTION = CORRECTION
+                  EMIT_TASKS(N_EMIT_TASKS)%MIX_ID = MIX_ID
+                  EMIT_TASKS(N_EMIT_TASKS)%IC = IC
+                  EMIT_TASKS(N_EMIT_TASKS)%IFACE = I
+                  ALLOCATE(EMIT_TASKS(N_EMIT_TASKS)%VDF, SOURCE=TEMP_VDF)
+   
+                  EMIT_TASKS(N_EMIT_TASKS)%IV1 = U1D_GRID%CELL_NODES(I,IC)
+                  
+                  EMIT_TASKS(N_EMIT_TASKS)%TYPE = THERMIONIC
+                  ! NFS WILL BE INITIALIZED LATER.
+               END IF
+            END DO
+         END DO
+      ELSE IF (DIMS == 2) THEN
+         DO IC = 1, NCELLS
+            DO I = 1, 3
+               IF (U2D_GRID%CELL_EDGES_PG(I,IC) == IPG) THEN
+                  
+                  IF (ALLOCATED(EMIT_TASKS)) THEN
+                     ALLOCATE(TEMP_EMIT_TASKS(N_EMIT_TASKS+1)) ! Append the mixture to the list
+                     TEMP_EMIT_TASKS(1:N_EMIT_TASKS) = EMIT_TASKS(1:N_EMIT_TASKS)
+                     CALL MOVE_ALLOC(TEMP_EMIT_TASKS, EMIT_TASKS)
+                  ELSE
+                     ALLOCATE(EMIT_TASKS(1))
+                  END IF
+                  N_EMIT_TASKS = N_EMIT_TASKS + 1
+   
+                  EMIT_TASKS(N_EMIT_TASKS)%T_SURFACE = T_SURFACE
+                  EMIT_TASKS(N_EMIT_TASKS)%WORK_FUNCTION = WORK_FUNCTION
+                  EMIT_TASKS(N_EMIT_TASKS)%CORRECTION = CORRECTION
+                  EMIT_TASKS(N_EMIT_TASKS)%MIX_ID = MIX_ID
+                  EMIT_TASKS(N_EMIT_TASKS)%IC = IC
+                  EMIT_TASKS(N_EMIT_TASKS)%IFACE = I
+                  ALLOCATE(EMIT_TASKS(N_EMIT_TASKS)%VDF, SOURCE=TEMP_VDF)
+                  
+                  IF (I == 1) THEN
+                     EMIT_TASKS(N_EMIT_TASKS)%IV1 = U2D_GRID%CELL_NODES(1,IC)
+                     EMIT_TASKS(N_EMIT_TASKS)%IV2 = U2D_GRID%CELL_NODES(2,IC)
+                  ELSE IF (I == 2) THEN
+                     EMIT_TASKS(N_EMIT_TASKS)%IV1 = U2D_GRID%CELL_NODES(2,IC)
+                     EMIT_TASKS(N_EMIT_TASKS)%IV2 = U2D_GRID%CELL_NODES(3,IC)
+                  ELSE
+                     EMIT_TASKS(N_EMIT_TASKS)%IV1 = U2D_GRID%CELL_NODES(3,IC)
+                     EMIT_TASKS(N_EMIT_TASKS)%IV2 = U2D_GRID%CELL_NODES(1,IC)
+                  END IF
+   
+                  EMIT_TASKS(N_EMIT_TASKS)%TYPE = THERMIONIC
+                  ! NFS WILL BE INITIALIZED LATER.
+               END IF
+            END DO
+         END DO
+      ELSE IF (DIMS == 3) THEN
+         DO IC = 1, NCELLS
+            DO I = 1, 4
+               IF (U3D_GRID%CELL_FACES_PG(I,IC) == IPG) THEN
+                  IF (ALLOCATED(EMIT_TASKS)) THEN
+                     ALLOCATE(TEMP_EMIT_TASKS(N_EMIT_TASKS+1)) ! Append the mixture to the list
+                     TEMP_EMIT_TASKS(1:N_EMIT_TASKS) = EMIT_TASKS(1:N_EMIT_TASKS)
+                     CALL MOVE_ALLOC(TEMP_EMIT_TASKS, EMIT_TASKS)
+                  ELSE
+                     ALLOCATE(EMIT_TASKS(1))
+                  END IF
+                  N_EMIT_TASKS = N_EMIT_TASKS + 1
+   
+                  EMIT_TASKS(N_EMIT_TASKS)%T_SURFACE = T_SURFACE
+                  EMIT_TASKS(N_EMIT_TASKS)%WORK_FUNCTION = WORK_FUNCTION
+                  EMIT_TASKS(N_EMIT_TASKS)%CORRECTION = CORRECTION
+                  EMIT_TASKS(N_EMIT_TASKS)%MIX_ID = MIX_ID
+                  EMIT_TASKS(N_EMIT_TASKS)%IC = IC
+                  EMIT_TASKS(N_EMIT_TASKS)%IFACE = I
+                  ALLOCATE(EMIT_TASKS(N_EMIT_TASKS)%VDF, SOURCE=TEMP_VDF)
+   
+                  EMIT_TASKS(N_EMIT_TASKS)%TYPE = THERMIONIC
+                  ! NFS WILL BE INITIALIZED LATER.
+               END IF
+            END DO
+         END DO
+      END IF
+
+   END SUBROUTINE DEF_THERMIONIC_EMIT
+
+
+   SUBROUTINE DEF_EVAPORATION_EMIT(DEFINITION)
+
+      IMPLICIT NONE
+
+      CHARACTER(LEN=*), INTENT(IN) :: DEFINITION
+
+      INTEGER :: N_STR
+      CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
+
+      CHARACTER*64 :: MIX_NAME
+      INTEGER      :: MIX_ID, I, IC, IPG
+      TYPE(EMIT_TASK_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: TEMP_EMIT_TASKS
+      CLASS(VELOCITY_DISTRIBUTION_STRUCTURE), ALLOCATABLE :: TEMP_VDF
+
+      REAL(KIND=8) :: T_SURFACE, A_COEFF, B_COEFF
+
+      CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
+
+      IPG = -1
+      DO I = 1, N_GRID_BC
+         IF (GRID_BC(I)%PHYSICAL_GROUP_NAME == STRARRAY(1)) IPG = I
+      END DO
+      IF (IPG == -1) CALL ERROR_ABORT('Error in boundary emit definition. Group name not found.')
+
+      READ(STRARRAY(2),'(A10)') MIX_NAME
+      READ(STRARRAY(3), '(ES14.0)') T_SURFACE
+      READ(STRARRAY(4), '(ES14.0)') A_COEFF
+      READ(STRARRAY(5), '(ES14.0)') B_COEFF
+
+      CALL ASSIGN_VDF(TEMP_VDF, 'Maxwell')
+
+      ! MIX_ID = SPECIES_NAME_TO_ID('e')
+      MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
+
+      IF (DIMS == 1) THEN 
+         DO IC = 1, NCELLS
+            DO I = 1, 2
+               IF (U1D_GRID%CELL_EDGES_PG(I,IC) == IPG) THEN
+                  
+                  IF (ALLOCATED(EMIT_TASKS)) THEN
+                     ALLOCATE(TEMP_EMIT_TASKS(N_EMIT_TASKS+1)) ! Append the mixture to the list
+                     TEMP_EMIT_TASKS(1:N_EMIT_TASKS) = EMIT_TASKS(1:N_EMIT_TASKS)
+                     CALL MOVE_ALLOC(TEMP_EMIT_TASKS, EMIT_TASKS)
+                  ELSE
+                     ALLOCATE(EMIT_TASKS(1))
+                  END IF
+                  N_EMIT_TASKS = N_EMIT_TASKS + 1
+   
+                  EMIT_TASKS(N_EMIT_TASKS)%T_SURFACE = T_SURFACE
+                  EMIT_TASKS(N_EMIT_TASKS)%A_COEFF = A_COEFF
+                  EMIT_TASKS(N_EMIT_TASKS)%B_COEFF = B_COEFF
+                  EMIT_TASKS(N_EMIT_TASKS)%MIX_ID = MIX_ID
+                  EMIT_TASKS(N_EMIT_TASKS)%IC = IC
+                  EMIT_TASKS(N_EMIT_TASKS)%IFACE = I
+                  ALLOCATE(EMIT_TASKS(N_EMIT_TASKS)%VDF, SOURCE=TEMP_VDF)
+   
+                  EMIT_TASKS(N_EMIT_TASKS)%IV1 = U1D_GRID%CELL_NODES(I,IC)
+                  
+                  EMIT_TASKS(N_EMIT_TASKS)%TYPE = EVAPORATION
+                  ! NFS WILL BE INITIALIZED LATER.
+               END IF
+            END DO
+         END DO
+      ELSE IF (DIMS == 2) THEN
+         DO IC = 1, NCELLS
+            DO I = 1, 3
+               IF (U2D_GRID%CELL_EDGES_PG(I,IC) == IPG) THEN
+                  
+                  IF (ALLOCATED(EMIT_TASKS)) THEN
+                     ALLOCATE(TEMP_EMIT_TASKS(N_EMIT_TASKS+1)) ! Append the mixture to the list
+                     TEMP_EMIT_TASKS(1:N_EMIT_TASKS) = EMIT_TASKS(1:N_EMIT_TASKS)
+                     CALL MOVE_ALLOC(TEMP_EMIT_TASKS, EMIT_TASKS)
+                  ELSE
+                     ALLOCATE(EMIT_TASKS(1))
+                  END IF
+                  N_EMIT_TASKS = N_EMIT_TASKS + 1
+   
+                  EMIT_TASKS(N_EMIT_TASKS)%T_SURFACE = T_SURFACE
+                  EMIT_TASKS(N_EMIT_TASKS)%A_COEFF = A_COEFF
+                  EMIT_TASKS(N_EMIT_TASKS)%B_COEFF = B_COEFF
+                  EMIT_TASKS(N_EMIT_TASKS)%MIX_ID = MIX_ID
+                  EMIT_TASKS(N_EMIT_TASKS)%IC = IC
+                  EMIT_TASKS(N_EMIT_TASKS)%IFACE = I
+                  ALLOCATE(EMIT_TASKS(N_EMIT_TASKS)%VDF, SOURCE=TEMP_VDF)
+                  
+                  IF (I == 1) THEN
+                     EMIT_TASKS(N_EMIT_TASKS)%IV1 = U2D_GRID%CELL_NODES(1,IC)
+                     EMIT_TASKS(N_EMIT_TASKS)%IV2 = U2D_GRID%CELL_NODES(2,IC)
+                  ELSE IF (I == 2) THEN
+                     EMIT_TASKS(N_EMIT_TASKS)%IV1 = U2D_GRID%CELL_NODES(2,IC)
+                     EMIT_TASKS(N_EMIT_TASKS)%IV2 = U2D_GRID%CELL_NODES(3,IC)
+                  ELSE
+                     EMIT_TASKS(N_EMIT_TASKS)%IV1 = U2D_GRID%CELL_NODES(3,IC)
+                     EMIT_TASKS(N_EMIT_TASKS)%IV2 = U2D_GRID%CELL_NODES(1,IC)
+                  END IF
+   
+                  EMIT_TASKS(N_EMIT_TASKS)%TYPE = EVAPORATION
+                  ! NFS WILL BE INITIALIZED LATER.
+               END IF
+            END DO
+         END DO
+      ELSE IF (DIMS == 3) THEN
+         DO IC = 1, NCELLS
+            DO I = 1, 4
+               IF (U3D_GRID%CELL_FACES_PG(I,IC) == IPG) THEN
+                  IF (ALLOCATED(EMIT_TASKS)) THEN
+                     ALLOCATE(TEMP_EMIT_TASKS(N_EMIT_TASKS+1)) ! Append the mixture to the list
+                     TEMP_EMIT_TASKS(1:N_EMIT_TASKS) = EMIT_TASKS(1:N_EMIT_TASKS)
+                     CALL MOVE_ALLOC(TEMP_EMIT_TASKS, EMIT_TASKS)
+                  ELSE
+                     ALLOCATE(EMIT_TASKS(1))
+                  END IF
+                  N_EMIT_TASKS = N_EMIT_TASKS + 1
+   
+                  EMIT_TASKS(N_EMIT_TASKS)%T_SURFACE = T_SURFACE
+                  EMIT_TASKS(N_EMIT_TASKS)%A_COEFF = A_COEFF
+                  EMIT_TASKS(N_EMIT_TASKS)%B_COEFF = B_COEFF
+                  EMIT_TASKS(N_EMIT_TASKS)%MIX_ID = MIX_ID
+                  EMIT_TASKS(N_EMIT_TASKS)%IC = IC
+                  EMIT_TASKS(N_EMIT_TASKS)%IFACE = I
+                  ALLOCATE(EMIT_TASKS(N_EMIT_TASKS)%VDF, SOURCE=TEMP_VDF)
+   
+                  EMIT_TASKS(N_EMIT_TASKS)%TYPE = EVAPORATION
+                  ! NFS WILL BE INITIALIZED LATER.
+               END IF
+            END DO
+         END DO
+      END IF
+
+   END SUBROUTINE DEF_EVAPORATION_EMIT
 
 
 
@@ -1440,11 +1943,13 @@ MODULE initialization
       INTEGER :: N_STR
       CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
 
-      CHARACTER*64 :: MIX_NAME
+      CHARACTER*64 :: MIX_NAME, VDF_NAME
       INTEGER      :: MIX_ID
       TYPE(INITIAL_PARTICLES_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: TEMP_INITIAL_PARTICLES_TASK
+      CLASS(VELOCITY_DISTRIBUTION_STRUCTURE), ALLOCATABLE :: TEMP_VDF
 
       REAL(KIND=8) :: NRHO, UX, UY, UZ, TTRAX, TTRAY, TTRAZ, TROT, TVIB
+      REAL(KIND=8) :: KAPPA
 
       CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
 
@@ -1459,6 +1964,12 @@ MODULE initialization
       READ(STRARRAY(8), '(ES14.0)') TTRAZ
       READ(STRARRAY(9), '(ES14.0)') TROT
       READ(STRARRAY(10),'(ES14.0)') TVIB
+      READ(STRARRAY(11),'(A10)') VDF_NAME
+
+      CALL ASSIGN_VDF(TEMP_VDF,VDF_NAME)
+      ! SELECT TYPE(TEMP_VDF)
+      !    TYPE IS (KAPPA_VDF)
+            
 
       MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
 
@@ -1484,6 +1995,7 @@ MODULE initialization
       INITIAL_PARTICLES_TASKS(N_INITIAL_PARTICLES_TASKS)%TROT = TROT
       INITIAL_PARTICLES_TASKS(N_INITIAL_PARTICLES_TASKS)%TVIB = TVIB
       INITIAL_PARTICLES_TASKS(N_INITIAL_PARTICLES_TASKS)%MIX_ID = MIX_ID
+      ALLOCATE(INITIAL_PARTICLES_TASKS(N_INITIAL_PARTICLES_TASKS)%VDF, SOURCE=TEMP_VDF)
 
    END SUBROUTINE DEF_INITIAL_PARTICLES
 
@@ -1497,9 +2009,10 @@ MODULE initialization
       INTEGER :: N_STR
       CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
 
-      CHARACTER*64 :: MIX_NAME
+      CHARACTER*64 :: MIX_NAME, VDF_NAME
       INTEGER      :: MIX_ID
       TYPE(VOLUME_INJECT_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: TEMP_VOLUME_INJECT_TASK
+      CLASS(VELOCITY_DISTRIBUTION_STRUCTURE), ALLOCATABLE :: TEMP_VDF
 
       REAL(KIND=8) :: NRHODOT, UX, UY, UZ, TTRAX, TTRAY, TTRAZ, TROT, TVIB
 
@@ -1516,6 +2029,9 @@ MODULE initialization
       READ(STRARRAY(8), '(ES14.0)') TTRAZ
       READ(STRARRAY(9), '(ES14.0)') TROT
       READ(STRARRAY(10),'(ES14.0)') TVIB
+      READ(STRARRAY(11),'(A10)') VDF_NAME
+
+      CALL ASSIGN_VDF(TEMP_VDF, VDF_NAME)
 
       MIX_ID = MIXTURE_NAME_TO_ID(MIX_NAME)
 
@@ -1541,6 +2057,7 @@ MODULE initialization
       VOLUME_INJECT_TASKS(N_VOLUME_INJECT_TASKS)%TROT = TROT
       VOLUME_INJECT_TASKS(N_VOLUME_INJECT_TASKS)%TVIB = TVIB
       VOLUME_INJECT_TASKS(N_VOLUME_INJECT_TASKS)%MIX_ID = MIX_ID
+      ALLOCATE(VOLUME_INJECT_TASKS(N_VOLUME_INJECT_TASKS)%VDF, SOURCE=TEMP_VDF)
 
    END SUBROUTINE DEF_VOLUME_INJECT
 
@@ -1704,7 +2221,13 @@ MODULE initialization
 
          READ(in3,'(A)', IOSTAT=ReasonEOF) DEFINITION ! Read reaction parameters line
          CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
-         IF (STRARRAY(1) == 'tce') THEN
+         IF (STRARRAY(1) == 'constant') THEN
+            NEW_REACTION%TYPE = FIXED_RATE
+            READ(STRARRAY(2), *) NEW_REACTION%EA
+            READ(STRARRAY(3), *) NEW_REACTION%CONSTANT_CS
+            NEW_REACTION%MAX_SIGMA = NEW_REACTION%CONSTANT_CS
+            IF (NEW_REACTION%CONSTANT_CS > SIGMAMAX) SIGMAMAX = NEW_REACTION%CONSTANT_CS
+         ELSE IF (STRARRAY(1) == 'tce') THEN
             NEW_REACTION%TYPE = TCE
             IF (NEW_REACTION%IS_CEX) THEN
                NEW_REACTION%EA = 0.d0
@@ -2128,13 +2651,13 @@ MODULE initialization
 
                      ! Assign velocity and energy following a Boltzmann distribution
                      M = SPECIES(S_ID)%MOLECULAR_MASS
-                     CALL MAXWELL(INITIAL_PARTICLES_TASKS(ITASK)%UX, &
-                                  INITIAL_PARTICLES_TASKS(ITASK)%UY, &
-                                  INITIAL_PARTICLES_TASKS(ITASK)%UZ, &
-                                  INITIAL_PARTICLES_TASKS(ITASK)%TTRAX, &
-                                  INITIAL_PARTICLES_TASKS(ITASK)%TTRAY, &
-                                  INITIAL_PARTICLES_TASKS(ITASK)%TTRAZ, &
-                                  VXP, VYP, VZP, M)
+                     CALL INITIAL_PARTICLES_TASKS(ITASK)%VDF%SAMPLE_VELOCITY(INITIAL_PARTICLES_TASKS(ITASK)%UX, &
+                                              INITIAL_PARTICLES_TASKS(ITASK)%UY, &
+                                              INITIAL_PARTICLES_TASKS(ITASK)%UZ, &
+                                              INITIAL_PARTICLES_TASKS(ITASK)%TTRAX, &
+                                              INITIAL_PARTICLES_TASKS(ITASK)%TTRAY, &
+                                              INITIAL_PARTICLES_TASKS(ITASK)%TTRAZ, &
+                                              VXP, VYP, VZP, M)
 
                      CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, INITIAL_PARTICLES_TASKS(ITASK)%TROT, EROT)
                      CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, INITIAL_PARTICLES_TASKS(ITASK)%TVIB, EVIB)
@@ -2187,13 +2710,13 @@ MODULE initialization
                
                   ! Assign velocity and energy following a Boltzmann distribution
                   M = SPECIES(S_ID)%MOLECULAR_MASS
-                  CALL MAXWELL(INITIAL_PARTICLES_TASKS(ITASK)%UX, &
-                               INITIAL_PARTICLES_TASKS(ITASK)%UY, &
-                               INITIAL_PARTICLES_TASKS(ITASK)%UZ, &
-                               INITIAL_PARTICLES_TASKS(ITASK)%TTRAX, &
-                               INITIAL_PARTICLES_TASKS(ITASK)%TTRAY, &
-                               INITIAL_PARTICLES_TASKS(ITASK)%TTRAZ, &
-                               VXP, VYP, VZP, M)
+                  CALL INITIAL_PARTICLES_TASKS(ITASK)%VDF%SAMPLE_VELOCITY(INITIAL_PARTICLES_TASKS(ITASK)%UX, &
+                                          INITIAL_PARTICLES_TASKS(ITASK)%UY, &
+                                          INITIAL_PARTICLES_TASKS(ITASK)%UZ, &
+                                          INITIAL_PARTICLES_TASKS(ITASK)%TTRAX, &
+                                          INITIAL_PARTICLES_TASKS(ITASK)%TTRAY, &
+                                          INITIAL_PARTICLES_TASKS(ITASK)%TTRAZ, &
+                                          VXP, VYP, VZP, M)
 
                   CALL INTERNAL_ENERGY(SPECIES(S_ID)%ROTDOF, INITIAL_PARTICLES_TASKS(ITASK)%TROT, EROT)
                   CALL INTERNAL_ENERGY(SPECIES(S_ID)%VIBDOF, INITIAL_PARTICLES_TASKS(ITASK)%TVIB, EVIB)
@@ -2218,6 +2741,19 @@ MODULE initialization
    SUBROUTINE INPUT_DATA_SANITY_CHECK
 
       IMPLICIT NONE
+
+      ! ------------ Check for various values for 0D simulation ------------
+      IF (DIMS == 0 .AND. ((NX /= 1) .OR. (NY /= 1) .OR. (NZ /= 1))) THEN
+         CALL ERROR_ABORT('ERROR! Number of cells along all directions must be 1 for 0d simulation. ABORTING!')
+      END IF
+
+      IF (DIMS == 0 .AND. ((.NOT. BOOL_X_PERIODIC) .OR. (.NOT. BOOL_Y_PERIODIC) .OR. (.NOT. BOOL_Z_PERIODIC))) THEN
+         CALL ERROR_ABORT('ERROR! All boundaries must be set to periodic for 0d simulation. ABORTING!')
+      END IF
+
+      IF (DIMS == 0 .AND. (PIC_TYPE /= NONE)) THEN
+         CALL ERROR_ABORT('ERROR! None PIC type needs to be selected for 0d simulation. ABORTING!')
+      END IF
  
       ! ------------ Check values for number of cells ------------
       IF ( GRID_TYPE .NE. UNSTRUCTURED .AND. ((NX < 1) .OR. (NY < 1)) ) THEN
@@ -2372,17 +2908,18 @@ MODULE initialization
 
       IMPLICIT NONE
 
-      REAL(KIND=8) :: BETA, FLUXBOUND, NtotINJECT, Snow
+      REAL(KIND=8) :: BETA, FLUXBOUND, FLUXSOURCE, NtotINJECT, Snow
       REAL(KIND=8) :: U_NORM, S_NORM, FLUXLINESOURCE, LINELENGTH, NORMX, NORMY, NORMZ, AREA
       REAL(KIND=8) :: PI2  
-      REAL(KIND=8) :: INTEG1, INTEG2
+      REAL(KIND=8) :: T_SURFACE, WORK_FUNCTION, A0
+      REAL(KIND=8) :: VAPOR_PRESSURE, A_COEFF, B_COEFF, RHO_VAPOR
 
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: nfs_LINE
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TASK_NFS
       !INTEGER, DIMENSION(:), ALLOCATABLE :: EMIT_COUNT
  
       REAL(KIND=8)  :: M, FRAC
-      INTEGER :: N_COMP, IS, S_ID, ILINE, ITASK, I
+      INTEGER :: N_COMP, IS, S_ID, ILINE, ITASK
 
       REAL(KIND=8) :: X1, X2, Y1, Y2
     
@@ -2510,7 +3047,8 @@ MODULE initialization
             S_ID = MIXTURES(LINESOURCES(ILINE)%MIX_ID)%COMPONENTS(IS)%ID
             M = SPECIES(S_ID)%MOLECULAR_MASS
             FRAC = MIXTURES(LINESOURCES(ILINE)%MIX_ID)%COMPONENTS(IS)%MOLFRAC
-            BETA = 1./SQRT(2.*KB/M*LINESOURCES(ILINE)%TTRA) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
+            ! BETA = 1./SQRT(2.*KB/M*LINESOURCES(ILINE)%TTRA) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
+            BETA = LINESOURCES(ILINE)%VDF%BETA(LINESOURCES(ILINE)%TTRA,M)
          
             LINELENGTH = SQRT((LINESOURCES(ILINE)%X2-LINESOURCES(ILINE)%X1)**2 + (LINESOURCES(ILINE)%Y2-LINESOURCES(ILINE)%Y1)**2)
 
@@ -2524,8 +3062,9 @@ MODULE initialization
             LINESOURCES(ILINE)%S_NORM = S_NORM
             Snow   = S_NORM     ! temp variable
 
-            FLUXLINESOURCE   = LINESOURCES(ILINE)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) &
-                                    + SQRT(PI)*Snow*(1.+ERF1(Snow)))      ! Tot number flux emitted
+            ! FLUXLINESOURCE   = LINESOURCES(ILINE)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-Snow**2) &
+            !                         + SQRT(PI)*Snow*(1.+ERF1(Snow)))      ! Tot number flux emitted
+            FLUXLINESOURCE   = LINESOURCES(ILINE)%NRHO*FRAC*LINESOURCES(ILINE)%VDF%FLUX_DISTR(BETA,S_NORM)
 
             IF (AXI) THEN
                AREA = 0.5*(ZMAX-ZMIN)*LINELENGTH*(LINESOURCES(ILINE)%Y1+LINESOURCES(ILINE)%Y2)
@@ -2556,7 +3095,7 @@ MODULE initialization
       ! =====================================================
       ! Injection from unstructured grid boundaries
       ! WRITE(*,*) 'N emit tasks ', N_EMIT_TASKS
-      DO ITASK = 1, N_EMIT_TASKS ! Loop on line sources
+      DO ITASK = 1, N_EMIT_TASKS ! Loop through emit tasks
 
          N_COMP = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%N_COMPONENTS
          
@@ -2595,59 +3134,87 @@ MODULE initialization
             AREA = U3D_GRID%FACE_AREA(EMIT_TASKS(ITASK)%IFACE, EMIT_TASKS(ITASK)%IC)
          END IF
 
+         ! Calculate number of injected particles based on EMIT_TASK type
 
-         DO IS = 1, N_COMP ! Loop on mixture components
-            ! The species ID of the component
-            S_ID = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%COMPONENTS(IS)%ID
-            M = SPECIES(S_ID)%MOLECULAR_MASS
-            FRAC = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%COMPONENTS(IS)%MOLFRAC
-            IF (EMIT_TASKS(ITASK)%TTRA == 0) THEN
-               BETA = 0
-            ELSE
-               BETA = 1./SQRT(2.*KB/M*EMIT_TASKS(ITASK)%TTRA) ! sqrt(M/(2*kB*T)), it's the Maxwellian std dev
-            END IF
+         !!! UNIFORM !!!
+         IF (EMIT_TASKS(ITASK)%TYPE == UNIFORM) THEN
+            DO IS = 1, N_COMP ! Loop on mixture components
+               ! The species ID of the component
+               S_ID = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%COMPONENTS(IS)%ID
+               M = SPECIES(S_ID)%MOLECULAR_MASS
+               FRAC = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%COMPONENTS(IS)%MOLFRAC
+               IF (EMIT_TASKS(ITASK)%TTRA == 0) THEN
+                  BETA = 0
+               ELSE
+                  BETA = EMIT_TASKS(ITASK)%VDF%BETA(EMIT_TASKS(ITASK)%TTRA,M)
+               END IF
 
-            U_NORM = EMIT_TASKS(ITASK)%UX*NORMX + EMIT_TASKS(ITASK)%UY*NORMY + EMIT_TASKS(ITASK)%UZ*NORMZ ! Molecular speed ratio normal to boundary
-            EMIT_TASKS(ITASK)%U_NORM = U_NORM
-            S_NORM = U_NORM*BETA
+               U_NORM = EMIT_TASKS(ITASK)%UX*NORMX + EMIT_TASKS(ITASK)%UY*NORMY + EMIT_TASKS(ITASK)%UZ*NORMZ ! Molecular speed ratio normal to boundary
+               EMIT_TASKS(ITASK)%U_NORM = U_NORM
+               S_NORM = U_NORM*BETA
 
-            IF (EMIT_TASKS(ITASK)%TTRA == 0) THEN
-               FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC*U_NORM      ! Tot number flux emitted
-            ELSE
-               FLUXLINESOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC/(BETA*2.*SQRT(PI)) * (EXP(-S_NORM**2) &
-                              + SQRT(PI)*S_NORM*(1.+ERF1(S_NORM)))      ! Tot number flux emitted
-            END IF
+               IF (EMIT_TASKS(ITASK)%TTRA == 0) THEN
+                  FLUXSOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC*U_NORM      ! Tot number flux emitted
+               ELSE
+                  FLUXSOURCE = EMIT_TASKS(ITASK)%NRHO*FRAC*EMIT_TASKS(ITASK)%VDF%FLUX_DISTR(BETA,S_NORM)
+               END IF
 
-            !!!!! KAPPA DISTRIBUTION !!!!! TODO: Obtain from Kappa distr func.
-            ! IF (BOOL_KAPPA_DISTRIBUTION) THEN
-            !    BETA = 1./SQRT(2.*KB/M*EMIT_TASKS(ITASK)%TTRA*(KAPPA_C-3./2.))
-            !    U_NORM = EMIT_TASKS(ITASK)%UX*NORMX + EMIT_TASKS(ITASK)%UY*NORMY + EMIT_TASKS(ITASK)%UZ*NORMZ ! Molecular speed ratio normal to boundary
-            !    EMIT_TASKS(ITASK)%U_NORM = U_NORM
-            !    S_NORM = U_NORM*BETA
+               NtotINJECT = FLUXSOURCE*AREA*DT/FNUM/SPECIES(S_ID)%SPWT ! Tot num of particles to be injected
 
-            !    INTEG1 = PI/2.
-            !    INTEG2 = ATAN(S_NORM)
-            !    DO I = 2, INT(KAPPA_C)
-            !       INTEG1 = (2.*I-3.)/(2.*(I-1.))*INTEG1
-            !       INTEG2 = S_NORM/(2.*(I-1.)*(1.+(S_NORM)**2)**(I-1.)) + (2.*I-3.)/(2.*(I-1.))*INTEG2
-            !    END DO
+               TASK_NFS(IS) = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
                
-            !    FLUXLINESOURCE = GAMMA(KAPPA_C)/GAMMA(KAPPA_C-1./2.)*EMIT_TASKS(ITASK)%NRHO*FRAC/(BETA*SQRT(PI)) * &
-            !    ( 1./(KAPPA_C-1.)/2.*(1+S_NORM**2)**(-KAPPA_C+1.) + S_NORM*(INTEG1 +INTEG2))      ! Tot number flux emitted
+               ! Check: if we are hypersonic and stuff exits domain print a warning
+               IF (S_NORM .LE. -3.) THEN 
+                  CALL ONLYMASTERPRINT1(PROC_ID, '$$$ Warning! Hypersonic boundary! Almost no &
+                                                      &particles will be emitted at boundary.')
+               END IF
+            END DO
 
-            ! END IF
+         !!! THERMIONIC !!!
+         ELSE IF (EMIT_TASKS(ITASK)%TYPE == THERMIONIC) THEN
+            DO IS = 1, N_COMP ! Loop on mixture components
+               ! The species ID of the component
+               S_ID = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%COMPONENTS(IS)%ID
+               M = SPECIES(S_ID)%MOLECULAR_MASS
+               FRAC = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%COMPONENTS(IS)%MOLFRAC
+
+               T_SURFACE = EMIT_TASKS(ITASK)%T_SURFACE
+               WORK_FUNCTION = EMIT_TASKS(ITASK)%WORK_FUNCTION
+               A0 = 4*PI*M*KB**2/HP**3  ! (RICHARDSON) CONSTANT FOR EMISSION
+               
+               FLUXSOURCE = FRAC*EMIT_TASKS(ITASK)%CORRECTION*A0*T_SURFACE**2*EXP(-QE*WORK_FUNCTION/(KB*T_SURFACE))
+
+               NtotINJECT = FLUXSOURCE*AREA*DT/FNUM/SPECIES(S_ID)%SPWT ! Tot num of particles to be injected
+
+               TASK_NFS(IS) = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
+            END DO
+         
+         !!! EVAPORATION !!!
+         ELSE IF (EMIT_TASKS(ITASK)%TYPE == EVAPORATION) THEN
+            DO IS = 1, N_COMP ! Loop on mixture components
+               ! The species ID of the component
+               S_ID = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%COMPONENTS(IS)%ID
+               M = SPECIES(S_ID)%MOLECULAR_MASS
+               FRAC = MIXTURES(EMIT_TASKS(ITASK)%MIX_ID)%COMPONENTS(IS)%MOLFRAC
+
+               T_SURFACE = EMIT_TASKS(ITASK)%T_SURFACE
+               A_COEFF = EMIT_TASKS(ITASK)%A_COEFF
+               B_COEFF = EMIT_TASKS(ITASK)%B_COEFF
+
+               ! Calculate vapor pressure from Hertz-Knudsen equation
+               VAPOR_PRESSURE = EXP(A_COEFF-B_COEFF/T_SURFACE)
+               RHO_VAPOR = VAPOR_PRESSURE/(KB*T_SURFACE) 
+               FLUXSOURCE = FRAC*RHO_VAPOR*SQRT(KB*T_SURFACE/(2*PI*M))
+
+               NtotINJECT = FLUXSOURCE*AREA*DT/FNUM/SPECIES(S_ID)%SPWT ! Tot num of particles to be injected       
+
+               EMIT_TASKS(ITASK)%VAPOR_PRESSURE = VAPOR_PRESSURE
+               TASK_NFS(IS) = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
+            END DO
+         END IF
 
 
-            NtotINJECT = FLUXLINESOURCE*AREA*DT/FNUM         ! Tot num of particles to be injected
 
-            TASK_NFS(IS) = NtotINJECT/REAL(N_MPI_THREADS,KIND=8) ! Particles injected by each proc
-            
-            ! Check: if we are hypersonic and stuff exits domain print a warning
-            IF (S_NORM .LE. -3.) THEN 
-               CALL ONLYMASTERPRINT1(PROC_ID, '$$$ Warning! Hypersonic boundary! Almost no &
-                                                   &particles will be emitted at boundary.')
-            END IF
-         END DO
          !WRITE(*,*) 'Task NFS', TASK_NFS
          CALL MOVE_ALLOC(TASK_NFS, EMIT_TASKS(ITASK)%NFS)
 

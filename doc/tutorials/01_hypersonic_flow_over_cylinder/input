@@ -1,0 +1,146 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!                 Input file for PANTERA                                !!!!
+!!!!                                                                       !!!!
+!!!! The program reads is line by line, and when it finds a known line, it !!!!
+!!!! reads and saves the value in the next one.                            !!!!
+!!!! All other lines are ignored (you can comment etc).                    !!!!
+!!!! You can put trailing comments on lines, starting with "!" symbol:     !!!!
+!!!! the program will remove them before checking the content of a line.   !!!!
+!!!!                                                                       !!!!
+!!!! All units are SI [m, kg, s, ...]                                      !!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+!Restart:
+!    200
+
+! ========= Computational domain and grid ===========
+Dimensions:
+2
+Axisymmetric:
+.FALSE.
+Number_of_cells: ! Only for structured grids
+1    1    1
+Domain_limits:
+-1.    1.    0.    1.    -0.5   0.5 ! xmin xmax ymin ymax zmin zmax
+Domain_periodicity:
+.FALSE.   .FALSE.   .TRUE. ! Z axis here is symmetry
+Domain_specular:
+.FALSE.    .FALSE.    .FALSE.    .FALSE.
+Domain_diffuse:
+.FALSE.    .FALSE.    .FALSE.   .FALSE.
+
+! Setup for PIC. Since we simulate only neutrals, we choose 'none'
+PIC_type:
+none
+
+! Load mesh from file
+Mesh_file_SU2:
+'./mesh.su2'
+
+! specify all paths or just "All_output_path:" + path
+All_output_path:
+'./dumps/'
+
+
+! ========= Numerical parameters ====================
+
+Fnum:  ! Ratio of real-to-simulated particles
+1e13
+Timestep:
+1e-6
+Number_of_timesteps:
+4000
+Stats_every: ! screen output every th timestep
+1
+
+RNG_seed:
+65344
+
+Binary_output:
+.TRUE.
+
+
+Dump_grid_start:
+0
+Dump_grid_avgevery: !average every th time step
+10
+Dump_grid_numavgs: ! how many averages before saving
+50
+
+Dump_bound_start:
+0
+Dump_bound_avgevery:
+10
+Dump_bound_numavgs:
+50
+
+Dump_part_start: ! start dumping particles
+1000000
+Dump_part_every: ! dumping particles every th timestep
+1000000
+
+Perform_checks: !50 .csv files -- saves integral quantitites (moments, etc)
+.FALSE.
+
+! We can setup a domain type if needed (for PIC =/= none)
+! Domain_type:
+! Domain fluid 1.0
+
+
+! ========= Multispecies ==============================
+
+Species_file:
+'ar.species'
+
+! First: name   second: specie     third: molecular fraction    (if more: +specie - fraction)
+Def_mixture:
+argon Ar 1.0
+
+
+! ========= Collisions ==============================
+
+! Choose DSMC collisions using VSS parameters
+Collision_type: ! [MCC / DSMC / BGK / NONE]
+DSMC
+
+! Choose a mixture for collisions (only argon in this case)
+DSMC_collisions_mixture:
+argon
+
+! VSS parameters for argon-argon collision
+VSS_parameters_file:
+arlofthouse.vss
+
+
+
+! ========= Initial particle seed ===================
+! If we want to start with initially full domain, uncomment Initial_particles block
+
+! mixture   density     3 components velocity   3 components temperature    rotational_temp     vibrational_temp
+! Initial_particles:
+! argon   1.699e19    6585.    0.    0.    200.    200.    200.    0.    0.
+
+
+
+! ========= Boundary conditions =====================
+! This is a setup of boundary conditions for unstructured grid (loaded from .su2 file)
+
+! Inlet and Side (top) will emit particles according to given parameters
+Boundary_emit:
+Inlet   argon    1.699e19  6585.  0.  0.  200.   0. 0.
+
+Boundary_emit:
+Side   argon    1.699e19  6585.  0.  0.  200.   0. 0.
+
+
+! Diffusive boundary condition on the cylinder with a given surface temperature
+Boundary_condition:
+Cylinder diffuse 1500.0
+
+! Specular boundary condition on the axis of symmetry
+Boundary_condition:
+Axis specular
+
+
+Partition_style:
+stripsx !strips in x direction

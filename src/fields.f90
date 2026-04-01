@@ -4343,7 +4343,7 @@ MODULE fields
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    SUBROUTINE SOLVE_BOLTZMANN
 
-      LOGICAL :: SET_INITIAL
+      LOGICAL :: SET_INITIAL = .FALSE.
       PetscScalar, POINTER :: solvec_l(:)
       PetscBool :: flg
       PetscInt :: d_nnz, o_nnz
@@ -4389,6 +4389,7 @@ MODULE fields
 
       IF (SET_INITIAL) THEN
          CALL VecSet(solvec,0.d0,ierr)
+         WRITE(*,*) 'Initial guess set to zero.'
       ELSE IF (.NOT. ALLOCATED(PHI_FIELD)) THEN
          ALLOCATE(PHI_FIELD(NNODES))
          PHI_FIELD = 0.d0
@@ -4579,7 +4580,7 @@ MODULE fields
                               V1 = VP
                               V2 = VQ
                               V3 = U2D_GRID%CELL_NODES(1 + MOD(Q,3),I)
-                              IF (V3 == V1 .OR. V3 == V1) V3 = U2D_GRID%CELL_NODES(1 + MOD(Q+1,3),I)
+                              IF (V3 == V1 .OR. V3 == V2) V3 = U2D_GRID%CELL_NODES(1 + MOD(Q+1,3),I)
                               Y1 = U2D_GRID%NODE_COORDS(2, V1)
                               Y2 = U2D_GRID%NODE_COORDS(2, V2)
                               Y3 = U2D_GRID%NODE_COORDS(2, V3)
@@ -4834,7 +4835,7 @@ MODULE fields
                               V1 = VP
                               V2 = VQ
                               V3 = U2D_GRID%CELL_NODES(1 + MOD(Q,3),I)
-                              IF (V3 == V1 .OR. V3 == V1) V3 = U2D_GRID%CELL_NODES(1 + MOD(Q+1,3),I)
+                              IF (V3 == V1 .OR. V3 == V2) V3 = U2D_GRID%CELL_NODES(1 + MOD(Q+1,3),I)
                               Y1 = U2D_GRID%NODE_COORDS(2, V1)
                               Y2 = U2D_GRID%NODE_COORDS(2, V2)
                               Y3 = U2D_GRID%NODE_COORDS(2, V3)

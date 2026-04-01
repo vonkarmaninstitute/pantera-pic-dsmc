@@ -4,6 +4,8 @@
 
 # GNU Compiler
 CMP  = mpifort -c -cpp -I$(PETSC_DIR)/include
+# If PETSc is installed in default installation folder, include PETSC_ARCH
+CMP += $(if $(PETSC_ARCH),-I$(PETSC_DIR)/$(PETSC_ARCH)/include)
 LNK  = mpifort -cpp
 OPTF = -O3 -fimplicit-none
 

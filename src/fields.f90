@@ -1935,7 +1935,7 @@ MODULE fields
       INTEGER :: P, Q, VP, VQ
       REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD, LENGTH
       TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: part_adv
-      REAL(KIND=8) :: MPQ, FACTOR1, FACTOR2, ME
+      REAL(KIND=8) :: MPQ, FACTOR1, FACTOR2
       INTEGER :: ELECTRON_S_ID
 
       IF (PROC_ID == 0) THEN
@@ -2075,8 +2075,6 @@ MODULE fields
          CALL MatSetFromOptions(Rmat,ierr)
          CALL MatSetUp(Rmat,ierr)
 
-         ELECTRON_S_ID = SPECIES_NAME_TO_ID('e')
-         ME = SPECIES(ELECTRON_S_ID)%MOLECULAR_MASS
          IF (DIMS == 2) THEN
             DO I = 1, NCELLS
                AREA = U2D_GRID%CELL_AREAS(I)
@@ -2288,7 +2286,7 @@ MODULE fields
       INTEGER :: V1, V2, V3, I
       INTEGER :: P, Q, VP, VQ
       REAL(KIND=8) :: KPQ, VOLUME, LENGTH
-      REAL(KIND=8) :: MPQ, FACTOR1, FACTOR2, ME
+      REAL(KIND=8) :: MPQ, FACTOR1, FACTOR2
       INTEGER :: ELECTRON_S_ID
 
       TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE :: part_adv
@@ -2464,8 +2462,6 @@ MODULE fields
          CALL MatSetFromOptions(Rmat,ierr)
          CALL MatSetUp(Rmat,ierr)
 
-         ELECTRON_S_ID = SPECIES_NAME_TO_ID('e')
-         ME = SPECIES(ELECTRON_S_ID)%MOLECULAR_MASS
 
          IF (DIMS == 2) THEN
             DO I = 1, NCELLS
@@ -2711,10 +2707,9 @@ MODULE fields
       REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: TIMESTEP_TTRZ
       
       INTEGER :: JP, IC, ELECTRON_S_ID
-      REAL(KIND=8) :: ME, NUMPART, SPWT
+      REAL(KIND=8) :: NUMPART, SPWT
 
       ELECTRON_S_ID = SPECIES_NAME_TO_ID('e')
-      ME = SPECIES(ELECTRON_S_ID)%MOLECULAR_MASS
       SPWT = SPECIES(ELECTRON_S_ID)%SPWT
 
       IF (.NOT. GRID_TYPE == UNSTRUCTURED) CALL ERROR_ABORT('Not implemented.')
@@ -6016,7 +6011,7 @@ MODULE fields
       REAL(KIND=8) :: VDOTTANG1, VRM, RN, R1, R2, THETA1, THETA2, DOT_NORM, VTANGENT
       INTEGER :: NI, NJ, VNI, VNJ
       REAL(KIND=8), DIMENSION(3) :: DIRB, VOLD, AMOVER, VMOVER
-      REAL(KIND=8) :: QOM, NORMB, A, MAG
+      REAL(KIND=8) :: QOM, NORMB, A, MAGB
       REAL(KIND=8) :: SPWT
 
       INTEGER :: NCROSSINGS
@@ -6292,10 +6287,10 @@ MODULE fields
                   NORMB = NORM2(B)
                   IF (NORMB == 0) THEN
                      DIRB = [1,0,0]
-                     MAG = 0
+                     MAGB = 0
                   ELSE
                      DIRB = B/NORMB
-                     MAG = (A*A*NORMB*NORMB)/(1 + A*A*NORMB*NORMB)
+                     MAGB = (A*A*NORMB*NORMB)/(1 + A*A*NORMB*NORMB)
                   END IF
                   VOLD = [part_adv(IP)%VX, part_adv(IP)%VY, part_adv(IP)%VZ]
 
@@ -6305,7 +6300,7 @@ MODULE fields
                         IF (NORMB == 0) THEN
                            AMOVER = QOM*E
                         ELSE
-                           AMOVER = (1-MAG)*QOM*(E+CROSS(VOLD,B)) + MAG*QOM*DOT(E,DIRB)*DIRB
+                           AMOVER = (1-MAGB)*QOM*(E+CROSS(VOLD,B)) + MAGB*QOM*DOT(E,DIRB)*DIRB
                         END IF
                         ALPHA = 0.5*(U3D_GRID%CELL_FACES_COEFFS(1,I,IC)*AMOVER(1) &
                                    + U3D_GRID%CELL_FACES_COEFFS(2,I,IC)*AMOVER(2) &
@@ -6316,7 +6311,7 @@ MODULE fields
                      IF (NORMB == 0) THEN
                         VMOVER = VOLD
                      ELSE
-                        VMOVER = (1-MAG)*VOLD + MAG*(CROSS(E,B)/(NORMB*NORMB) + DOT(VOLD,DIRB)*DIRB)
+                        VMOVER = (1-MAGB)*VOLD + MAGB*(CROSS(E,B)/(NORMB*NORMB) + DOT(VOLD,DIRB)*DIRB)
                      END IF
                      BETA = U3D_GRID%CELL_FACES_COEFFS(1,I,IC)*VMOVER(1) &
                           + U3D_GRID%CELL_FACES_COEFFS(2,I,IC)*VMOVER(2) &
@@ -6354,7 +6349,7 @@ MODULE fields
                         VY_TEMP = part_adv(IP)%VY
                         VZ_TEMP = part_adv(IP)%VZ
 
-                        CALL MOVE_PARTICLE_CN_B(part_adv, IP, E, B, MAG, COLLTIMES(I))
+                        CALL MOVE_PARTICLE_CN_B(part_adv, IP, E, B, MAGB, COLLTIMES(I))
                         J = EDGEINDEX(I)
 
                         ! ! A small check that we actually found an intersection.
@@ -6388,7 +6383,7 @@ MODULE fields
 
                ! Do the advection
                IF (BOUNDCOLL > 0) THEN
-                  CALL MOVE_PARTICLE_CN_B(part_adv, IP, E, B, MAG, DTCOLL)
+                  CALL MOVE_PARTICLE_CN_B(part_adv, IP, E, B, MAGB, DTCOLL)
                   IF (AXI .AND. DIMS == 2) CALL AXI_ROTATE_VELOCITY(part_adv, IP)
                   part_adv(IP)%DTRIM = part_adv(IP)%DTRIM - DTCOLL
 
@@ -6605,12 +6600,12 @@ MODULE fields
                      !WRITE(*,*) 'moved particle to cell: ', IC
                   END IF
                ELSE IF (BOUNDCOLL == 0) THEN
-                  CALL MOVE_PARTICLE_CN_B(part_adv, IP, E, B, MAG, DTCOLL)
+                  CALL MOVE_PARTICLE_CN_B(part_adv, IP, E, B, MAGB, DTCOLL)
                   IF (AXI .AND. DIMS == 2) CALL AXI_ROTATE_VELOCITY(part_adv, IP)
                   part_adv(IP)%DTRIM = part_adv(IP)%DTRIM - DTCOLL
                ELSE
                   ! The particle stays within the current cell. End of the motion.
-                  CALL MOVE_PARTICLE_CN_B(part_adv, IP, E, B, MAG, part_adv(IP)%DTRIM)
+                  CALL MOVE_PARTICLE_CN_B(part_adv, IP, E, B, MAGB, part_adv(IP)%DTRIM)
                   IF (AXI .AND. DIMS == 2) CALL AXI_ROTATE_VELOCITY(part_adv, IP)
                   part_adv(IP)%DTRIM = 0.d0
                   
@@ -6765,7 +6760,7 @@ MODULE fields
 
 
 
-   SUBROUTINE MOVE_PARTICLE_CN_B(part_adv, IP, E, B, MAG, TIME)
+   SUBROUTINE MOVE_PARTICLE_CN_B(part_adv, IP, E, B, MAGB, TIME)
 
       ! Moves particle with index IP for time TIME.
       ! For now simply rectilinear movement, will have to include Lorentz's force
@@ -6774,7 +6769,7 @@ MODULE fields
 
       INTEGER, INTENT(IN)      :: IP
       REAL(KIND=8), DIMENSION(3), INTENT(IN) :: E, B
-      REAL(KIND=8), INTENT(IN) :: TIME, MAG
+      REAL(KIND=8), INTENT(IN) :: TIME, MAGB
       REAL(KIND=8), DIMENSION(3) :: DIRB, VOLD, VNEW, VHALF, AMOVER, VMOVER
       REAL(KIND=8) :: QOM, NORMB, A
       TYPE(PARTICLE_DATA_STRUCTURE), DIMENSION(:), ALLOCATABLE, INTENT(INOUT) :: part_adv
@@ -6794,8 +6789,8 @@ MODULE fields
          AMOVER = QOM*E
          VMOVER = VOLD
       ELSE
-         AMOVER = (1-MAG)*QOM*(E+CROSS(VOLD,B)) + MAG*QOM*DOT(E,DIRB)*DIRB
-         VMOVER = (1-MAG)*VOLD + MAG*(CROSS(E,B)/(NORMB*NORMB) + DOT(VOLD,DIRB)*DIRB)
+         AMOVER = (1-MAGB)*QOM*(E+CROSS(VOLD,B)) + MAGB*QOM*DOT(E,DIRB)*DIRB
+         VMOVER = (1-MAGB)*VOLD + MAGB*(CROSS(E,B)/(NORMB*NORMB) + DOT(VOLD,DIRB)*DIRB)
       END IF
 
       VHALF = VMOVER + 0.5*AMOVER*TIME

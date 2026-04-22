@@ -1,24 +1,24 @@
-SetFactory("OpenCASCADE");
+// INPUT FOR MESH.GEO FILE
 
 upstream_distance = -0.045;
 downstream_distance = 0.08;
 domain_width = 0.035;
 
-radius = 0.0095;
+sphere_radius = 0.0095;
 
-cs1 = 0.0003; // Cell size on the sphere
-cs2 = 0.005;  // Cell size extending to domain boundaries
+cell_size_sphere = 0.0003; // Cell size on the sphere
+cell_size_boundary = 0.005;  // Cell size extending to domain boundaries
 
 // ----- MESH ----- //
-Point(1) = {upstream_distance, 0., 0., cs2};
-Point(2) = {downstream_distance, 0., 0., cs2};
-Point(3) = {downstream_distance, domain_width, 0., cs2};
-Point(4) = {upstream_distance, domain_width, 0., cs2};
+Point(1) = {upstream_distance, 0., 0., cell_size_boundary};
+Point(2) = {downstream_distance, 0., 0., cell_size_boundary};
+Point(3) = {downstream_distance, domain_width, 0., cell_size_boundary};
+Point(4) = {upstream_distance, domain_width, 0., cell_size_boundary};
 
-Point(5) = {-radius, 0., 0., cs1};
-Point(6) = {0., radius, 0., cs1};
-Point(7) = {radius, 0., 0., cs1};
-Point(8) = {0., 0., 0., cs1};
+Point(5) = {-sphere_radius, 0., 0., cell_size_sphere};
+Point(6) = {0., sphere_radius, 0., cell_size_sphere};
+Point(7) = {sphere_radius, 0., 0., cell_size_sphere};
+Point(8) = {0., 0., 0., cell_size_sphere};
 
 Line(1) = {1,5};
 Circle(2) = {5, 8, 6};

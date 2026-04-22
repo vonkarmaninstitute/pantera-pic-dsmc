@@ -1,0 +1,8 @@
+# This file contains references to papers from which the reference data were obtained from
+# ------------------
+
+# Files expdata*.csv contain experimental data obtained from
+E. D. Knechtel, and W. C. Pitts, 'Experimental investigation of electric drag on satellites', (1964), DOI:10.2514/3.2515
+
+# Files capon*.csv contain numerical data obtained from
+C. J. Capon, P. Lorrain, M. Brown, and R. R. Boyce, 'Early experimental ionosphere drag measurements compared with numerical predictions using pdFOAM', (2019),  DOI:10.1063/1.5119612

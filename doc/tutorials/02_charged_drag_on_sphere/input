@@ -1,0 +1,152 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!                 Input file for PANTERA                                !!!!
+!!!!                                                                       !!!!
+!!!! The program reads is line by line, and when it finds a known line, it !!!!
+!!!! reads and saves the value in the next one.                            !!!!
+!!!! All other lines are ignored (you can comment etc).                    !!!!
+!!!! You can put trailing comments on lines, starting with "!" symbol:     !!!!
+!!!! the program will remove them before checking the content of a line.   !!!!
+!!!!                                                                       !!!!
+!!!! All units are SI [m, kg, s, ...]                                      !!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+! ========= Computational domain and grid ===========
+Dimensions:
+2
+Axisymmetric:
+.TRUE.
+Number_of_cells:
+1    1    1
+Domain_limits:
+-1.    1.    0.    1.    -0.5   0.5 ! xmin xmax ymin ymax zmin zmax
+Domain_periodicity:
+.FALSE.   .FALSE.   .FALSE.
+Domain_specular:
+.FALSE.    .FALSE.    .TRUE.    .FALSE.
+Domain_diffuse:
+.FALSE.    .FALSE.    .FALSE.   .FALSE.
+
+PIC_type:
+hybrid
+Mesh_file_SU2:
+'./mesh.su2'
+
+! specify all paths or just "All_output_path:" + path
+All_output_path:
+'./dumps/'
+
+
+! ========= Numerical parameters ====================
+
+Fnum:  ! Ratio of real-to-simulated particles
+4e3
+Timestep:
+1e-8
+Number_of_timesteps:
+3000
+Stats_every: ! screen output every th timestep
+10
+Save_initial_timestep:
+.TRUE.
+
+RNG_seed:
+15950
+
+Binary_output:
+.TRUE.
+
+
+Dump_grid_start:
+0
+Dump_grid_avgevery: !average every th time step
+1
+Dump_grid_numavgs: ! how many averages before saving
+100
+
+Dump_bound_start:
+0
+Dump_bound_avgevery:
+1
+Dump_bound_numavgs:
+100
+
+Dump_part_start: ! start dumping particles
+1000000
+Dump_part_every: ! dumping particles every th timestep
+1000000
+
+Perform_checks: ! .csv files -- saves integral quantitites (moments, etc)
+.FALSE.
+
+Domain_type:
+Domain fluid 1.0
+
+
+! ========= Multispecies ==============================
+
+Species_file:
+'mercury_exp.species'
+
+! First: name   second: specie     third: molecular fraction    (if more: +specie - fraction)
+Def_mixture:
+Ions Hg+ 1.0
+
+Def_mixture:
+Neutrals Hg 1.0
+
+! ========= Collisions ==============================
+
+Collision_type: ! [MCC / DSMC / BGK / NONE]
+NONE
+
+Wall_reactions_file:
+mercury_exp.wall
+
+
+! ========= Initial particle seed ===================
+
+! mixture   density     3 components velocity   3 components temperature    rotational_temp     vibrational_temp
+Initial_particles:
+Ions   1e14    10000.    0.0    0.    3000.    3000.    3000.    0.    0.
+
+Fluid_electrons:
+1e14    0.  32180.
+
+
+! BOUNDARY CONDITIONS FOR PARTICLES AND EB FIELD
+
+Boundary_emit:
+    Inlet   Ions    1e14  10000.  0.  0.  3000.   0. 0.
+Boundary_emit:
+    Top   Ions    1e14  10000.  0.  0.  3000.   0. 0.
+
+Boundary_condition:
+    Inlet   dirichlet 0.0
+
+Boundary_condition:
+    Outlet  neumann 0.0
+
+Boundary_condition:
+    Top neumann 0.0
+
+Boundary_condition:
+    Symmetry neumann 0.0
+
+! BC for sphere
+Boundary_condition:
+    Sphere dirichlet -100.
+
+Boundary_condition:
+    Sphere diffuse 300.
+
+Boundary_condition:
+    Sphere react
+
+
+
+Partition_style:
+stripsx !strips in x direction
+
+!Partition_num_blocks:
+!    1  96

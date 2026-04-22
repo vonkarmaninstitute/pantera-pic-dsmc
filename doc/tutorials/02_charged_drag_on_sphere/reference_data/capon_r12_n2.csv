@@ -1,0 +1,7 @@
+# Data set obtained from C. Capon et al, 2019 (Early experimental ionosphere drag measurements compared with numerical predictions using pdFOAM)
+# alpha [-]             Fc/Fn
+0.003337041156840914, 1.0054744525547443
+0.5038932146829811, 1.6076642335766427
+1.011123470522803, 2.133211678832117
+2.022246941045606, 2.954379562043796
+3.0300333704115685, 3.6277372262773726

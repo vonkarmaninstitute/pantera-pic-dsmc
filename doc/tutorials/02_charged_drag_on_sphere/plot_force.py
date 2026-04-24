@@ -39,9 +39,11 @@ timestep = 3000
 # ----- SOURCE FUNCTIONS -----
 # ----------------------------
 
+# Function to calculate the drag coefficient (C_d) on the sphere from analytical solution
 def get_Cd(S,T,Tw):
     return np.exp(-S**2)/(np.sqrt(np.pi)*S**3)*(2*S**2+1) + erf(S)*(4*S**4+4*S**2-1)/(2*S**4) + 2*np.sqrt(np.pi)*np.sqrt(Tw/T)/3/S
 
+# Function to read VTK file, extract data and calculate the charged force on the sphere
 def get_force(folder,timestep,parameters):
 
 
@@ -57,26 +59,24 @@ def get_force(folder,timestep,parameters):
     alpha_arr = np.array([])
     force_arr = np.array([])
 
-    # Load your dataset (replace 'YourFile.vtk' with your file)
+    # Load the VTK file
     data = OpenDataFile(folder+'/dsmc_boundary_'+str(timestep)+'.vtk')
 
     # Threshold to filter the specific PHYS_GROUP (adjusted for cell data)
-    phys_group_id = 4  # Replace with the desired PHYS_GROUP ID
+    phys_group_id = 4  # Replace with the desired PHYS_GROUP ID (should be 4 from our settings)
     threshold = Threshold(Input=data)
-    threshold.Scalars = ['CELLS', 'PHYSICAL_GROUP']  # Use CELLS instead of POINTS
+    threshold.Scalars = ['CELLS', 'PHYSICAL_GROUP']
     threshold.LowerThreshold = phys_group_id
     threshold.UpperThreshold = phys_group_id
 
-    # Generate the geometry to get line segments explicitly
     geometry = ExtractSurface(Input=threshold)
 
-    # Fetch the processed geometry for further calculations
     geometry.UpdatePipeline()
     data_info = servermanager.Fetch(geometry)
 
-    # Sum variable contributions
-    pem_sum = 0.0
+    # Sum variables (momentum + electromagnetic contribution)
     mom_sum = 0.0
+    pem_sum = 0.0
 
     # Iterate over each line segment (cell)
     for j in range(data_info.GetNumberOfCells()):
@@ -84,9 +84,9 @@ def get_force(folder,timestep,parameters):
         cell = data_info.GetCell(j)
         p0 = cell.GetPoints().GetPoint(0)
         p1 = cell.GetPoints().GetPoint(1)
-        length = ((p1[0] - p0[0])**2 + (p1[1] - p0[1])**2)**0.5  # Euclidean distance
+        length = ((p1[0] - p0[0])**2 + (p1[1] - p0[1])**2)**0.5 # Length of segment between points
 
-        # Get the variable value for the cell (e.g., flux)
+        # Get the variable value for the cell (segment)
         pem_x = data_info.GetCellData().GetArray('pem_x').GetValue(j)
         mom_x = data_info.GetCellData().GetArray('mom_x_in_Hg+').GetValue(j)
         mom_x+= data_info.GetCellData().GetArray('mom_x_out_Hg+').GetValue(j)
@@ -99,12 +99,12 @@ def get_force(folder,timestep,parameters):
     F_direct = mom_sum
     F_indirect = pem_sum
 
-    alpha_arr = np.append(alpha_arr,sc.e*np.abs(phi)/E)
-    force_arr = np.append(force_arr,(F_direct+F_indirect)/F_N)
+    alpha_arr = np.append(alpha_arr,sc.e*np.abs(phi)/E) # Normalized potential by the particle energy
+    force_arr = np.append(force_arr,(F_direct+F_indirect)/F_N) # Normalized force by the neutral drag force
 
     return alpha_arr, force_arr
 
-
+# Functionn to plot experimental and numerical results
 def plot(folder,timestep,parameters):
 
     fig,axs = plt.subplots(1,1,figsize=(8,6))

@@ -19,18 +19,23 @@ Axisymmetric:
 Number_of_cells:
 1    1    1
 Domain_limits:
--1.    1.    0.    1.    -0.5   0.5 ! xmin xmax ymin ymax zmin zmax
+-0.1    0.1    0.    0.5    -0.5   0.5 ! xmin[m] xmax[m] ymin[m] ymax[m] zmin[rad] zmax[rad]
 Domain_periodicity:
 .FALSE.   .FALSE.   .FALSE.
 Domain_specular:
-.FALSE.    .FALSE.    .TRUE.    .FALSE.
+.FALSE.    .FALSE.    .TRUE.    .FALSE. ! Here ymin is set to .TRUE. for axisymmetric case
 Domain_diffuse:
 .FALSE.    .FALSE.    .FALSE.   .FALSE.
 
+! PIC Settings, we choose 'hybrid' to include electron fluid model
 PIC_type:
 hybrid
+
 Mesh_file_SU2:
 './mesh.su2'
+
+Partition_style:
+stripsx !strips in x direction
 
 ! specify all paths or just "All_output_path:" + path
 All_output_path:
@@ -39,7 +44,7 @@ All_output_path:
 
 ! ========= Numerical parameters ====================
 
-Fnum:  ! Ratio of real-to-simulated particles
+Fnum:  ! ratio of real-to-simulated particles
 4e3
 Timestep:
 1e-8
@@ -59,16 +64,16 @@ Binary_output:
 
 Dump_grid_start:
 0
-Dump_grid_avgevery: !average every th time step
+Dump_grid_avgevery: ! average flow field every th time step
 1
-Dump_grid_numavgs: ! how many averages before saving
+Dump_grid_numavgs:  ! how many averages before saving
 100
 
 Dump_bound_start:
 0
-Dump_bound_avgevery:
+Dump_bound_avgevery: ! average values on boundaries every th time step
 1
-Dump_bound_numavgs:
+Dump_bound_numavgs:  ! how many averages before saving
 100
 
 Dump_part_start: ! start dumping particles
@@ -110,17 +115,22 @@ mercury_exp.wall
 Initial_particles:
 Ions   1e14    10000.    0.0    0.    3000.    3000.    3000.    0.    0.
 
+! Settings for fluid electrons when choosing 'hybrid' PIC type
+! n0   phi0    Te0
 Fluid_electrons:
 1e14    0.  32180.
 
 
-! BOUNDARY CONDITIONS FOR PARTICLES AND EB FIELD
-
+! ========= Boundary emit conditions ================
 Boundary_emit:
     Inlet   Ions    1e14  10000.  0.  0.  3000.   0. 0.
 Boundary_emit:
     Top   Ions    1e14  10000.  0.  0.  3000.   0. 0.
 
+
+! ========= Boundary conditions =====================
+
+! BC for electrostatic potential
 Boundary_condition:
     Inlet   dirichlet 0.0
 
@@ -133,20 +143,12 @@ Boundary_condition:
 Boundary_condition:
     Symmetry neumann 0.0
 
-! BC for sphere
-Boundary_condition:
+! BC for sphere with particle BC
+Boundary_condition: ! Potential of the sphere with respect to the beam
     Sphere dirichlet -100.
 
-Boundary_condition:
+Boundary_condition: ! Particles diffusively scatter on the sphere with a temperature of 300 K
     Sphere diffuse 300.
 
-Boundary_condition:
+Boundary_condition: ! Particle reactions on wall using 'Wall_reactions_file'
     Sphere react
-
-
-
-Partition_style:
-stripsx !strips in x direction
-
-!Partition_num_blocks:
-!    1  96

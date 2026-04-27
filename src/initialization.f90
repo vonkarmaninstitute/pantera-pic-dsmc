@@ -117,7 +117,7 @@ MODULE initialization
          IF (line=='Mesh_file:') THEN
             READ(in1,*) MESH_FILENAME
             IF (DIMS == 1) THEN
-               ! CALL READ_1D_UNSTRUCTURED_GRID_MSH(MESH_FILENAME)
+               CALL READ_1D_UNSTRUCTURED_GRID_MSH(MESH_FILENAME)
             ELSE IF (DIMS == 2) THEN
                CALL READ_2D_UNSTRUCTURED_GRID_MSH(MESH_FILENAME)
             ELSE IF (DIMS == 3) THEN

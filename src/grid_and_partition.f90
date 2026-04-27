@@ -2154,4 +2154,1058 @@ MODULE grid_and_partition
    END SUBROUTINE READ_3D_UNSTRUCTURED_GRID_SU2
 
 
+
+   SUBROUTINE READ_2D_UNSTRUCTURED_GRID_MSH(FILENAME)
+
+      IMPLICIT NONE
+
+      CHARACTER*256, INTENT(IN) :: FILENAME
+
+      CHARACTER*256 :: LINE, GROUPNAME, DUMMYLINE
+
+      INTEGER, PARAMETER :: in5 = 2385
+      INTEGER            :: ios
+      INTEGER            :: ReasonEOF
+
+      REAL :: MESH_VERSION
+      INTEGER :: FILE_TYPE, DATA_SIZE, DUMMY, CELL_COUNT
+      INTEGER, DIMENSION(:), ALLOCATABLE :: PG_MAP, PG_PREMAP, TEMP_CELL_PG
+      INTEGER, DIMENSION(:,:), ALLOCATABLE :: TEMP_CELL_NODES
+
+      INTEGER            :: NUM, I, J, FOUND, V1, V2, V3, ELEM_TYPE, NUMELEMS
+      INTEGER, DIMENSION(3,2) :: IND
+      REAL(KIND=8)       :: X1, X2, X3, Y1, Y2, Y3, LEN, RAD
+      REAL(KIND=8), DIMENSION(3) :: XYZ, A, B, C
+
+      INTEGER, DIMENSION(:,:), ALLOCATABLE      :: TEMP_CELL_NEIGHBORS
+
+      INTEGER, DIMENSION(2) :: VLIST2, WHICH1, WHICH2
+      INTEGER, DIMENSION(3) :: VLIST3
+
+      INTEGER, DIMENSION(:), ALLOCATABLE :: N_CELLS_WITH_NODE, CELL_WITH_NODE, IOF
+      INTEGER :: IDX, JN, JC1, JC2, IPG
+
+      LOGICAL, DIMENSION(:), ALLOCATABLE :: NODE_ON_BOUNDARY
+      INTEGER :: NUM_BOUNDARY_NODES, NUM_BOUNDARY_ELEM
+
+      ! Open input file for reading
+      OPEN(UNIT=in5,FILE=FILENAME, STATUS='old',IOSTAT=ios)
+
+      IF (ios .NE. 0) THEN
+         CALL ERROR_ABORT('Attention, mesh file not found! ABORTING.')
+      ENDIF
+
+      ! Read the mesh file. MSH file format (*.msh), verson 2, ASCII only
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Reading grid file in MSH2 format.'
+         WRITE(*,*) '==========================================='
+      END IF
+
+      DO
+         READ(in5,*, IOSTAT=ReasonEOF) LINE
+         IF (ReasonEOF < 0) EXIT 
+
+         IF (TRIM(LINE) == '$MeshFormat') THEN
+            READ(in5,*, IOSTAT=ReasonEOF) MESH_VERSION, FILE_TYPE, DATA_SIZE
+
+            IF (INT(MESH_VERSION) .NE. 2) THEN
+               CALL ERROR_ABORT('Attention, only MSH version 2 is supported! ABORTING.')
+            END IF
+            IF (FILE_TYPE .NE. 0) THEN
+               CALL ERROR_ABORT('Attention, only ASCII MSH files are supported! ABORTING.')
+            END IF
+         END IF
+
+         IF (TRIM(LINE) == '$PhysicalNames') THEN
+            READ(in5,*, IOSTAT=ReasonEOF) NUM
+
+            N_GRID_BC = NUM
+            ALLOCATE(GRID_BC(NUM))
+
+            ALLOCATE(PG_PREMAP(NUM))
+            DO I = 1, NUM
+               READ(in5,*, IOSTAT=ReasonEOF) ELEM_TYPE, IPG, GRID_BC(I)%PHYSICAL_GROUP_NAME
+               PG_PREMAP(I) = IPG
+            END DO
+            ALLOCATE(PG_MAP(MINVAL(PG_PREMAP):MAXVAL(PG_PREMAP)))
+            PG_MAP = -1
+            DO I = 1, NUM
+               PG_MAP(PG_PREMAP(I)) = I
+            END DO
+
+            DEALLOCATE(PG_PREMAP)
+         END IF
+
+         IF (TRIM(LINE) == '$Nodes') THEN
+            READ(in5,*, IOSTAT=ReasonEOF) NUM
+
+            ALLOCATE(U2D_GRID%NODE_COORDS(3,NUM))
+            U2D_GRID%NUM_NODES = NUM
+
+            DO I = 1, NUM
+               READ(in5,*, IOSTAT=ReasonEOF) IDX, XYZ
+               U2D_GRID%NODE_COORDS(:,I) = XYZ
+            END DO
+         END IF
+
+
+         IF (TRIM(LINE) == '$Elements') THEN
+            READ(in5,*, IOSTAT=ReasonEOF) NUM
+
+            ALLOCATE(TEMP_CELL_NODES(3, NUM))
+            ALLOCATE(TEMP_CELL_PG(NUM))
+            CELL_COUNT = 0
+
+            DO I = 1, NUM
+               READ(in5,'(A)', IOSTAT=ReasonEOF) LINE
+               READ(LINE,*) IDX, ELEM_TYPE
+
+               IF (ELEM_TYPE .EQ. 2) THEN
+                  CELL_COUNT = CELL_COUNT + 1
+                  READ(LINE,*) IDX, ELEM_TYPE, DUMMY, IPG, DUMMY, TEMP_CELL_NODES(:,CELL_COUNT)
+                  TEMP_CELL_PG(CELL_COUNT) = PG_MAP(IPG)
+               END IF
+            END DO
+
+
+
+            ALLOCATE(U2D_GRID%CELL_NODES(3,CELL_COUNT))
+            ALLOCATE(U2D_GRID%CELL_EDGES_PG(3, CELL_COUNT))
+            ALLOCATE(U2D_GRID%CELL_PG(CELL_COUNT))
+            U2D_GRID%NUM_CELLS = CELL_COUNT
+            U2D_GRID%CELL_EDGES_PG = -1
+            U2D_GRID%CELL_PG = -1
+
+            U2D_GRID%CELL_NODES(:, :) = TEMP_CELL_NODES(:, 1:CELL_COUNT)
+            U2D_GRID%CELL_PG(:)       = TEMP_CELL_PG(1:CELL_COUNT)
+
+            DEALLOCATE(TEMP_CELL_NODES)
+            DEALLOCATE(TEMP_CELL_PG)
+         END IF
+      END DO
+
+      REWIND(in5)
+
+      ALLOCATE(N_CELLS_WITH_NODE(U2D_GRID%NUM_NODES))
+      ALLOCATE(IOF(U2D_GRID%NUM_NODES))
+
+      N_CELLS_WITH_NODE = 0
+      DO I = 1, U2D_GRID%NUM_CELLS
+         DO V1 = 1, 3
+            JN = U2D_GRID%CELL_NODES(V1,I)
+            N_CELLS_WITH_NODE(JN) = N_CELLS_WITH_NODE(JN) + 1
+         END DO
+      END DO
+   
+      IOF = -1
+      IDX = 1
+      DO JN = 1, U2D_GRID%NUM_NODES
+         IF (N_CELLS_WITH_NODE(JN) .NE. 0) THEN
+            IOF(JN) = IDX
+            IDX = IDX + N_CELLS_WITH_NODE(JN)
+         END IF
+      END DO
+   
+      ALLOCATE(CELL_WITH_NODE(IDX))
+      
+      N_CELLS_WITH_NODE = 0
+      DO I = 1, U2D_GRID%NUM_CELLS
+         DO V1 = 1, 3
+            JN = U2D_GRID%CELL_NODES(V1,I)
+            CELL_WITH_NODE(IOF(JN) + N_CELLS_WITH_NODE(JN)) = I
+            N_CELLS_WITH_NODE(JN) = N_CELLS_WITH_NODE(JN) + 1
+         END DO
+      END DO
+
+
+      DO
+         READ(in5,*, IOSTAT=ReasonEOF) LINE
+         IF (ReasonEOF < 0) EXIT 
+
+         IF (TRIM(LINE) == '$Elements') THEN
+            READ(in5,*, IOSTAT=ReasonEOF) NUM
+
+            ! Assign physical groups to cell edges.
+            DO I = 1, NUM
+
+               READ(in5,'(A)', IOSTAT=ReasonEOF) LINE
+               READ(LINE,*) IDX, ELEM_TYPE
+
+               IF (ELEM_TYPE == 1) THEN ! element in physical group is a cell edge (segment).
+
+                  READ(LINE,*) IDX, ELEM_TYPE, DUMMY, IPG, DUMMY, VLIST2
+                  
+                  JN = VLIST2(1)
+                  IF (N_CELLS_WITH_NODE(JN) > 0) THEN
+                     DO IDX = 0, N_CELLS_WITH_NODE(JN) - 1
+                        JC1 = CELL_WITH_NODE(IOF(JN) + IDX)
+                        FOUND = 0
+                        DO V1 = 1, 3
+                           IF (ANY(VLIST2 == U2D_GRID%CELL_NODES(V1,JC1))) THEN
+                              FOUND = FOUND + 1
+                              WHICH1(FOUND) = V1
+                           END IF
+                        END DO
+         
+                        IF (FOUND == 2) THEN
+                           IF (ANY(WHICH1 == 1) .AND. ANY(WHICH1 == 2)) THEN
+                              U2D_GRID%CELL_EDGES_PG(1, JC1) = PG_MAP(IPG)
+                           ELSE IF (ANY(WHICH1 == 2) .AND. ANY(WHICH1 == 3)) THEN
+                              U2D_GRID%CELL_EDGES_PG(2, JC1) = PG_MAP(IPG)
+                           ELSE IF (ANY(WHICH1 == 3) .AND. ANY(WHICH1 == 1)) THEN
+                              U2D_GRID%CELL_EDGES_PG(3, JC1) = PG_MAP(IPG)
+                           END IF
+                        END IF
+                     END DO
+                  END IF
+               ELSE IF (ELEM_TYPE == 2) THEN
+                  ! element is a triangle
+               ELSE
+                  WRITE(*,*) 'Error! element type was not line or triangle.'
+               END IF
+
+            END DO
+
+         END IF
+      END DO
+
+      ! Done reading
+      CLOSE(in5)
+      DEALLOCATE(PG_MAP)
+
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Computing cell volumes.'
+         WRITE(*,*) '==========================================='
+      END IF
+
+      ! Compute cell volumes
+      ALLOCATE(U2D_GRID%CELL_AREAS(U2D_GRID%NUM_CELLS))
+      ALLOCATE(U2D_GRID%CELL_VOLUMES(U2D_GRID%NUM_CELLS))
+      DO I = 1, U2D_GRID%NUM_CELLS
+         A = U2D_GRID%NODE_COORDS(:, U2D_GRID%CELL_NODES(1,I))
+         B = U2D_GRID%NODE_COORDS(:, U2D_GRID%CELL_NODES(2,I))
+         C = U2D_GRID%NODE_COORDS(:, U2D_GRID%CELL_NODES(3,I))
+
+         U2D_GRID%CELL_AREAS(I) = 0.5*ABS(A(1)*(B(2)-C(2)) + B(1)*(C(2)-A(2)) + C(1)*(A(2)-B(2)))
+         IF (DIMS == 2 .AND. .NOT. AXI) THEN
+            U2D_GRID%CELL_VOLUMES(I) = U2D_GRID%CELL_AREAS(I) * (ZMAX-ZMIN)
+            !WRITE(*,*) U2D_GRID%CELL_VOLUMES(I)
+         END IF
+         IF (DIMS == 2 .AND. AXI) THEN
+            RAD = (A(2)+B(2)+C(2))/3.
+            U2D_GRID%CELL_VOLUMES(I) = U2D_GRID%CELL_AREAS(I) * (ZMAX-ZMIN)*RAD
+         END IF
+      END DO
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Computing grid connectivity.'
+         WRITE(*,*) '==========================================='
+      END IF
+
+      ! Find cell connectivity
+      ALLOCATE(TEMP_CELL_NEIGHBORS(3, U2D_GRID%NUM_CELLS))
+      TEMP_CELL_NEIGHBORS = -1
+
+
+
+      DO JN = 1, U2D_GRID%NUM_NODES
+         !IF (PROC_ID == 0) WRITE(*,*) 'Checking node ', JN, ' of ',  U2D_GRID%NUM_NODES
+         IF (N_CELLS_WITH_NODE(JN) > 1) THEN
+            DO I = 0, N_CELLS_WITH_NODE(JN) - 1
+               DO J = I, N_CELLS_WITH_NODE(JN) - 1
+                  IF (I == J) CYCLE
+                  JC1 = CELL_WITH_NODE(IOF(JN) + I)
+                  JC2 = CELL_WITH_NODE(IOF(JN) + J)
+
+
+                  FOUND = 0
+                  DO V1 = 1, 3
+                     DO V2 = 1, 3
+                        IF (U2D_GRID%CELL_NODES(V1,JC1) == U2D_GRID%CELL_NODES(V2,JC2)) THEN
+                           FOUND = FOUND + 1
+                           IF (FOUND .GT. 2) CALL ERROR_ABORT('Error! Found duplicate cells in the mesh!')
+                           WHICH1(FOUND) = V1
+                           WHICH2(FOUND) = V2
+                        END IF
+                     END DO
+                  END DO
+
+                  IF (FOUND == 2) THEN
+      
+                     IF (ANY(WHICH1 == 1) .AND. ANY(WHICH1 == 2)) THEN
+                        TEMP_CELL_NEIGHBORS(1, JC1) = JC2
+                     ELSE IF (ANY(WHICH1 == 2) .AND. ANY(WHICH1 == 3)) THEN
+                        TEMP_CELL_NEIGHBORS(2, JC1) = JC2
+                     ELSE IF (ANY(WHICH1 == 3) .AND. ANY(WHICH1 == 1)) THEN
+                        TEMP_CELL_NEIGHBORS(3, JC1) = JC2
+                     END IF
+
+                     IF (ANY(WHICH2 == 1) .AND. ANY(WHICH2 == 2)) THEN
+                        TEMP_CELL_NEIGHBORS(1, JC2) = JC1
+                     ELSE IF (ANY(WHICH2 == 2) .AND. ANY(WHICH2 == 3)) THEN
+                        TEMP_CELL_NEIGHBORS(2, JC2) = JC1
+                     ELSE IF (ANY(WHICH2 == 3) .AND. ANY(WHICH2 == 1)) THEN
+                        TEMP_CELL_NEIGHBORS(3, JC2) = JC1
+                     END IF
+      
+                  END IF
+
+
+               END DO
+            END DO
+         END IF
+      END DO
+
+      U2D_GRID%CELL_NEIGHBORS = TEMP_CELL_NEIGHBORS
+
+
+
+      !WRITE(*,*) 'Generated grid connectivity. '
+      !DO I = 1, U2D_GRID%NUM_CELLS
+      !   WRITE(*,*) 'Cell ', I, ' neighbors cells ', TEMP_CELL_NEIGHBORS(:, I)
+      !END DO
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Computing face normals.'
+         WRITE(*,*) '==========================================='
+      END IF
+
+      ! Compute cell edge normals
+      IND(1,:) = [1,2]
+      IND(2,:) = [2,3]
+      IND(3,:) = [3,1]
+      ALLOCATE(U2D_GRID%EDGE_NORMAL(3, 3, U2D_GRID%NUM_CELLS))
+      ALLOCATE(U2D_GRID%CELL_EDGES_LEN(3, U2D_GRID%NUM_CELLS))
+      DO I = 1, U2D_GRID%NUM_CELLS
+         DO J = 1, 3
+            X1 = U2D_GRID%NODE_COORDS(1, U2D_GRID%CELL_NODES(IND(J,1),I))
+            X2 = U2D_GRID%NODE_COORDS(1, U2D_GRID%CELL_NODES(IND(J,2),I))
+            Y1 = U2D_GRID%NODE_COORDS(2, U2D_GRID%CELL_NODES(IND(J,1),I))
+            Y2 = U2D_GRID%NODE_COORDS(2, U2D_GRID%CELL_NODES(IND(J,2),I))
+            LEN = SQRT((Y2-Y1)*(Y2-Y1) + (X2-X1)*(X2-X1))
+            U2D_GRID%CELL_EDGES_LEN(J,I) = LEN
+            U2D_GRID%EDGE_NORMAL(1,J,I) = (Y2-Y1)/LEN
+            U2D_GRID%EDGE_NORMAL(2,J,I) = (X1-X2)/LEN
+            U2D_GRID%EDGE_NORMAL(3,J,I) = 0.d0
+         END DO
+      END DO
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Checking ordering.'
+         WRITE(*,*) '==========================================='
+      END IF
+
+      DO I = 1, U2D_GRID%NUM_CELLS
+         X1 = U2D_GRID%NODE_COORDS(1, U2D_GRID%CELL_NODES(2,I)) &
+            - U2D_GRID%NODE_COORDS(1, U2D_GRID%CELL_NODES(1,I))
+         X2 = U2D_GRID%NODE_COORDS(1, U2D_GRID%CELL_NODES(3,I)) &
+            - U2D_GRID%NODE_COORDS(1, U2D_GRID%CELL_NODES(1,I))
+         Y1 = U2D_GRID%NODE_COORDS(2, U2D_GRID%CELL_NODES(2,I)) &
+            - U2D_GRID%NODE_COORDS(2, U2D_GRID%CELL_NODES(1,I))
+         Y2 = U2D_GRID%NODE_COORDS(2, U2D_GRID%CELL_NODES(3,I)) &
+            - U2D_GRID%NODE_COORDS(2, U2D_GRID%CELL_NODES(1,I))
+
+         IF (X1*Y2-X2*Y1 < 0) CALL ERROR_ABORT('2D mesh triangles have negative z-normal.')
+
+      END DO
+
+      NCELLS = U2D_GRID%NUM_CELLS
+      NNODES = U2D_GRID%NUM_NODES
+
+
+
+      ALLOCATE(U2D_GRID%BASIS_COEFFS(3,3,NCELLS))
+
+      DO I = 1, NCELLS
+         V1 = U2D_GRID%CELL_NODES(1,I)
+         V2 = U2D_GRID%CELL_NODES(2,I)
+         V3 = U2D_GRID%CELL_NODES(3,I)
+
+         X1 = U2D_GRID%NODE_COORDS(1, V1)
+         X2 = U2D_GRID%NODE_COORDS(1, V2)
+         X3 = U2D_GRID%NODE_COORDS(1, V3)
+         Y1 = U2D_GRID%NODE_COORDS(2, V1)
+         Y2 = U2D_GRID%NODE_COORDS(2, V2)
+         Y3 = U2D_GRID%NODE_COORDS(2, V3)
+
+         ! These are such that PSI_i = SUM_j [ x_j * BASIS_COEFFS(j,i,IC) ] + BASIS_COEFFS(3,i,IC)
+
+         U2D_GRID%BASIS_COEFFS(1,1,I) =  Y2-Y3
+         U2D_GRID%BASIS_COEFFS(2,1,I) = -(X2-X3)
+         U2D_GRID%BASIS_COEFFS(3,1,I) =  X2*Y3 - X3*Y2
+
+         U2D_GRID%BASIS_COEFFS(1,2,I) = -(Y1-Y3)
+         U2D_GRID%BASIS_COEFFS(2,2,I) =  X1-X3
+         U2D_GRID%BASIS_COEFFS(3,2,I) =  X3*Y1 - X1*Y3
+
+         U2D_GRID%BASIS_COEFFS(1,3,I) = -(Y2-Y1)
+         U2D_GRID%BASIS_COEFFS(2,3,I) =  X2-X1
+         U2D_GRID%BASIS_COEFFS(3,3,I) =  X1*Y2 - X2*Y1
+
+         U2D_GRID%BASIS_COEFFS(:,:,I) = 0.5*U2D_GRID%BASIS_COEFFS(:,:,I)/U2D_GRID%CELL_AREAS(I)
+
+      END DO
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Creating boundary grid.'
+         WRITE(*,*) '==========================================='
+      END IF
+
+      ALLOCATE(U2D_GRID%CELL_EDGES_BOUNDARY_INDEX(3,NCELLS))
+      U2D_GRID%CELL_EDGES_BOUNDARY_INDEX = -1
+      ALLOCATE(NODE_ON_BOUNDARY(NNODES))
+      NODE_ON_BOUNDARY = .FALSE.
+      ALLOCATE(U2D_GRID%NODES_BOUNDARY_INDEX(NNODES))
+      U2D_GRID%NODES_BOUNDARY_INDEX = -1
+      NUM_BOUNDARY_NODES = 0
+      NUM_BOUNDARY_ELEM = 0
+      DO I = 1, NCELLS
+         DO J = 1, 3
+            ! If the edge belongs to any physical group, it should be part of the boundary grid
+            ! Later, we may want to filter this further
+            IF (U2D_GRID%CELL_EDGES_PG(J,I) .NE. -1) THEN
+               NUM_BOUNDARY_ELEM = NUM_BOUNDARY_ELEM + 1
+               V1 = U2D_GRID%CELL_NODES(J, I)
+               IF (J == 3) THEN
+                  V2 = U2D_GRID%CELL_NODES(1, I)
+               ELSE
+                  V2 = U2D_GRID%CELL_NODES(J+1, I)
+               END IF
+               IF (.NOT. NODE_ON_BOUNDARY(V1)) THEN
+                  NUM_BOUNDARY_NODES = NUM_BOUNDARY_NODES + 1
+                  U2D_GRID%NODES_BOUNDARY_INDEX(V1) = NUM_BOUNDARY_NODES
+                  NODE_ON_BOUNDARY(V1) = .TRUE.
+               END IF
+               IF (.NOT. NODE_ON_BOUNDARY(V2)) THEN
+                  NUM_BOUNDARY_NODES = NUM_BOUNDARY_NODES + 1
+                  U2D_GRID%NODES_BOUNDARY_INDEX(V2) = NUM_BOUNDARY_NODES
+                  NODE_ON_BOUNDARY(V2) = .TRUE.
+               END IF
+               
+            END IF
+         END DO
+      END DO      
+
+      U1D_GRID%NUM_CELLS = NUM_BOUNDARY_ELEM
+      U1D_GRID%NUM_NODES = NUM_BOUNDARY_NODES
+      ALLOCATE(U1D_GRID%CELL_NODES(2, NUM_BOUNDARY_ELEM))
+      ALLOCATE(U1D_GRID%CELL_PG(NUM_BOUNDARY_ELEM))
+      ALLOCATE(U1D_GRID%NODE_COORDS(3, NUM_BOUNDARY_NODES))
+
+      DO I = 1, NNODES
+         IF (NODE_ON_BOUNDARY(I)) THEN
+            U1D_GRID%NODE_COORDS(:,U2D_GRID%NODES_BOUNDARY_INDEX(I)) = U2D_GRID%NODE_COORDS(:,I)
+         END IF
+      END DO
+
+      NUM_BOUNDARY_ELEM = 0
+
+      DO I = 1, NCELLS
+         DO J = 1, 3
+            IF (U2D_GRID%CELL_EDGES_PG(J,I) .NE. -1) THEN
+               NUM_BOUNDARY_ELEM = NUM_BOUNDARY_ELEM + 1
+               U1D_GRID%CELL_PG(NUM_BOUNDARY_ELEM) = U2D_GRID%CELL_EDGES_PG(J,I)
+               U2D_GRID%CELL_EDGES_BOUNDARY_INDEX(J,I) = NUM_BOUNDARY_ELEM
+
+               V1 = U2D_GRID%CELL_NODES(J, I)
+               IF (J == 3) THEN
+                  V2 = U2D_GRID%CELL_NODES(1, I)
+               ELSE
+                  V2 = U2D_GRID%CELL_NODES(J+1, I)
+               END IF
+               U1D_GRID%CELL_NODES(1, NUM_BOUNDARY_ELEM) = U2D_GRID%NODES_BOUNDARY_INDEX(V1)
+               U1D_GRID%CELL_NODES(2, NUM_BOUNDARY_ELEM) = U2D_GRID%NODES_BOUNDARY_INDEX(V2)
+
+            END IF
+         END DO
+      END DO
+      
+      DEALLOCATE(NODE_ON_BOUNDARY)
+
+      NBOUNDCELLS = NUM_BOUNDARY_ELEM
+      NBOUNDNODES = NUM_BOUNDARY_NODES
+
+      ! Compute areas and lengths of boundary mesh
+      ALLOCATE(U1D_GRID%SEGMENT_LENGTHS(U1D_GRID%NUM_CELLS))
+      ALLOCATE(U1D_GRID%SEGMENT_AREAS(U1D_GRID%NUM_CELLS))
+      DO I = 1, U1D_GRID%NUM_CELLS
+         A = U1D_GRID%NODE_COORDS(:, U1D_GRID%CELL_NODES(1,I))
+         B = U1D_GRID%NODE_COORDS(:, U1D_GRID%CELL_NODES(2,I))
+
+         U1D_GRID%SEGMENT_LENGTHS(I) = SQRT((B(1) - A(1))**2 + (B(2) - A(2))**2)
+         IF (.NOT. AXI) THEN
+            U1D_GRID%SEGMENT_AREAS(I) = U1D_GRID%SEGMENT_LENGTHS(I) * (ZMAX-ZMIN)
+         ELSE
+            RAD = 0.5*(A(2)+B(2))
+            U1D_GRID%SEGMENT_AREAS(I) = U1D_GRID%SEGMENT_LENGTHS(I) * (ZMAX-ZMIN)*RAD
+         END IF
+      END DO
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '============================================================='
+         WRITE(*,*) 'Done reading grid file.'
+         WRITE(*,*) 'It contains ', NNODES, ' nodes and ', NCELLS, ' cells.'
+         WRITE(*,*) 'The boundary grid contains ', NBOUNDCELLS, ' lines and ', NBOUNDNODES, ' nodes.'
+         WRITE(*,*) '============================================================='
+      END IF
+      
+   END SUBROUTINE READ_2D_UNSTRUCTURED_GRID_MSH
+
+
+   SUBROUTINE READ_3D_UNSTRUCTURED_GRID_MSH(FILENAME)
+
+      IMPLICIT NONE
+
+      CHARACTER*256, INTENT(IN) :: FILENAME
+
+      CHARACTER*256 :: LINE, GROUPNAME, DUMMYLINE
+
+      INTEGER, PARAMETER :: in5 = 2385
+      INTEGER            :: ios
+      INTEGER            :: ReasonEOF
+
+      REAL :: MESH_VERSION
+      INTEGER :: FILE_TYPE, DATA_SIZE, DUMMY, CELL_COUNT
+      INTEGER, DIMENSION(:), ALLOCATABLE :: PG_MAP, PG_PREMAP, TEMP_CELL_PG
+      INTEGER, DIMENSION(:,:), ALLOCATABLE :: TEMP_CELL_NODES
+
+      INTEGER            :: NUM, I, J, FOUND, V1, V2, V3, V4, ELEM_TYPE, NUMELEMS
+      INTEGER, DIMENSION(4,3) :: IND
+      REAL(KIND=8), DIMENSION(3) :: XYZ, A, B, C, CROSSP
+
+      INTEGER, DIMENSION(:,:), ALLOCATABLE      :: TEMP_CELL_NEIGHBORS
+
+      INTEGER, DIMENSION(3) :: VLIST3, WHICH1, WHICH2
+      INTEGER, DIMENSION(4) :: VLIST4
+
+      INTEGER, DIMENSION(:), ALLOCATABLE :: N_CELLS_WITH_NODE, CELL_WITH_NODE, IOF
+      INTEGER :: IDX, JN, JC1, JC2, IPG
+
+      REAL(KIND=8) :: VOLUME, X1, X2, X3, X4, Y1, Y2, Y3, Y4, Z1, Z2, Z3, Z4
+
+      LOGICAL, DIMENSION(:), ALLOCATABLE :: NODE_ON_BOUNDARY
+      INTEGER :: NUM_BOUNDARY_NODES, NUM_BOUNDARY_ELEM
+
+      ! Open input file for reading
+      OPEN(UNIT=in5,FILE=FILENAME, STATUS='old',IOSTAT=ios)
+
+      IF (ios .NE. 0) THEN
+         CALL ERROR_ABORT('Attention, mesh file not found! ABORTING.')
+      ENDIF
+
+      ! Read the mesh file. MSH file format (*.msh), verson 2, ASCII only
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Reading grid file in MSH format.'
+         WRITE(*,*) '==========================================='
+      END IF
+
+
+      DO
+         READ(in5,*, IOSTAT=ReasonEOF) LINE
+         IF (ReasonEOF < 0) EXIT 
+
+         IF (TRIM(LINE) == '$MeshFormat') THEN
+            READ(in5,*, IOSTAT=ReasonEOF) MESH_VERSION, FILE_TYPE, DATA_SIZE
+
+            IF (INT(MESH_VERSION) .NE. 2) THEN
+               CALL ERROR_ABORT('Attention, only MSH version 2 is supported! ABORTING.')
+            END IF
+            IF (FILE_TYPE .NE. 0) THEN
+               CALL ERROR_ABORT('Attention, only ASCII MSH files are supported! ABORTING.')
+            END IF
+         END IF
+
+         IF (TRIM(LINE) == '$PhysicalNames') THEN
+            READ(in5,*, IOSTAT=ReasonEOF) NUM
+
+            N_GRID_BC = NUM
+            ALLOCATE(GRID_BC(NUM))
+
+            ALLOCATE(PG_PREMAP(NUM))
+            DO I = 1, NUM
+               READ(in5,*, IOSTAT=ReasonEOF) ELEM_TYPE, IPG, GRID_BC(I)%PHYSICAL_GROUP_NAME
+               PG_PREMAP(I) = IPG
+            END DO
+            ALLOCATE(PG_MAP(MINVAL(PG_PREMAP):MAXVAL(PG_PREMAP)))
+            PG_MAP = -1
+            DO I = 1, NUM
+               PG_MAP(PG_PREMAP(I)) = I
+               WRITE(*,*) 'Physical group ', I, ' with name ', GRID_BC(I)%PHYSICAL_GROUP_NAME, ' has index ', PG_PREMAP(I)
+            END DO
+
+
+            DEALLOCATE(PG_PREMAP)
+         END IF
+
+         IF (TRIM(LINE) == '$Nodes') THEN
+            READ(in5,*, IOSTAT=ReasonEOF) NUM
+
+            ALLOCATE(U3D_GRID%NODE_COORDS(3,NUM))
+            U3D_GRID%NUM_NODES = NUM
+
+            DO I = 1, NUM
+               READ(in5,*, IOSTAT=ReasonEOF) IDX, XYZ
+               U3D_GRID%NODE_COORDS(:,I) = XYZ
+            END DO
+         END IF
+
+
+         IF (TRIM(LINE) == '$Elements') THEN
+            READ(in5,*, IOSTAT=ReasonEOF) NUM
+
+            ALLOCATE(TEMP_CELL_NODES(4, NUM))
+            ALLOCATE(TEMP_CELL_PG(NUM))
+            CELL_COUNT = 0
+
+            DO I = 1, NUM
+               READ(in5,'(A)', IOSTAT=ReasonEOF) LINE
+               READ(LINE,*) IDX, ELEM_TYPE
+
+               IF (ELEM_TYPE .EQ. 4) THEN
+                  CELL_COUNT = CELL_COUNT + 1
+                  READ(LINE,*) IDX, ELEM_TYPE, DUMMY, IPG, DUMMY, TEMP_CELL_NODES(:,CELL_COUNT)
+                  TEMP_CELL_PG(CELL_COUNT) = PG_MAP(IPG)
+               END IF
+            END DO
+
+
+
+            ALLOCATE(U3D_GRID%CELL_NODES(4,CELL_COUNT))
+            ALLOCATE(U3D_GRID%CELL_FACES_PG(4, CELL_COUNT))
+            ALLOCATE(U3D_GRID%CELL_PG(CELL_COUNT))
+            U3D_GRID%NUM_CELLS = CELL_COUNT
+            U3D_GRID%CELL_FACES_PG = -1
+            U3D_GRID%CELL_PG = -1
+
+            U3D_GRID%CELL_NODES(:, :) = TEMP_CELL_NODES(:, 1:CELL_COUNT)
+            U3D_GRID%CELL_PG(:)       = TEMP_CELL_PG(1:CELL_COUNT)
+
+            DEALLOCATE(TEMP_CELL_NODES)
+            DEALLOCATE(TEMP_CELL_PG)
+         END IF
+      END DO
+
+      REWIND(in5)
+
+      
+      ALLOCATE(N_CELLS_WITH_NODE(U3D_GRID%NUM_NODES))
+      ALLOCATE(IOF(U3D_GRID%NUM_NODES))
+
+      N_CELLS_WITH_NODE = 0
+      DO I = 1, U3D_GRID%NUM_CELLS
+         DO V1 = 1, 4
+            JN = U3D_GRID%CELL_NODES(V1,I)
+            N_CELLS_WITH_NODE(JN) = N_CELLS_WITH_NODE(JN) + 1
+         END DO
+      END DO
+   
+      IOF = -1
+      IDX = 1
+      DO JN = 1, U3D_GRID%NUM_NODES
+         IF (N_CELLS_WITH_NODE(JN) .NE. 0) THEN
+            IOF(JN) = IDX
+            IDX = IDX + N_CELLS_WITH_NODE(JN)
+         END IF
+      END DO
+   
+      ALLOCATE(CELL_WITH_NODE(IDX))
+      
+      N_CELLS_WITH_NODE = 0
+      DO I = 1, U3D_GRID%NUM_CELLS
+         DO V1 = 1, 4
+            JN = U3D_GRID%CELL_NODES(V1,I)
+            CELL_WITH_NODE(IOF(JN) + N_CELLS_WITH_NODE(JN)) = I
+            N_CELLS_WITH_NODE(JN) = N_CELLS_WITH_NODE(JN) + 1
+         END DO
+      END DO
+
+
+      DO
+         READ(in5,*, IOSTAT=ReasonEOF) LINE
+         IF (ReasonEOF < 0) EXIT
+         !WRITE(*,*) 'Read line:', LINE, ' number ', NUM
+         
+         IF (TRIM(LINE) == '$Elements') THEN
+            READ(in5,*, IOSTAT=ReasonEOF) NUM
+
+            ! Assign physical groups to cell edges.
+            DO I = 1, NUM
+               
+               READ(in5,'(A)', IOSTAT=ReasonEOF) LINE
+               READ(LINE,*) IDX, ELEM_TYPE
+
+               IF (ELEM_TYPE == 2) THEN ! element in physical group is a cell (simplex).
+
+                  READ(LINE,*) IDX, ELEM_TYPE, DUMMY, IPG, DUMMY, VLIST3
+
+                  JN = VLIST3(1)
+                  IF (N_CELLS_WITH_NODE(JN) > 0) THEN
+                     DO IDX = 0, N_CELLS_WITH_NODE(JN) - 1
+                        JC1 = CELL_WITH_NODE(IOF(JN) + IDX)
+                        FOUND = 0
+                        DO V1 = 1, 4
+                           IF (ANY(VLIST3 == U3D_GRID%CELL_NODES(V1,JC1))) THEN
+                              FOUND = FOUND + 1
+                              WHICH1(FOUND) = V1
+                           END IF
+                        END DO
+         
+                        IF (FOUND == 3) THEN
+            
+                           IF (ANY(WHICH1 == 1)) THEN
+                              IF (ANY(WHICH1 == 2)) THEN
+                                 IF (ANY(WHICH1 == 3))  THEN
+                                    U3D_GRID%CELL_FACES_PG(1, JC1) = PG_MAP(IPG)
+                                 ELSE IF (ANY(WHICH1 == 4)) THEN
+                                    U3D_GRID%CELL_FACES_PG(2, JC1) = PG_MAP(IPG)
+                                 END IF
+                              ELSE IF (ANY(WHICH1 == 3)) THEN
+                                 IF (ANY(WHICH1 == 4)) U3D_GRID%CELL_FACES_PG(4, JC1) = PG_MAP(IPG)
+                              END IF
+                           ELSE IF (ANY(WHICH1 == 2)) THEN
+                              IF (ANY(WHICH1 == 3) .AND. ANY(WHICH1 == 4)) U3D_GRID%CELL_FACES_PG(3, JC1) = PG_MAP(IPG)
+                           END IF
+
+                        END IF
+                     END DO
+                  END IF
+
+               ELSE IF (ELEM_TYPE == 4) THEN 
+                  ! element in physical group is a tetrahedron.
+               ELSE
+                  WRITE(*,*) 'Error! element type was not triangle or prism.'
+               END IF
+            END DO
+
+         END IF
+      END DO
+
+      ! Done reading
+      CLOSE(in5)
+      DEALLOCATE(PG_MAP)
+
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Computing cell volumes.'
+         WRITE(*,*) '==========================================='
+      END IF
+
+      ! Compute cell volumes
+      ALLOCATE(U3D_GRID%CELL_VOLUMES(U3D_GRID%NUM_CELLS))
+      DO I = 1, U3D_GRID%NUM_CELLS
+         A = U3D_GRID%NODE_COORDS(:, U3D_GRID%CELL_NODES(2,I)) - U3D_GRID%NODE_COORDS(:, U3D_GRID%CELL_NODES(1,I))
+         B = U3D_GRID%NODE_COORDS(:, U3D_GRID%CELL_NODES(3,I)) - U3D_GRID%NODE_COORDS(:, U3D_GRID%CELL_NODES(1,I))
+         C = U3D_GRID%NODE_COORDS(:, U3D_GRID%CELL_NODES(4,I)) - U3D_GRID%NODE_COORDS(:, U3D_GRID%CELL_NODES(1,I))
+
+         U3D_GRID%CELL_VOLUMES(I) = ABS(C(1)*(A(2)*B(3)-A(3)*B(2)) + C(2)*(A(3)*B(1)-A(1)*B(3)) + C(3)*(A(1)*B(2)-A(2)*B(1))) / 6.
+      END DO
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Computing grid connectivity.'
+         WRITE(*,*) '==========================================='
+      END IF
+
+
+      ALLOCATE(TEMP_CELL_NEIGHBORS(4, U3D_GRID%NUM_CELLS))
+      TEMP_CELL_NEIGHBORS = -1
+
+      DO JN = 1, U3D_GRID%NUM_NODES
+         !IF (PROC_ID == 0) WRITE(*,*) 'Checking node ', JN, ' of ',  U3D_GRID%NUM_NODES
+         IF (N_CELLS_WITH_NODE(JN) > 1) THEN
+            DO I = 0, N_CELLS_WITH_NODE(JN) - 1
+               DO J = I, N_CELLS_WITH_NODE(JN) - 1
+                  IF (I == J) CYCLE
+                  JC1 = CELL_WITH_NODE(IOF(JN) + I)
+                  JC2 = CELL_WITH_NODE(IOF(JN) + J)
+
+
+                  FOUND = 0
+                  DO V1 = 1, 4
+                     DO V2 = 1, 4
+                        IF (U3D_GRID%CELL_NODES(V1,JC1) == U3D_GRID%CELL_NODES(V2,JC2)) THEN
+                           FOUND = FOUND + 1
+                           IF (FOUND .GT. 3) CALL ERROR_ABORT('Error! Found duplicate cells in the mesh!')
+                           WHICH1(FOUND) = V1
+                           WHICH2(FOUND) = V2
+                        END IF
+                     END DO
+                  END DO
+
+                  IF (FOUND == 3) THEN
+      
+                     IF (ANY(WHICH1 == 1)) THEN
+                        IF (ANY(WHICH1 == 2)) THEN
+                           IF (ANY(WHICH1 == 3))  THEN
+                              TEMP_CELL_NEIGHBORS(1, JC1) = JC2
+                           ELSE IF (ANY(WHICH1 == 4)) THEN
+                              TEMP_CELL_NEIGHBORS(2, JC1) = JC2
+                           END IF
+                        ELSE IF (ANY(WHICH1 == 3)) THEN
+                           IF (ANY(WHICH1 == 4)) TEMP_CELL_NEIGHBORS(4, JC1) = JC2
+                        END IF
+                     ELSE IF (ANY(WHICH1 == 2)) THEN
+                        IF (ANY(WHICH1 == 3) .AND. ANY(WHICH1 == 4)) TEMP_CELL_NEIGHBORS(3, JC1) = JC2
+                     END IF
+      
+      
+                     IF (ANY(WHICH2 == 1)) THEN
+                        IF (ANY(WHICH2 == 2)) THEN
+                           IF (ANY(WHICH2 == 3))  THEN
+                              TEMP_CELL_NEIGHBORS(1, JC2) = JC1
+                           ELSE IF (ANY(WHICH2 == 4)) THEN
+                              TEMP_CELL_NEIGHBORS(2, JC2) = JC1
+                           END IF
+                        ELSE IF (ANY(WHICH2 == 3)) THEN
+                           IF (ANY(WHICH2 == 4)) TEMP_CELL_NEIGHBORS(4, JC2) = JC1
+                        END IF
+                     ELSE IF (ANY(WHICH2 == 2)) THEN
+                        IF (ANY(WHICH2 == 3) .AND. ANY(WHICH2 == 4)) TEMP_CELL_NEIGHBORS(3, JC2) = JC1
+                     END IF
+      
+                  END IF
+
+
+               END DO
+            END DO
+         END IF
+      END DO
+
+      U3D_GRID%CELL_NEIGHBORS = TEMP_CELL_NEIGHBORS
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Computing face normals.'
+         WRITE(*,*) '==========================================='
+      END IF
+
+      ! Compute cell edge normals
+      IND(1,:) = [1,3,2]
+      IND(2,:) = [1,2,4]
+      IND(3,:) = [2,3,4]
+      IND(4,:) = [1,4,3]
+      ALLOCATE(U3D_GRID%FACE_NORMAL(3, 4, U3D_GRID%NUM_CELLS))
+      ALLOCATE(U3D_GRID%FACE_TANG1(3, 4, U3D_GRID%NUM_CELLS))
+      ALLOCATE(U3D_GRID%FACE_TANG2(3, 4, U3D_GRID%NUM_CELLS))
+      ALLOCATE(U3D_GRID%FACE_NODES(3, 4, U3D_GRID%NUM_CELLS))
+      ALLOCATE(U3D_GRID%CELL_FACES_COEFFS(4, 4, U3D_GRID%NUM_CELLS))
+      ALLOCATE(U3D_GRID%FACE_AREA(4, U3D_GRID%NUM_CELLS))
+
+      DO I = 1, U3D_GRID%NUM_CELLS
+         DO J = 1, 4
+            V1 = U3D_GRID%CELL_NODES(IND(J,1),I)
+            V2 = U3D_GRID%CELL_NODES(IND(J,2),I)
+            V3 = U3D_GRID%CELL_NODES(IND(J,3),I)
+
+            U3D_GRID%FACE_NODES(1,J,I) = V1
+            U3D_GRID%FACE_NODES(2,J,I) = V2
+            U3D_GRID%FACE_NODES(3,J,I) = V3
+
+            A = U3D_GRID%NODE_COORDS(:,V1)
+            B = U3D_GRID%NODE_COORDS(:,V2)
+            C = U3D_GRID%NODE_COORDS(:,V3)
+            
+            CROSSP = CROSS(B-A,C-A)
+            U3D_GRID%FACE_NORMAL(:,J,I) = CROSSP/NORM2(CROSSP)
+            U3D_GRID%FACE_AREA(J,I) = 0.5*NORM2(CROSSP)
+            
+            U3D_GRID%FACE_TANG1(:,J,I) = (B-A)/NORM2(B-A)
+            U3D_GRID%FACE_TANG2(:,J,I) = CROSS(U3D_GRID%FACE_NORMAL(:,J,I), U3D_GRID%FACE_TANG1(:,J,I))
+
+
+            ! The coefficients (a,b,c,d) of a*x + b*y + c*z + d = 0
+            U3D_GRID%CELL_FACES_COEFFS(1,J,I) =  A(2)*B(3)-B(2)*A(3) &
+                                                +B(2)*C(3)-C(2)*B(3) &
+                                                +C(2)*A(3)-A(2)*C(3)
+            U3D_GRID%CELL_FACES_COEFFS(2,J,I) = -A(1)*B(3)+B(1)*A(3) &
+                                                -B(1)*C(3)+C(1)*B(3) &
+                                                -C(1)*A(3)+A(1)*C(3)
+            U3D_GRID%CELL_FACES_COEFFS(3,J,I) =  A(1)*B(2)-B(1)*A(2) &
+                                                +B(1)*C(2)-C(1)*B(2) &
+                                                +C(1)*A(2)-A(1)*C(2)
+            U3D_GRID%CELL_FACES_COEFFS(4,J,I) = -A(1)*B(2)*C(3) &
+                                                +A(1)*C(2)*B(3) &
+                                                +B(1)*A(2)*C(3) &
+                                                -B(1)*C(2)*A(3) &
+                                                -C(1)*A(2)*B(3) &
+                                                +C(1)*B(2)*A(3)
+
+         END DO
+      END DO
+
+
+
+      NCELLS = U3D_GRID%NUM_CELLS
+      NNODES = U3D_GRID%NUM_NODES
+
+
+
+      ALLOCATE(U3D_GRID%BASIS_COEFFS(4,4,NCELLS))
+
+      DO I = 1, NCELLS
+         VOLUME = U3D_GRID%CELL_VOLUMES(I)
+         V1 = U3D_GRID%CELL_NODES(1,I)
+         V2 = U3D_GRID%CELL_NODES(2,I)
+         V3 = U3D_GRID%CELL_NODES(3,I)
+         V4 = U3D_GRID%CELL_NODES(4,I)
+
+         X1 = U3D_GRID%NODE_COORDS(1, V1)
+         X2 = U3D_GRID%NODE_COORDS(1, V2)
+         X3 = U3D_GRID%NODE_COORDS(1, V3)
+         X4 = U3D_GRID%NODE_COORDS(1, V4)
+         Y1 = U3D_GRID%NODE_COORDS(2, V1)
+         Y2 = U3D_GRID%NODE_COORDS(2, V2)
+         Y3 = U3D_GRID%NODE_COORDS(2, V3)
+         Y4 = U3D_GRID%NODE_COORDS(2, V4)
+         Z1 = U3D_GRID%NODE_COORDS(3, V1)
+         Z2 = U3D_GRID%NODE_COORDS(3, V2)
+         Z3 = U3D_GRID%NODE_COORDS(3, V3)
+         Z4 = U3D_GRID%NODE_COORDS(3, V4)
+
+
+         ! These are such that PSI_i = SUM_j [ x_j * BASIS_COEFFS(j,i,IC) ] + BASIS_COEFFS(4,i,IC)
+
+         U3D_GRID%BASIS_COEFFS(1,1,I) =  Y2*Z3-Y3*Z2 -Y2*Z4+Y4*Z2 +Y3*Z4-Y4*Z3
+         U3D_GRID%BASIS_COEFFS(2,1,I) = -X2*Z3+X3*Z2 +X2*Z4-X4*Z2 -X3*Z4+X4*Z3
+         U3D_GRID%BASIS_COEFFS(3,1,I) =  X2*Y3-X3*Y2 -X2*Y4+X4*Y2 +X3*Y4-X4*Y3
+         U3D_GRID%BASIS_COEFFS(4,1,I) = -X2*Y3*Z4 +X3*Y2*Z4 +X2*Y4*Z3 -X4*Y2*Z3 -X3*Y4*Z2 +X4*Y3*Z2
+
+         U3D_GRID%BASIS_COEFFS(1,2,I) = -Y1*Z3+Y3*Z1 +Y1*Z4-Y4*Z1 -Y3*Z4+Y4*Z3
+         U3D_GRID%BASIS_COEFFS(2,2,I) =  X1*Z3-X3*Z1 -X1*Z4+X4*Z1 +X3*Z4-X4*Z3
+         U3D_GRID%BASIS_COEFFS(3,2,I) = -X1*Y3+X3*Y1 +X1*Y4-X4*Y1 -X3*Y4+X4*Y3
+         U3D_GRID%BASIS_COEFFS(4,2,I) =  X1*Y3*Z4 -X3*Y1*Z4 -X1*Y4*Z3 +X4*Y1*Z3 +X3*Y4*Z1 -X4*Y3*Z1
+
+         U3D_GRID%BASIS_COEFFS(1,3,I) =  Y1*Z2-Y2*Z1 -Y1*Z4+Y4*Z1 +Y2*Z4-Y4*Z2
+         U3D_GRID%BASIS_COEFFS(2,3,I) = -X1*Z2+X2*Z1 +X1*Z4-X4*Z1 -X2*Z4+X4*Z2
+         U3D_GRID%BASIS_COEFFS(3,3,I) =  X1*Y2-X2*Y1 -X1*Y4+X4*Y1 +X2*Y4-X4*Y2
+         U3D_GRID%BASIS_COEFFS(4,3,I) = -X1*Y2*Z4 +X2*Y1*Z4 +X1*Y4*Z2 -X4*Y1*Z2 -X2*Y4*Z1 +X4*Y2*Z1
+
+         U3D_GRID%BASIS_COEFFS(1,4,I) = -Y1*Z2+Y2*Z1 +Y1*Z3-Y3*Z1 -Y2*Z3+Y3*Z2
+         U3D_GRID%BASIS_COEFFS(2,4,I) =  X1*Z2-X2*Z1 -X1*Z3+X3*Z1 +X2*Z3-X3*Z2
+         U3D_GRID%BASIS_COEFFS(3,4,I) = -X1*Y2+X2*Y1 +X1*Y3-X3*Y1 -X2*Y3+X3*Y2
+         U3D_GRID%BASIS_COEFFS(4,4,I) =  X1*Y2*Z3 -X2*Y1*Z3 -X1*Y3*Z2 +X3*Y1*Z2 +X2*Y3*Z1 -X3*Y2*Z1
+
+         U3D_GRID%BASIS_COEFFS(:,:,I) = -U3D_GRID%BASIS_COEFFS(:,:,I)/6./VOLUME
+
+      END DO
+
+
+
+
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '==========================================='
+         WRITE(*,*) 'Creating boundary grid.'
+         WRITE(*,*) '==========================================='
+      END IF
+
+      ALLOCATE(U3D_GRID%CELL_FACES_BOUNDARY_INDEX(4,NCELLS))
+      U3D_GRID%CELL_FACES_BOUNDARY_INDEX = -1
+      ALLOCATE(NODE_ON_BOUNDARY(NNODES))
+      NODE_ON_BOUNDARY = .FALSE.
+      ALLOCATE(U3D_GRID%NODES_BOUNDARY_INDEX(NNODES))
+      U3D_GRID%NODES_BOUNDARY_INDEX = -1
+      NUM_BOUNDARY_NODES = 0
+      NUM_BOUNDARY_ELEM = 0
+      DO I = 1, NCELLS
+         DO J = 1, 4
+            ! If the face belongs to any physical group, it should be part of the boundary grid
+            ! Later, we may want to filter this further
+            IF (U3D_GRID%CELL_FACES_PG(J,I) .NE. -1) THEN
+               NUM_BOUNDARY_ELEM = NUM_BOUNDARY_ELEM + 1
+
+               V1 = U3D_GRID%CELL_NODES(IND(J,1),I)
+               V2 = U3D_GRID%CELL_NODES(IND(J,2),I)
+               V3 = U3D_GRID%CELL_NODES(IND(J,3),I)
+
+               IF (.NOT. NODE_ON_BOUNDARY(V1)) THEN
+                  NUM_BOUNDARY_NODES = NUM_BOUNDARY_NODES + 1
+                  U3D_GRID%NODES_BOUNDARY_INDEX(V1) = NUM_BOUNDARY_NODES
+                  NODE_ON_BOUNDARY(V1) = .TRUE.
+               END IF
+               IF (.NOT. NODE_ON_BOUNDARY(V2)) THEN
+                  NUM_BOUNDARY_NODES = NUM_BOUNDARY_NODES + 1
+                  U3D_GRID%NODES_BOUNDARY_INDEX(V2) = NUM_BOUNDARY_NODES
+                  NODE_ON_BOUNDARY(V2) = .TRUE.
+               END IF
+               IF (.NOT. NODE_ON_BOUNDARY(V3)) THEN
+                  NUM_BOUNDARY_NODES = NUM_BOUNDARY_NODES + 1
+                  U3D_GRID%NODES_BOUNDARY_INDEX(V3) = NUM_BOUNDARY_NODES
+                  NODE_ON_BOUNDARY(V3) = .TRUE.
+               END IF
+               
+            END IF
+         END DO
+      END DO      
+
+      U2D_GRID%NUM_CELLS = NUM_BOUNDARY_ELEM
+      U2D_GRID%NUM_NODES = NUM_BOUNDARY_NODES
+      ALLOCATE(U2D_GRID%CELL_NODES(3, NUM_BOUNDARY_ELEM))
+      ALLOCATE(U2D_GRID%CELL_PG(NUM_BOUNDARY_ELEM))
+      ALLOCATE(U2D_GRID%NODE_COORDS(3, NUM_BOUNDARY_NODES))
+
+      DO I = 1, NNODES
+         IF (NODE_ON_BOUNDARY(I)) THEN
+            U2D_GRID%NODE_COORDS(:,U3D_GRID%NODES_BOUNDARY_INDEX(I)) = U3D_GRID%NODE_COORDS(:,I)
+         END IF
+      END DO
+
+      NUM_BOUNDARY_ELEM = 0
+
+      DO I = 1, NCELLS
+         DO J = 1, 4
+            IF (U3D_GRID%CELL_FACES_PG(J,I) .NE. -1) THEN
+               NUM_BOUNDARY_ELEM = NUM_BOUNDARY_ELEM + 1
+               U2D_GRID%CELL_PG(NUM_BOUNDARY_ELEM) = U3D_GRID%CELL_FACES_PG(J,I)
+               U3D_GRID%CELL_FACES_BOUNDARY_INDEX(J,I) = NUM_BOUNDARY_ELEM
+
+               V1 = U3D_GRID%CELL_NODES(IND(J,1),I)
+               V2 = U3D_GRID%CELL_NODES(IND(J,2),I)
+               V3 = U3D_GRID%CELL_NODES(IND(J,3),I)
+               U2D_GRID%CELL_NODES(1, NUM_BOUNDARY_ELEM) = U3D_GRID%NODES_BOUNDARY_INDEX(V1)
+               U2D_GRID%CELL_NODES(2, NUM_BOUNDARY_ELEM) = U3D_GRID%NODES_BOUNDARY_INDEX(V2)
+               U2D_GRID%CELL_NODES(3, NUM_BOUNDARY_ELEM) = U3D_GRID%NODES_BOUNDARY_INDEX(V3)
+
+            END IF
+         END DO
+      END DO
+      
+      DEALLOCATE(NODE_ON_BOUNDARY)
+
+      NBOUNDCELLS = NUM_BOUNDARY_ELEM
+      NBOUNDNODES = NUM_BOUNDARY_NODES
+
+      ! Compute areas and lengths of boundary mesh
+      ALLOCATE(U2D_GRID%CELL_AREAS(U2D_GRID%NUM_CELLS))
+      DO I = 1, U2D_GRID%NUM_CELLS
+         A = U2D_GRID%NODE_COORDS(:, U2D_GRID%CELL_NODES(1,I))
+         B = U2D_GRID%NODE_COORDS(:, U2D_GRID%CELL_NODES(2,I))
+         C = U2D_GRID%NODE_COORDS(:, U2D_GRID%CELL_NODES(3,I))
+
+         U2D_GRID%CELL_AREAS(I) = 0.5*NORM2(CROSS(B-A, C-A))
+      END DO
+
+
+
+
+      IF (PROC_ID == 0) THEN
+         WRITE(*,*) '============================================================='
+         WRITE(*,*) 'Done reading grid file.'
+         WRITE(*,*) 'It contains ', NNODES, ' nodes and ', NCELLS, ' cells.'
+         WRITE(*,*) 'The boundary grid contains ', NBOUNDCELLS, ' surfaces and ', NBOUNDNODES, ' nodes.'
+         WRITE(*,*) '============================================================='
+      END IF
+
+   END SUBROUTINE READ_3D_UNSTRUCTURED_GRID_MSH
+
+
 END MODULE grid_and_partition

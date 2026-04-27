@@ -109,7 +109,21 @@ MODULE initialization
             ELSE IF (DIMS == 3) THEN
                CALL READ_3D_UNSTRUCTURED_GRID_SU2(MESH_FILENAME)
             ELSE
-               CALL ERROR_ABORT('Asked to read SU2 grid file but dimensions are not set to 2 or 3.')
+               CALL ERROR_ABORT('Asked to read SU2 grid file but dimensions are not set to 1, 2 or 3.')
+            END IF
+            GRID_TYPE = UNSTRUCTURED
+         END IF
+
+         IF (line=='Mesh_file:') THEN
+            READ(in1,*) MESH_FILENAME
+            IF (DIMS == 1) THEN
+               ! CALL READ_1D_UNSTRUCTURED_GRID_MSH(MESH_FILENAME)
+            ELSE IF (DIMS == 2) THEN
+               CALL READ_2D_UNSTRUCTURED_GRID_MSH(MESH_FILENAME)
+            ELSE IF (DIMS == 3) THEN
+               CALL READ_3D_UNSTRUCTURED_GRID_MSH(MESH_FILENAME)
+            ELSE
+               CALL ERROR_ABORT('Asked to read MSH grid file but dimensions are not set to 1,2 or 3.')
             END IF
             GRID_TYPE = UNSTRUCTURED
          END IF
@@ -157,9 +171,9 @@ MODULE initialization
          IF (line=='External_B_field:') READ(in1,*) EXTERNAL_B_FIELD(1), EXTERNAL_B_FIELD(2), EXTERNAL_B_FIELD(3)
          IF (line=='External_E_field:') READ(in1,*) EXTERNAL_E_FIELD(1), EXTERNAL_E_FIELD(2), EXTERNAL_E_FIELD(3)
 
-         IF (line=='Magnetic_dipole:') THEN
+         IF (line=='Magnetic_dipole_field:') THEN
             BOOL_MAGNETIC_DIPOLE = .TRUE.
-            READ(in1,*) MAGNETIC_MOMENT, DIPOLE_POSITION(:), DIPOLE_ORIENTATION(:)
+            READ(in1,*) DIPOLE_POSITION(:), DIPOLE_ORIENTATION(:), MAGNETIC_MOMENT
          END IF
 
          IF (line=='Boundary_dump_fluxes:') THEN

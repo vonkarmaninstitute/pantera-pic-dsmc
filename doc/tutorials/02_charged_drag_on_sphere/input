@@ -31,8 +31,8 @@ Domain_diffuse:
 PIC_type:
 hybrid
 
-Mesh_file_SU2:
-'./mesh.su2'
+Mesh_file:
+'./mesh.msh'
 
 Partition_style:
 stripsx !strips in x direction

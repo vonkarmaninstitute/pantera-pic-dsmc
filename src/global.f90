@@ -193,12 +193,6 @@ MODULE global
 
    TYPE(UNSTRUCTURED_3D_GRID_DATA_STRUCTURE) :: U3D_GRID
 
-   !CHARACTER*256 :: MESH_FILENAME = 'meshlofthousecoarse.su2'
-   !CHARACTER*256 :: MESH_FILENAME = 'meshlofthousenew.su2'
-   !CHARACTER*256 :: MESH_FILENAME = 'meshtestfine.su2'
-   !CHARACTER*256 :: MESH_FILENAME = 'meshrectfine.su2'
-   !CHARACTER*256 :: MESH_FILENAME = 'meshtestbound.su2'
-   !CHARACTER*256 :: MESH_FILENAME = 'meshlh.su2'
    CHARACTER*256 :: MESH_FILENAME
 
    INTEGER         :: N_GRID_BC = 0

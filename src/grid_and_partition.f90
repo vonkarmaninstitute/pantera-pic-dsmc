@@ -2360,7 +2360,7 @@ MODULE grid_and_partition
                      END DO
                   END IF
                ELSE IF (ELEM_TYPE == 2) THEN
-                  ! element is a triangle
+                  ! Element in the physical group is a triangle
                ELSE
                   WRITE(*,*) 'Error! element type was not line or triangle.'
                END IF
@@ -2392,7 +2392,6 @@ MODULE grid_and_partition
          U2D_GRID%CELL_AREAS(I) = 0.5*ABS(A(1)*(B(2)-C(2)) + B(1)*(C(2)-A(2)) + C(1)*(A(2)-B(2)))
          IF (DIMS == 2 .AND. .NOT. AXI) THEN
             U2D_GRID%CELL_VOLUMES(I) = U2D_GRID%CELL_AREAS(I) * (ZMAX-ZMIN)
-            !WRITE(*,*) U2D_GRID%CELL_VOLUMES(I)
          END IF
          IF (DIMS == 2 .AND. AXI) THEN
             RAD = (A(2)+B(2)+C(2))/3.
@@ -2413,7 +2412,6 @@ MODULE grid_and_partition
 
 
       DO JN = 1, U2D_GRID%NUM_NODES
-         !IF (PROC_ID == 0) WRITE(*,*) 'Checking node ', JN, ' of ',  U2D_GRID%NUM_NODES
          IF (N_CELLS_WITH_NODE(JN) > 1) THEN
             DO I = 0, N_CELLS_WITH_NODE(JN) - 1
                DO J = I, N_CELLS_WITH_NODE(JN) - 1
@@ -2738,7 +2736,6 @@ MODULE grid_and_partition
             PG_MAP = -1
             DO I = 1, NUM
                PG_MAP(PG_PREMAP(I)) = I
-               WRITE(*,*) 'Physical group ', I, ' with name ', GRID_BC(I)%PHYSICAL_GROUP_NAME, ' has index ', PG_PREMAP(I)
             END DO
 
 
@@ -2831,7 +2828,6 @@ MODULE grid_and_partition
       DO
          READ(in5,*, IOSTAT=ReasonEOF) LINE
          IF (ReasonEOF < 0) EXIT
-         !WRITE(*,*) 'Read line:', LINE, ' number ', NUM
          
          IF (TRIM(LINE) == '$Elements') THEN
             READ(in5,*, IOSTAT=ReasonEOF) NUM
@@ -2842,7 +2838,7 @@ MODULE grid_and_partition
                READ(in5,'(A)', IOSTAT=ReasonEOF) LINE
                READ(LINE,*) IDX, ELEM_TYPE
 
-               IF (ELEM_TYPE == 2) THEN ! element in physical group is a cell (simplex).
+               IF (ELEM_TYPE == 2) THEN ! Element in physical group is a cell (simplex).
 
                   READ(LINE,*) IDX, ELEM_TYPE, DUMMY, IPG, DUMMY, VLIST3
 

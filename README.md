@@ -16,7 +16,7 @@ Main developers:
 * Stefano Boccelli - stefano.boccelli@nasa.gov   - *Politecnico di Milano / VKI / uOttawa / NASA Goddard*
 * Federico Bariselli - federico.bariselli@vki.ac.be - *Politecnico di Milano / VKI*
 
-Original DSMC code by Aldo Frezzotti - Politecnico di Milano. Main development is done at [the von Karman Institute for Fluid Dynamics](https://www.vki.ac.be/) under an FWO (Research Foundation - Flanders) PhD fellowship. See "history" section for a complete list of contributors.
+Original DSMC code by Aldo Frezzotti - Politecnico di Milano. Main development is done at [the von Karman Institute for Fluid Dynamics](https://www.vki.ac.be/) under a FWO (Research Foundation - Flanders) PhD fellowship and FRIA (Fund for Research Training in Industry and Agriculture - F.R.S-FNRS, Wallonia) PhD fellowship. See "history" section for a complete list of contributors.
 
 ## Applications and main features
 
@@ -24,10 +24,11 @@ PANTERA is extremely flexible in the possible applications. It has been applied 
 
 * Simulation of multiple species
 * 1D, 2D, 3D, and 2D axisymmetric domains, always 3V (3 velocity components)
-* Structured regular and unstructured grids (read in the [SU2](https://su2code.github.io/docs/Mesh-File/) format)
+* Structured regular and unstructured grids (read in the [MSH2](https://gmsh.info/doc/texinfo/#MSH-file-format) and [SU2](https://su2code.github.io/docs/Mesh-File/) format)
 * DSMC Collisions using the pair-wise VSS coefficients and optionally binary reactions using the TCE model from modified Arrhenius rates and Borgnakke-Larsen internal energy exchange
 * DSMC or MCC collisions and reactions from tabulated cross sections in the [LXCat](https://us.lxcat.net/home/) txt format
 * Explicit as well as energy-conserving (semi-implicit and fully-implicit) electrostatic PIC schemes
+* Fluid electron model, sampling from other velocity distribution functions, such as Kappa distribution
 * Possibility to restart a simulation from a saved state (particle dump)
 * Many models including Maxwell and CLL surface scattering, dielectric solids, surface charging, surface reactions, externally applied electric and magnetic fields, ...
 

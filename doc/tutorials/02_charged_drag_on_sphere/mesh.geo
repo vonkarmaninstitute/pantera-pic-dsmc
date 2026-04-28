@@ -1,5 +1,6 @@
 // INPUT FOR MESH.GEO FILE
 
+// Domain parameters //
 upstream_distance = -0.045;
 downstream_distance = 0.08;
 domain_width = 0.035;
@@ -32,13 +33,8 @@ Curve Loop(8) = {1,2,3,4,5,6,7};
 Plane Surface(9) = {8};
 
 Physical Curve("Sphere", 14) = {2, 3};
-//+
 Physical Curve("Inlet", 10) = {7};
-//+
 Physical Curve("Outlet", 11) = {5};
-//+
 Physical Curve("Top", 13) = {6};
-//+
 Physical Curve("Symmetry", 15) = {1,4};
-//+
 Physical Surface("Domain", 16) = {9};

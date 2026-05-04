@@ -1,0 +1,13 @@
+* SCRIPT: initial circuit solution
+
+.include circuit.cir
+
+.ic V(cathode)=0
+
+.control
+stop when time > $tsmall
+tran $tsmall $tend uic
+snsave snapshot.snap
+wrnodev voltages
+quit
+.endc

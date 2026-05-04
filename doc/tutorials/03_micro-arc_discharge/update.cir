@@ -1,0 +1,11 @@
+* SCRIPT: update circuit solution
+
+.control
+snload circuit.cir snapshot.snap
+alter I1 $icathode
+stop when time > $tf
+resume
+snsave snapshot.snap
+wrnodev voltages
+quit
+.endc

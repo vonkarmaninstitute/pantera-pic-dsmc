@@ -1,0 +1,8 @@
+e + Ar --> e + Ar+ + e
+lxcat 15.8 'lxcat/e+Ar_ionization_15d8.txt'
+e + Ar --> e + Ar
+lxcat 11.5 'lxcat/e+Ar_excitation_11d5.txt'
+e + Ar --> e + Ar
+lxcat 0.0 'lxcat/e+Ar_elastic_0d0.txt'
+Ar+ + Ar --> Ar+ + Ar
+lxcat 0.0 'lxcat/Ar++Ar_elastic_0d0.txt'

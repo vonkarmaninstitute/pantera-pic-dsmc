@@ -1,0 +1,9 @@
+.title external circuit
+
+V1 0 bal DC 50
+R1 cathode bal 50
+C1 cathode 0 10p
+
+I1 0 cathode 0
+
+.end

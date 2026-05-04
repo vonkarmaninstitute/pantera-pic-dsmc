@@ -1,0 +1,144 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!                 Input file for PANTERA                                !!!!
+!!!!                                                                       !!!!
+!!!! The program reads is line by line, and when it finds a known line, it !!!!
+!!!! reads and saves the value in the next one.                            !!!!
+!!!! All other lines are ignored (you can comment etc).                    !!!!
+!!!! You can put trailing comments on lines, starting with "!" symbol:     !!!!
+!!!! the program will remove them before checking the content of a line.   !!!!
+!!!!                                                                       !!!!
+!!!! All units are SI [m, kg, s, ...]                                      !!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+! ========= Computational domain and grid ===========
+Dimensions:
+1
+Axisymmetric:
+.FALSE.
+Number_of_cells:
+1    1    1
+
+! Here we select the length of the domain + the size of the electrode (ymax-ymin)*(zmax-zmin)
+Domain_limits:
+0.    1e-4    0.    0.006    0.   0.006 ! xmin xmax ymin ymax zmin zmax
+
+
+Domain_periodicity:
+.FALSE.   .TRUE.   .TRUE.
+Domain_specular:
+.FALSE.    .FALSE.    .FALSE.    .FALSE.
+Domain_diffuse:
+.FALSE.    .FALSE.    .FALSE.   .FALSE.
+
+! For solving the electric potential with charged particles we set the PIC type to explicit
+PIC_type:
+explicit
+
+Mesh_file:
+'mesh.msh'
+
+Partition_style:
+stripsx ! strips in x direction
+
+! specify all paths or just "All_output_path:" + path
+All_output_path:
+'./dumps/'
+
+
+! ========= Numerical parameters ====================
+
+Fnum:  ! Ratio of real-to-simulated particles
+1e4
+Timestep:
+5e-13
+Number_of_timesteps:
+200000
+Stats_every: ! screen output every th timestep
+100
+Save_initial_timestep:
+.TRUE.
+
+RNG_seed:
+15950
+
+Binary_output:
+.TRUE.
+
+
+Dump_grid_start:
+0
+Dump_grid_avgevery: !average every th time step
+10
+Dump_grid_numavgs: ! how many averages before saving
+100
+
+Dump_bound_start:
+0
+Dump_bound_avgevery:
+10
+Dump_bound_numavgs:
+100
+
+Dump_part_start: ! start dumping particles
+100000
+Dump_part_every: ! dumping particles every th timestep
+100000
+
+Perform_checks: ! .csv files -- saves integral quantitites (moments, etc)
+.FALSE.
+
+Domain_type:
+Domain fluid 1.0
+
+
+! ========= Multispecies ==============================
+
+Species_file:
+'argon.species'
+
+! First: name   second: species     third: molecular fraction (if more: species_2 fraction_2 species_3 fraction_3 ...)
+Def_mixture:
+Ions Ar+ 1.0
+
+Def_mixture:
+Electrons e 1.0
+
+Def_mixture:
+Neutrals Ar 1.0
+
+! ========= Collisions ==============================
+
+Collision_type: ! [MCC / DSMC / BGK / NONE]
+MCC_VAHEDI
+
+Reactions_file:
+'argon.react'
+
+MCC_background_mixture:
+Neutrals
+
+MCC_background_dens:
+2.94e24
+
+MCC_background_Ttra:
+2500.
+
+MCC_null_rate: ! This sets the maximum collision frequency for null collisions (i.e number of collisions to be tested)
+5e-13
+
+Remove_particles_in_mixture: ! Remove particles each time step
+Neutrals
+
+
+
+! ========= Boundary conditions ===================
+
+Boundary_condition:
+    anode dirichlet 0.0
+
+Boundary_condition: ! Left boundary is a cathode for which we update the potential using ngspice (please see circuit.cir file)
+    cathode spicenode
+
+Thermionic_emit: ! physical_group    species    temperature    work_function   constant
+    cathode Electrons   2500.    4.55 1.
+

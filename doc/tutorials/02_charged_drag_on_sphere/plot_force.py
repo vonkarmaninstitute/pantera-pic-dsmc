@@ -89,7 +89,7 @@ def get_force(folder,timestep,parameters):
         # Get the variable value for the cell (segment)
         pem_x = data_info.GetCellData().GetArray('pem_x').GetValue(j)
         mom_x = data_info.GetCellData().GetArray('mom_x_in_Hg+').GetValue(j)
-        mom_x+= data_info.GetCellData().GetArray('mom_x_out_Hg+').GetValue(j)
+        mom_x+= data_info.GetCellData().GetArray('mom_x_out_Hg').GetValue(j) # Neutralized ions bounce back from the surface
         
         # Add contribution to total sum
         mom_sum += mom_x*length*(p0[1] + p1[1])/2*2*np.pi

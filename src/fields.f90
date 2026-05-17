@@ -4482,13 +4482,13 @@ MODULE fields
 
                         ! ---- FLUID ELECTRONS -----
                         
-                        VALUETOADD = QE*BOLTZ_N0/(EPS0)*LENGTH*EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                        VALUETOADD = QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*LENGTH*EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
 
                         !!!!! TEST FOR SINH(U) POTENTIAL
-                        ! VALUETOADD = QE*BOLTZ_N0/(EPS0)*AREA*SINH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
+                        ! VALUETOADD = QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*AREA*SINH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
                         !!!!!
                         IF (BOOL_KAPPA_FLUID) THEN 
-                           VALUETOADD = QE*BOLTZ_N0/EPS0*LENGTH&
+                           VALUETOADD = QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*LENGTH&
                            *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.))&
                            )**(-KAPPA_FLUID_C+1./2.)
                         END IF
@@ -4540,14 +4540,14 @@ MODULE fields
 
                         ! ---- FLUID ELECTRONS -----
                         
-                        VALUETOADD = QE*BOLTZ_N0/EPS0*AREA*EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                        VALUETOADD = QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*AREA*EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
 
                         !!!!! TEST FOR SINH(U) POTENTIAL
-                        ! VALUETOADD = QE*BOLTZ_N0/(EPS0)*AREA*SINH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
+                        ! VALUETOADD = QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*AREA*SINH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
                         !!!!!
                         IF (BOOL_KAPPA_FLUID) THEN 
 
-                           VALUETOADD = QE*BOLTZ_N0/EPS0*AREA&
+                           VALUETOADD = QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*AREA&
                            *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.))&
                            )**(-KAPPA_FLUID_C+1./2.)
 
@@ -4612,15 +4612,15 @@ MODULE fields
 
                      ! FLUID ELECTRONS
 
-                     VALUETOADD = QE*BOLTZ_N0/EPS0*VOLUME*EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                     VALUETOADD = QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*VOLUME*EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
 
                      !!!!! TEST FOR SINH(U) POTENTIAL
-                     ! VALUETOADD = QE*BOLTZ_N0/(EPS0)*VOLUME*SINH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
+                     ! VALUETOADD = QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*VOLUME*SINH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
                      !!!!!
 
                      IF (BOOL_KAPPA_FLUID) THEN
 
-                        VALUETOADD = QE*BOLTZ_N0/EPS0*VOLUME&
+                        VALUETOADD = QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*VOLUME&
                         *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
                         **(-KAPPA_FLUID_C+1./2.)
 
@@ -4734,16 +4734,16 @@ MODULE fields
                         CALL MatSetValue(jac,VP-1,VQ-1,KPQ,ADD_VALUES,ierr)
 
                         ! FLUID ELECTRONS
-                        VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*LENGTH &
+                        VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*EPS_SCALING**2*KB*BOLTZ_TE)*LENGTH &
                         *EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
 
                         !!!!! TEST FOR SINH(U) POTENTIAL
-                        ! VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*AREA&
+                        ! VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*EPS_SCALING**2*KB*BOLTZ_TE)*AREA&
                         ! *COSH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
                         !!!!!
                         IF (BOOL_KAPPA_FLUID) THEN 
 
-                           VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*LENGTH&
+                           VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*EPS_SCALING**2*KB*BOLTZ_TE)*LENGTH&
                            *(2.*KAPPA_FLUID_C-1.)/(2.*KAPPA_FLUID_C-3.)&
                            *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))**(-KAPPA_FLUID_C-1./2.)
                         END IF
@@ -4794,15 +4794,15 @@ MODULE fields
                         CALL MatSetValue(jac,VP-1,VQ-1,KPQ,ADD_VALUES,ierr)
 
                         ! FLUID ELECTRONS
-                        VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*AREA&
+                        VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*EPS_SCALING**2*KB*BOLTZ_TE)*AREA&
                         *EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
 
                         !!!!! TEST FOR SINH(U) POTENTIAL
-                        ! VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*AREA&
+                        ! VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*EPS_SCALING**2*KB*BOLTZ_TE)*AREA&
                         ! *COSH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
                         !!!!!
                         IF (BOOL_KAPPA_FLUID) THEN 
-                           VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*AREA&
+                           VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*EPS_SCALING**2*KB*BOLTZ_TE)*AREA&
                            *(2.*KAPPA_FLUID_C-1.)/(2.*KAPPA_FLUID_C-3.)&
                            *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))**(-KAPPA_FLUID_C-1./2.)
                         END IF
@@ -4868,16 +4868,16 @@ MODULE fields
                         CALL MatSetValue(jac,VP-1,VQ-1,KPQ,ADD_VALUES,ierr)
 
                         ! FLUID ELECTRONS
-                        VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*VOLUME&
+                        VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*EPS_SCALING**2*KB*BOLTZ_TE)*VOLUME&
                         *EXP(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
 
                         !!!!! TEST FOR SINH(U) POTENTIAL !!!!!
-                        ! VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*VOLUME&
+                        ! VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*EPS_SCALING**2*KB*BOLTZ_TE)*VOLUME&
                         ! *COSH(QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
                         !!!!!
 
                         IF (BOOL_KAPPA_FLUID) THEN 
-                           VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*VOLUME&
+                           VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*EPS_SCALING**2*KB*BOLTZ_TE)*VOLUME&
                            *(2.*KAPPA_FLUID_C-1.)/(2.*KAPPA_FLUID_C-3.)&
                            *(1-QE*(PHI_FIELD_NEW(VQ)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))**(-KAPPA_FLUID_C-1./2.)
                         END IF

@@ -1196,7 +1196,7 @@ MODULE postprocess
 
       IMPLICIT NONE
 
-      INTEGER      :: I, IP, IC, INDEX
+      INTEGER      :: I, IP, IC, INDEX, VMN
 
       REAL(KIND=8) :: DBLE_BOUNDARY_AVG_CUMULATED, E_MAG2
 
@@ -1207,16 +1207,28 @@ MODULE postprocess
                IF (U1D_GRID%NODES_BOUNDARY_INDEX(I) .NE. -1) THEN
                   TIMESTEP_PHI_BOUND(U1D_GRID%NODES_BOUNDARY_INDEX(I)) = PHI_FIELD(I)
                   TIMESTEP_QRHO_BOUND(U1D_GRID%NODES_BOUNDARY_INDEX(I)) = SURFACE_CHARGE(I)
+                  IF (BOOL_CONDUCTIVE_BC) THEN
+                     VMN = CONDUCTOR_NODEMAP(I+1) + 1
+                     TIMESTEP_QRHO_BOUND(U1D_GRID%NODES_BOUNDARY_INDEX(I)) = SURFACE_CHARGE(VMN)
+                  END IF
                END IF
             ELSE IF (DIMS == 2) THEN
                IF (U2D_GRID%NODES_BOUNDARY_INDEX(I) .NE. -1) THEN
                   TIMESTEP_PHI_BOUND(U2D_GRID%NODES_BOUNDARY_INDEX(I)) = PHI_FIELD(I)
                   TIMESTEP_QRHO_BOUND(U2D_GRID%NODES_BOUNDARY_INDEX(I)) = SURFACE_CHARGE(I)
+                  IF (BOOL_CONDUCTIVE_BC) THEN
+                     VMN = CONDUCTOR_NODEMAP(I+1) + 1
+                     TIMESTEP_QRHO_BOUND(U2D_GRID%NODES_BOUNDARY_INDEX(I)) = SURFACE_CHARGE(VMN)
+                  END IF
                END IF
             ELSE IF (DIMS == 3) THEN
                IF (U3D_GRID%NODES_BOUNDARY_INDEX(I) .NE. -1) THEN
                   TIMESTEP_PHI_BOUND(U3D_GRID%NODES_BOUNDARY_INDEX(I)) = PHI_FIELD(I)
                   TIMESTEP_QRHO_BOUND(U3D_GRID%NODES_BOUNDARY_INDEX(I)) = SURFACE_CHARGE(I)
+                  IF (BOOL_CONDUCTIVE_BC) THEN
+                     VMN = CONDUCTOR_NODEMAP(I+1) + 1
+                     TIMESTEP_QRHO_BOUND(U3D_GRID%NODES_BOUNDARY_INDEX(I)) = SURFACE_CHARGE(VMN)
+                  END IF
                END IF
             END IF
          END DO

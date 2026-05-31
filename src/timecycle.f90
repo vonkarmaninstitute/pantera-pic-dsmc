@@ -60,7 +60,8 @@ MODULE timecycle
          CALL SET_WALL_POTENTIAL
 
          CALL DEPOSIT_CHARGE(particles)
-         IF (PIC_TYPE == HYBRID) THEN           
+         IF (PIC_TYPE == HYBRID) THEN  
+            CALL SETUP_BOLTZMANN         
             CALL SOLVE_BOLTZMANN
          ELSE
             CALL SETUP_POISSON
@@ -121,15 +122,6 @@ MODULE timecycle
          !END IF
 
 
-
-         ! IF (tID == 40001) THEN
-         !    DO IP = 1, NP_PROC
-         !       IF (rf() < 1.d-4) THEN
-         !          particles(IP)%DUMP_TRAJ = .TRUE.
-         !       END IF
-         !    END DO
-         ! END IF
-
          ! ########### Print simulation info #######################################
 
          CURRENT_TIME = tID*DT
@@ -185,7 +177,6 @@ MODULE timecycle
          CALL BOUNDARIES_EMIT
          CALL VOLUME_INJECT
 
-         !CALL FIXED_IONIZATION
 
          ! ########### Perform load balancing ###################################
          IF (LOAD_BALANCE) THEN
@@ -355,10 +346,6 @@ MODULE timecycle
          IF (REMOVE_MIX .NE. -1) CALL REMOVE_PARTICLES_IN_MIXTURE(REMOVE_MIX)
 
 
-         !IF (PERFORM_CHECKS .AND. MOD(tID, CHECKS_EVERY) .EQ. 0) THEN
-         !   CALL ONLYMASTERPRINT1(PROC_ID, '---> Checking if particles are in the correct cells.')
-         !   CALL REASSIGN_PARTICLES_TO_CELLS_2D
-         !END IF
 
          ! ~~~~~ Hmm that's it! ~~~~~
 
@@ -367,6 +354,11 @@ MODULE timecycle
 
       END DO
 
+
+      ! CLEAN UP  FOR  SOLVERS
+      IF (PIC_TYPE == HYBRID) CALL CLEANUP_BOLTZMANN
+
+      
    END SUBROUTINE TIME_LOOP
  
 
@@ -375,7 +367,7 @@ MODULE timecycle
   
       IMPLICIT NONE
    
-      INTEGER      :: IP, IC, IS, NFS, ITASK, FACE_PG, VP, I
+      INTEGER      :: IP, IC, IS, NFS, ITASK, FACE_PG, VP, I, VMN
       REAL(KIND=8) :: DTFRAC, Vdummy, V_NORM, V_TANG1, V_TANG2, BETA, BETA_E, X1, X2, Y1, Y2, R, P, Q, S, T
       REAL(KIND=8) :: X, Y, Z, VX, VY, VZ, EROT, EVIB 
       TYPE(PARTICLE_DATA_STRUCTURE) :: particleNOW
@@ -609,8 +601,10 @@ MODULE timecycle
                   ELSE IF (DIMS == 3) THEN
                      RHO_Q = K*CHARGE*FNUM*SPWT
                   END IF
-
-                  GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE = GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE - RHO_Q
+                  I = GRID_BC(FACE_PG)%CONDUCTIVE_PART_ID
+                  VMN = CONNECTED_COND_SURFACES(I)%MASTER_NODE
+                  SURFACE_CHARGE(VMN) = SURFACE_CHARGE(VMN) - RHO_Q
+                  ! CONNECTED_COND_SURFACES(I)%SUM_METAL_CHARGE = CONNECTED_COND_SURFACES(I)%SUM_METAL_CHARGE  - RHO_Q
                END IF
 
                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1162,7 +1156,7 @@ MODULE timecycle
       LOGICAL :: FLUIDBOUNDARY
       INTEGER :: NEIGHBORPG
       REAL(KIND=8) :: CHARGE, K, PSIP, RHO_Q, SPWT
-      INTEGER :: VP
+      INTEGER :: VP, VMN
 
       REAL(KIND=8) :: VXPRE, VYPRE, VZPRE
       REAL(KIND=8) :: XI_PRE, XI_POST, P_REINJECTION
@@ -1533,7 +1527,10 @@ MODULE timecycle
                               RHO_Q = K*CHARGE*FNUM*SPWT
                            END IF
 
-                           GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE = GRID_BC(FACE_PG)%METAL_TOTAL_CHARGE + RHO_Q
+                           I = GRID_BC(FACE_PG)%CONDUCTIVE_PART_ID
+                           VMN = CONNECTED_COND_SURFACES(I)%MASTER_NODE
+                           SURFACE_CHARGE(VMN) = SURFACE_CHARGE(VMN) + RHO_Q
+                           ! CONNECTED_COND_SURFACES(I)%SUM_METAL_CHARGE = CONNECTED_COND_SURFACES(I)%SUM_METAL_CHARGE + RHO_Q
                         END IF
 
                         ! Apply particle boundary condition
@@ -1558,7 +1555,6 @@ MODULE timecycle
                                  + particles(IP)%VY*FACE_NORMAL(2) &
                                  + particles(IP)%VZ*FACE_NORMAL(3)
                            
-                           ! WRITE(*,*) 'PRE', particles(IP)%VX, FACE_NORMAL(1)
                            VDOTN = (particles(IP)%VX-GRID_BC(FACE_PG)%U_PISTON(1))*FACE_NORMAL(1) &
                                  + (particles(IP)%VY-GRID_BC(FACE_PG)%U_PISTON(2))*FACE_NORMAL(2) &
                                  + (particles(IP)%VZ-GRID_BC(FACE_PG)%U_PISTON(3))*FACE_NORMAL(3)
@@ -1570,14 +1566,12 @@ MODULE timecycle
                                  + particles(IP)%VY*FACE_NORMAL(2) &
                                  + particles(IP)%VZ*FACE_NORMAL(3)
 
-                           ! WRITE(*,*) 'POST+++', particles(IP)%VX, FACE_NORMAL(1)
 
                            IF (XI_POST < 0) THEN
                               REMOVE_PART(IP) = .TRUE.
                               particles(IP)%DTRIM = 0.d0
                            ELSE 
                               P_REINJECTION = -XI_POST/XI_PRE
-                              ! WRITE(*,*) 'PROB:', P_REINJECTION
                               IF (rf() > P_REINJECTION) THEN
                                  REMOVE_PART(IP) = .TRUE.
                                  particles(IP)%DTRIM = 0.d0
@@ -2198,24 +2192,24 @@ MODULE timecycle
 
          IF (DIMS == 0) THEN
             DO WHILE (particles(IP)%X .GT. XMAX)
-               particles(IP)%X = XMIN + (particles(IP)%X - XMAX)
+               particles(IP)%X = XMIN
             END DO
             DO WHILE (particles(IP)%X .LT. XMIN) 
-               particles(IP)%X = XMAX + (particles(IP)%X - XMIN)
+               particles(IP)%X = XMAX
             END DO
 
             DO WHILE (particles(IP)%Y .GT. YMAX)
-               particles(IP)%Y = YMIN + (particles(IP)%Y - YMAX)
+               particles(IP)%Y = YMIN
             END DO
             DO WHILE (particles(IP)%Y .LT. YMIN) 
-               particles(IP)%Y = YMAX + (particles(IP)%Y - YMIN)
+               particles(IP)%Y = YMAX
             END DO
 
             DO WHILE (particles(IP)%Z .GT. ZMAX)
-               particles(IP)%Z = ZMIN + (particles(IP)%Z - ZMAX)
+               particles(IP)%Z = ZMIN
             END DO
             DO WHILE (particles(IP)%Z .LT. ZMIN) 
-               particles(IP)%Z = ZMAX + (particles(IP)%Z - ZMIN)
+               particles(IP)%Z = ZMAX
             END DO
          END IF
 

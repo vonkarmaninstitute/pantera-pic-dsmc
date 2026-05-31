@@ -168,6 +168,11 @@ MODULE initialization
             CALL DEF_MAGNET(MAGNET_DEFINITION)
          END IF
 
+         IF (line=='Bias_conductive_group:') THEN
+            READ(in1,'(A)') BC_DEFINITION
+            CALL DEF_BIASED_CONDUCTIVE_GROUP(BC_DEFINITION)
+         END IF
+
          IF (line=='External_B_field:') READ(in1,*) EXTERNAL_B_FIELD(1), EXTERNAL_B_FIELD(2), EXTERNAL_B_FIELD(3)
          IF (line=='External_E_field:') READ(in1,*) EXTERNAL_E_FIELD(1), EXTERNAL_E_FIELD(2), EXTERNAL_E_FIELD(3)
 
@@ -1379,6 +1384,55 @@ MODULE initialization
 
    END SUBROUTINE DEF_CONDUCTIVE_GROUP
 
+   SUBROUTINE DEF_BIASED_CONDUCTIVE_GROUP(DEFINITION)
+      
+      
+      IMPLICIT NONE
+
+      CHARACTER(LEN=*), INTENT(IN) :: DEFINITION
+      CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
+
+      INTEGER :: IG, IPG1, IPG2, N_STR
+
+      CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
+
+      IPG1 = -1
+      DO IG = 1, N_CONNECTED_COND_SURFACES
+         IF (CONNECTED_COND_SURFACES(IG)%CONDUCTIVE_PART_NAME == STRARRAY(1)) THEN
+            IPG1 = CONNECTED_COND_SURFACES(IG)%CONDUCTIVE_PART_ID
+            EXIT
+         END IF
+      END DO
+      
+      IF (IPG1 == -1) THEN
+         WRITE(*,*) 'First conductive group ', STRARRAY(1), ' not found.'
+         RETURN
+      END IF
+
+      IPG2 = -1
+      DO IG = 1, N_CONNECTED_COND_SURFACES
+         IF (CONNECTED_COND_SURFACES(IG)%CONDUCTIVE_PART_NAME == STRARRAY(2)) THEN
+            IPG2 = CONNECTED_COND_SURFACES(IG)%CONDUCTIVE_PART_ID
+            EXIT
+         END IF
+      END DO
+      
+      IF (IPG2 == -1) THEN
+         WRITE(*,*) 'Second conductive group ', STRARRAY(2), ' not found.'
+         RETURN
+      END IF
+
+      IF (N_STR == 3) THEN
+
+         CONNECTED_COND_SURFACES(IPG1)%BIAS_CONDUCTOR_PART_ID = IPG2
+         READ(STRARRAY(3), '(ES14.0)') CONNECTED_COND_SURFACES(IPG1)%BIAS_VOLTAGE
+         BOOL_BIASED_BC = .TRUE.
+      ELSE
+         CALL ERROR_ABORT('Error in conductive boundary definition.')
+      END IF
+
+
+   END SUBROUTINE DEF_BIASED_CONDUCTIVE_GROUP
 
 
    SUBROUTINE READ_WASHBOARD_TABLES(IPG)

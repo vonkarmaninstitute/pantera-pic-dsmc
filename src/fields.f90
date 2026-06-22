@@ -4661,7 +4661,7 @@ MODULE fields
       REAL(KIND=8) :: Y1, Y2, Y3, AREA, EPS_REL
       INTEGER :: V1, V2, V3, V4, I, FACE_PG, EDGE_PG, VV1, VV2, VV3, VV4, VMN
       INTEGER :: IP, P, Q, VP, VQ, J
-      REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD, KE, LENGTH, KIJ
+      REAL(KIND=8) :: KQ, KPQ, VOLUME, VALUETOADD, KE, LENGTH, KIJ
 
       IF (MOD(tID, STATS_EVERY) .EQ. 0) CALL ONLYMASTERPRINT1(PROC_ID, 'FormFunctionBoltz Called')
       
@@ -4688,6 +4688,8 @@ MODULE fields
             ELSE
                EPS_REL = GRID_BC(U1D_GRID%CELL_PG(I))%EPS_REL
             END IF
+
+            KQ = QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*LENGTH
             
             ! We need to ADD to a sparse matrix entry.
             DO P = 1, 2
@@ -4705,11 +4707,10 @@ MODULE fields
                         !!! FLUID ELECTRONS !!!
 
                         IF (IS_CONDUCTIVE(VQ)) PHI_FIELD_NEW(VQ+1) = PHI_FIELD_NEW(VQ+1) + CONDUCTOR_BIASMAP(VQ)
-                        VALUETOADD = QE*BOLTZ_N0/(EPS0)*LENGTH*EXP(QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                        VALUETOADD = KQ * EXP(QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
 
                         IF (BOOL_KAPPA_FLUID) THEN 
-                           VALUETOADD = QE*BOLTZ_N0/EPS0*LENGTH&
-                           *(1-QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.))&
+                           VALUETOADD = KQ*(1-QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.))&
                            )**(-KAPPA_FLUID_C+1./2.)
                         END IF
 
@@ -4739,6 +4740,8 @@ MODULE fields
             ELSE
                EPS_REL = GRID_BC(U2D_GRID%CELL_PG(I))%EPS_REL
             END IF
+
+            KQ = QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*AREA
             
             ! We need to ADD to a sparse matrix entry.
             DO P = 1, 3
@@ -4767,11 +4770,10 @@ MODULE fields
                         !!! FLUID ELECTRONS !!!
 
                         IF (IS_CONDUCTIVE(VQ)) PHI_FIELD_NEW(VQ+1) = PHI_FIELD_NEW(VQ+1) + CONDUCTOR_BIASMAP(VQ)
-                        VALUETOADD = QE*BOLTZ_N0/EPS0*AREA*EXP(QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                        VALUETOADD = KQ * EXP(QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
 
                         IF (BOOL_KAPPA_FLUID) THEN 
-                           VALUETOADD = QE*BOLTZ_N0/EPS0*AREA&
-                           *(1-QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.))&
+                           VALUETOADD = KQ*(1-QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.))&
                            )**(-KAPPA_FLUID_C+1./2.)
                         END IF
 
@@ -4826,6 +4828,8 @@ MODULE fields
                EPS_REL = GRID_BC(U3D_GRID%CELL_PG(I))%EPS_REL
             END IF
             
+            KQ = QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*VOLUME
+            
             DO P = 1, 4
                VP = U3D_GRID%CELL_NODES(P,I) - 1
                IF (IS_CONDUCTIVE(VP)) VP = CONDUCTOR_NODEMAP(VP)
@@ -4841,11 +4845,10 @@ MODULE fields
                      !!!! FLUID ELECTRONS !!!
 
                      IF (IS_CONDUCTIVE(VQ)) PHI_FIELD_NEW(VQ+1) = PHI_FIELD_NEW(VQ+1) + CONDUCTOR_BIASMAP(VQ)
-                     VALUETOADD = QE*BOLTZ_N0/EPS0*VOLUME*EXP(QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                     VALUETOADD = KQ*EXP(QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
 
                      IF (BOOL_KAPPA_FLUID) THEN
-                        VALUETOADD = QE*BOLTZ_N0/EPS0*VOLUME&
-                        *(1-QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
+                        VALUETOADD = KQ*(1-QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
                         **(-KAPPA_FLUID_C+1./2.)
                      END IF
 
@@ -4917,7 +4920,7 @@ MODULE fields
 
       INTEGER :: IP, IQ, V1, V2, V3, V4, VV1, VV2, VV3, VMN
       INTEGER :: P, Q, VP, VQ, J, EDGE_PG
-      REAL(KIND=8) :: KPQ, VOLUME, VALUETOADD, FACTOR, AREA, LENGTH, KIJ
+      REAL(KIND=8) :: KQ, KPQ, VOLUME, VALUETOADD, FACTOR, AREA, LENGTH, KIJ
 
 
       IF (MOD(tID, STATS_EVERY) .EQ. 0) CALL ONLYMASTERPRINT1(PROC_ID, 'FormJacobianBoltz Called')
@@ -4950,6 +4953,8 @@ MODULE fields
             ELSE
                EPS_REL = GRID_BC(U1D_GRID%CELL_PG(I))%EPS_REL
             END IF
+
+            KQ = QE**2*BOLTZ_N0/(EPS0*EPS_SCALING**2*KB*BOLTZ_TE)*LENGTH
             
             ! We need to ADD to a sparse matrix entry.
             DO P = 1, 2
@@ -4966,12 +4971,10 @@ MODULE fields
                         !!! FLUID ELECTRONS !!!
                         IF (IS_CONDUCTIVE(VQ)) PHI_FIELD_NEW(VQ+1) = PHI_FIELD_NEW(VQ+1) + CONDUCTOR_BIASMAP(VQ)
 
-                        VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*LENGTH &
-                        *EXP(QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                        VALUETOADD = KQ*EXP(QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
 
                         IF (BOOL_KAPPA_FLUID) THEN 
-                           VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*LENGTH&
-                           *(2.*KAPPA_FLUID_C-1.)/(2.*KAPPA_FLUID_C-3.)&
+                           VALUETOADD = KQ*(2.*KAPPA_FLUID_C-1.)/(2.*KAPPA_FLUID_C-3.)&
                            *(1-QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))**(-KAPPA_FLUID_C-1./2.)
                         END IF
 
@@ -5002,6 +5005,8 @@ MODULE fields
             ELSE
                EPS_REL = GRID_BC(U2D_GRID%CELL_PG(I))%EPS_REL
             END IF
+
+            KQ = QE**2*BOLTZ_N0/(EPS0*EPS_SCALING**2*KB*BOLTZ_TE)*AREA
             
             ! We need to ADD to a sparse matrix entry.
             DO P = 1, 3
@@ -5031,12 +5036,10 @@ MODULE fields
 
                         IF (IS_CONDUCTIVE(VQ)) PHI_FIELD_NEW(VQ+1) = PHI_FIELD_NEW(VQ+1) + CONDUCTOR_BIASMAP(VQ)
 
-                        VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*AREA&
-                        *EXP(QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                        VALUETOADD = KQ*EXP(QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
 
                         IF (BOOL_KAPPA_FLUID) THEN 
-                           VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*EPS_SCALING**2*KB*BOLTZ_TE)*AREA&
-                           *(2.*KAPPA_FLUID_C-1.)/(2.*KAPPA_FLUID_C-3.)&
+                           VALUETOADD = KQ*(2.*KAPPA_FLUID_C-1.)/(2.*KAPPA_FLUID_C-3.)&
                            *(1-QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))**(-KAPPA_FLUID_C-1./2.)
                         END IF
 
@@ -5092,6 +5095,8 @@ MODULE fields
             ELSE
                EPS_REL = GRID_BC(U3D_GRID%CELL_PG(I))%EPS_REL
             END IF
+
+            KQ = QE**2*BOLTZ_N0/(EPS0*EPS_SCALING**2*KB*BOLTZ_TE)*VOLUME
             
             ! We need to ADD to a sparse matrix entry.
             DO P = 1, 4
@@ -5112,12 +5117,10 @@ MODULE fields
 
                         IF (IS_CONDUCTIVE(VQ)) PHI_FIELD_NEW(VQ+1) = PHI_FIELD_NEW(VQ+1) + CONDUCTOR_BIASMAP(VQ)
                         
-                        VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*VOLUME&
-                        *EXP(QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                        VALUETOADD = KQ*EXP(QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
 
                         IF (BOOL_KAPPA_FLUID) THEN 
-                           VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*EPS_SCALING**2*KB*BOLTZ_TE)*VOLUME&
-                           *(2.*KAPPA_FLUID_C-1.)/(2.*KAPPA_FLUID_C-3.)&
+                           VALUETOADD = KQ*(2.*KAPPA_FLUID_C-1.)/(2.*KAPPA_FLUID_C-3.)&
                            *(1-QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))**(-KAPPA_FLUID_C-1./2.)
                         END IF
 

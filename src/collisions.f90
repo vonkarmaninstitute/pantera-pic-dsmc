@@ -1366,10 +1366,7 @@ MODULE collisions
             END IF
             IF (BG_NRHO == 0) CYCLE
             
-            !SIGMA = PI * (0.5 * (SPECIES(SP_ID1)%DIAM + SPECIES(SP_ID2)%DIAM))**2
-            !OMEGA = 0.5 * (SPECIES(SP_ID1)%OMEGA + SPECIES(SP_ID2)%OMEGA)
             CREF = VSS_GREFS(SP_ID1, SP_ID2)
-            !ALPHA = 0.5 * (SPECIES(SP_ID1)%ALPHA + SPECIES(SP_ID2)%ALPHA)
             SIGMA = VSS_SIGMAS(SP_ID1, SP_ID2)
             OMEGA = VSS_OMEGAS(SP_ID1, SP_ID2)
             ALPHA = VSS_ALPHAS(SP_ID1, SP_ID2)

@@ -1207,8 +1207,8 @@ MODULE postprocess
                IF (U1D_GRID%NODES_BOUNDARY_INDEX(I) .NE. -1) THEN
                   TIMESTEP_PHI_BOUND(U1D_GRID%NODES_BOUNDARY_INDEX(I)) = PHI_FIELD(I)
                   TIMESTEP_QRHO_BOUND(U1D_GRID%NODES_BOUNDARY_INDEX(I)) = SURFACE_CHARGE(I)
-                  IF (BOOL_CONDUCTIVE_BC) THEN
-                     VMN = CONDUCTOR_NODEMAP(I+1) + 1
+                  IF (IS_CONDUCTIVE(I-1)) THEN
+                     VMN = CONDUCTOR_NODEMAP(I-1) + 1
                      TIMESTEP_QRHO_BOUND(U1D_GRID%NODES_BOUNDARY_INDEX(I)) = SURFACE_CHARGE(VMN)
                   END IF
                END IF
@@ -1216,8 +1216,8 @@ MODULE postprocess
                IF (U2D_GRID%NODES_BOUNDARY_INDEX(I) .NE. -1) THEN
                   TIMESTEP_PHI_BOUND(U2D_GRID%NODES_BOUNDARY_INDEX(I)) = PHI_FIELD(I)
                   TIMESTEP_QRHO_BOUND(U2D_GRID%NODES_BOUNDARY_INDEX(I)) = SURFACE_CHARGE(I)
-                  IF (BOOL_CONDUCTIVE_BC) THEN
-                     VMN = CONDUCTOR_NODEMAP(I+1) + 1
+                  IF (IS_CONDUCTIVE(I-1)) THEN
+                     VMN = CONDUCTOR_NODEMAP(I-1) + 1
                      TIMESTEP_QRHO_BOUND(U2D_GRID%NODES_BOUNDARY_INDEX(I)) = SURFACE_CHARGE(VMN)
                   END IF
                END IF
@@ -1225,8 +1225,8 @@ MODULE postprocess
                IF (U3D_GRID%NODES_BOUNDARY_INDEX(I) .NE. -1) THEN
                   TIMESTEP_PHI_BOUND(U3D_GRID%NODES_BOUNDARY_INDEX(I)) = PHI_FIELD(I)
                   TIMESTEP_QRHO_BOUND(U3D_GRID%NODES_BOUNDARY_INDEX(I)) = SURFACE_CHARGE(I)
-                  IF (BOOL_CONDUCTIVE_BC) THEN
-                     VMN = CONDUCTOR_NODEMAP(I+1) + 1
+                  IF (IS_CONDUCTIVE(I-1)) THEN
+                     VMN = CONDUCTOR_NODEMAP(I-1) + 1
                      TIMESTEP_QRHO_BOUND(U3D_GRID%NODES_BOUNDARY_INDEX(I)) = SURFACE_CHARGE(VMN)
                   END IF
                END IF

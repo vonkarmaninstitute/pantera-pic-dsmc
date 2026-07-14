@@ -749,7 +749,7 @@ MODULE postprocess
 
                   IF (PIC_TYPE == HYBRID) THEN
                      WRITE(54321) 'nrho_e_FLUID '//ITOA(1)//' '//ITOA( NNODES )//' double'//ACHAR(10)
-                     WRITE(54321) BOLTZ_NRHOE, ACHAR(10)
+                     WRITE(54321) RHO_FLUID, ACHAR(10)
                   END IF
                ELSE
                   WRITE(54321) 'POINT_DATA '//ITOA( NNODES )//ACHAR(10)

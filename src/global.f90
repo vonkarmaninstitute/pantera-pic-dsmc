@@ -58,19 +58,6 @@ MODULE global
    REAL(KIND=8) :: INJECT_PROBABILITY = 1
    LOGICAL :: BOOL_INJECT_FROM_FILE = .FALSE.
 
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   !!!!!!!!!!!!! Fluid electrons !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-   REAL(KIND=8) :: BOLTZ_N0 = 0., BOLTZ_PHI0 = 0., BOLTZ_TE = 0.
-   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: BOLTZ_NRHOE
-
-   ! Option for Kappa distribution
-   LOGICAL :: BOOL_KAPPA_FLUID    = .FALSE.
-   REAL(KIND=8) :: KAPPA_FLUID_C  = 4.d0
-
-   LOGICAL :: BOOL_CONDUCTIVE_BC = .FALSE.
-   LOGICAL :: BOOL_BIASED_BC = .FALSE.
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Geometry, domain and grid !!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -520,6 +507,9 @@ MODULE global
    !!!!!!!!! Connected conductive surfaces !!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+   LOGICAL :: BOOL_CONDUCTIVE_BC = .FALSE.
+   LOGICAL :: BOOL_BIASED_BC = .FALSE.
+
    INTEGER         :: N_CONNECTED_COND_SURFACES = 0
    TYPE CONNECTED_COND_SURFACE
       INTEGER            :: N_GROUPS
@@ -591,7 +581,40 @@ MODULE global
    END TYPE MIXTURE
 
    TYPE(MIXTURE), DIMENSION(:), ALLOCATABLE :: MIXTURES
- 
+
+
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!! Fluid electrons !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: RHO_FLUID
+
+   TYPE ELECTRON_FLUID
+      CHARACTER*64 :: NAME
+      REAL(KIND=8) :: N0, T0, PHI0
+      REAL(KIND=8) :: KAPPA_INDEX
+   END TYPE ELECTRON_FLUID
+
+   INTEGER :: N_ELECTRON_FLUIDS = 0
+   TYPE(ELECTRON_FLUID), DIMENSION(:), ALLOCATABLE :: ELECTRON_FLUIDS
+
+   TYPE ANISOTROPIC_FLUID
+      CHARACTER*64 :: NAME
+      REAL(KIND=8) :: N0, E0, V0, PHI0
+      REAL(KIND=8) :: KAPPA_INDEX, B0
+      REAL(KIND=8), DIMENSION(3) :: DIRECTION = [0., 0., -1.]
+   END TYPE ANISOTROPIC_FLUID
+
+   LOGICAL BOOL_ANISOTROPIC_FLUID
+   TYPE(ANISOTROPIC_FLUID) :: ANISOTROPIC_FLUIDS
+
+   TYPE CUT_BIMAXWELL_FLUID
+      CHARACTER*64 :: NAME
+      REAL(KIND=8) :: N1 = 0., E1 = 1., N2 =0., E2 = 1.
+   END TYPE CUT_BIMAXWELL_FLUID
+
+   TYPE(CUT_BIMAXWELL_FLUID) :: CUT_BIMAXWELL_FLUIDS
+
 
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

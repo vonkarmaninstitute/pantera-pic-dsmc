@@ -46,7 +46,7 @@ MODULE initialization
       INTEGER            :: ReasonEOF
 
       CHARACTER*512      :: MIXTURE_DEFINITION, VSS_PARAMS_FILENAME, LINESOURCE_DEFINITION, WALL_DEFINITION, MCC_BG_FILENAME
-      CHARACTER*512      :: BC_DEFINITION, SOLENOID_DEFINITION, MAGNET_DEFINITION
+      CHARACTER*512      :: BC_DEFINITION, SOLENOID_DEFINITION, MAGNET_DEFINITION, FLUID_DEFINITION
       CHARACTER*64       :: MIX_BOUNDINJECT_NAME, DSMC_COLL_MIX_NAME, MCC_BG_MIX_NAME, PIC_TYPE_STRING, PARTITION_STYLE_STRING, &
       COLLISION_TYPE_STRING, REMOVE_MIX_NAME, MIX_BOUNDINJECT_VDF_NAME
       CLASS(VELOCITY_DISTRIBUTION_STRUCTURE), ALLOCATABLE :: TEMP_VDF_BOUND
@@ -218,9 +218,13 @@ MODULE initialization
             END IF
          END IF
          
-         ! Fluid electrons setting
-         IF (line=='Fluid_electrons:')         READ(in1,*) BOLTZ_N0, BOLTZ_PHI0, BOLTZ_TE
-         IF (line=='Kappa_fluid:')             READ(in1,*) BOOL_KAPPA_FLUID, KAPPA_FLUID_C
+         ! ============ Fluid electrons setting ============
+         ! Option 1: New multi-fluid setup
+         IF (line=='Electron_fluid:') THEN
+            READ(in1,'(A)') FLUID_DEFINITION
+            CALL DEF_ELECTRON_FLUID(FLUID_DEFINITION)
+         END IF
+
 
          IF (line=='Jacobian_type:')           READ(in1,*) JACOBIAN_TYPE
          IF (line=='Residual_and_jacobian_combined:') READ(in1,*) RESIDUAL_AND_JACOBIAN_COMBINED
@@ -437,7 +441,7 @@ MODULE initialization
    SUBROUTINE PRINTINPUT
 
       IMPLICIT NONE
-      INTEGER :: j, k
+      INTEGER :: J, K, IFLUID
       CHARACTER(LEN=512) string
 
       IF (PROC_ID == 0) THEN ! Only master prints
@@ -561,17 +565,32 @@ MODULE initialization
          WRITE(*,*) '  =========== Mixtures ========================='
          string = 'Number of mixtures:'
          WRITE(*,'(A5,A50,I9)') '    ', string, N_MIXTURES
-         DO j = 1, N_MIXTURES
+         DO J = 1, N_MIXTURES
 
-            WRITE(*,*)'    ','Mixture ', j, ' named ', TRIM(MIXTURES(j)%NAME), ' has ', MIXTURES(j)%N_COMPONENTS, ' components:'
-            DO k = 1, MIXTURES(j)%N_COMPONENTS
-               WRITE(*,*) '    ','Mixture component ', k, ' is ', TRIM(MIXTURES(j)%COMPONENTS(k)%NAME), &
-                        ' with fraction ', MIXTURES(j)%COMPONENTS(k)%MOLFRAC, &
-                        ' and ID ', MIXTURES(j)%COMPONENTS(k)%ID
+            WRITE(*,*)'    ','Mixture ', J, ' named ', TRIM(MIXTURES(J)%NAME), ' has ', MIXTURES(J)%N_COMPONENTS, ' components:'
+            DO K = 1, MIXTURES(J)%N_COMPONENTS
+               WRITE(*,*) '    ','Mixture component ', K, ' is ', TRIM(MIXTURES(J)%COMPONENTS(K)%NAME), &
+                        ' with fraction ', MIXTURES(J)%COMPONENTS(K)%MOLFRAC, &
+                        ' and ID ', MIXTURES(J)%COMPONENTS(K)%ID
             END DO
          END DO
 
-         
+         IF (PIC_TYPE == HYBRID) THEN
+            WRITE(*,*) '  =========== Electron fluids ===================='
+            WRITE(*,'(A5,A50,I9)') '    ', 'Number of fluids:', N_ELECTRON_FLUIDS
+            
+            DO IFLUID = 1, N_ELECTRON_FLUIDS
+               WRITE(*,'(A5,A,I3,A,A,A)') ' ','Fluid ', IFLUID, " named '", TRIM(ELECTRON_FLUIDS(IFLUID)%NAME), "' with parameters:"
+               WRITE(*,'(A5,A35,ES12.2)') ' ', 'Reference density (n0) [m^-3]:   ', ELECTRON_FLUIDS(IFLUID)%N0
+               WRITE(*,'(A5,A35,F12.1)') ' ', 'Temperature (Te) [K]:   ', ELECTRON_FLUIDS(IFLUID)%T0
+               WRITE(*,'(A5,A35,F12.1)') ' ', 'Reference potential (phi0) [V]:   ', ELECTRON_FLUIDS(IFLUID)%PHI0
+               IF (INT(ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX) /= 0) THEN
+                  WRITE(*,'(A5,A35,F12.1)') '    ','  Kappa index:   ', ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX
+               END IF 
+            END DO
+
+         END IF
+
       END IF
 
    END SUBROUTINE PRINTINPUT
@@ -988,6 +1007,41 @@ MODULE initialization
 
 
    END SUBROUTINE DEF_MIXTURE
+
+      
+   SUBROUTINE DEF_ELECTRON_FLUID(DEFINITION)
+
+      IMPLICIT NONE
+
+      CHARACTER(LEN=*), INTENT(IN) :: DEFINITION
+      INTEGER :: N_STR
+      CHARACTER(LEN=80), ALLOCATABLE :: STRARRAY(:)
+      TYPE(ELECTRON_FLUID), DIMENSION(:), ALLOCATABLE :: TEMP_ELECTRON_FLUIDS
+
+      CALL SPLIT_STR(DEFINITION, ' ', STRARRAY, N_STR)
+
+      IF (ALLOCATED(ELECTRON_FLUIDS)) THEN
+         ALLOCATE(TEMP_ELECTRON_FLUIDS(N_ELECTRON_FLUIDS+1))
+         TEMP_ELECTRON_FLUIDS(1:N_ELECTRON_FLUIDS) = ELECTRON_FLUIDS(1:N_ELECTRON_FLUIDS)
+         CALL MOVE_ALLOC(TEMP_ELECTRON_FLUIDS, ELECTRON_FLUIDS)
+      ELSE
+         ALLOCATE(ELECTRON_FLUIDS(1))
+      END IF
+      N_ELECTRON_FLUIDS = N_ELECTRON_FLUIDS + 1
+
+      READ(STRARRAY(1),'(A64)') ELECTRON_FLUIDS(N_ELECTRON_FLUIDS)%NAME
+      READ(STRARRAY(2), '(ES14.0)') ELECTRON_FLUIDS(N_ELECTRON_FLUIDS)%N0
+      READ(STRARRAY(3), '(ES14.0)') ELECTRON_FLUIDS(N_ELECTRON_FLUIDS)%T0
+      READ(STRARRAY(4), '(ES14.0)') ELECTRON_FLUIDS(N_ELECTRON_FLUIDS)%PHI0
+      IF (N_STR > 4) THEN
+         READ(STRARRAY(5), '(ES14.0)') ELECTRON_FLUIDS(N_ELECTRON_FLUIDS)%KAPPA_INDEX
+         IF (ELECTRON_FLUIDS(N_ELECTRON_FLUIDS)%KAPPA_INDEX <= 1.5) THEN
+            CALL ERROR_ABORT('Error in electron fluid definition. Kappa index must be > 1.5.')
+         END IF
+      END IF
+
+
+   END SUBROUTINE DEF_ELECTRON_FLUID
 
 
    
@@ -2033,6 +2087,7 @@ MODULE initialization
       READ(STRARRAY(9), '(ES14.0)') TROT
       READ(STRARRAY(10),'(ES14.0)') TVIB
       READ(STRARRAY(11),'(A10)') VDF_NAME
+      IF (N_STR .EQ. 12) READ(STRARRAY(12), '(ES14.0)') KAPPA
 
       CALL ASSIGN_VDF(TEMP_VDF,VDF_NAME)
       ! SELECT TYPE(TEMP_VDF)
@@ -2064,7 +2119,13 @@ MODULE initialization
       INITIAL_PARTICLES_TASKS(N_INITIAL_PARTICLES_TASKS)%TVIB = TVIB
       INITIAL_PARTICLES_TASKS(N_INITIAL_PARTICLES_TASKS)%MIX_ID = MIX_ID
       ALLOCATE(INITIAL_PARTICLES_TASKS(N_INITIAL_PARTICLES_TASKS)%VDF, SOURCE=TEMP_VDF)
-
+      IF (N_STR .EQ. 12) THEN
+         SELECT TYPE(vdf_ptr => INITIAL_PARTICLES_TASKS(N_INITIAL_PARTICLES_TASKS)%VDF)
+         TYPE IS (KAPPA_VDF)
+            vdf_ptr%KAPPA = KAPPA
+         CLASS DEFAULT
+         END SELECT
+      END IF
    END SUBROUTINE DEF_INITIAL_PARTICLES
 
 
@@ -2852,9 +2913,10 @@ MODULE initialization
          END IF
       END IF
       ! ---------- Check if fluid electron parameters were set for HYBRID PIC_TYPE ------
-      IF (PIC_TYPE == HYBRID .AND. (BOLTZ_N0 == 0. .OR. BOLTZ_TE == 0.)) THEN
-         WRITE(*,*) BOLTZ_N0, BOLTZ_TE
-         CALL ERROR_ABORT('Hybrid PIC Type was chosen but proper parameter setting for fluid electrons is missing.')
+      IF (PIC_TYPE == HYBRID) THEN
+         IF (.NOT. ALLOCATED(ELECTRON_FLUIDS) .OR. N_ELECTRON_FLUIDS < 1) THEN
+            CALL ERROR_ABORT('Hybrid PIC Type was chosen but no electron fluids are defined.')
+         END IF
       END IF
 
    END SUBROUTINE INPUT_DATA_SANITY_CHECK

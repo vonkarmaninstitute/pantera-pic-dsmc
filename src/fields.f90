@@ -4543,10 +4543,10 @@ MODULE fields
 
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   !!!!!!!! SOLVE_BOLTZMAN: Solve Poisson's equation !!!!!!
-   !!!!!!!!  with FLUID ELECTRONS as NON-LINEAR TERM !!!!!!
+   !!!! SOLVE_FLUID_POISSON Solve Poisson's equation !!!!!!
+   !!!!  with FLUID ELECTRONS as NON-LINEAR TERM     !!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   SUBROUTINE SETUP_BOLTZMANN
+   SUBROUTINE SETUP_FLUID_POISSON
 
       IMPLICIT NONE
 
@@ -4555,14 +4555,14 @@ MODULE fields
       ! Create SNES environment
       CALL SNESCreate(PETSC_COMM_WORLD,snes,ierr)
 
-      ! Create rvec (for FormFunctionBoltz) and solvec (for the solution)
+      ! Create rvec (for FormFunctionFluid) and solvec (for the solution)
       CALL VecCreate(PETSC_COMM_WORLD,rvec,ierr)
       CALL VecSetSizes(rvec,PETSC_DECIDE,NNODES,ierr)
       CALL VecSetFromOptions(rvec, ierr)
       CALL VecDuplicate(rvec, solvec, ierr)
 
       ! Function evaluation routine
-      CALL SNESSetFunction(snes,rvec,FormFunctionBoltz,0,ierr)
+      CALL SNESSetFunction(snes,rvec,FormFunctionFluid,0,ierr)
 
       ! Initialize Jacobian Matrix
       CALL MatCreate(PETSC_COMM_WORLD,Jmat,ierr)
@@ -4586,15 +4586,15 @@ MODULE fields
       CALL MatSetFromOptions(Jmat,ierr)
       CALL MatSetUp(Jmat,ierr)
 
-      CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobianBoltz,0,ierr)
+      CALL SNESSetJacobian(snes,Jmat,Jmat,FormJacobianFluid,0,ierr)
       CALL SNESSetFromOptions(snes,ierr)
 
       CALL VecScatterCreateToAll(solvec,ctx,solvec_seq,ierr)
 
-   END SUBROUTINE SETUP_BOLTZMANN
+   END SUBROUTINE SETUP_FLUID_POISSON
 
 
-   SUBROUTINE SOLVE_BOLTZMANN
+   SUBROUTINE SOLVE_FLUID_POISSON
 
       IMPLICIT NONE
 
@@ -4628,12 +4628,12 @@ MODULE fields
       CALL VecRestoreArrayRead(solvec_seq,PHI_FIELD_TEMP,ierr)
 
       IF (BOOL_CONDUCTIVE_BC) CALL ASSIGN_CONDUCTIVE_PHI
-      CALL GET_BOLTZMANN_DENSITY
+      CALL GET_FLUID_DENSITY
 
-   END SUBROUTINE SOLVE_BOLTZMANN
+   END SUBROUTINE SOLVE_FLUID_POISSON
 
 
-   SUBROUTINE CLEANUP_BOLTZMANN
+   SUBROUTINE CLEANUP_FLUID_POISSON
 
       IMPLICIT NONE
 
@@ -4644,10 +4644,10 @@ MODULE fields
       CALL SNESDestroy(snes, ierr)
       CALL MatDestroy(Jmat,ierr)
 
-   END SUBROUTINE CLEANUP_BOLTZMANN
+   END SUBROUTINE CLEANUP_FLUID_POISSON
 
 
-   SUBROUTINE FormFunctionBoltz(snes,x,f,dummy,ierr_l)
+   SUBROUTINE FormFunctionFluid(snes,x,f,dummy,ierr_l)
 
       IMPLICIT NONE
 
@@ -4658,12 +4658,13 @@ MODULE fields
       PetscScalar, POINTER :: RESIDUAL(:)
       CHARACTER(LEN=512)  :: filename
 
-      REAL(KIND=8) :: Y1, Y2, Y3, AREA, EPS_REL
-      INTEGER :: V1, V2, V3, V4, I, FACE_PG, EDGE_PG, VV1, VV2, VV3, VV4, VMN
-      INTEGER :: IP, P, Q, VP, VQ, J
-      REAL(KIND=8) :: KQ, KPQ, VOLUME, VALUETOADD, KE, LENGTH, KIJ
+      INTEGER :: I, IC, IFLUID, P, Q, VP, VQ
+      INTEGER :: V1, V2, V3, V4, VMN, FACE_PG
+      REAL(KIND=8) :: Y1, Y2, Y3
+      REAL(KIND=8) :: EPS_REL, KPQ, VALUETOADD, LENGTH, AREA, VOLUME
+      REAL(KIND=8) :: KQ, N0, T0, PHI0, KAPPA
 
-      IF (MOD(tID, STATS_EVERY) .EQ. 0) CALL ONLYMASTERPRINT1(PROC_ID, 'FormFunctionBoltz Called')
+      IF (MOD(tID, STATS_EVERY) .EQ. 0) CALL ONLYMASTERPRINT1(PROC_ID, 'FormFunctionFluid Called')
       
       CALL VecScatterBegin(ctx,x,solvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
       CALL VecScatterEnd(ctx,x,solvec_seq,INSERT_VALUES,SCATTER_FORWARD,ierr)
@@ -4680,50 +4681,57 @@ MODULE fields
       CALL VecGetOwnershipRange( f, Istart, Iend, ierr)
 
       IF (DIMS == 1) THEN
-         DO I = 1, NCELLS
-            LENGTH = U1D_GRID%SEGMENT_LENGTHS(I)
+         DO IC = 1, NCELLS
+            LENGTH = U1D_GRID%SEGMENT_LENGTHS(IC)
 
-            IF (U1D_GRID%CELL_PG(I) == -1) THEN
+            IF (U1D_GRID%CELL_PG(IC) == -1) THEN
                EPS_REL = 1.d0
             ELSE
-               EPS_REL = GRID_BC(U1D_GRID%CELL_PG(I))%EPS_REL
+               EPS_REL = GRID_BC(U1D_GRID%CELL_PG(IC))%EPS_REL
             END IF
-
-            KQ = QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*LENGTH
             
             ! We need to ADD to a sparse matrix entry.
             DO P = 1, 2
-               VP = U1D_GRID%CELL_NODES(P,I) - 1
+               VP = U1D_GRID%CELL_NODES(P,IC) - 1
                IF (IS_CONDUCTIVE(VP)) VP = CONDUCTOR_NODEMAP(VP)
                IF (VP >= Istart .AND. VP < Iend) THEN
                   IF (.NOT. IS_DIRICHLET(VP)) THEN
                      DO Q = 1, 2
-                        VQ = U1D_GRID%CELL_NODES(Q,I) - 1
+                        VQ = U1D_GRID%CELL_NODES(Q,IC) - 1
                         IF (IS_CONDUCTIVE(VQ)) VQ = CONDUCTOR_NODEMAP(VQ)
-                        KPQ = LENGTH*(U1D_GRID%BASIS_COEFFS(1,P,I)*U1D_GRID%BASIS_COEFFS(1,Q,I))*EPS_REL
+                        KPQ = LENGTH*(U1D_GRID%BASIS_COEFFS(1,P,IC)*U1D_GRID%BASIS_COEFFS(1,Q,IC))*EPS_REL
 
+                        IF (IS_CONDUCTIVE(VQ)) PHI_FIELD_NEW(VQ+1) = PHI_FIELD_NEW(VQ+1) + CONDUCTOR_BIASMAP(VQ)
                         RHS_NEW(VP) = RHS_NEW(VP) + KPQ*PHI_FIELD_NEW(VQ+1)
 
                         !!! FLUID ELECTRONS !!!
 
-                        IF (IS_CONDUCTIVE(VQ)) PHI_FIELD_NEW(VQ+1) = PHI_FIELD_NEW(VQ+1) + CONDUCTOR_BIASMAP(VQ)
-                        VALUETOADD = KQ * EXP(QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                        VALUETOADD = 0
+                        DO IFLUID = 1, N_ELECTRON_FLUIDS
+                           N0 = ELECTRON_FLUIDS(IFLUID)%N0
+                           T0 = ELECTRON_FLUIDS(IFLUID)%T0
+                           PHI0 = ELECTRON_FLUIDS(IFLUID)%PHI0
+                           
+                           IF (INT(ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX) /= 0) THEN
+                              KAPPA = ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX
 
-                        IF (BOOL_KAPPA_FLUID) THEN 
-                           VALUETOADD = KQ*(1-QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.))&
-                           )**(-KAPPA_FLUID_C+1./2.)
-                        END IF
+                              VALUETOADD = VALUETOADD + &
+                              QE*N0/(EPS0*EPS_SCALING**2)*LENGTH &
+                              *(1-QE*(PHI_FIELD_NEW(VQ+1)-PHI0)/(KB*T0*(KAPPA-3./2.)))**(-KAPPA+1./2.)
 
-                        !!!!! TEST FOR SINH(U) POTENTIAL
-                        ! VALUETOADD = QE*BOLTZ_N0/(EPS0)*AREA*SINH(QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
-                        !!!!!
+                           ELSE
+                              VALUETOADD = VALUETOADD + &
+                              QE*N0/(EPS0*EPS_SCALING**2)*LENGTH &
+                              *EXP(QE*(PHI_FIELD_NEW(VQ+1)-PHI0)/(KB*T0))
+                           END IF
+                        END DO
 
                         IF (P == Q) THEN
                            VALUETOADD = VALUETOADD/3.
                         ELSE
                            VALUETOADD = VALUETOADD/6.
                         END IF
-                        IF (GRID_BC(U1D_GRID%CELL_PG(I))%VOLUME_BC .NE. SOLID) THEN
+                        IF (GRID_BC(U1D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
                            RHS_NEW(VP) = RHS_NEW(VP) + VALUETOADD
                         END IF
                      END DO
@@ -4732,62 +4740,70 @@ MODULE fields
             END DO
          END DO
       ELSE IF (DIMS == 2) THEN
-         DO I = 1, NCELLS
-            AREA = U2D_GRID%CELL_AREAS(I)
+         DO IC = 1, NCELLS
+            AREA = U2D_GRID%CELL_AREAS(IC)
 
-            IF (U2D_GRID%CELL_PG(I) == -1) THEN
+            IF (U2D_GRID%CELL_PG(IC) == -1) THEN
                EPS_REL = 1.d0
             ELSE
-               EPS_REL = GRID_BC(U2D_GRID%CELL_PG(I))%EPS_REL
+               EPS_REL = GRID_BC(U2D_GRID%CELL_PG(IC))%EPS_REL
             END IF
-
-            KQ = QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*AREA
             
             ! We need to ADD to a sparse matrix entry.
             DO P = 1, 3
-               VP = U2D_GRID%CELL_NODES(P,I) - 1
+               VP = U2D_GRID%CELL_NODES(P,IC) - 1
                IF (IS_CONDUCTIVE(VP)) VP = CONDUCTOR_NODEMAP(VP)
                IF (VP >= Istart .AND. VP < Iend) THEN
                   IF (.NOT. IS_DIRICHLET(VP)) THEN
                      DO Q = 1, 3
-                        VQ = U2D_GRID%CELL_NODES(Q,I) - 1
+                        VQ = U2D_GRID%CELL_NODES(Q,IC) - 1
                         IF (IS_CONDUCTIVE(VQ)) VQ = CONDUCTOR_NODEMAP(VQ)
-                        KPQ = AREA*(U2D_GRID%BASIS_COEFFS(1,P,I)*U2D_GRID%BASIS_COEFFS(1,Q,I) &
-                                    + U2D_GRID%BASIS_COEFFS(2,P,I)*U2D_GRID%BASIS_COEFFS(2,Q,I))*EPS_REL
+                        KPQ = AREA*(U2D_GRID%BASIS_COEFFS(1,P,IC)*U2D_GRID%BASIS_COEFFS(1,Q,IC) &
+                                    + U2D_GRID%BASIS_COEFFS(2,P,IC)*U2D_GRID%BASIS_COEFFS(2,Q,IC))*EPS_REL
 
                         IF (AXI) THEN
-                           V1 = U2D_GRID%CELL_NODES(1,I)
-                           V2 = U2D_GRID%CELL_NODES(2,I)
-                           V3 = U2D_GRID%CELL_NODES(3,I)
+                           V1 = U2D_GRID%CELL_NODES(1,IC)
+                           V2 = U2D_GRID%CELL_NODES(2,IC)
+                           V3 = U2D_GRID%CELL_NODES(3,IC)
                            Y1 = U2D_GRID%NODE_COORDS(2, V1)
                            Y2 = U2D_GRID%NODE_COORDS(2, V2)
                            Y3 = U2D_GRID%NODE_COORDS(2, V3)
 
                            KPQ = KPQ*(Y1+Y2+Y3)/3.
                         END IF
+
+                        IF (IS_CONDUCTIVE(VQ)) PHI_FIELD_NEW(VQ+1) = PHI_FIELD_NEW(VQ+1) + CONDUCTOR_BIASMAP(VQ)
                         RHS_NEW(VP) = RHS_NEW(VP) + KPQ*PHI_FIELD_NEW(VQ+1)
 
                         !!! FLUID ELECTRONS !!!
 
-                        IF (IS_CONDUCTIVE(VQ)) PHI_FIELD_NEW(VQ+1) = PHI_FIELD_NEW(VQ+1) + CONDUCTOR_BIASMAP(VQ)
-                        VALUETOADD = KQ * EXP(QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                        VALUETOADD = 0
+                        DO IFLUID = 1, N_ELECTRON_FLUIDS
+                           N0 = ELECTRON_FLUIDS(IFLUID)%N0
+                           T0 = ELECTRON_FLUIDS(IFLUID)%T0
+                           PHI0 = ELECTRON_FLUIDS(IFLUID)%PHI0
+                           
+                           IF (INT(ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX) /= 0) THEN
+                              KAPPA = ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX
 
-                        IF (BOOL_KAPPA_FLUID) THEN 
-                           VALUETOADD = KQ*(1-QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.))&
-                           )**(-KAPPA_FLUID_C+1./2.)
-                        END IF
+                              VALUETOADD = VALUETOADD + &
+                              QE*N0/(EPS0*EPS_SCALING**2)*AREA &
+                              *(1-QE*(PHI_FIELD_NEW(VQ+1)-PHI0)/(KB*T0*(KAPPA-3./2.)))**(-KAPPA+1./2.)
 
-                        !!!!! TEST FOR SINH(U) POTENTIAL
-                        ! VALUETOADD = QE*BOLTZ_N0/(EPS0)*AREA*SINH(QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
-                        !!!!!
+                           ELSE
+                              VALUETOADD = VALUETOADD + &
+                              QE*N0/(EPS0*EPS_SCALING**2)*AREA &
+                              *EXP(QE*(PHI_FIELD_NEW(VQ+1)-PHI0)/(KB*T0))
+                           END IF
+                        END DO
 
                         IF (P == Q) THEN
                            VALUETOADD = VALUETOADD/6.
                            IF (AXI) THEN
                               ! We do cyclic permutation using MOD 
-                              V1 = U2D_GRID%CELL_NODES(1 + MOD(P-1,3),I) ! Start from P node in cell I
-                              V2 = U2D_GRID%CELL_NODES(1 + MOD(P,3),I)
-                              V3 = U2D_GRID%CELL_NODES(1 + MOD(P+1,3),I)
+                              V1 = U2D_GRID%CELL_NODES(1 + MOD(P-1,3),IC) ! Start from P node in cell I
+                              V2 = U2D_GRID%CELL_NODES(1 + MOD(P,3),IC)
+                              V3 = U2D_GRID%CELL_NODES(1 + MOD(P+1,3),IC)
                               Y1 = U2D_GRID%NODE_COORDS(2, V1)
                               Y2 = U2D_GRID%NODE_COORDS(2, V2)
                               Y3 = U2D_GRID%NODE_COORDS(2, V3)
@@ -4800,8 +4816,8 @@ MODULE fields
                               ! We have to choose first P and Q node, then choose the last one using MOD
                               V1 = VP + 1
                               V2 = VQ + 1
-                              V3 = U2D_GRID%CELL_NODES(1 + MOD(Q,3),I)
-                              IF (V3 == V1 .OR. V3 == V2) V3 = U2D_GRID%CELL_NODES(1 + MOD(Q+1,3),I)
+                              V3 = U2D_GRID%CELL_NODES(1 + MOD(Q,3),IC)
+                              IF (V3 == V1 .OR. V3 == V2) V3 = U2D_GRID%CELL_NODES(1 + MOD(Q+1,3),IC)
                               Y1 = U2D_GRID%NODE_COORDS(2, V1)
                               Y2 = U2D_GRID%NODE_COORDS(2, V2)
                               Y3 = U2D_GRID%NODE_COORDS(2, V3)
@@ -4810,7 +4826,7 @@ MODULE fields
                            END IF
                         END IF
 
-                        IF (GRID_BC(U2D_GRID%CELL_PG(I))%VOLUME_BC .NE. SOLID) THEN
+                        IF (GRID_BC(U2D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
                            RHS_NEW(VP) = RHS_NEW(VP) + VALUETOADD
                         END IF
                      END DO
@@ -4819,53 +4835,63 @@ MODULE fields
             END DO
          END DO
       ELSE IF (DIMS == 3) THEN
-         DO I = 1, NCELLS
-            VOLUME = U3D_GRID%CELL_VOLUMES(I)
+         DO IC = 1, NCELLS
+            VOLUME = U3D_GRID%CELL_VOLUMES(IC)
 
-            IF (U3D_GRID%CELL_PG(I) == -1) THEN
+            IF (U3D_GRID%CELL_PG(IC) == -1) THEN
                EPS_REL = 1.d0
             ELSE
-               EPS_REL = GRID_BC(U3D_GRID%CELL_PG(I))%EPS_REL
+               EPS_REL = GRID_BC(U3D_GRID%CELL_PG(IC))%EPS_REL
             END IF
             
-            KQ = QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*VOLUME
-            
             DO P = 1, 4
-               VP = U3D_GRID%CELL_NODES(P,I) - 1
+               VP = U3D_GRID%CELL_NODES(P,IC) - 1
                IF (IS_CONDUCTIVE(VP)) VP = CONDUCTOR_NODEMAP(VP)
                IF (VP >= Istart .AND. VP < Iend) THEN
-                  DO Q = 1, 4
-                     VQ = U3D_GRID%CELL_NODES(Q,I) - 1
-                     IF (IS_CONDUCTIVE(VQ)) VQ = CONDUCTOR_NODEMAP(VQ)
-                     KPQ = VOLUME*(U3D_GRID%BASIS_COEFFS(1,P,I)*U3D_GRID%BASIS_COEFFS(1,Q,I) &
-                                 + U3D_GRID%BASIS_COEFFS(2,P,I)*U3D_GRID%BASIS_COEFFS(2,Q,I) &
-                                 + U3D_GRID%BASIS_COEFFS(3,P,I)*U3D_GRID%BASIS_COEFFS(3,Q,I))*EPS_REL
-                     RHS_NEW(VP) = RHS_NEW(VP) + KPQ*PHI_FIELD_NEW(VQ+1)
+                  IF (.NOT. IS_DIRICHLET(VP)) THEN
+                     DO Q = 1, 4
+                        VQ = U3D_GRID%CELL_NODES(Q,IC) - 1
+                        IF (IS_CONDUCTIVE(VQ)) VQ = CONDUCTOR_NODEMAP(VQ)
+                        KPQ = VOLUME*(U3D_GRID%BASIS_COEFFS(1,P,IC)*U3D_GRID%BASIS_COEFFS(1,Q,IC) &
+                                    + U3D_GRID%BASIS_COEFFS(2,P,IC)*U3D_GRID%BASIS_COEFFS(2,Q,IC) &
+                                    + U3D_GRID%BASIS_COEFFS(3,P,IC)*U3D_GRID%BASIS_COEFFS(3,Q,IC))*EPS_REL
 
-                     !!!! FLUID ELECTRONS !!!
+                        IF (IS_CONDUCTIVE(VQ)) PHI_FIELD_NEW(VQ+1) = PHI_FIELD_NEW(VQ+1) + CONDUCTOR_BIASMAP(VQ)
+                        RHS_NEW(VP) = RHS_NEW(VP) + KPQ*PHI_FIELD_NEW(VQ+1)
 
-                     IF (IS_CONDUCTIVE(VQ)) PHI_FIELD_NEW(VQ+1) = PHI_FIELD_NEW(VQ+1) + CONDUCTOR_BIASMAP(VQ)
-                     VALUETOADD = KQ*EXP(QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                        !!!! FLUID ELECTRONS !!!
 
-                     IF (BOOL_KAPPA_FLUID) THEN
-                        VALUETOADD = KQ*(1-QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
-                        **(-KAPPA_FLUID_C+1./2.)
-                     END IF
+                        VALUETOADD = 0
+                        DO IFLUID = 1, N_ELECTRON_FLUIDS
+                           N0 = ELECTRON_FLUIDS(IFLUID)%N0
+                           T0 = ELECTRON_FLUIDS(IFLUID)%T0
+                           PHI0 = ELECTRON_FLUIDS(IFLUID)%PHI0
+                           
+                           IF (INT(ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX) /= 0) THEN
+                              KAPPA = ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX
 
-                     !!!!! TEST FOR SINH(U) POTENTIAL
-                     ! VALUETOADD = QE*BOLTZ_N0/(EPS0)*VOLUME*SINH(QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
-                     !!!!!
+                              VALUETOADD = VALUETOADD + &
+                              QE*N0/(EPS0*EPS_SCALING**2)*VOLUME &
+                              *(1-QE*(PHI_FIELD_NEW(VQ+1)-PHI0)/(KB*T0*(KAPPA-3./2.)))**(-KAPPA+1./2.)
 
-                     IF (P == Q) THEN
-                        VALUETOADD = VALUETOADD/10.
-                     ELSE
-                        VALUETOADD = VALUETOADD/20.
-                     END IF
+                           ELSE
+                              VALUETOADD = VALUETOADD + &
+                              QE*N0/(EPS0*EPS_SCALING**2)*VOLUME &
+                              *EXP(QE*(PHI_FIELD_NEW(VQ+1)-PHI0)/(KB*T0))
+                           END IF
+                        END DO
 
-                     IF (GRID_BC(U3D_GRID%CELL_PG(I))%VOLUME_BC .NE. SOLID) THEN
-                        RHS_NEW(VP) = RHS_NEW(VP) + VALUETOADD
-                     END IF
-                  END DO
+                        IF (P == Q) THEN
+                           VALUETOADD = VALUETOADD/10.
+                        ELSE
+                           VALUETOADD = VALUETOADD/20.
+                        END IF
+
+                        IF (GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
+                           RHS_NEW(VP) = RHS_NEW(VP) + VALUETOADD
+                        END IF
+                     END DO
+                  END IF
                END IF
             END DO
          END DO 
@@ -4901,9 +4927,9 @@ MODULE fields
 
       DEALLOCATE(RHS_NEW)
 
-   END SUBROUTINE FormFunctionBoltz
+   END SUBROUTINE FormFunctionFluid
 
-   SUBROUTINE FormJacobianBoltz(snes,x,jac,prec,dummy,ierr_l)
+   SUBROUTINE FormJacobianFluid(snes,x,jac,prec,dummy,ierr_l)
    
       IMPLICIT NONE
 
@@ -4914,16 +4940,15 @@ MODULE fields
       PetscBool      flg
       PetscScalar    mat_value
       INTEGER dummy(*)
-      INTEGER I, IC, FACE_PG
 
-      REAL(KIND=8) :: Y1, Y2, Y3, EPS_REL
+      INTEGER :: I, IC, IFLUID, P, Q, VP, VQ
+      INTEGER :: V1, V2, V3, V4, VMN, FACE_PG
+      REAL(KIND=8) :: Y1, Y2, Y3
+      REAL(KIND=8) :: EPS_REL, KPQ, VALUETOADD, FACTOR, LENGTH, AREA, VOLUME
+      REAL(KIND=8) :: KQ, N0, T0, PHI0, KAPPA
 
-      INTEGER :: IP, IQ, V1, V2, V3, V4, VV1, VV2, VV3, VMN
-      INTEGER :: P, Q, VP, VQ, J, EDGE_PG
-      REAL(KIND=8) :: KQ, KPQ, VOLUME, VALUETOADD, FACTOR, AREA, LENGTH, KIJ
 
-
-      IF (MOD(tID, STATS_EVERY) .EQ. 0) CALL ONLYMASTERPRINT1(PROC_ID, 'FormJacobianBoltz Called')
+      IF (MOD(tID, STATS_EVERY) .EQ. 0) CALL ONLYMASTERPRINT1(PROC_ID, 'FormJacobianFluid Called')
 
 
 
@@ -4945,50 +4970,58 @@ MODULE fields
       ! Accumulate Jacobian. All this is in principle not needed since we already have Amat.
 
       IF (DIMS == 1) THEN
-         DO I = 1, NCELLS
-            LENGTH = U1D_GRID%SEGMENT_LENGTHS(I)
+         DO IC = 1, NCELLS
+            LENGTH = U1D_GRID%SEGMENT_LENGTHS(IC)
 
-            IF (U1D_GRID%CELL_PG(I) == -1) THEN
+            IF (U1D_GRID%CELL_PG(IC) == -1) THEN
                EPS_REL = 1.d0
             ELSE
-               EPS_REL = GRID_BC(U1D_GRID%CELL_PG(I))%EPS_REL
+               EPS_REL = GRID_BC(U1D_GRID%CELL_PG(IC))%EPS_REL
             END IF
-
-            KQ = QE**2*BOLTZ_N0/(EPS0*EPS_SCALING**2*KB*BOLTZ_TE)*LENGTH
             
             ! We need to ADD to a sparse matrix entry.
             DO P = 1, 2
-               VP = U1D_GRID%CELL_NODES(P,I) - 1
+               VP = U1D_GRID%CELL_NODES(P,IC) - 1
                IF (IS_CONDUCTIVE(VP)) VP = CONDUCTOR_NODEMAP(VP)
                IF (VP >= Istart .AND. VP < Iend) THEN
                   IF (.NOT. IS_DIRICHLET(VP)) THEN
                      DO Q = 1, 2
-                        VQ = U1D_GRID%CELL_NODES(Q,I) - 1
+                        VQ = U1D_GRID%CELL_NODES(Q,IC) - 1
                         IF (IS_CONDUCTIVE(VQ)) VQ = CONDUCTOR_NODEMAP(VQ)
-                        KPQ = LENGTH*(U1D_GRID%BASIS_COEFFS(1,P,I)*U1D_GRID%BASIS_COEFFS(1,Q,I))*EPS_REL
+                        KPQ = LENGTH*(U1D_GRID%BASIS_COEFFS(1,P,IC)*U1D_GRID%BASIS_COEFFS(1,Q,IC))*EPS_REL
                         CALL MatSetValue(jac,VP,VQ,KPQ,ADD_VALUES,ierr)
 
                         !!! FLUID ELECTRONS !!!
                         IF (IS_CONDUCTIVE(VQ)) PHI_FIELD_NEW(VQ+1) = PHI_FIELD_NEW(VQ+1) + CONDUCTOR_BIASMAP(VQ)
 
-                        VALUETOADD = KQ*EXP(QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                        
+                        VALUETOADD = 0
+                        DO IFLUID = 1, N_ELECTRON_FLUIDS
 
-                        IF (BOOL_KAPPA_FLUID) THEN 
-                           VALUETOADD = KQ*(2.*KAPPA_FLUID_C-1.)/(2.*KAPPA_FLUID_C-3.)&
-                           *(1-QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))**(-KAPPA_FLUID_C-1./2.)
-                        END IF
+                           N0 = ELECTRON_FLUIDS(IFLUID)%N0
+                           T0 = ELECTRON_FLUIDS(IFLUID)%T0
+                           PHI0 = ELECTRON_FLUIDS(IFLUID)%PHI0
+                           KQ = QE*QE*N0/(EPS0*EPS_SCALING**2*KB*T0)*LENGTH
+                           
+                           IF (INT(ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX) /= 0) THEN
+                              KAPPA = ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX
 
-                        !!!!! TEST FOR SINH(U) POTENTIAL
-                        ! VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*LENGTH&
-                        ! *COSH(QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
-                        !!!!!
+                              VALUETOADD = VALUETOADD + &
+                              KQ *(2.*KAPPA-1.)/(2.*KAPPA-3.) &
+                              *(1-QE*(PHI_FIELD_NEW(VQ+1)-PHI0)/(KB*T0*(KAPPA-3./2.)))**(-KAPPA-1./2.)
+
+                           ELSE
+                              VALUETOADD = VALUETOADD + &
+                              KQ * EXP(QE*(PHI_FIELD_NEW(VQ+1)-PHI0)/(KB*T0))
+                           END IF
+                        END DO
 
                         IF (P == Q) THEN
                            VALUETOADD = VALUETOADD/3.
                         ELSE
                            VALUETOADD = VALUETOADD/6.
                         END IF
-                        IF (GRID_BC(U1D_GRID%CELL_PG(I))%VOLUME_BC .NE. SOLID) THEN
+                        IF (GRID_BC(U1D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
                            CALL MatSetValue(jac,VP,VQ,VALUETOADD,ADD_VALUES,ierr)
                         END IF
                      END DO
@@ -4997,33 +5030,31 @@ MODULE fields
             END DO
          END DO
       ELSE IF (DIMS == 2) THEN
-         DO I = 1, NCELLS
-            AREA = U2D_GRID%CELL_AREAS(I)
+         DO IC = 1, NCELLS
+            AREA = U2D_GRID%CELL_AREAS(IC)
 
-            IF (U2D_GRID%CELL_PG(I) == -1) THEN
+            IF (U2D_GRID%CELL_PG(IC) == -1) THEN
                EPS_REL = 1.d0
             ELSE
-               EPS_REL = GRID_BC(U2D_GRID%CELL_PG(I))%EPS_REL
+               EPS_REL = GRID_BC(U2D_GRID%CELL_PG(IC))%EPS_REL
             END IF
-
-            KQ = QE**2*BOLTZ_N0/(EPS0*EPS_SCALING**2*KB*BOLTZ_TE)*AREA
             
             ! We need to ADD to a sparse matrix entry.
             DO P = 1, 3
-               VP = U2D_GRID%CELL_NODES(P,I) - 1
+               VP = U2D_GRID%CELL_NODES(P,IC) - 1
                IF (IS_CONDUCTIVE(VP)) VP = CONDUCTOR_NODEMAP(VP)
                IF (VP >= Istart .AND. VP < Iend) THEN
                   IF (.NOT. IS_DIRICHLET(VP)) THEN
                      DO Q = 1, 3
-                        VQ = U2D_GRID%CELL_NODES(Q,I) - 1
+                        VQ = U2D_GRID%CELL_NODES(Q,IC) - 1
                         IF (IS_CONDUCTIVE(VQ)) VQ = CONDUCTOR_NODEMAP(VQ)
-                        KPQ = AREA*(U2D_GRID%BASIS_COEFFS(1,P,I)*U2D_GRID%BASIS_COEFFS(1,Q,I) &
-                                    + U2D_GRID%BASIS_COEFFS(2,P,I)*U2D_GRID%BASIS_COEFFS(2,Q,I))*EPS_REL
+                        KPQ = AREA*(U2D_GRID%BASIS_COEFFS(1,P,IC)*U2D_GRID%BASIS_COEFFS(1,Q,IC) &
+                                    + U2D_GRID%BASIS_COEFFS(2,P,IC)*U2D_GRID%BASIS_COEFFS(2,Q,IC))*EPS_REL
 
                         IF (AXI) THEN
-                           V1 = U2D_GRID%CELL_NODES(1,I)
-                           V2 = U2D_GRID%CELL_NODES(2,I)
-                           V3 = U2D_GRID%CELL_NODES(3,I)
+                           V1 = U2D_GRID%CELL_NODES(1,IC)
+                           V2 = U2D_GRID%CELL_NODES(2,IC)
+                           V3 = U2D_GRID%CELL_NODES(3,IC)
                            Y1 = U2D_GRID%NODE_COORDS(2, V1)
                            Y2 = U2D_GRID%NODE_COORDS(2, V2)
                            Y3 = U2D_GRID%NODE_COORDS(2, V3)
@@ -5036,25 +5067,34 @@ MODULE fields
 
                         IF (IS_CONDUCTIVE(VQ)) PHI_FIELD_NEW(VQ+1) = PHI_FIELD_NEW(VQ+1) + CONDUCTOR_BIASMAP(VQ)
 
-                        VALUETOADD = KQ*EXP(QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                        VALUETOADD = 0
+                        DO IFLUID = 1, N_ELECTRON_FLUIDS
+                           
+                           N0 = ELECTRON_FLUIDS(IFLUID)%N0
+                           T0 = ELECTRON_FLUIDS(IFLUID)%T0
+                           PHI0 = ELECTRON_FLUIDS(IFLUID)%PHI0
+                           KQ = QE*QE*N0/(EPS0*EPS_SCALING**2*KB*T0)*AREA
+                           
+                           IF (INT(ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX) /= 0) THEN
+                              KAPPA = ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX
 
-                        IF (BOOL_KAPPA_FLUID) THEN 
-                           VALUETOADD = KQ*(2.*KAPPA_FLUID_C-1.)/(2.*KAPPA_FLUID_C-3.)&
-                           *(1-QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))**(-KAPPA_FLUID_C-1./2.)
-                        END IF
+                              VALUETOADD = VALUETOADD + &
+                              KQ * (2.*KAPPA-1.)/(2.*KAPPA-3.) &
+                              *(1-QE*(PHI_FIELD_NEW(VQ+1)-PHI0)/(KB*T0*(KAPPA-3./2.)))**(-KAPPA-1./2.)
 
-                        !!!!! TEST FOR SINH(U) POTENTIAL
-                        ! VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*AREA&
-                        ! *COSH(QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
-                        !!!!!
+                           ELSE
+                              VALUETOADD = VALUETOADD + &
+                              KQ * EXP(QE*(PHI_FIELD_NEW(VQ+1)-PHI0)/(KB*T0))
+                           END IF
+                        END DO
 
                         IF (P == Q) THEN
                            VALUETOADD = VALUETOADD/6.
                            IF (AXI) THEN
                               ! We do cyclic permutation using MOD 
-                              V1 = U2D_GRID%CELL_NODES(1 + MOD(P-1,3),I) ! Start from P node in cell I
-                              V2 = U2D_GRID%CELL_NODES(1 + MOD(P,3),I)
-                              V3 = U2D_GRID%CELL_NODES(1 + MOD(P+1,3),I)
+                              V1 = U2D_GRID%CELL_NODES(1 + MOD(P-1,3),IC) ! Start from P node in cell I
+                              V2 = U2D_GRID%CELL_NODES(1 + MOD(P,3),IC)
+                              V3 = U2D_GRID%CELL_NODES(1 + MOD(P+1,3),IC)
 
                               Y1 = U2D_GRID%NODE_COORDS(2, V1)
                               Y2 = U2D_GRID%NODE_COORDS(2, V2)
@@ -5068,8 +5108,8 @@ MODULE fields
                               ! We have to choose first P and Q node, then choose the last one using MOD
                               V1 = VP + 1
                               V2 = VQ + 1
-                              V3 = U2D_GRID%CELL_NODES(1 + MOD(Q,3),I)
-                              IF (V3 == V1 .OR. V3 == V2) V3 = U2D_GRID%CELL_NODES(1 + MOD(Q+1,3),I)
+                              V3 = U2D_GRID%CELL_NODES(1 + MOD(Q,3),IC)
+                              IF (V3 == V1 .OR. V3 == V2) V3 = U2D_GRID%CELL_NODES(1 + MOD(Q+1,3),IC)
                               Y1 = U2D_GRID%NODE_COORDS(2, V1)
                               Y2 = U2D_GRID%NODE_COORDS(2, V2)
                               Y3 = U2D_GRID%NODE_COORDS(2, V3)
@@ -5077,7 +5117,7 @@ MODULE fields
                               VALUETOADD = VALUETOADD*(2*Y1+2*Y2+Y3)/5.
                            END IF
                         END IF
-                        IF (GRID_BC(U2D_GRID%CELL_PG(I))%VOLUME_BC .NE. SOLID) THEN
+                        IF (GRID_BC(U2D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
                            CALL MatSetValue(jac,VP,VQ,VALUETOADD,ADD_VALUES,ierr)
                         END IF
                      END DO
@@ -5086,55 +5126,62 @@ MODULE fields
             END DO
          END DO
       ELSE IF (DIMS == 3) THEN
-         DO I = 1, NCELLS
+         DO IC = 1, NCELLS
 
-            VOLUME = U3D_GRID%CELL_VOLUMES(I)
+            VOLUME = U3D_GRID%CELL_VOLUMES(IC)
 
-            IF (U3D_GRID%CELL_PG(I) == -1) THEN
+            IF (U3D_GRID%CELL_PG(IC) == -1) THEN
                EPS_REL = 1.d0
             ELSE
-               EPS_REL = GRID_BC(U3D_GRID%CELL_PG(I))%EPS_REL
+               EPS_REL = GRID_BC(U3D_GRID%CELL_PG(IC))%EPS_REL
             END IF
-
-            KQ = QE**2*BOLTZ_N0/(EPS0*EPS_SCALING**2*KB*BOLTZ_TE)*VOLUME
             
             ! We need to ADD to a sparse matrix entry.
             DO P = 1, 4
-               VP = U3D_GRID%CELL_NODES(P,I) - 1
+               VP = U3D_GRID%CELL_NODES(P,IC) - 1
                IF (IS_CONDUCTIVE(VP)) VP = CONDUCTOR_NODEMAP(VP)
                IF (VP >= Istart .AND. VP < Iend) THEN
                   IF (.NOT. IS_DIRICHLET(VP)) THEN
                      DO Q = 1, 4
-                        VQ = U3D_GRID%CELL_NODES(Q,I) - 1
+                        VQ = U3D_GRID%CELL_NODES(Q,IC) - 1
                         IF (IS_CONDUCTIVE(VQ)) VQ = CONDUCTOR_NODEMAP(VQ)
-                        KPQ = VOLUME*(U3D_GRID%BASIS_COEFFS(1,P,I)*U3D_GRID%BASIS_COEFFS(1,Q,I) &
-                                    + U3D_GRID%BASIS_COEFFS(2,P,I)*U3D_GRID%BASIS_COEFFS(2,Q,I) &
-                                    + U3D_GRID%BASIS_COEFFS(3,P,I)*U3D_GRID%BASIS_COEFFS(3,Q,I))*EPS_REL
+                        KPQ = VOLUME*(U3D_GRID%BASIS_COEFFS(1,P,IC)*U3D_GRID%BASIS_COEFFS(1,Q,IC) &
+                                    + U3D_GRID%BASIS_COEFFS(2,P,IC)*U3D_GRID%BASIS_COEFFS(2,Q,IC) &
+                                    + U3D_GRID%BASIS_COEFFS(3,P,IC)*U3D_GRID%BASIS_COEFFS(3,Q,IC))*EPS_REL
                         CALL MatSetValue(jac,VP,VQ,KPQ,ADD_VALUES,ierr)
                         
                         
                         !!! FLUID ELECTRONS !!!
 
                         IF (IS_CONDUCTIVE(VQ)) PHI_FIELD_NEW(VQ+1) = PHI_FIELD_NEW(VQ+1) + CONDUCTOR_BIASMAP(VQ)
-                        
-                        VALUETOADD = KQ*EXP(QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
 
-                        IF (BOOL_KAPPA_FLUID) THEN 
-                           VALUETOADD = KQ*(2.*KAPPA_FLUID_C-1.)/(2.*KAPPA_FLUID_C-3.)&
-                           *(1-QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))**(-KAPPA_FLUID_C-1./2.)
-                        END IF
+                        VALUETOADD = 0
+                        DO IFLUID = 1, N_ELECTRON_FLUIDS
 
-                        !!!!! TEST FOR SINH(U) POTENTIAL !!!!!
-                        ! VALUETOADD = QE*QE*BOLTZ_N0/(EPS0*KB*BOLTZ_TE)*VOLUME&
-                        ! *COSH(QE*(PHI_FIELD_NEW(VQ+1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))*2.
-                        !!!!!
+                           N0 = ELECTRON_FLUIDS(IFLUID)%N0
+                           T0 = ELECTRON_FLUIDS(IFLUID)%T0
+                           PHI0 = ELECTRON_FLUIDS(IFLUID)%PHI0
+                           KQ = QE*QE*N0/(EPS0*EPS_SCALING**2*KB*T0)*VOLUME
+                           
+                           IF (INT(ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX) /= 0) THEN
+                              KAPPA = ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX
+
+                              VALUETOADD = VALUETOADD + &
+                              KQ * (2.*KAPPA-1.)/(2.*KAPPA-3.) &
+                              *(1-QE*(PHI_FIELD_NEW(VQ+1)-PHI0)/(KB*T0*(KAPPA-3./2.)))**(-KAPPA-1./2.)
+
+                           ELSE
+                              VALUETOADD = VALUETOADD + &
+                              KQ * EXP(QE*(PHI_FIELD_NEW(VQ+1)-PHI0)/(KB*T0))
+                           END IF
+                        END DO
 
                         IF (P == Q) THEN
                            VALUETOADD = VALUETOADD/10.
                         ELSE
                            VALUETOADD = VALUETOADD/20.
                         END IF
-                        IF (GRID_BC(U3D_GRID%CELL_PG(I))%VOLUME_BC .NE. SOLID) THEN
+                        IF (GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
                            CALL MatSetValue(jac,VP,VQ,VALUETOADD,ADD_VALUES,ierr)
                         END IF
                      END DO
@@ -5169,20 +5216,21 @@ MODULE fields
       END IF
 
 
-   END SUBROUTINE FormJacobianBoltz
+   END SUBROUTINE FormJacobianFluid
 
 
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   !!!!!! FLUID ELECTRON CHARGING on DIELECTRIC BC !!!!!!
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    SUBROUTINE FLUID_ELECTRONS_SURFACE_CHARGING
 
       IMPLICIT NONE
 
-      INTEGER :: IC, IP, FACE_PG, IG
+      INTEGER :: IC, IP, FACE_PG, IG, IFLUID
       INTEGER :: V1, V2, V3, VV1, VV2, VV3, VMN
-      REAL(KIND=8) :: Y1, Y2, AREA, CHARGE, FACTOR, KAPPA_1, TEMP_1
-      REAL(KIND=8) :: POT1, POT2, POT3
+      REAL(KIND=8) :: Y1, Y2, AREA, CHARGE, FACTOR
+      REAL(KIND=8) :: FLUX1, FLUX2, FLUX3
+      REAL(KIND=8) :: N0, T0, PHI0, KAPPA
+      REAL(KIND=8) :: E0, V0, B0, AK, DOT_PRODUCT
+      REAL(KIND=8), DIMENSION(3) :: FACE_NORMAL
+      REAL(KIND=8) :: N1, E1, N2, E2
 
       IF (DIMS == 1) THEN
          DO IC = 1, NCELLS
@@ -5198,29 +5246,38 @@ MODULE fields
                      V1 = U1D_GRID%CELL_NODES(IP,IC)
                      AREA = 1. ! Flux should be on unit surface
 
-                     CHARGE = -QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*SQRT(KB*BOLTZ_TE/(2*PI*ME))*AREA*DT
-                     POT1 = EXP(QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                     FLUX1 = 0
+                     DO IFLUID = 1, N_ELECTRON_FLUIDS
+                        N0 = ELECTRON_FLUIDS(IFLUID)%N0
+                        T0 = ELECTRON_FLUIDS(IFLUID)%T0
+                        PHI0 = ELECTRON_FLUIDS(IFLUID)%PHI0
 
-                     IF (BOOL_KAPPA_FLUID) THEN
-                        FACTOR = SQRT(KAPPA_FLUID_C-3./2.)*GAMMA(KAPPA_FLUID_C+1.)&
-                        /GAMMA(KAPPA_FLUID_C-1./2.)/(KAPPA_FLUID_C*(KAPPA_FLUID_C-1.))
-                        POT1 = FACTOR*(1-QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
-                        **(-KAPPA_FLUID_C+1.)
-                     END IF
+                        CHARGE = -QE*N0/(EPS0*EPS_SCALING**2)*SQRT(KB*T0/(2*PI*ME))*AREA*DT
+                        
+                        IF (INT(ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX) /= 0) THEN
+                           KAPPA = ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX
+
+                           FACTOR = SQRT(KAPPA-3./2.)*GAMMA(KAPPA-1.)/GAMMA(KAPPA-1./2.)
+
+                           FLUX1 = FLUX1 + & 
+                                 CHARGE*FACTOR*(1-QE*(PHI_FIELD(V1)-PHI0)/(KB*T0*(KAPPA-3./2.)))**(-KAPPA+1.)
+                        ELSE
+                           FLUX1 = FLUX1 + CHARGE*EXP(QE*(PHI_FIELD(V1)-PHI0)/(KB*T0))
+                        END IF
+                     END DO
 
                      IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC) THEN
-                        SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + CHARGE*(POT1)
+                        SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + FLUX1
 
                      ELSE IF (GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
                         IG = GRID_BC(FACE_PG)%CONDUCTIVE_PART_ID
                         VMN = CONNECTED_COND_SURFACES(IG)%MASTER_NODE
-                        SURFACE_CHARGE(VMN) = SURFACE_CHARGE(VMN) + CHARGE*POT1
-                        ! CONNECTED_COND_SURFACES(IG)%SUM_METAL_CHARGE = CONNECTED_COND_SURFACES(IG)%SUM_METAL_CHARGE + CHARGE*POT1
+                        SURFACE_CHARGE(VMN) = SURFACE_CHARGE(VMN) + FLUX1
                      
                      ELSE IF (GRID_BC(FACE_PG)%FIELD_BC == SPICE_NODE_BC) THEN
                         AREA = (YMAX-YMIN)*(ZMAX-ZMIN)
-                        CHARGE = -QE*BOLTZ_N0*SQRT(KB*BOLTZ_TE/(2*PI*ME))*AREA
-                        GRID_BC(FACE_PG)%SPICE_NODE_CURRENT = GRID_BC(FACE_PG)%SPICE_NODE_CURRENT + CHARGE*POT1
+                        FLUX1 = FLUX1/DT*(EPS0*EPS_SCALING**2)*AREA
+                        GRID_BC(FACE_PG)%SPICE_NODE_CURRENT = GRID_BC(FACE_PG)%SPICE_NODE_CURRENT + FLUX1
                      END IF
                   END IF
                END DO
@@ -5257,52 +5314,57 @@ MODULE fields
                      Y2 = U2D_GRID%NODE_COORDS(2, V2)
                      AREA = U2D_GRID%CELL_EDGES_LEN(IP,IC)
 
+                     FLUX1 = 0.
+                     FLUX2 = 0.
+                     DO IFLUID = 1, N_ELECTRON_FLUIDS
+                        N0 = ELECTRON_FLUIDS(IFLUID)%N0
+                        T0 = ELECTRON_FLUIDS(IFLUID)%T0
+                        PHI0 = ELECTRON_FLUIDS(IFLUID)%PHI0
 
-                     CHARGE = -QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*SQRT(KB*BOLTZ_TE/(2*PI*ME))*AREA*DT
-                     POT1 = EXP(QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
-                     POT2 = EXP(QE*(PHI_FIELD(V2)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                        CHARGE = -QE*N0/(EPS0*EPS_SCALING**2)*SQRT(KB*T0/(2*PI*ME))*AREA*DT
+                        
+                        IF (INT(ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX) /= 0) THEN
+                           KAPPA = ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX
 
-                     IF (BOOL_KAPPA_FLUID) THEN
-                        FACTOR = SQRT(KAPPA_FLUID_C-3./2.)*GAMMA(KAPPA_FLUID_C+1.)&
-                        /GAMMA(KAPPA_FLUID_C-1./2.)/(KAPPA_FLUID_C*(KAPPA_FLUID_C-1.))
+                           FACTOR = SQRT(KAPPA-3./2.)*GAMMA(KAPPA-1.)/GAMMA(KAPPA-1./2.)
 
-                        POT1 = FACTOR*(1-QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
-                        **(-KAPPA_FLUID_C+1.)
-                        POT2 = FACTOR*(1-QE*(PHI_FIELD(V2)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
-                        **(-KAPPA_FLUID_C+1.)
-                     END IF
+                           FLUX1 = FLUX1 + CHARGE*FACTOR*(1-QE*(PHI_FIELD(V1)-PHI0)/(KB*T0*(KAPPA-3./2.)))**(-KAPPA+1.)
+                           FLUX2 = FLUX2 + CHARGE*FACTOR*(1-QE*(PHI_FIELD(V2)-PHI0)/(KB*T0*(KAPPA-3./2.)))**(-KAPPA+1.)
+                        ELSE
+                           FLUX1 = FLUX1 + CHARGE*EXP(QE*(PHI_FIELD(V1)-PHI0)/(KB*T0))
+                           FLUX2 = FLUX2 + CHARGE*EXP(QE*(PHI_FIELD(V2)-PHI0)/(KB*T0))
+                        END IF
+                     END DO
 
                      IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC) THEN
                         IF (AXI) THEN
                            SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) +&
-                           CHARGE*(POT1*(3.*Y1+Y2) + POT2*(Y1+Y2))/12.
+                           (FLUX1*(3.*Y1+Y2) + FLUX2*(Y1+Y2))/12.
                            SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) +&
-                           CHARGE*(POT1*(Y1+Y2) + POT2*(Y1+3.*Y2))/12.
+                           (FLUX1*(Y1+Y2) + FLUX2*(Y1+3.*Y2))/12.
                         ELSE
-                           SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + CHARGE*(POT1/3. + POT2/6.)
-                           SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) + CHARGE*(POT2/3. + POT1/6.)
+                           SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + (FLUX1/3. + FLUX2/6.)
+                           SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) + (FLUX1/6. + FLUX2/3.)
                         END IF
 
                      ELSE IF (GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
                         IG = GRID_BC(FACE_PG)%CONDUCTIVE_PART_ID
                         VMN = CONNECTED_COND_SURFACES(IG)%MASTER_NODE
                         IF (AXI) THEN
-                           SURFACE_CHARGE(VMN) = SURFACE_CHARGE(VMN) + CHARGE*(POT1*(4*Y1 + 2*Y2)+POT2*(2*Y1 + 4*Y2))/12.
-                           ! CONNECTED_COND_SURFACES(IG)%SUM_METAL_CHARGE = CONNECTED_COND_SURFACES(IG)%SUM_METAL_CHARGE &
-                           ! + CHARGE*(POT1*(4*Y1 + 2*Y2)+POT2*(2*Y1 + 4*Y2))/12.
+                           SURFACE_CHARGE(VMN) = SURFACE_CHARGE(VMN) + (FLUX1*(4*Y1 + 2*Y2)+FLUX2*(2*Y1 + 4*Y2))/12.
                         ELSE
-                           SURFACE_CHARGE(VMN) = SURFACE_CHARGE(VMN) + CHARGE*(POT1+POT2)/2.
-                           ! CONNECTED_COND_SURFACES(IG)%SUM_METAL_CHARGE = CONNECTED_COND_SURFACES(IG)%SUM_METAL_CHARGE &
-                           !  + CHARGE*(POT1+POT2)/2.
+                           SURFACE_CHARGE(VMN) = SURFACE_CHARGE(VMN) + (FLUX1+FLUX2)/2.
                         END IF
 
                      ELSE IF (GRID_BC(FACE_PG)%FIELD_BC == SPICE_NODE_BC) THEN
-                        CHARGE = -QE*BOLTZ_N0*SQRT(KB*BOLTZ_TE/(2*PI*ME))*AREA
-                        AREA = U2D_GRID%CELL_EDGES_LEN(IP,IC)*(ZMAX-ZMIN)
-                        IF (AXI) AREA = AREA*(Y1+Y2)/2.
-                        CHARGE = -QE*BOLTZ_N0*SQRT(KB*BOLTZ_TE/(2*PI*ME))*AREA
-
-                        GRID_BC(FACE_PG)%SPICE_NODE_CURRENT = GRID_BC(FACE_PG)%SPICE_NODE_CURRENT + CHARGE*(POT1+POT2)/2.
+                        AREA = (ZMAX-ZMIN)
+                        FLUX1 = FLUX1/DT*(EPS0*EPS_SCALING**2)*AREA
+                        FLUX2 = FLUX2/DT*(EPS0*EPS_SCALING**2)*AREA
+                        IF (AXI) THEN
+                           FLUX1 = FLUX1*(Y1+Y2)/2.
+                           FLUX2 = FLUX2*(Y1+Y2)/2.
+                        END IF
+                        GRID_BC(FACE_PG)%SPICE_NODE_CURRENT = GRID_BC(FACE_PG)%SPICE_NODE_CURRENT + (FLUX1+FLUX2)/2.
                      END IF
                   END IF
                END DO
@@ -5343,84 +5405,51 @@ MODULE fields
                      V3 = U3D_GRID%CELL_NODES(VV3,IC)    
                      AREA = U3D_GRID%FACE_AREA(IP,IC)
 
-                     CHARGE = -QE*BOLTZ_N0/(EPS0*EPS_SCALING**2)*SQRT(KB*BOLTZ_TE/(2*PI*ME))*AREA*DT
-                     POT1 = EXP(QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
-                     POT2 = EXP(QE*(PHI_FIELD(V2)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
-                     POT3 = EXP(QE*(PHI_FIELD(V3)-BOLTZ_PHI0)/(KB*BOLTZ_TE))
+                     FLUX1 = 0.
+                     FLUX2 = 0.
+                     FLUX3 = 0.
+                     DO IFLUID = 1, N_ELECTRON_FLUIDS
+                        N0 = ELECTRON_FLUIDS(IFLUID)%N0
+                        T0 = ELECTRON_FLUIDS(IFLUID)%T0
+                        PHI0 = ELECTRON_FLUIDS(IFLUID)%PHI0
 
-                     IF (BOOL_KAPPA_FLUID) THEN
-                        FACTOR = SQRT(KAPPA_FLUID_C-3./2.)*GAMMA(KAPPA_FLUID_C+1.)&
-                        /GAMMA(KAPPA_FLUID_C-1./2.)/(KAPPA_FLUID_C*(KAPPA_FLUID_C-1.))
-                        POT1 = FACTOR*(1-QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
-                        **(-KAPPA_FLUID_C+1.)
-                        POT2 = FACTOR*(1-QE*(PHI_FIELD(V2)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
-                        **(-KAPPA_FLUID_C+1.)
-                        POT3 = FACTOR*(1-QE*(PHI_FIELD(V3)-BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
-                        **(-KAPPA_FLUID_C+1.)
-                     END IF
+                        CHARGE = -QE*N0/(EPS0*EPS_SCALING**2)*SQRT(KB*T0/(2*PI*ME))*AREA*DT
+                        
+                        IF (INT(ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX) /= 0) THEN
+                           KAPPA = ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX
+
+                           FACTOR = SQRT(KAPPA-3./2.)*GAMMA(KAPPA-1.)/GAMMA(KAPPA-1./2.)
+
+                           FLUX1 = FLUX1 + CHARGE*FACTOR*(1-QE*(PHI_FIELD(V1)-PHI0)/(KB*T0*(KAPPA-3./2.)))&
+                           **(-KAPPA+1.)
+                           FLUX2 = FLUX2 + CHARGE*FACTOR*(1-QE*(PHI_FIELD(V2)-PHI0)/(KB*T0*(KAPPA-3./2.)))&
+                           **(-KAPPA+1.)
+                           FLUX3 = FLUX3 + CHARGE*FACTOR*(1-QE*(PHI_FIELD(V3)-PHI0)/(KB*T0*(KAPPA-3./2.)))&
+                           **(-KAPPA+1.)
+                        ELSE
+                           FLUX1 = FLUX1 + CHARGE*EXP(QE*(PHI_FIELD(V1)-PHI0)/(KB*T0))
+                           FLUX2 = FLUX2 + CHARGE*EXP(QE*(PHI_FIELD(V2)-PHI0)/(KB*T0))
+                           FLUX3 = FLUX3 + CHARGE*EXP(QE*(PHI_FIELD(V3)-PHI0)/(KB*T0))
+                        END IF
+                     END DO
+
 
                      IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC) THEN
-                        SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + CHARGE*(POT1/6. + POT2/12. + POT3/12.)
-                        SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) + CHARGE*(POT1/12. + POT2/6. + POT3/12.)
-                        SURFACE_CHARGE(V3) = SURFACE_CHARGE(V3) + CHARGE*(POT1/12. + POT2/12. + POT3/6.)
+                        SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + (FLUX1/6.  + FLUX2/12. + FLUX3/12.)
+                        SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) + (FLUX1/12. + FLUX2/6.  + FLUX3/12.)
+                        SURFACE_CHARGE(V3) = SURFACE_CHARGE(V3) + (FLUX1/12. + FLUX2/12. + FLUX3/6.)
 
                      ELSE IF (GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
                         IG = GRID_BC(FACE_PG)%CONDUCTIVE_PART_ID
                         VMN = CONNECTED_COND_SURFACES(IG)%MASTER_NODE
-                        SURFACE_CHARGE(VMN) = SURFACE_CHARGE(VMN) + CHARGE*(POT1+POT2+POT3)/3.
-                        ! CONNECTED_COND_SURFACES(IG)%SUM_METAL_CHARGE = CONNECTED_COND_SURFACES(IG)%SUM_METAL_CHARGE &
-                        !  + CHARGE*(POT1+POT2+POT3)/3.
+                        SURFACE_CHARGE(VMN) = SURFACE_CHARGE(VMN) + (FLUX1+FLUX2+FLUX3)/3.
 
                      ELSE IF (GRID_BC(FACE_PG)%FIELD_BC == SPICE_NODE_BC) THEN
-                        CHARGE = -QE*BOLTZ_N0*SQRT(KB*BOLTZ_TE/(2*PI*ME))*AREA
-                        GRID_BC(FACE_PG)%SPICE_NODE_CURRENT = GRID_BC(FACE_PG)%SPICE_NODE_CURRENT + CHARGE*(POT1+POT2+POT3)/3.
+                        FLUX1 = FLUX1/DT*(EPS0*EPS_SCALING**2)
+                        FLUX2 = FLUX2/DT*(EPS0*EPS_SCALING**2)
+                        FLUX3 = FLUX3/DT*(EPS0*EPS_SCALING**2)
+                        GRID_BC(FACE_PG)%SPICE_NODE_CURRENT = GRID_BC(FACE_PG)%SPICE_NODE_CURRENT + (FLUX1+FLUX2+FLUX3)/3.
                      END IF
-
-
-                     ! Aurora flux test
-                     ! KAPPA_1 = 4.0
-                     ! TEMP_1 = 11e3*QE/KB
-                     ! CHARGE = -QE*1e7/(EPS0*EPS_SCALING**2)*SQRT(KB*TEMP_1/(2*PI*ME))*AREA*DT
-                     ! FACTOR = SQRT(KAPPA_1-3./2.)*GAMMA(KAPPA_1+1.)&
-                     !                         /GAMMA(KAPPA_1-1./2.)/(KAPPA_1*(KAPPA_1-1.))
-                     ! FACTOR = 4.0
-                     ! POT1 = FACTOR*(1-QE*(PHI_FIELD(V1)-BOLTZ_PHI0)/(KB*TEMP_1*(KAPPA_1-3./2.)))&
-                     ! **(-KAPPA_1+1.)
-                     ! POT2 = FACTOR*(1-QE*(PHI_FIELD(V2)-BOLTZ_PHI0)/(KB*TEMP_1*(KAPPA_1-3./2.)))&
-                     ! **(-KAPPA_1+1.)
-                     ! POT3 = FACTOR*(1-QE*(PHI_FIELD(V3)-BOLTZ_PHI0)/(KB*TEMP_1*(KAPPA_1-3./2.)))&
-                     ! **(-KAPPA_1+1.)
-                     ! IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC &
-                     ! .OR. GRID_BC(FACE_PG)%FIELD_BC == THIN_DIELECTRIC_LAYER_BC) THEN
-                     !    SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + CHARGE*(POT1/6. + POT2/12. + POT3/12.)
-                     !    SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) + CHARGE*(POT1/12. + POT2/6. + POT3/12.)
-                     !    SURFACE_CHARGE(V3) = SURFACE_CHARGE(V3) + CHARGE*(POT1/12. + POT2/12. + POT3/6.)
-
-                     ! ELSE IF (GRID_BC(FACE_PG)%FIELD_BC == CONDUCTIVE_BC) THEN
-                     !    IG = GRID_BC(FACE_PG)%CONDUCTIVE_PART_ID
-                     !    CONNECTED_COND_SURFACES(IG)%SUM_METAL_CHARGE = CONNECTED_COND_SURFACES(IG)%SUM_METAL_CHARGE &
-                     !     + CHARGE*(POT1+POT2+POT3)/3.
-                     ! END IF
-
-
-
-                     ! Aurora flux test
-                     ! REAL(KIND=8), DIMENSION(3) :: U_VECTOR
-                     ! REAL(KIND=8) :: ENERGY_VAL, DOT_PRODUCT
-                     ! U_VECTOR(1) = 0.
-                     ! U_VECTOR(2) = -1.
-                     ! U_VECTOR(3) = 0.
-                     ! CHARGE = QE/EPS0*AREA*DT
-                     ! ENERGY_VAL  = 1E4
-
-                     ! DOT_PRODUCT = DOT(U_VECTOR,U3D_GRID%FACE_NORMAL(:,IP,IC))
-                     ! IF (DOT_PRODUCT .GT. 0) THEN
-                     !    FACTOR = CHARGE*(1E6*SQRT(2*ENERGY_VAL*QE/16/MU0)-1E15)*DOT_PRODUCT
-
-                     !    SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + FACTOR/3
-                     !    SURFACE_CHARGE(V2) = SURFACE_CHARGE(V2) + FACTOR/3
-                     !    SURFACE_CHARGE(V3) = SURFACE_CHARGE(V3) + FACTOR/3
-                     ! END IF
                   END IF
                END DO
             END IF
@@ -5431,25 +5460,35 @@ MODULE fields
 
 
    
-   SUBROUTINE GET_BOLTZMANN_DENSITY
+   SUBROUTINE GET_FLUID_DENSITY
 
       IMPLICIT NONE
 
-      INTEGER :: IC, IP, V
+      INTEGER :: IC, IP, IFLUID, V
+      REAL(KIND=8) :: N0, T0, PHI0, KAPPA
 
-      IF (ALLOCATED(BOLTZ_NRHOE)) DEALLOCATE(BOLTZ_NRHOE)
-      ALLOCATE(BOLTZ_NRHOE(NNODES))
+      IF (ALLOCATED(RHO_FLUID)) DEALLOCATE(RHO_FLUID)
+      ALLOCATE(RHO_FLUID(NNODES))
 
       IF (DIMS == 1) THEN
-         DO IC=1, NCELLS
+         DO IC = 1, NCELLS
             IF (GRID_BC(U1D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
                DO IP = 1, 2
                   V = U1D_GRID%CELL_NODES(IP,IC)
-                  BOLTZ_NRHOE(V) = BOLTZ_N0 * exp(QE*(PHI_FIELD(V) - BOLTZ_PHI0)/(KB*BOLTZ_TE))
-                  IF (BOOL_KAPPA_FLUID) THEN
-                     BOLTZ_NRHOE(V) = BOLTZ_N0*(1-QE*(PHI_FIELD(V) - BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
-                     **(-KAPPA_FLUID_C+1./2.)
-                  END IF
+                  DO IFLUID = 1, N_ELECTRON_FLUIDS
+                     N0 = ELECTRON_FLUIDS(IFLUID)%N0
+                     T0 = ELECTRON_FLUIDS(IFLUID)%T0
+                     PHI0 = ELECTRON_FLUIDS(IFLUID)%PHI0
+
+                     IF (INT(ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX) /= 0) THEN
+                        KAPPA = ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX
+
+                        RHO_FLUID(V) = N0*(1-QE*(PHI_FIELD(V) - PHI0)/(KB*T0*(KAPPA-3./2.)))&
+                        **(-KAPPA+1./2.)
+                     ELSE
+                        RHO_FLUID(V) = N0*EXP(QE*(PHI_FIELD(V) - PHI0)/(KB*T0))
+                     END IF
+                  END DO
                END DO
             END IF
          END DO
@@ -5458,11 +5497,21 @@ MODULE fields
             IF (GRID_BC(U2D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
                DO IP = 1, 3
                   V = U2D_GRID%CELL_NODES(IP,IC)
-                  BOLTZ_NRHOE(V) = BOLTZ_N0 * exp(QE*(PHI_FIELD(V) - BOLTZ_PHI0)/(KB*BOLTZ_TE))
-                  IF (BOOL_KAPPA_FLUID) THEN
-                     BOLTZ_NRHOE(V) = BOLTZ_N0*(1-QE*(PHI_FIELD(V) - BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
-                     **(-KAPPA_FLUID_C+1./2.)
-                  END IF
+
+                  DO IFLUID = 1, N_ELECTRON_FLUIDS
+                     N0 = ELECTRON_FLUIDS(IFLUID)%N0
+                     T0 = ELECTRON_FLUIDS(IFLUID)%T0
+                     PHI0 = ELECTRON_FLUIDS(IFLUID)%PHI0
+
+                     IF (INT(ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX) /= 0) THEN
+                        KAPPA = ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX
+
+                        RHO_FLUID(V) = N0*(1-QE*(PHI_FIELD(V) - PHI0)/(KB*T0*(KAPPA-3./2.)))&
+                        **(-KAPPA+1./2.)
+                     ELSE
+                        RHO_FLUID(V) = N0*EXP(QE*(PHI_FIELD(V) - PHI0)/(KB*T0))
+                     END IF
+                  END DO
                END DO
             END IF
          END DO
@@ -5471,17 +5520,26 @@ MODULE fields
             IF (GRID_BC(U3D_GRID%CELL_PG(IC))%VOLUME_BC .NE. SOLID) THEN
                DO IP = 1, 4
                   V = U3D_GRID%CELL_NODES(IP,IC)
-                  BOLTZ_NRHOE(V) = BOLTZ_N0 * exp(QE*(PHI_FIELD(V) - BOLTZ_PHI0)/(KB*BOLTZ_TE))
-                  IF (BOOL_KAPPA_FLUID) THEN
-                     BOLTZ_NRHOE(V) = BOLTZ_N0*(1-QE*(PHI_FIELD(V) - BOLTZ_PHI0)/(KB*BOLTZ_TE*(KAPPA_FLUID_C-3./2.)))&
-                     **(-KAPPA_FLUID_C+1./2.)
-                  END IF
+                  DO IFLUID = 1, N_ELECTRON_FLUIDS
+                     N0 = ELECTRON_FLUIDS(IFLUID)%N0
+                     T0 = ELECTRON_FLUIDS(IFLUID)%T0
+                     PHI0 = ELECTRON_FLUIDS(IFLUID)%PHI0
+
+                     IF (INT(ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX) /= 0) THEN
+                        KAPPA = ELECTRON_FLUIDS(IFLUID)%KAPPA_INDEX
+
+                        RHO_FLUID(V) = N0*(1-QE*(PHI_FIELD(V) - PHI0)/(KB*T0*(KAPPA-3./2.)))&
+                        **(-KAPPA+1./2.)
+                     ELSE
+                        RHO_FLUID(V) = N0*EXP(QE*(PHI_FIELD(V) - PHI0)/(KB*T0))
+                     END IF
+                  END DO
                END DO
             END IF
          END DO
       END IF
 
-   END SUBROUTINE GET_BOLTZMANN_DENSITY
+   END SUBROUTINE GET_FLUID_DENSITY
 
 
 

@@ -61,8 +61,8 @@ MODULE timecycle
 
          CALL DEPOSIT_CHARGE(particles)
          IF (PIC_TYPE == HYBRID) THEN  
-            CALL SETUP_BOLTZMANN         
-            CALL SOLVE_BOLTZMANN
+            CALL SETUP_FLUID_POISSON         
+            CALL SOLVE_FLUID_POISSON
          ELSE
             CALL SETUP_POISSON
             CALL SOLVE_POISSON
@@ -254,7 +254,7 @@ MODULE timecycle
             CALL DEPOSIT_CHARGE(particles)
 
             CALL TIMER_START(2)
-            CALL SOLVE_BOLTZMANN
+            CALL SOLVE_FLUID_POISSON
             CALL COMPUTE_E_FIELD
             CALL TIMER_STOP(2)
 
@@ -356,7 +356,7 @@ MODULE timecycle
 
 
       ! CLEAN UP  FOR  SOLVERS
-      IF (PIC_TYPE == HYBRID) CALL CLEANUP_BOLTZMANN
+      IF (PIC_TYPE == HYBRID) CALL CLEANUP_FLUID_POISSON
 
       
    END SUBROUTINE TIME_LOOP

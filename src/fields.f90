@@ -4543,10 +4543,10 @@ MODULE fields
 
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   !!!! SOLVE_FLUID_POISSON Solve Poisson's equation !!!!!!
+   !!!! SOLVE_POISSON_FLUID Solve Poisson's equation !!!!!!
    !!!!  with FLUID ELECTRONS as NON-LINEAR TERM     !!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   SUBROUTINE SETUP_FLUID_POISSON
+   SUBROUTINE SETUP_POISSON_FLUID
 
       IMPLICIT NONE
 
@@ -4591,10 +4591,10 @@ MODULE fields
 
       CALL VecScatterCreateToAll(solvec,ctx,solvec_seq,ierr)
 
-   END SUBROUTINE SETUP_FLUID_POISSON
+   END SUBROUTINE SETUP_POISSON_FLUID
 
 
-   SUBROUTINE SOLVE_FLUID_POISSON
+   SUBROUTINE SOLVE_POISSON_FLUID
 
       IMPLICIT NONE
 
@@ -4630,10 +4630,10 @@ MODULE fields
       IF (BOOL_CONDUCTIVE_BC) CALL ASSIGN_CONDUCTIVE_PHI
       CALL GET_FLUID_DENSITY
 
-   END SUBROUTINE SOLVE_FLUID_POISSON
+   END SUBROUTINE SOLVE_POISSON_FLUID
 
 
-   SUBROUTINE CLEANUP_FLUID_POISSON
+   SUBROUTINE CLEANUP_POISSON_FLUID
 
       IMPLICIT NONE
 
@@ -4644,7 +4644,7 @@ MODULE fields
       CALL SNESDestroy(snes, ierr)
       CALL MatDestroy(Jmat,ierr)
 
-   END SUBROUTINE CLEANUP_FLUID_POISSON
+   END SUBROUTINE CLEANUP_POISSON_FLUID
 
 
    SUBROUTINE FormFunctionFluid(snes,x,f,dummy,ierr_l)

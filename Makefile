@@ -70,7 +70,7 @@ $(BUILDDIR)initialization.o: $(SRCDIR)initialization.f90  $(BUILDDIR)global.o  $
 $(BUILDDIR)tools.o: $(SRCDIR)tools.f90  $(BUILDDIR)mpi_common.o  $(BUILDDIR)global.o  $(BUILDDIR)screen.o  $(BUILDDIR)mt19937.o  createbuilddir
 	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)tools.f90
 
-$(BUILDDIR)grid_and_partition.o: $(SRCDIR)grid_and_partition.f90  $(BUILDDIR)mpi_common.o  $(BUILDDIR)global.o  $(BUILDDIR)tools.o  createbuilddir
+$(BUILDDIR)grid_and_partition.o: $(SRCDIR)grid_and_partition.f90  $(BUILDDIR)mpi_common.o  $(BUILDDIR)global.o  $(BUILDDIR)tools.o  $(BUILDDIR)screen.o  createbuilddir
 	$(CMP) $(OPTF) -o $@ -J$(BUILDDIR) $(SRCDIR)grid_and_partition.f90
 
 $(BUILDDIR)screen.o: $(SRCDIR)screen.f90  createbuilddir

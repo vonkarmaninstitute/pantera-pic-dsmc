@@ -42,7 +42,7 @@ MODULE timecycle
       REAL(KIND=8) :: CURRENT_TIME, CURRENT_CPU_TIME, EST_TIME
       INTEGER :: EST_TIME_H, EST_TIME_M
 
-      CHARACTER(len=512) :: stringTMP
+      CHARACTER(LEN=512) :: stringTMP
 
       ! Init variables
       NP_TOT = 0
@@ -97,7 +97,7 @@ MODULE timecycle
       IF ((tID .GE. DUMP_BOUND_START) .AND. (SAVE_INITIAL_TIMESTEP)) THEN
          ! If we are in the boundary save timestep, average, then dump the cumulated averages
          IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_AVG_EVERY*DUMP_BOUND_N_AVG) .EQ. 0) THEN
-            CALL BOUNDARY_GATHER
+            CALL BOUNDARY_AVG
             CALL BOUNDARY_SAVE
             CALL BOUNDARY_RESET
          END IF
@@ -323,12 +323,12 @@ MODULE timecycle
          IF (tID .GT. DUMP_BOUND_START) THEN
             ! If we are in the grid save timestep, average, then dump the cumulated averages
             IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_AVG_EVERY*DUMP_BOUND_N_AVG) .EQ. 0) THEN
-               CALL BOUNDARY_GATHER
+               CALL BOUNDARY_AVG
                CALL BOUNDARY_SAVE
                CALL BOUNDARY_RESET
             ! If we are just in a grid average timestep, compute the grid average
             ELSE IF (MOD(tID-DUMP_BOUND_START, DUMP_BOUND_AVG_EVERY) .EQ. 0) THEN
-               CALL BOUNDARY_GATHER
+               CALL BOUNDARY_AVG
             END IF
          END IF
 

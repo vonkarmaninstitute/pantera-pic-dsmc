@@ -232,7 +232,6 @@ MODULE initialization
             READ(in1,*) COLOCATED_ELECTRONS_TTRA
             COLOCATED_ELECTRONS = .TRUE.
          END IF
-         IF (line=='SNES_rtol:')               READ(in1,*) SNES_RTOL
          
          ! ~~~~~~~~~~~~~  File output ~~~~~~~~~~~~~~~
 

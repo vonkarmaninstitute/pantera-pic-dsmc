@@ -1189,10 +1189,10 @@ MODULE postprocess
 
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   ! SUBROUTINE BOUNDARY_GATHER -> Adds timestep to cumulative average of boundary !!!!!!
+   ! SUBROUTINE BOUNDARY_AVG -> Adds timestep to cumulative average of boundary !!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-   SUBROUTINE BOUNDARY_GATHER
+   SUBROUTINE BOUNDARY_AVG
 
       IMPLICIT NONE
 
@@ -1353,7 +1353,7 @@ MODULE postprocess
       TIMESTEP_PHI_BOUND = 0
       TIMESTEP_QRHO_BOUND = 0
       
-   END SUBROUTINE BOUNDARY_GATHER
+   END SUBROUTINE BOUNDARY_AVG
 
 
 

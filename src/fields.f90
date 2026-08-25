@@ -4569,6 +4569,7 @@ MODULE fields
       CALL MatSetSizes(Jmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
       CALL MatSetType(Jmat, MATMPIAIJ, ierr)
 
+      ! Determine the number of non-zero entries per row
       IF (DIMS == 1) THEN
          d_nnz = 4
          o_nnz = 2

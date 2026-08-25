@@ -112,7 +112,7 @@ MODULE collisions
          NPCALL(JC) = NPCALL(JC) + 1
       END DO
 
-      ! Verify: ! DBDBDBDBDBDDBDBDBDBDBDBDDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBD
+      ! Verify:
       ! DO JC = 1, NCELLS
       !    DO JS = 1, N_SPECIES
       !       DO JP = IOF(JS,JC), IOF(JS,JC)+NPC(JS,JC)-1
@@ -153,7 +153,6 @@ MODULE collisions
       DEALLOCATE(REMOVE_PART)
       DEALLOCATE(HAS_REACTED)
    
-      !WRITE(*,*) 'Number of real collisions: ', TIMESTEP_COLL
       DEALLOCATE(NPC)
       DEALLOCATE(IOF)
       DEALLOCATE(IND)
@@ -299,9 +298,6 @@ MODULE collisions
          SP_ID1 = particles(JP1)%S_ID
          SP_ID2 = particles(JP2)%S_ID
 
-         !SIGMA = PI * (0.5 * (SPECIES(SP_ID1)%DIAM + SPECIES(SP_ID2)%DIAM))**2
-         !OMEGA    = 0.5 * (SPECIES(SP_ID1)%OMEGA + SPECIES(SP_ID2)%OMEGA)
-         !TREF = 0.5 * (SPECIES(SP_ID1)%TREF + SPECIES(SP_ID2)%TREF)
          CREF  = VSS_GREFS(SP_ID1, SP_ID2)
          SIGMA = VSS_SIGMAS(SP_ID1, SP_ID2)
          OMEGA = VSS_OMEGAS(SP_ID1, SP_ID2)
@@ -460,7 +456,6 @@ MODULE collisions
 
                      CALL INIT_PARTICLE(particles(JP2)%X,particles(JP2)%Y,particles(JP2)%Z, &
                      C2(1),C2(2),C2(3),EROT,EVIB,P3_SP_ID,JC,DT, NEWparticle)
-                     !WRITE(*,*) 'Should be adding particle!'
                      CALL ADD_PARTICLE_ARRAY(NEWparticle, NP_PROC, particles)
                      
                   END IF
@@ -473,8 +468,6 @@ MODULE collisions
             ! Perform elastic/inelastic collision
             ! Test for inelastic collision and TR/TV exchange
             TRDOF = 3.
-
-            !TRDOF = 5. -2.*OMEGA why not?
 
             PROT1 = (TRDOF + SPECIES(SP_ID1)%ROTDOF)/TRDOF * SPECIES(SP_ID1)%ROTREL
             PROT2 = (TRDOF + SPECIES(SP_ID2)%ROTDOF)/TRDOF * SPECIES(SP_ID2)%ROTREL
@@ -885,12 +878,9 @@ MODULE collisions
                   END IF
                   TOTDOF = TOTDOF - 3.
                   EI = COLL_INTERNAL_ENERGY(ECOLL, TOTDOF, 3)
-                  !EI = ECOLL
-                  !IF (TIMESTEP_COLL < 10) WRITE(*,*) 'Colliding particles ', JP1, JP2, ' with mass ', M1, ' and ', M2
-                  !IF (TIMESTEP_COLL < 10) WRITE(*,*) 'Pre collision velocities  ', C1, ' and ', C2
 
                   CALL HS_SCATTER(EI, M1, M2, C1, C2)
-                  !IF (TIMESTEP_COLL < 10) WRITE(*,*) 'Post collision velocities ', C1, ' and ', C2
+
                   ECOLL = ECOLL - EI
 
                   particles(IP1)%VX = C1(1)
@@ -934,18 +924,9 @@ MODULE collisions
 
                   END IF
                END IF
-
             END IF
-
          END DO
-
       END DO
-
-      !WRITE(*,*) 'Actually performed:', NCOLLREAL
-      !WRITE(*,*) NCOLL/(DT*NPC(JC))/MCRVHS, NCOLLREAL/(DT*NPC(JC))/MCRVHS 
-
-      
-         
    END SUBROUTINE VAHEDI_COLLIS
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

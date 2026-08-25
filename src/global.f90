@@ -396,13 +396,11 @@ MODULE global
    LOGICAL      :: COLOCATED_ELECTRONS = .FALSE.
    REAL(KIND=8) :: COLOCATED_ELECTRONS_TTRA = 11600.d0
    LOGICAL      :: RESIDUAL_AND_JACOBIAN_COMBINED = .FALSE.
-   REAL(KIND=8) :: SNES_RTOL = 1.d-9
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!! Collisions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-   !LOGICAL           :: BOOL_MCC = .FALSE., BOOL_DSMC = .FALSE., BOOL_BGK = .FALSE.
    ENUM, BIND(C)
    ENUMERATOR NO_COLL, DSMC, BGK, MCC, MCC_VAHEDI, DSMC_VAHEDI
    END ENUM

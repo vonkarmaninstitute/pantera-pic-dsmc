@@ -225,6 +225,17 @@ MODULE initialization
             CALL DEF_ELECTRON_FLUID(FLUID_DEFINITION)
          END IF
 
+         IF (line=='Anisotropic_fluid:') THEN
+            BOOL_ANISOTROPIC_FLUID = .TRUE.
+            READ(in1,*) ANISOTROPIC_FLUIDS%NAME, ANISOTROPIC_FLUIDS%N0, ANISOTROPIC_FLUIDS%E0, &
+                        ANISOTROPIC_FLUIDS%V0, ANISOTROPIC_FLUIDS%PHI0, ANISOTROPIC_FLUIDS%KAPPA_INDEX, &
+                        ANISOTROPIC_FLUIDS%B0
+         END IF
+         IF (line=='Anisotropic_fluid_direction:') READ(in1,*) ANISOTROPIC_FLUIDS%DIRECTION(:)
+         IF (line=='Cut_bimaxwell_fluid:') THEN
+            READ(in1,*) CUT_BIMAXWELL_FLUIDS%N1, CUT_BIMAXWELL_FLUIDS%E1, CUT_BIMAXWELL_FLUIDS%N2, &
+                        CUT_BIMAXWELL_FLUIDS%E2
+         END IF
 
          IF (line=='Jacobian_type:')           READ(in1,*) JACOBIAN_TYPE
          IF (line=='Residual_and_jacobian_combined:') READ(in1,*) RESIDUAL_AND_JACOBIAN_COMBINED
@@ -232,7 +243,6 @@ MODULE initialization
             READ(in1,*) COLOCATED_ELECTRONS_TTRA
             COLOCATED_ELECTRONS = .TRUE.
          END IF
-         IF (line=='SNES_rtol:')               READ(in1,*) SNES_RTOL
          
          ! ~~~~~~~~~~~~~  File output ~~~~~~~~~~~~~~~
 
@@ -589,6 +599,14 @@ MODULE initialization
                END IF 
             END DO
 
+            IF (BOOL_ANISOTROPIC_FLUID) THEN
+               WRITE(*,'(A5,A,A,A)') ' ',"Fluid named '", TRIM(ANISOTROPIC_FLUIDS%NAME), "' with parameters:"
+               WRITE(*,'(A5,A35,ES12.2)') ' ', 'Reference density (n0) [m^-3]:   ', ANISOTROPIC_FLUIDS%N0
+               WRITE(*,'(A5,A35,F12.1)') ' ', 'Energy (E0) [eV]:   ', ANISOTROPIC_FLUIDS%E0
+               WRITE(*,'(A5,A35,F12.1)') ' ', 'Potential (v0) [eV]:   ', ANISOTROPIC_FLUIDS%V0
+               WRITE(*,'(A5,A35,F12.1)') ' ', 'Reference potential (phi0) [V]:   ', ANISOTROPIC_FLUIDS%PHI0
+               WRITE(*,'(A5,A35,F12.1)') '    ','  Kappa index:   ', ANISOTROPIC_FLUIDS%KAPPA_INDEX
+            END IF
          END IF
 
       END IF

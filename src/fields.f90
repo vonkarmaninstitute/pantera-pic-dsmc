@@ -4569,6 +4569,7 @@ MODULE fields
       CALL MatSetSizes(Jmat,PETSC_DECIDE,PETSC_DECIDE,NNODES,NNODES,ierr)
       CALL MatSetType(Jmat, MATMPIAIJ, ierr)
 
+      ! Determine the number of non-zero entries per row
       IF (DIMS == 1) THEN
          d_nnz = 4
          o_nnz = 2
@@ -5433,6 +5434,54 @@ MODULE fields
                         END IF
                      END DO
 
+                     !!!! AURORAL FLUXES !!!!
+                     ! Implementation for anisotropic auroral flux with Kappa distribution
+                     IF (BOOL_ANISOTROPIC_FLUID) THEN
+                        FACE_NORMAL = U3D_GRID%FACE_NORMAL(:,IP,IC)
+                        DOT_PRODUCT = DOT(FACE_NORMAL,ANISOTROPIC_FLUIDS%DIRECTION)
+                        IF (DOT_PRODUCT > 0.) THEN
+                           N0    = ANISOTROPIC_FLUIDS%N0
+                           E0    = ANISOTROPIC_FLUIDS%E0
+                           V0    = ANISOTROPIC_FLUIDS%V0
+                           PHI0  = ANISOTROPIC_FLUIDS%PHI0
+                           KAPPA = ANISOTROPIC_FLUIDS%KAPPA_INDEX
+                           B0    = ANISOTROPIC_FLUIDS%B0
+
+                           AK = -QE*N0/(EPS0*EPS_SCALING**2)*AREA*DT&
+                              *B0*SQRT(QE*E0*(KAPPA-3./2.)/(2*PI*ME))*GAMMA(KAPPA-1.)/GAMMA(KAPPA-1./2.)
+
+                           FLUX1 = FLUX2 + DOT_PRODUCT*AK &
+                                 *(1 - (1-1/B0)*(1+(QE*(V0+PHI_FIELD(V1)-PHI0))/(QE*E0*(KAPPA-3./2.)*(B0-1)))**(-KAPPA+1.))
+                           FLUX2 = FLUX2 + DOT_PRODUCT*AK &
+                                 *(1 - (1-1/B0)*(1+(QE*(V0+PHI_FIELD(V2)-PHI0))/(QE*E0*(KAPPA-3./2.)*(B0-1)))**(-KAPPA+1.))
+                           FLUX3 = FLUX3 + DOT_PRODUCT*AK &
+                                 *(1 - (1-1/B0)*(1+(QE*(V0+PHI_FIELD(V3)-PHI0))/(QE*E0*(KAPPA-3./2.)*(B0-1)))**(-KAPPA+1.))
+                           
+                           N1 = CUT_BIMAXWELL_FLUIDS%N1
+                           E1 = CUT_BIMAXWELL_FLUIDS%E1
+
+                           AK = -QE*N1/(EPS0*EPS_SCALING**2)*AREA*DT*SQRT(QE*E1/(2*PI*ME))
+
+                           FLUX1 = FLUX1 + AK &
+                                 *(1 - EXP(-(QE*(V0+PHI_FIELD(V1)-PHI0))/(QE*E1)))
+                           FLUX2 = FLUX2 + AK &
+                                 *(1 - EXP(-(QE*(V0+PHI_FIELD(V2)-PHI0))/(QE*E1)))
+                           FLUX3 = FLUX3 + AK &
+                                 *(1 - EXP(-(QE*(V0+PHI_FIELD(V3)-PHI0))/(QE*E1)))
+
+                           N2 = CUT_BIMAXWELL_FLUIDS%N2
+                           E2 = CUT_BIMAXWELL_FLUIDS%E2
+
+                           AK = -QE*N2/(EPS0*EPS_SCALING**2)*AREA*DT*SQRT(QE*E2/(2*PI*ME))
+
+                           FLUX1 = FLUX1 + AK &
+                                 *(1 - EXP(-(QE*(V0+PHI_FIELD(V1)-PHI0))/(QE*E2)))
+                           FLUX2 = FLUX2 + AK &
+                                 *(1 - EXP(-(QE*(V0+PHI_FIELD(V2)-PHI0))/(QE*E2)))
+                           FLUX3 = FLUX3 + AK &
+                                 *(1 - EXP(-(QE*(V0+PHI_FIELD(V3)-PHI0))/(QE*E2)))
+                        END IF
+                     END IF
 
                      IF (GRID_BC(FACE_PG)%FIELD_BC == DIELECTRIC_BC) THEN
                         SURFACE_CHARGE(V1) = SURFACE_CHARGE(V1) + (FLUX1/6.  + FLUX2/12. + FLUX3/12.)

@@ -342,6 +342,7 @@ MODULE fields
                               CONNECTED_COND_SURFACES(GRID_BC(EDGE_PG)%CONDUCTIVE_PART_ID)%MASTER_NODE = V1
                            END IF
                            VMN = CONNECTED_COND_SURFACES(GRID_BC(EDGE_PG)%CONDUCTIVE_PART_ID)%MASTER_NODE
+                           BIAS = CONNECTED_COND_SURFACES(GRID_BC(EDGE_PG)%CONDUCTIVE_PART_ID)%BIAS_VOLTAGE
                            CONDUCTOR_NODEMAP(V1-1) = VMN-1
                            CONDUCTOR_NODEMAP(V2-1) = VMN-1
 
@@ -357,6 +358,7 @@ MODULE fields
                               CONNECTED_COND_SURFACES(GRID_BC(EDGE_PG)%CONDUCTIVE_PART_ID)%MASTER_NODE = V2
                            END IF
                            VMN = CONNECTED_COND_SURFACES(GRID_BC(EDGE_PG)%CONDUCTIVE_PART_ID)%MASTER_NODE
+                           BIAS = CONNECTED_COND_SURFACES(GRID_BC(EDGE_PG)%CONDUCTIVE_PART_ID)%BIAS_VOLTAGE
                            CONDUCTOR_NODEMAP(V2-1) = VMN-1
                            CONDUCTOR_NODEMAP(V3-1) = VMN-1
 
@@ -372,11 +374,14 @@ MODULE fields
                               CONNECTED_COND_SURFACES(GRID_BC(EDGE_PG)%CONDUCTIVE_PART_ID)%MASTER_NODE = V3
                            END IF
                            VMN = CONNECTED_COND_SURFACES(GRID_BC(EDGE_PG)%CONDUCTIVE_PART_ID)%MASTER_NODE
+                           BIAS = CONNECTED_COND_SURFACES(GRID_BC(EDGE_PG)%CONDUCTIVE_PART_ID)%BIAS_VOLTAGE
                            CONDUCTOR_NODEMAP(V3-1) = VMN-1
                            CONDUCTOR_NODEMAP(V1-1) = VMN-1
 
+                           CONDUCTOR_PGMAP(V3-1) = GRID_BC(EDGE_PG)%CONDUCTIVE_PART_ID
+                           CONDUCTOR_PGMAP(V1-1) = GRID_BC(EDGE_PG)%CONDUCTIVE_PART_ID
                            CONDUCTOR_BIASMAP(V3-1) = BIAS
-                           CONDUCTOR_BIASMAP(V2-1) = BIAS
+                           CONDUCTOR_BIASMAP(V1-1) = BIAS
                         END IF
                      END IF
                   END IF

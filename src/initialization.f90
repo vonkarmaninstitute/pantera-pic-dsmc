@@ -1459,7 +1459,7 @@ MODULE initialization
       
       IF (IPG1 == -1) THEN
          WRITE(*,*) 'First conductive group ', STRARRAY(1), ' not found.'
-         RETURN
+         CALL ERROR_ABORT('Error in conductive boundary definition.')
       END IF
 
       IPG2 = -1
@@ -1472,7 +1472,7 @@ MODULE initialization
       
       IF (IPG2 == -1) THEN
          WRITE(*,*) 'Second conductive group ', STRARRAY(2), ' not found.'
-         RETURN
+         CALL ERROR_ABORT('Error in conductive boundary definition.')
       END IF
 
       IF (N_STR == 3) THEN

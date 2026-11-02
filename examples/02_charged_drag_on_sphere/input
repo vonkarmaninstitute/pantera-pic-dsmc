@@ -116,9 +116,9 @@ Initial_particles:
 Ions   1e14    10000.    0.0    0.    3000.    3000.    3000.    0.    0.
 
 ! Settings for fluid electrons when choosing 'hybrid' PIC type
-! n0   phi0    Te0
-Fluid_electrons:
-1e14    0.  32810.
+! fluid_name  n0  Te0  phi0    
+Electron_fluid:
+Electron  1e14  32810.  0.  
 
 
 ! ========= Boundary emit conditions ================
